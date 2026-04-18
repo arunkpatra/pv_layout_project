@@ -15,7 +15,7 @@ export default function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Nav */}
-      <header className="flex h-14 items-center justify-between border-b px-6">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <SolarPanelIcon weight="duotone" className="h-5 w-5 text-primary" />
           <span className="font-semibold tracking-tight">SolarDesign</span>
