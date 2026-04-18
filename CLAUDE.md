@@ -12,6 +12,12 @@ Before doing any work, read this file in full:
 
 **Self-review rule**: After any significant/wide-blast work (5+ files, new infrastructure, renames, new patterns), run `superpowers:code-reviewer` before declaring complete. "Tests pass" is not sufficient — the reviewer catches what static gates cannot.
 
+**Pre-commit gate (mandatory — run from repo root before every commit):**
+```bash
+bun run lint && bun run typecheck && bun run test && bun run build
+```
+All four must pass across all workspaces. Never commit if any step fails.
+
 ## Commands
 
 ```bash

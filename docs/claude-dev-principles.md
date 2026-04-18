@@ -223,8 +223,15 @@ The reviewer checks for: missed files, misaligned configs, correctness issues, a
 - [ ] Has Claude listed what it CAN'T verify?
 - [ ] For significant/wide-blast work: has the `superpowers:code-reviewer` self-review been run?
 
-**Before committing:**
-- [ ] All gates pass (lint, typecheck, build)
+**Before committing — mandatory gate sequence (run from repo root):**
+```bash
+bun run lint && bun run typecheck && bun run test && bun run build
+```
+All four must pass across all workspaces. Never commit if any step fails.
+- [ ] `bun run lint` — no errors across all packages
+- [ ] `bun run typecheck` — no type errors across all packages
+- [ ] `bun run test` — all tests pass across all packages
+- [ ] `bun run build` — production build succeeds for all packages
 - [ ] Manual browser testing confirms the feature works
 - [ ] No "it should work" — only "I tested it and it works"
 
