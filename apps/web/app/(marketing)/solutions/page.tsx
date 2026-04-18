@@ -1,99 +1,94 @@
 import Link from "next/link"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
-  BuildingsIcon,
-  FactoryIcon,
+  ArrowRightIcon,
+  CheckCircleIcon,
   SolarPanelIcon,
   HardHatIcon,
-  ArrowRightIcon,
   ChartLineUpIcon,
+  BuildingsIcon,
   LeafIcon,
-  CheckCircleIcon,
 } from "@phosphor-icons/react/dist/ssr"
 
 const solutions = [
   {
-    icon: BuildingsIcon,
-    title: "Commercial rooftop",
-    tagline: "From feasibility to stamped drawings — in a single project.",
+    icon: LeafIcon,
+    title: "Independent Power Producers (IPPs) and developers",
+    tagline:
+      "Manage the full project pipeline — from site KMZ to grid connectivity application.",
     description:
-      "Commercial rooftop projects live and die on the details: setback rules, HVAC clearances, structural load limits, and competing tenant arrangements all constrain your design before a single panel is placed. SolarDesign's precision layout engine understands these constraints natively. Import a site plan, satellite image, or survey DXF, define your exclusion zones once, and the tool enforces them automatically — across every revision.",
+      "IPPs and solar developers in India work simultaneously across multiple sites at different stages of the development cycle. Early-stage sites need a quick capacity and CUF estimate to support land negotiations and bid decisions. Mid-stage sites need a detailed DC/AC layout and P50/P90 simulation for grid connectivity applications. Late-stage sites need a complete DPR for lender financing — IREDA, PFC, SBI Cap, and Axis Bank each have specific format expectations. SolarDesign covers all three stages without switching tools.",
     capabilities: [
-      "Multi-pitch and mixed-orientation roof support in one project file",
-      "Automatic setback and fire-path enforcement per local code profiles",
-      "HVAC, skylight, and penetration obstacle modelling with shadow casting",
-      "Structural zone overlays to flag areas exceeding allowable dead load",
-      "One-click branded proposal with yield estimate, financials, and layout PDF",
-    ],
-  },
-  {
-    icon: FactoryIcon,
-    title: "Industrial & warehouse",
-    tagline: "Maximise density on large flat roofs without leaving yield on the table.",
-    description:
-      "Industrial rooftops offer scale, but flat-roof design is deceptively complex. Row spacing must balance inter-row shading losses against panel density. East-west configurations reduce structural loading and unlock higher capacity per square metre — but require careful string layout to avoid mismatch losses. SolarDesign models all of this simultaneously, so you can compare south-tilt, east-west, and hybrid configurations side by side before committing to a design.",
-    capabilities: [
-      "Inter-row shading optimisation with adjustable GCR and tilt angle",
-      "East-west ballasted layout generator with automatic row pairing",
-      "String-level mismatch analysis to inform inverter and optimiser selection",
-      "Roof zone segmentation for phased installations across multiple tenancies",
-      "Material take-off with racking, cabling, and inverter quantities",
-    ],
-  },
-  {
-    icon: SolarPanelIcon,
-    title: "Ground-mount utility",
-    tagline: "Design bankable utility-scale arrays from terrain data to IFC handover.",
-    description:
-      "Utility-scale ground-mount projects demand engineering rigour from the first layout sketch. Terrain slopes affect row spacing, pile depths, cable runs, and ultimately yield. Bifacial gains depend on ground albedo and row height. Tracker geometry changes shadow behaviour entirely. SolarDesign ingests terrain data directly, propagates slope corrections through the design, and produces the P50/P90 yield outputs and CAD-ready deliverables that lenders and EPC teams require.",
-    capabilities: [
-      "DTM/DSM terrain import with automatic slope correction across rows",
-      "Fixed-tilt and single-axis tracker layout modes",
-      "Bifacial yield modelling with albedo and rear-irradiance simulation",
-      "Pile and post layout export for civil and structural engineering teams",
-      "IFC and DXF export compatible with AutoCAD Civil 3D and Revit",
+      "KMZ import → shadow-free area → capacity estimate in one step",
+      "CUF and P50/P75/P90 yield simulation for PPA obligation sizing",
+      "Multi-scenario comparison: fixed tilt vs. single-axis tracker, varying DC:AC ratios",
+      "DPR export in lender-accepted format (IREDA, PFC, commercial banks)",
+      "Portfolio-level project management with version history across all sites",
+      "SECI and state DISCOM submission-ready document packages",
     ],
   },
   {
     icon: HardHatIcon,
     title: "EPC contractors",
-    tagline: "One design file. Every deliverable your project needs.",
+    tagline:
+      "One design file. Every statutory and contractual document your project requires.",
     description:
-      "EPC teams are accountable for what gets built — which means every drawing, take-off, and specification must be traceable to the design. SolarDesign keeps all of that in one place. When the design changes — and it will — material quantities, installation drawings, and client proposals update automatically. No more manually reconciling the layout in one tool, the BoM in a spreadsheet, and the proposal in a slide deck.",
+      "EPC contractors are accountable for what gets built, which means every drawing, cable schedule, and BoM must be traceable to the design. The standard India workflow — PVsyst for simulation, AutoCAD for layout and SLD, Excel for cable schedules and BoM — has no data linkage. Any layout change requires manual updates across all three tools, and inconsistencies between them are a common source of site rework and CEIG inspection failures. SolarDesign keeps the design and all its derived documents in one place. When the layout changes, the SLD, cable schedule, and BoM update automatically.",
     capabilities: [
-      "Automated bill of materials with panel, inverter, racking, and cable quantities",
-      "Installation drawing package: string diagrams, mounting layouts, single-line",
-      "Version history with change tracking across all project revisions",
-      "Client proposal generation with configurable branding and financial inputs",
-      "Role-based access so site teams, engineers, and clients see what they need",
+      "DC and AC layout in the same project file as the simulation",
+      "DISCOM-compliant SLD auto-generated from the design — no AutoCAD drafting",
+      "DC and AC cable schedules sized to IS 732 / IS 1255 for CEIG inspection",
+      "ALMM-compliant module and inverter library — non-listed equipment is flagged",
+      "BoM and BoQ update automatically when the layout changes",
+      "Role-based access for civil, electrical, and project management teams",
     ],
   },
   {
     icon: ChartLineUpIcon,
-    title: "Solar consultants",
-    tagline: "Produce bankable yield reports and defensible feasibility studies at speed.",
+    title: "Solar consultants and DPR engineers",
+    tagline:
+      "Produce bankable P50/P90 reports and defensible feasibility studies.",
     description:
-      "Consulting work is won on credibility and lost on turnaround time. Your clients — whether project developers, lenders, or corporate sustainability teams — need yield estimates they can take to a bank and design options they can compare. SolarDesign's simulation engine uses TMY irradiance data, real panel degradation curves, and validated loss models to produce P50/P90 outputs that meet lender and insurer requirements — and you can run multiple scenarios in the time it used to take to set up one.",
+      "Solar consultants and independent DPR engineers are hired by developers and lenders to provide an objective assessment of a project's yield and design quality. Their outputs — P50/P75/P90 simulation, shading analysis, PR, loss breakdown — are the documents that IREDA, PFC, and international lenders use to sanction debt financing. The simulation methodology must be documented and defensible. Consultants also need to run multiple design scenarios quickly, as clients routinely ask to compare fixed tilt vs. single-axis tracker, different module wattage, and varying DC:AC ratios before committing to a design.",
     capabilities: [
-      "TMY3 and Meteonorm irradiance data for 200,000+ global locations",
-      "P50/P90 generation with configurable uncertainty stacking",
-      "Side-by-side scenario comparison across orientation, technology, and capacity",
-      "Shading loss breakdown by near and far horizon obstructions",
-      "Exportable simulation logs for third-party review and due diligence",
+      "P50/P75/P90 yield simulation with documented TMY methodology",
+      "CUF, PR, and full loss breakdown in lender-accepted format",
+      "Multi-scenario comparison across tilt type, inverter type, and DC:AC ratio",
+      "Irradiance data from Meteonorm, NASA POWER, and Solargis",
+      "Shading analysis: near horizon, far horizon, and inter-row",
+      "Simulation report export formatted for IREDA, PFC, and international lender review",
     ],
   },
   {
-    icon: LeafIcon,
-    title: "Renewable energy developers",
-    tagline: "Manage your entire project pipeline — from site selection to financial close.",
+    icon: SolarPanelIcon,
+    title: "Ground-mount utility-scale projects",
+    tagline:
+      "Design from terrain data through evacuation line — for projects from 10 MW to 500 MW.",
     description:
-      "Developers operate across dozens of sites simultaneously, each at a different stage of the development cycle. Early-stage sites need quick feasibility layouts to inform land negotiations. Mid-stage sites need detailed designs for grid connection applications. Late-stage sites need investor-grade documentation packages. SolarDesign scales with your pipeline — fast sketch tools for early stage, full simulation and CAD export for late stage, and a shared workspace that keeps your whole team and all your sites in sync.",
+      "Utility-scale ground-mount projects in India span 10 MW open access installations to 500 MW+ SECI park allocations. The project boundary arrives as a KMZ from the land team. Within it, design engineers must calculate usable shadow-free area, determine optimal row orientation (fixed tilt or single-axis tracker), size the DC and AC electrical systems, and identify the evacuation route to the nearest DISCOM or PGCIL substation. Each of these steps feeds the BD team's bid submission and the lender's DPR. SolarDesign handles the complete workflow from KMZ intake to DPR export.",
     capabilities: [
-      "Portfolio dashboard with project status, capacity, and yield across all sites",
-      "Rapid feasibility mode: area-based capacity estimate in under two minutes",
-      "Grid connection report templates formatted for DNO and TSO submissions",
-      "Investor documentation package: yield report, layout drawings, BoM, financials",
-      "Multi-team access control with audit log for all project activity",
+      "KMZ boundary import with terrain and slope analysis",
+      "Shadow-free area calculation for net usable land",
+      "Fixed-tilt and single-axis tracker layout modes",
+      "Bifacial yield modelling with rear-irradiance and albedo inputs",
+      "Evacuation line routing and voltage level selection (33/66/132/220 kV)",
+      "IFC and DXF export for structural and civil engineering teams",
+    ],
+  },
+  {
+    icon: BuildingsIcon,
+    title: "Large C&I and open access projects",
+    tagline:
+      "Design, simulate, and produce the documentation package for 1 MW to 50 MW installations.",
+    description:
+      "Large industrial and commercial consumers in India — manufacturing plants, steel mills, cement plants, data centres — are increasingly commissioning captive solar plants (CPP) under the open access framework to reduce power purchase costs and meet RPO/RCO obligations. These projects (1–50 MW) sit below utility-scale in size but share many of the same design requirements: yield simulation for PPA or CPP structuring, SLD for DISCOM connectivity approval, and IS-compliant cable sizing for CEIG inspection. SolarDesign covers this segment without requiring a utility-scale licence.",
+    capabilities: [
+      "Yield simulation and CUF estimate for CPP and open access structuring",
+      "SLD for DISCOM grid connectivity application",
+      "IS 732 / IS 1255 cable schedule for CEIG inspection",
+      "BoM for procurement and EPC contracting",
+      "RPO / RCO compliance documentation",
+      "Rooftop and ground-mount layout support",
     ],
   },
 ]
@@ -104,11 +99,13 @@ export default function SolutionsPage() {
       {/* Hero */}
       <section className="flex flex-col items-center gap-6 px-6 py-20 text-center">
         <h1 className="max-w-2xl text-4xl font-bold tracking-tight">
-          Built for every part of the solar industry
+          Designed for India&apos;s utility-scale solar sector
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          Whether you design one rooftop a week or manage a portfolio of
-          utility-scale sites, SolarDesign adapts to your workflow.
+          SolarDesign is built for IPPs, EPC contractors, and solar consultants
+          working on greenfield projects from 10 MW to 500 MW. The tool covers
+          the full pre-bid to DPR workflow — in the regulatory and compliance
+          context that Indian projects require.
         </p>
       </section>
 
@@ -155,15 +152,16 @@ export default function SolutionsPage() {
       {/* CTA */}
       <section className="border-t px-6 py-16 text-center">
         <h2 className="mb-2 text-2xl font-bold tracking-tight">
-          Not sure which solution fits?
+          Not sure which solution fits your workflow?
         </h2>
         <p className="mb-6 text-muted-foreground">
-          Talk to our team — we&apos;ll help you find the right setup.
+          Talk to our team. We have worked on EPC projects, yield consulting,
+          and grid connection submissions.
         </p>
         <div className="flex justify-center gap-3">
           <Button asChild>
             <Link href="/dashboard">
-              Start free
+              Create a free account
               <ArrowRightIcon className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>

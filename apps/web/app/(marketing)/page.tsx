@@ -5,16 +5,14 @@ import { Separator } from "@renewable-energy/ui/components/separator"
 import {
   SolarPanelIcon,
   ChartLineUpIcon,
-  BuildingsIcon,
   ArrowRightIcon,
   LightningIcon,
-  FactoryIcon,
-  MagnifyingGlassIcon,
   FileTextIcon,
-  BookOpenIcon,
-  VideoIcon,
-  ChatCircleIcon,
+  MapPinIcon,
+  TreeStructureIcon,
+  StackIcon,
   CheckIcon,
+  UsersThreeIcon,
 } from "@phosphor-icons/react/dist/ssr"
 
 export default function LandingPage() {
@@ -27,15 +25,18 @@ export default function LandingPage() {
           Now in beta
         </Badge>
         <h1 className="max-w-3xl text-5xl font-bold tracking-tight">
-          Layout design and yield simulation
+          From KMZ to DPR.
           <br />
-          <span className="text-muted-foreground">for solar professionals.</span>
+          <span className="text-muted-foreground">
+            Utility-scale solar design for India.
+          </span>
         </h1>
-        <p className="max-w-xl text-lg text-muted-foreground">
-          SolarDesign is used by solar engineers and EPC contractors to produce
-          compliant layouts, run P50/P90 yield simulations, and generate client
-          deliverables — for commercial rooftop, industrial, and utility-scale
-          projects.
+        <p className="max-w-2xl text-lg text-muted-foreground">
+          SolarDesign covers the full pre-bid to DPR workflow for greenfield
+          solar projects — KMZ import, shadow-free area calculation, DC/AC
+          layout, CUF and P50/P90 simulation, SLD generation, and lender-ready
+          report export. Built for design engineers and EPC teams working on
+          10 MW to 500 MW projects in India.
         </p>
         <div className="flex items-center gap-3">
           <Button asChild size="lg">
@@ -52,23 +53,87 @@ export default function LandingPage() {
 
       <Separator />
 
-      {/* Solutions */}
+      {/* Workflow */}
+      <section className="mx-auto w-full max-w-5xl px-6 py-20">
+        <div className="mb-10">
+          <h2 className="text-2xl font-bold tracking-tight">
+            The pre-bid to DPR pipeline
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            BD teams need a capacity estimate and CUF within 24–48 hours of
+            receiving a site KMZ. SolarDesign compresses that cycle.
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              step: "01",
+              title: "KMZ import and site boundary",
+              description:
+                "Import the KMZ file from your land or BD team. SolarDesign reads the site boundary, exclusion zones, and terrain. No manual coordinate re-entry.",
+            },
+            {
+              step: "02",
+              title: "Shadow-free area and capacity estimate",
+              description:
+                "Automated shadow-free area calculation from the KMZ boundary and terrain data. Outputs net usable area, estimated MW DC/AC, and indicative CUF — ready for the BD team.",
+            },
+            {
+              step: "03",
+              title: "CUF and P50/P90 yield simulation",
+              description:
+                "Energy simulation using TMY irradiance data. Produces CUF, P50/P75/P90 annual yield, PR, and loss breakdown in a format accepted by IREDA, PFC, and commercial bank technical advisors.",
+            },
+            {
+              step: "04",
+              title: "DC and AC layout",
+              description:
+                "Module row layout within the KMZ boundary — fixed tilt or single-axis tracker, inter-row pitch for target GCR, string layout, IVT placement, and AC yard design.",
+            },
+            {
+              step: "05",
+              title: "SLD and cable schedule",
+              description:
+                "Auto-generated Single Line Diagram in DISCOM-compliant format. DC and AC cable schedules sized to IS 732 / IS 1255. No manual AutoCAD drafting.",
+            },
+            {
+              step: "06",
+              title: "BoM, BoQ, and DPR export",
+              description:
+                "Bill of Materials and Bill of Quantities generated directly from the design. Full DPR export — site data, simulation, drawings, BoM — in lender-ready format.",
+            },
+          ].map((step) => (
+            <div key={step.step} className="flex flex-col gap-3">
+              <span className="text-xs font-mono font-semibold text-primary">
+                {step.step}
+              </span>
+              <h3 className="font-semibold">{step.title}</h3>
+              <p className="text-sm text-muted-foreground">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Who uses it */}
       <section className="mx-auto w-full max-w-5xl px-6 py-20">
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              For every project type
+              Built for utility-scale solar teams
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Commercial rooftop, industrial flat-roof, or ground-mount utility.
-              SolarDesign handles the design workflow for each.
+              IPPs, EPC contractors, and solar consultants working on greenfield
+              projects from 10 MW to 500 MW.
             </p>
           </div>
           <Link
             href="/solutions"
             className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
-            See all solutions
+            View all solutions
             <ArrowRightIcon className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -76,22 +141,22 @@ export default function LandingPage() {
         <div className="grid gap-8 md:grid-cols-3">
           {[
             {
-              icon: BuildingsIcon,
-              title: "Commercial rooftop",
-              description:
-                "Handle complex roof geometries, HVAC obstructions, and multi-orientation layouts. Automatic setback enforcement keeps every design code-compliant.",
-            },
-            {
-              icon: FactoryIcon,
-              title: "Industrial & warehouse",
-              description:
-                "Maximise panel density on large flat roofs. Compare south-tilt and east-west configurations side by side with full shading and yield analysis.",
-            },
-            {
               icon: SolarPanelIcon,
-              title: "Ground-mount utility",
+              title: "Design engineers",
               description:
-                "Ingest terrain data, model bifacial gains, and produce the P50/P90 yield reports and IFC exports that lenders and EPC teams require.",
+                "Replaces the PVsyst + AutoCAD + Excel workflow with a single tool. KMZ in, DPR out — without re-entering data between tools or maintaining parallel spreadsheets.",
+            },
+            {
+              icon: UsersThreeIcon,
+              title: "EPC contractors",
+              description:
+                "Produce DISCOM-compliant SLDs, IS-standard cable schedules, and ALMM-compliant BoMs from the same design file. Design changes update all documents automatically.",
+            },
+            {
+              icon: ChartLineUpIcon,
+              title: "Solar consultants",
+              description:
+                "Run multi-scenario comparisons — fixed tilt vs. tracker, string vs. central inverter, varying DC:AC ratios — and export P50/P90 reports for lender technical due diligence.",
             },
           ].map((s) => (
             <div key={s.title} className="flex flex-col gap-3">
@@ -107,7 +172,7 @@ export default function LandingPage() {
         <div className="mt-8 md:hidden">
           <Button variant="outline" asChild size="sm">
             <Link href="/solutions">
-              See all solutions
+              View all solutions
               <ArrowRightIcon className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           </Button>
@@ -116,23 +181,23 @@ export default function LandingPage() {
 
       <Separator />
 
-      {/* Features */}
+      {/* Core capabilities */}
       <section className="mx-auto w-full max-w-5xl px-6 py-20">
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Design, analysis, and delivery tools
+              Core design and analysis capabilities
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Layout editor, yield simulation, shading analysis, and report
-              export — in a single project file.
+              All tools required for the pre-bid to DPR workflow in one
+              platform.
             </p>
           </div>
           <Link
             href="/features"
             className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
-            See all features
+            View all features
             <ArrowRightIcon className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -140,28 +205,40 @@ export default function LandingPage() {
         <div className="grid gap-8 md:grid-cols-2">
           {[
             {
-              icon: SolarPanelIcon,
-              title: "Precision layout editor",
+              icon: MapPinIcon,
+              title: "KMZ / KML site import",
               description:
-                "Drag-and-drop panel placement on imported site plans with snap-to-grid alignment. Supports complex multi-pitch roofs, obstacles, exclusion zones, and DXF, PDF, and satellite imagery imports.",
+                "Import KMZ files directly. Site boundary, exclusion zones, and terrain data are read automatically. Shadow-free usable area is calculated without manual input.",
             },
             {
               icon: ChartLineUpIcon,
-              title: "Yield modelling & simulation",
+              title: "CUF and yield simulation",
               description:
-                "Real-time energy yield estimates based on location, tilt, orientation, and shading. Hourly, monthly, and annual production forecasts with P50/P90 outputs — ready for bankable reports.",
+                "Energy simulation with TMY irradiance data. CUF, P50/P75/P90, PR, and full loss breakdown. Supports Meteonorm, NASA POWER, and Solargis data sources. Output meets IREDA and PFC technical advisor standards.",
             },
             {
-              icon: MagnifyingGlassIcon,
-              title: "Shading & irradiance analysis",
+              icon: TreeStructureIcon,
+              title: "DC layout and stringing",
               description:
-                "3D horizon shading from surrounding structures and terrain. Per-panel irradiance heatmaps at any time of year. String-level mismatch analysis to guide inverter and optimiser selection.",
+                "Module row layout for fixed tilt and single-axis tracker configurations. Automated inter-row pitch calculation for target GCR. Stringing schedule and combiner layout generated from the same design.",
             },
             {
               icon: FileTextIcon,
-              title: "Professional report generation",
+              title: "SLD generation",
               description:
-                "One-click export of client-ready PDF proposals, material take-offs, and installation drawings. Branded templates, live proposal links — no download required for your clients.",
+                "Single Line Diagram auto-generated from the DC and AC design. DISCOM-compliant format for grid connectivity application. No AutoCAD drafting required.",
+            },
+            {
+              icon: StackIcon,
+              title: "ALMM-compliant equipment library",
+              description:
+                "Module and inverter selection from an MNRE ALMM-listed library. The library is updated as the ALMM list changes. Non-listed equipment is flagged before it reaches a bid submission.",
+            },
+            {
+              icon: SolarPanelIcon,
+              title: "BoM, BoQ, and DPR export",
+              description:
+                "Bill of Materials and Bill of Quantities update automatically when the design changes. DPR export compiles site data, simulation, layout drawings, and schedules in lender-accepted format.",
             },
           ].map((f) => (
             <div key={f.title} className="flex gap-4">
@@ -179,10 +256,44 @@ export default function LandingPage() {
         <div className="mt-8 md:hidden">
           <Button variant="outline" asChild size="sm">
             <Link href="/features">
-              See all features
+              View all features
               <ArrowRightIcon className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           </Button>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Compliance */}
+      <section className="mx-auto w-full max-w-5xl px-6 py-20">
+        <div className="mb-10">
+          <h2 className="text-2xl font-bold tracking-tight">
+            India regulatory compliance
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            Design outputs are aligned with the regulatory requirements that
+            apply to utility-scale solar projects in India.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            "MNRE ALMM-compliant module and inverter library",
+            "DISCOM-compliant SLD format for grid connectivity application",
+            "IS 732 / IS 1255 cable sizing for CEIG inspection",
+            "P50/P90 simulation output for IREDA, PFC, and lender technical advisors",
+            "CEA Regulations 2024 design standards",
+            "DPR format for SECI and state DISCOM project submissions",
+          ].map((item) => (
+            <div key={item} className="flex items-start gap-2 text-sm">
+              <CheckIcon
+                weight="bold"
+                className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-400"
+              />
+              <span>{item}</span>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -204,7 +315,7 @@ export default function LandingPage() {
             href="/pricing"
             className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
-            See full pricing
+            View full pricing
             <ArrowRightIcon className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -216,7 +327,7 @@ export default function LandingPage() {
               price: "Free",
               period: null,
               highlight: false,
-              perks: ["1 user", "Up to 3 projects", "Basic layout editor"],
+              perks: ["1 user", "Up to 3 active projects", "Basic layout editor"],
             },
             {
               name: "Professional",
@@ -227,7 +338,7 @@ export default function LandingPage() {
               perks: [
                 "Up to 10 users",
                 "Unlimited projects",
-                "Yield modelling & simulation",
+                "CUF and P50/P90 simulation",
               ],
             },
             {
@@ -237,7 +348,7 @@ export default function LandingPage() {
               highlight: false,
               perks: [
                 "Unlimited users",
-                "SSO & audit logs",
+                "SSO and audit logs",
                 "Private cloud deployment",
               ],
             },
@@ -279,73 +390,10 @@ export default function LandingPage() {
                 variant={tier.highlight ? "default" : "outline"}
                 className="w-full"
               >
-                <Link href="/pricing">See full plan</Link>
+                <Link href="/pricing">View full plan</Link>
               </Button>
             </div>
           ))}
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* Resources */}
-      <section className="mx-auto w-full max-w-5xl px-6 py-20">
-        <div className="mb-10 flex items-end justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              Documentation and support
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Technical guides, video tutorials, and a practitioner community.
-            </p>
-          </div>
-          <Link
-            href="/resources"
-            className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
-          >
-            Browse resources
-            <ArrowRightIcon className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid gap-8 md:grid-cols-3">
-          {[
-            {
-              icon: BookOpenIcon,
-              title: "Getting started guide",
-              description:
-                "Set up your first project in minutes. Step-by-step walkthrough from site import to layout export.",
-            },
-            {
-              icon: VideoIcon,
-              title: "Video tutorials",
-              description:
-                "Watch real-world workflows — layout editing, yield simulation, shading analysis, and report generation.",
-            },
-            {
-              icon: ChatCircleIcon,
-              title: "Community forum",
-              description:
-                "Ask questions and share designs with thousands of solar practitioners. Monitored daily by our team.",
-            },
-          ].map((r) => (
-            <div key={r.title} className="flex flex-col gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <r.icon weight="duotone" className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-semibold">{r.title}</h3>
-              <p className="text-sm text-muted-foreground">{r.description}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-8 md:hidden">
-          <Button variant="outline" asChild size="sm">
-            <Link href="/resources">
-              Browse resources
-              <ArrowRightIcon className="ml-1.5 h-3.5 w-3.5" />
-            </Link>
-          </Button>
         </div>
       </section>
 
@@ -359,11 +407,11 @@ export default function LandingPage() {
               About SolarDesign
             </h2>
             <p className="mt-3 text-muted-foreground">
-              SolarDesign was built by solar practitioners and engineers in
-              2022. The platform is used in 40+ countries for commercial,
-              industrial, and utility-scale project design. Our team includes
-              people who have worked on solar EPC projects, yield consulting,
-              and grid connection submissions.
+              SolarDesign was built by solar practitioners and engineers who
+              have worked on EPC projects, yield consulting, and grid connection
+              submissions. The platform is designed for the Indian utility-scale
+              market and is used across greenfield projects from 10 MW to
+              500 MW.
             </p>
           </div>
           <Button variant="outline" asChild className="shrink-0">
