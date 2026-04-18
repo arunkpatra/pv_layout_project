@@ -28,6 +28,9 @@ build
 dist
 *.tsbuildinfo
 
+# Next.js — auto-generated, must not be committed
+next-env.d.ts
+
 
 # Debug
 npm-debug.log*
