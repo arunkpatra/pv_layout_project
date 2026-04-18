@@ -3,6 +3,13 @@ import { Button } from "@renewable-energy/ui/components/button"
 import { Badge } from "@renewable-energy/ui/components/badge"
 import { Separator } from "@renewable-energy/ui/components/separator"
 import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@renewable-energy/ui/components/card"
+import {
   Sun,
   TrendingUp,
   ArrowRight,
@@ -379,47 +386,51 @@ export default function LandingPage() {
               ],
             },
           ].map((tier) => (
-            <div
+            <Card
               key={tier.name}
-              className={`flex flex-col border p-6 ${tier.highlight ? "ring-2 ring-primary" : ""}`}
+              className={`flex flex-col${tier.highlight ? " ring-2 ring-primary" : ""}`}
             >
-              <div className="mb-4 flex items-center justify-between">
-                <span className="font-semibold">{tier.name}</span>
-                {tier.badge && (
-                  <Badge variant="secondary" className="text-xs">
-                    {tier.badge}
-                  </Badge>
-                )}
-              </div>
-              <div className="mb-4 flex flex-col gap-1">
-                <span className="text-3xl font-bold">{tier.price}</span>
-                {tier.period && (
-                  <span className="text-xs leading-snug text-muted-foreground">
-                    {tier.period}
-                  </span>
-                )}
-              </div>
-              <ul className="flex flex-1 flex-col gap-2">
-                {tier.perks.map((perk) => (
-                  <li key={perk} className="flex items-center gap-2 text-sm">
-                    <Check
-                      className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400"
-                    />
-                    <span className="text-muted-foreground">{perk}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                asChild
-                size="sm"
-                variant={tier.highlight ? "default" : "outline"}
-                className="mt-6 w-full"
-              >
-                <Link href="/pricing">
-                  {tier.name === "Starter" ? "Create a free account" : "View full plan"}
-                </Link>
-              </Button>
-            </div>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{tier.name}</CardTitle>
+                  {tier.badge && (
+                    <Badge variant="secondary" className="text-xs">
+                      {tier.badge}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-3xl font-bold">{tier.price}</span>
+                  {tier.period && (
+                    <span className="text-xs leading-snug text-muted-foreground">
+                      {tier.period}
+                    </span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <ul className="flex flex-col gap-2">
+                  {tier.perks.map((perk) => (
+                    <li key={perk} className="flex items-center gap-2 text-sm">
+                      <Check className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                      <span className="text-muted-foreground">{perk}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  asChild
+                  size="sm"
+                  variant={tier.highlight ? "default" : "outline"}
+                  className="w-full"
+                >
+                  <Link href="/pricing">
+                    {tier.name === "Starter" ? "Create a free account" : "View full plan"}
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       </section>
