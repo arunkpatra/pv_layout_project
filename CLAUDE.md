@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Before doing any work, read this file in full:
 
+- **[Architecture and Decisions](./docs/architecture.md)** — Stack choices, ownership boundaries, build order, and rationale. Update when new decisions are made.
 - **[Development Principles](./docs/claude-dev-principles.md)** — Spike-first methodology, what Claude can and cannot verify, prompt patterns, session structure, anti-patterns, and the mandatory self-review protocol.
 - **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** — How to conduct browser/runtime testing with the human. Ask one question at a time, never dump a full test list.
 
