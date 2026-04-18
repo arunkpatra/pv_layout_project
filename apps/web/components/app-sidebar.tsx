@@ -123,7 +123,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const clerkUser = {
     name: user?.fullName ?? user?.username ?? "User",
     email: user?.primaryEmailAddress?.emailAddress ?? "",
-    avatar: user?.imageUrl ?? "",
+    avatar: user?.imageUrl || undefined,
   }
 
   return (
