@@ -9,7 +9,7 @@
     "start": "bun run dist/index.js",
     "test": "echo 'No tests yet'",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.0",
@@ -21,6 +21,7 @@
     "@renewable-energy/eslint-config": "workspace:*",
     "@renewable-energy/typescript-config": "workspace:*",
     "@types/bun": "latest",
+    "eslint": "^9.39.2",
     "typescript": "^5.9.3"
   }
 }
