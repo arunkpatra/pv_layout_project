@@ -1,12 +1,10 @@
-"use client"
-
 import { cn } from "@renewable-energy/ui/lib/utils"
-import { SpinnerIcon } from "@phosphor-icons/react"
+import { Loader2Icon } from "lucide-react"
 
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
   return (
-    <SpinnerIcon role="status" aria-label="Loading" className={cn("size-4 animate-spin", className)} {...props} />
+    <Loader2Icon role="status" aria-label="Loading" className={cn("size-4 animate-spin", className)} {...props} />
   )
 }
 
-export { SpinnerIcon }
+export { Spinner }

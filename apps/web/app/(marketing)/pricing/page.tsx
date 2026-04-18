@@ -17,7 +17,7 @@ import {
   TableRow,
   TableCell,
 } from "@renewable-energy/ui/components/table"
-import { CheckIcon, ArrowRightIcon, InfoIcon, MinusIcon } from "@phosphor-icons/react/dist/ssr"
+import { Check, ArrowRight, Info, Minus } from "lucide-react"
 import { cn } from "@renewable-energy/ui/lib/utils"
 
 const tiers = [
@@ -109,9 +109,8 @@ export default function PricingPage() {
 
       {/* Trial notice */}
       <section className="mx-auto w-full max-w-5xl px-6 pb-10">
-        <div className="flex items-start gap-3 border border-primary/30 bg-primary/5 px-5 py-4">
-          <InfoIcon
-            weight="duotone"
+        <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 px-5 py-4">
+          <Info
             className="mt-0.5 h-5 w-5 shrink-0 text-primary"
           />
           <div>
@@ -159,8 +158,7 @@ export default function PricingPage() {
               <ul className="flex flex-col gap-2">
                 {tier.entitlements.map((item) => (
                   <li key={item} className="flex items-start gap-2 text-xs">
-                    <CheckIcon
-                      weight="bold"
+                    <Check
                       className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400"
                     />
                     <span>{item}</span>
@@ -176,7 +174,7 @@ export default function PricingPage() {
               >
                 <Link href={tier.href}>
                   {tier.cta}
-                  <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+                  <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Link>
               </Button>
             </CardFooter>
@@ -191,7 +189,7 @@ export default function PricingPage() {
         </h2>
 
         {/* Mobile: stacked cards */}
-        <div className="flex flex-col divide-y border md:hidden">
+        <div className="flex flex-col divide-y rounded-lg border md:hidden">
           {[
             { tool: "PVsyst 8", cost: "~₹67,000", covers: "Yield simulation only", highlight: false, muted: true },
             { tool: "AutoCAD (full)", cost: "~₹1,21,000", covers: "Drafting only — no solar intelligence", highlight: false, muted: true },
@@ -209,7 +207,7 @@ export default function PricingPage() {
         </div>
 
         {/* Desktop: table */}
-        <div className="hidden overflow-hidden border md:block">
+        <div className="hidden overflow-hidden rounded-lg border md:block">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -249,7 +247,7 @@ export default function PricingPage() {
         <h2 className="mb-8 text-2xl font-bold tracking-tight">
           Feature comparison
         </h2>
-        <div className="overflow-hidden border">
+        <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -326,9 +324,9 @@ export default function PricingPage() {
                     return <span className="font-medium">{val}</span>
                   }
                   return val ? (
-                    <CheckIcon weight="bold" className="mx-auto h-4 w-4 text-green-600 dark:text-green-400" />
+                    <Check className="mx-auto h-4 w-4 text-green-600 dark:text-green-400" />
                   ) : (
-                    <MinusIcon weight="bold" className="mx-auto h-4 w-4 text-muted-foreground/40" />
+                    <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />
                   )
                 }
                 return (

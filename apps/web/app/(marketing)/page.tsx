@@ -3,17 +3,24 @@ import { Button } from "@renewable-energy/ui/components/button"
 import { Badge } from "@renewable-energy/ui/components/badge"
 import { Separator } from "@renewable-energy/ui/components/separator"
 import {
-  SolarPanelIcon,
-  ChartLineUpIcon,
-  ArrowRightIcon,
-  LightningIcon,
-  FileTextIcon,
-  MapPinIcon,
-  TreeStructureIcon,
-  StackIcon,
-  CheckIcon,
-  UsersThreeIcon,
-} from "@phosphor-icons/react/dist/ssr"
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@renewable-energy/ui/components/card"
+import {
+  Sun,
+  TrendingUp,
+  ArrowRight,
+  Zap,
+  FileText,
+  MapPin,
+  Network,
+  Layers,
+  Check,
+  Users,
+} from "lucide-react"
 import { HeroSchematic } from "@/components/marketing/hero-schematic"
 import { HeroStats } from "@/components/marketing/hero-stats"
 
@@ -36,7 +43,7 @@ export default function LandingPage() {
           {/* Left: text */}
           <div className="flex flex-col gap-6 lg:max-w-xl">
             <Badge variant="secondary" className="w-fit gap-1.5">
-              <LightningIcon weight="fill" className="h-3 w-3" />
+              <Zap className="h-3 w-3" />
               Now in beta
             </Badge>
             <h1 className="text-5xl font-bold tracking-tight">
@@ -57,7 +64,7 @@ export default function LandingPage() {
               <Button asChild size="lg">
                 <Link href="/sign-up">
                   Create a free account
-                  <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+                  <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
@@ -161,34 +168,34 @@ export default function LandingPage() {
             className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
             View all solutions
-            <ArrowRightIcon className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
         <div className="grid gap-8 md:grid-cols-3">
           {[
             {
-              icon: SolarPanelIcon,
+              icon: Sun,
               title: "Design engineers",
               description:
                 "Replaces the PVsyst + AutoCAD + Excel workflow with a single tool. KMZ in, DPR out — without re-entering data between tools or maintaining parallel spreadsheets.",
             },
             {
-              icon: UsersThreeIcon,
+              icon: Users,
               title: "EPC contractors",
               description:
                 "Produce DISCOM-compliant SLDs, IS-standard cable schedules, and ALMM-compliant BoMs from the same design file. Design changes update all documents automatically.",
             },
             {
-              icon: ChartLineUpIcon,
+              icon: TrendingUp,
               title: "Solar consultants",
               description:
                 "Run multi-scenario comparisons — fixed tilt vs. tracker, string vs. central inverter, varying DC:AC ratios — and export P50/P90 reports for lender technical due diligence.",
             },
           ].map((s) => (
             <div key={s.title} className="flex flex-col gap-3">
-              <div className="flex h-10 w-10 items-center justify-center bg-primary/10">
-                <s.icon weight="duotone" className="h-5 w-5 text-primary" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <s.icon className="h-5 w-5 text-primary" />
               </div>
               <h3 className="font-semibold">{s.title}</h3>
               <p className="text-sm text-muted-foreground">{s.description}</p>
@@ -200,7 +207,7 @@ export default function LandingPage() {
           <Button variant="outline" asChild size="sm">
             <Link href="/solutions">
               View all solutions
-              <ArrowRightIcon className="ml-1.5 h-3.5 w-3.5" />
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           </Button>
         </div>
@@ -225,52 +232,52 @@ export default function LandingPage() {
             className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
             View all features
-            <ArrowRightIcon className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
         <div className="grid gap-8 md:grid-cols-2">
           {[
             {
-              icon: MapPinIcon,
+              icon: MapPin,
               title: "KMZ / KML site import",
               description:
                 "Import KMZ files directly. Site boundary, exclusion zones, and terrain data are read automatically. Shadow-free usable area is calculated without manual input.",
             },
             {
-              icon: ChartLineUpIcon,
+              icon: TrendingUp,
               title: "CUF and yield simulation",
               description:
                 "Energy simulation with TMY irradiance data. CUF, P50/P75/P90, PR, and full loss breakdown. Supports Meteonorm, NASA POWER, and Solargis data sources. Output meets IREDA and PFC technical advisor standards.",
             },
             {
-              icon: TreeStructureIcon,
+              icon: Network,
               title: "DC layout and stringing",
               description:
                 "Module row layout for fixed tilt and single-axis tracker configurations. Automated inter-row pitch calculation for target GCR. Stringing schedule and combiner layout generated from the same design.",
             },
             {
-              icon: FileTextIcon,
+              icon: FileText,
               title: "SLD generation",
               description:
                 "Single Line Diagram auto-generated from the DC and AC design. DISCOM-compliant format for grid connectivity application. No AutoCAD drafting required.",
             },
             {
-              icon: StackIcon,
+              icon: Layers,
               title: "ALMM-compliant equipment library",
               description:
                 "Module and inverter selection from an MNRE ALMM-listed library. The library is updated as the ALMM list changes. Non-listed equipment is flagged before it reaches a bid submission.",
             },
             {
-              icon: SolarPanelIcon,
+              icon: Sun,
               title: "BoM, BoQ, and DPR export",
               description:
                 "Bill of Materials and Bill of Quantities update automatically when the design changes. DPR export compiles site data, simulation, layout drawings, and schedules in lender-accepted format.",
             },
           ].map((f) => (
             <div key={f.title} className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary/10">
-                <f.icon weight="duotone" className="h-5 w-5 text-primary" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <f.icon className="h-5 w-5 text-primary" />
               </div>
               <div className="flex flex-col gap-1">
                 <h3 className="font-semibold">{f.title}</h3>
@@ -284,7 +291,7 @@ export default function LandingPage() {
           <Button variant="outline" asChild size="sm">
             <Link href="/features">
               View all features
-              <ArrowRightIcon className="ml-1.5 h-3.5 w-3.5" />
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           </Button>
         </div>
@@ -314,8 +321,7 @@ export default function LandingPage() {
             "DPR format for SECI and state DISCOM project submissions",
           ].map((item) => (
             <div key={item} className="flex items-start gap-2 text-sm">
-              <CheckIcon
-                weight="bold"
+              <Check
                 className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-400"
               />
               <span>{item}</span>
@@ -343,7 +349,7 @@ export default function LandingPage() {
             className="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
             View full pricing
-            <ArrowRightIcon className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
@@ -380,48 +386,51 @@ export default function LandingPage() {
               ],
             },
           ].map((tier) => (
-            <div
+            <Card
               key={tier.name}
-              className={`flex flex-col border p-6 ${tier.highlight ? "ring-2 ring-primary" : ""}`}
+              className={`flex flex-col${tier.highlight ? " ring-2 ring-primary" : ""}`}
             >
-              <div className="mb-4 flex items-center justify-between">
-                <span className="font-semibold">{tier.name}</span>
-                {tier.badge && (
-                  <Badge variant="secondary" className="text-xs">
-                    {tier.badge}
-                  </Badge>
-                )}
-              </div>
-              <div className="mb-4 flex flex-col gap-1">
-                <span className="text-3xl font-bold">{tier.price}</span>
-                {tier.period && (
-                  <span className="text-xs leading-snug text-muted-foreground">
-                    {tier.period}
-                  </span>
-                )}
-              </div>
-              <ul className="flex flex-1 flex-col gap-2">
-                {tier.perks.map((perk) => (
-                  <li key={perk} className="flex items-center gap-2 text-sm">
-                    <CheckIcon
-                      weight="bold"
-                      className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400"
-                    />
-                    <span className="text-muted-foreground">{perk}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                asChild
-                size="sm"
-                variant={tier.highlight ? "default" : "outline"}
-                className="mt-6 w-full"
-              >
-                <Link href="/pricing">
-                  {tier.name === "Starter" ? "Create a free account" : "View full plan"}
-                </Link>
-              </Button>
-            </div>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{tier.name}</CardTitle>
+                  {tier.badge && (
+                    <Badge variant="secondary" className="text-xs">
+                      {tier.badge}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-3xl font-bold">{tier.price}</span>
+                  {tier.period && (
+                    <span className="text-xs leading-snug text-muted-foreground">
+                      {tier.period}
+                    </span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <ul className="flex flex-col gap-2">
+                  {tier.perks.map((perk) => (
+                    <li key={perk} className="flex items-center gap-2 text-sm">
+                      <Check className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                      <span className="text-muted-foreground">{perk}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  asChild
+                  size="sm"
+                  variant={tier.highlight ? "default" : "outline"}
+                  className="w-full"
+                >
+                  <Link href="/pricing">
+                    {tier.name === "Starter" ? "Create a free account" : "View full plan"}
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       </section>
@@ -446,7 +455,7 @@ export default function LandingPage() {
           <Button variant="outline" asChild className="shrink-0">
             <Link href="/about">
               Meet the team
-              <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+              <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
         </div>
@@ -467,7 +476,7 @@ export default function LandingPage() {
           <Button asChild size="lg">
             <Link href="/sign-up">
               Create a free account
-              <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+              <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" size="lg" asChild>

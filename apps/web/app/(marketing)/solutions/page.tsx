@@ -1,18 +1,18 @@
 import Link from "next/link"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
-  ArrowRightIcon,
-  CheckCircleIcon,
-  SolarPanelIcon,
-  HardHatIcon,
-  ChartLineUpIcon,
-  BuildingsIcon,
-  LeafIcon,
-} from "@phosphor-icons/react/dist/ssr"
+  ArrowRight,
+  CircleCheck,
+  Sun,
+  HardHat,
+  TrendingUp,
+  Building2,
+  Leaf,
+} from "lucide-react"
 
 const solutions = [
   {
-    icon: LeafIcon,
+    icon: Leaf,
     title: "Independent Power Producers (IPPs) and developers",
     tagline:
       "Manage the full project pipeline — from site KMZ to grid connectivity application.",
@@ -28,7 +28,7 @@ const solutions = [
     ],
   },
   {
-    icon: HardHatIcon,
+    icon: HardHat,
     title: "EPC contractors",
     tagline:
       "One design file. Every statutory and contractual document your project requires.",
@@ -44,7 +44,7 @@ const solutions = [
     ],
   },
   {
-    icon: ChartLineUpIcon,
+    icon: TrendingUp,
     title: "Solar consultants and DPR engineers",
     tagline:
       "Produce bankable P50/P90 reports and defensible feasibility studies.",
@@ -60,7 +60,7 @@ const solutions = [
     ],
   },
   {
-    icon: SolarPanelIcon,
+    icon: Sun,
     title: "Ground-mount utility-scale projects",
     tagline:
       "Design from terrain data through evacuation line — for projects from 10 MW to 500 MW.",
@@ -76,7 +76,7 @@ const solutions = [
     ],
   },
   {
-    icon: BuildingsIcon,
+    icon: Building2,
     title: "Large C&I and open access projects",
     tagline:
       "Design, simulate, and produce the documentation package for 1 MW to 50 MW installations.",
@@ -114,9 +114,8 @@ export default function SolutionsPage() {
         {solutions.map((solution) => (
           <div key={solution.title} className="py-14">
             <div className="flex items-start gap-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <solution.icon
-                  weight="duotone"
                   className="h-6 w-6 text-primary"
                 />
               </div>
@@ -137,8 +136,7 @@ export default function SolutionsPage() {
             <ul className="mt-6 grid gap-2 sm:grid-cols-2">
               {solution.capabilities.map((cap) => (
                 <li key={cap} className="flex items-start gap-2 text-sm">
-                  <CheckCircleIcon
-                    weight="regular"
+                  <CircleCheck
                     className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400"
                   />
                   <span>{cap}</span>
@@ -162,7 +160,7 @@ export default function SolutionsPage() {
           <Button asChild>
             <Link href="/dashboard">
               Create a free account
-              <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+              <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" asChild>

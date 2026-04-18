@@ -1,9 +1,9 @@
 import { ContactForm } from "./contact-form"
 import {
-  EnvelopeIcon,
-  ClockIcon,
-  MapPinIcon,
-} from "@phosphor-icons/react/dist/ssr"
+  Mail,
+  Clock,
+  MapPin,
+} from "lucide-react"
 
 export const metadata = {
   title: "Contact — SolarDesign",
@@ -11,25 +11,25 @@ export const metadata = {
 
 const contactDetails = [
   {
-    icon: EnvelopeIcon,
+    icon: Mail,
     label: "Email",
     value: "sales@solardesign.in",
     note: "Enterprise enquiries, integration requirements, custom DISCOM formats",
   },
   {
-    icon: EnvelopeIcon,
+    icon: Mail,
     label: "Support",
     value: "support@solardesign.in",
     note: "Platform issues, billing queries, account management",
   },
   {
-    icon: ClockIcon,
+    icon: Clock,
     label: "Response time",
     value: "One business day",
     note: "Monday to Friday, Indian business hours (IST)",
   },
   {
-    icon: MapPinIcon,
+    icon: MapPin,
     label: "Office",
     value: "Bengaluru, Karnataka",
     note: "India",
@@ -63,7 +63,6 @@ export default function ContactPage() {
             {contactDetails.map((item) => (
               <div key={item.label} className="flex gap-3">
                 <item.icon
-                  weight="duotone"
                   className="mt-0.5 h-5 w-5 shrink-0 text-primary"
                 />
                 <div>

@@ -5,18 +5,18 @@ It applies to all marketing pages and the application UI.
 
 ---
 
-## Theme: Industrial
+## Theme: Nova (shadcn radix-nova)
 
 SolarDesign is used by utility-scale solar engineers, EPC contractors, and IPPs.
-The visual language reflects that context — precise, functional, no decoration.
+The visual language reflects that context — precise, functional, clean.
 
 **Do not use:**
-- Rounded corners (`rounded-xl`, `rounded-lg`, `rounded-full`, etc.) on containers, cards, tables, and inputs
 - Decorative gradients or background blobs
 - Animated hero elements or parallax effects
 - Drop shadows for visual depth (`shadow-lg`, `shadow-xl`)
 
 **Do use:**
+- shadcn's default Nova radius (`--radius: 0.625rem`) — subtle rounding is fine
 - Sharp borders (`border`, `border-b`, `border-t`) for structure
 - Muted fills (`bg-muted/40`, `bg-muted/20`) for section distinction
 - Consistent spacing from Tailwind's scale — no arbitrary values
@@ -50,12 +50,10 @@ bunx --bun shadcn@latest add <component> --cwd packages/ui
 ### Cards
 
 Use `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`.
-Do not add `rounded-xl` or shadow overrides — the default card border is sufficient.
 
 ### Tables
 
-Use shadcn `Table` primitives. No `rounded-xl` wrapper on the container `div`.
-Use `overflow-hidden border` on the wrapper, not `rounded-xl border`.
+Use shadcn `Table` primitives with `overflow-hidden border` on the wrapper div.
 
 ---
 
@@ -85,10 +83,9 @@ Do not mix Lucide or Heroicons.
 
 ## Typography
 
+- Font: **Geist** (sans) as primary, **Geist Mono** for code/data
 - Page headings: `text-4xl font-bold tracking-tight` (h1), `text-2xl font-bold tracking-tight` (h2)
 - Section subheadings: `font-semibold`
 - Body / descriptions: `text-sm text-muted-foreground`
-- Table content: inherits from `Table` (`text-xs` base)
+- Table content: inherits from `Table` (`text-sm` base)
 - Badges / group labels: `text-xs`
-
-No decorative fonts. System font stack via Tailwind default.

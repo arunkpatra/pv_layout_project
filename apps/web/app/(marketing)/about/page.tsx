@@ -7,35 +7,35 @@ import {
   CardDescription,
 } from "@renewable-energy/ui/components/card"
 import {
-  SolarPanelIcon,
-  ArrowRightIcon,
-  FileTextIcon,
-  ShieldCheckIcon,
-  UsersThreeIcon,
-  WrenchIcon,
-} from "@phosphor-icons/react/dist/ssr"
+  Sun,
+  ArrowRight,
+  FileText,
+  ShieldCheck,
+  Users,
+  Wrench,
+} from "lucide-react"
 
 const values = [
   {
-    icon: WrenchIcon,
+    icon: Wrench,
     title: "Built by practitioners",
     description:
       "SolarDesign was built by engineers who have worked on EPC projects, yield consulting, and grid connection submissions in India. The workflows in the platform reflect how utility-scale projects are actually executed — not how they are described in textbooks.",
   },
   {
-    icon: FileTextIcon,
+    icon: FileText,
     title: "India regulatory standards throughout",
     description:
       "ALMM compliance, DISCOM-format SLDs, IS 732 and IS 1255 cable schedules, CEIG inspection requirements, and IREDA / PFC lender formats are built into the platform — not bolted on as exports.",
   },
   {
-    icon: UsersThreeIcon,
+    icon: Users,
     title: "Designed with EPC and IPP teams",
     description:
       "We work directly with design engineers, BD engineers, and project managers at Indian EPC contractors and IPPs. Feature decisions come from live project workflows, not hypothetical requirements.",
   },
   {
-    icon: ShieldCheckIcon,
+    icon: ShieldCheck,
     title: "One file, all documents",
     description:
       "Design changes propagate automatically to SLD, cable schedule, BoM, BoQ, and DPR. No parallel spreadsheets, no re-entry between tools, no version mismatch between the layout and the bid package.",
@@ -70,8 +70,8 @@ export default function AboutPage() {
     <>
       {/* Hero */}
       <section className="flex flex-col items-center gap-6 px-6 py-20 text-center">
-        <div className="flex h-12 w-12 items-center justify-center bg-primary/10">
-          <SolarPanelIcon weight="duotone" className="h-6 w-6 text-primary" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+          <Sun className="h-6 w-6 text-primary" />
         </div>
         <h1 className="max-w-2xl text-4xl font-bold tracking-tight">
           Built for India&apos;s utility-scale solar market
@@ -105,9 +105,8 @@ export default function AboutPage() {
             {values.map((value) => (
               <Card key={value.title}>
                 <CardHeader>
-                  <div className="mb-1 flex h-10 w-10 items-center justify-center bg-primary/10">
+                  <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                     <value.icon
-                      weight="duotone"
                       className="h-5 w-5 text-primary"
                     />
                   </div>
@@ -130,7 +129,7 @@ export default function AboutPage() {
             {team.map((member) => (
               <Card key={member.name}>
                 <CardHeader>
-                  <div className="mb-2 flex h-12 w-12 items-center justify-center bg-muted text-lg font-bold text-muted-foreground">
+                  <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-lg font-bold text-muted-foreground">
                     {member.name
                       .split(" ")
                       .map((n) => n[0])
@@ -161,7 +160,7 @@ export default function AboutPage() {
           <Button asChild>
             <Link href="/dashboard">
               Start free trial
-              <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+              <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" asChild>
