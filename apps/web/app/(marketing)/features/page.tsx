@@ -2,6 +2,12 @@ import Link from "next/link"
 import { Button } from "@renewable-energy/ui/components/button"
 import { Badge } from "@renewable-energy/ui/components/badge"
 import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@renewable-energy/ui/components/card"
+import {
   SolarPanelIcon,
   ChartLineUpIcon,
   BuildingsIcon,
@@ -89,26 +95,23 @@ export default function FeaturesPage() {
       {/* Features grid */}
       <section className="mx-auto grid w-full max-w-5xl gap-6 px-6 pb-20 md:grid-cols-2">
         {features.map((feature) => (
-          <div
-            key={feature.title}
-            className="flex flex-col gap-3 rounded-xl border bg-card p-6 text-card-foreground"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <feature.icon
-                  weight="duotone"
-                  className="h-5 w-5 text-primary"
-                />
+          <Card key={feature.title}>
+            <CardHeader>
+              <div className="mb-1 flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <feature.icon
+                    weight="duotone"
+                    className="h-5 w-5 text-primary"
+                  />
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {feature.badge}
+                </Badge>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {feature.badge}
-              </Badge>
-            </div>
-            <h3 className="font-semibold">{feature.title}</h3>
-            <p className="text-sm text-muted-foreground">
-              {feature.description}
-            </p>
-          </div>
+              <CardTitle>{feature.title}</CardTitle>
+              <CardDescription>{feature.description}</CardDescription>
+            </CardHeader>
+          </Card>
         ))}
       </section>
 

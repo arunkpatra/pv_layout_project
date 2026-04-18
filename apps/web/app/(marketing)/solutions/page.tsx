@@ -1,6 +1,12 @@
 import Link from "next/link"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@renewable-energy/ui/components/card"
+import {
   BuildingsIcon,
   FactoryIcon,
   SolarPanelIcon,
@@ -65,21 +71,18 @@ export default function SolutionsPage() {
       {/* Solutions grid */}
       <section className="mx-auto grid w-full max-w-5xl gap-6 px-6 pb-20 md:grid-cols-2 lg:grid-cols-3">
         {solutions.map((solution) => (
-          <div
-            key={solution.title}
-            className="flex flex-col gap-3 rounded-xl border bg-card p-6 text-card-foreground"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <solution.icon
-                weight="duotone"
-                className="h-5 w-5 text-primary"
-              />
-            </div>
-            <h3 className="font-semibold">{solution.title}</h3>
-            <p className="text-sm text-muted-foreground">
-              {solution.description}
-            </p>
-          </div>
+          <Card key={solution.title}>
+            <CardHeader>
+              <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <solution.icon
+                  weight="duotone"
+                  className="h-5 w-5 text-primary"
+                />
+              </div>
+              <CardTitle>{solution.title}</CardTitle>
+              <CardDescription>{solution.description}</CardDescription>
+            </CardHeader>
+          </Card>
         ))}
       </section>
 
