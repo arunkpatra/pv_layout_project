@@ -96,8 +96,8 @@ export default function PricingPage() {
           <Card
             key={tier.name}
             className={cn(
-              tier.highlight &&
-                "ring-2 ring-primary relative",
+              "flex flex-col",
+              tier.highlight && "ring-2 ring-primary relative",
             )}
           >
             <CardHeader>
@@ -119,13 +119,13 @@ export default function PricingPage() {
               </div>
               <CardDescription>{tier.description}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               <ul className="flex flex-col gap-2">
                 {tier.entitlements.map((item) => (
                   <li key={item} className="flex items-start gap-2 text-xs">
                     <CheckIcon
                       weight="bold"
-                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400"
                     />
                     <span>{item}</span>
                   </li>

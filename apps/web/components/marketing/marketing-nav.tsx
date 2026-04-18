@@ -46,8 +46,8 @@ export function MarketingNav() {
             key={link.href}
             href={link.href}
             className={cn(
-              "relative text-sm transition-colors hover:text-foreground",
-              "after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:rounded-full after:bg-foreground after:transition-transform after:duration-200",
+              "relative flex h-14 items-center text-sm transition-colors hover:text-foreground",
+              "after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:bg-foreground after:transition-transform after:duration-200",
               isActive(link.href)
                 ? "text-foreground after:scale-x-100"
                 : "text-muted-foreground",
