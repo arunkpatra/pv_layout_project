@@ -21,6 +21,7 @@ import {
   useSidebar,
 } from "@renewable-energy/ui/components/sidebar"
 import { CaretUpDownIcon, SparkleIcon, CheckCircleIcon, CreditCardIcon, BellIcon, SignOutIcon } from "@phosphor-icons/react"
+import { useClerk } from "@clerk/nextjs"
 
 export function NavUser({
   user,
@@ -32,6 +33,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const { signOut } = useClerk()
 
   return (
     <SidebarMenu>
@@ -98,9 +100,8 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <SignOutIcon
-              />
+            <DropdownMenuItem onClick={() => signOut({ redirectUrl: "/" })}>
+              <SignOutIcon />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

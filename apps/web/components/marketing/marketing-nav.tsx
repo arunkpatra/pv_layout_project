@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
-import { SignInButton, UserButton, Show } from "@clerk/nextjs"
+import { UserButton, Show } from "@clerk/nextjs"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
   Sheet,
@@ -70,9 +70,9 @@ export function MarketingNav() {
           </div>
         </Show>
         <Show when="signed-out">
-          <SignInButton mode="modal">
-            <Button size="sm">Sign in</Button>
-          </SignInButton>
+          <Button asChild size="sm">
+            <Link href="/sign-in">Sign in</Link>
+          </Button>
         </Show>
       </div>
 
@@ -118,11 +118,11 @@ export function MarketingNav() {
                 </div>
               </Show>
               <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <Button className="w-full" onClick={() => setOpen(false)}>
+                <Button asChild className="w-full">
+                  <Link href="/sign-in" onClick={() => setOpen(false)}>
                     Sign in
-                  </Button>
-                </SignInButton>
+                  </Link>
+                </Button>
               </Show>
             </div>
           </SheetContent>
