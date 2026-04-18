@@ -14,6 +14,14 @@ Before doing any work, read this file in full:
 ## Commands
 
 ```bash
+# Local infrastructure (Docker)
+docker compose up -d          # Start Postgres + pgAdmin in background
+docker compose down           # Stop containers (keeps volumes)
+docker compose down -v        # Stop and delete volumes (destructive — wipes DB)
+docker compose ps             # Check container status
+# pgAdmin UI: http://localhost:5050  (admin@local.dev / admin)
+# Postgres:   localhost:5432         (renewable / renewable)
+
 # Development (all workspaces)
 bun run dev          # Start all dev servers (Turbopack)
 bun run build        # Production build (all workspaces)
