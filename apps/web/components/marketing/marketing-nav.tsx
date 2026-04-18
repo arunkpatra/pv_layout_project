@@ -17,7 +17,7 @@ import { cn } from "@renewable-energy/ui/lib/utils"
 
 const navLinks = [
   { href: "/solutions", label: "Solutions" },
-  { href: "/#features", label: "Features" },
+  { href: "/features", label: "Features" },
   { href: "/#pricing", label: "Pricing" },
   { href: "/#resources", label: "Resources" },
   { href: "/#about", label: "About" },
