@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google"
+import { ClerkProvider } from "@clerk/nextjs"
 
 import "@renewable-energy/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -18,16 +19,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("antialiased", fontSans.variable, "font-mono", jetbrainsMono.variable)}
-    >
-      <body>
-        <ThemeProvider>
-          <TooltipProvider>{children}</TooltipProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider afterSignOutUrl="/">
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={cn("antialiased", fontSans.variable, "font-mono", jetbrainsMono.variable)}
+      >
+        <body>
+          <ThemeProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

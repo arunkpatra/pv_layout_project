@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
+import { SignInButton, UserButton, Show } from "@clerk/nextjs"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
   Sheet,
@@ -59,10 +60,20 @@ export function MarketingNav() {
       </nav>
 
       {/* Desktop CTA */}
-      <div className="hidden md:flex">
-        <Button asChild size="sm">
-          <Link href="/dashboard">Sign In</Link>
-        </Button>
+      <div className="hidden items-center md:flex">
+        <Show when="signed-in">
+          <div className="flex items-center gap-3">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
+            <UserButton />
+          </div>
+        </Show>
+        <Show when="signed-out">
+          <SignInButton mode="modal">
+            <Button size="sm">Sign in</Button>
+          </SignInButton>
+        </Show>
       </div>
 
       {/* Mobile: hamburger */}
@@ -95,12 +106,24 @@ export function MarketingNav() {
                 </SheetClose>
               ))}
             </nav>
-            <div className="mt-6 px-3">
-              <Button asChild className="w-full">
-                <Link href="/dashboard" onClick={() => setOpen(false)}>
-                  Sign In
-                </Link>
-              </Button>
+            <div className="mt-6 flex flex-col gap-3 px-3">
+              <Show when="signed-in">
+                <Button asChild className="w-full">
+                  <Link href="/dashboard" onClick={() => setOpen(false)}>
+                    Dashboard
+                  </Link>
+                </Button>
+                <div className="flex justify-center">
+                  <UserButton />
+                </div>
+              </Show>
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <Button className="w-full" onClick={() => setOpen(false)}>
+                    Sign in
+                  </Button>
+                </SignInButton>
+              </Show>
             </div>
           </SheetContent>
         </Sheet>
