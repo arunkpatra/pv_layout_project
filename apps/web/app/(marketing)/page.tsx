@@ -19,15 +19,15 @@ export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-24 text-center">
+      <section className="flex flex-col items-center gap-6 px-6 pb-24 pt-20 text-center">
         <Badge variant="secondary" className="gap-1.5">
           <LightningIcon weight="fill" className="h-3 w-3" />
           Now in beta
         </Badge>
         <h1 className="max-w-3xl text-5xl font-bold tracking-tight">
-          From KMZ to DPR.
+          From site boundary to bankable design package.
           <br />
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground text-3xl">
             Utility-scale solar design for India.
           </span>
         </h1>
