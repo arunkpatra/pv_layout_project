@@ -18,9 +18,9 @@ import { cn } from "@renewable-energy/ui/lib/utils"
 const navLinks = [
   { href: "/solutions", label: "Solutions" },
   { href: "/features", label: "Features" },
-  { href: "/#pricing", label: "Pricing" },
-  { href: "/#resources", label: "Resources" },
-  { href: "/#about", label: "About" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/resources", label: "Resources" },
+  { href: "/about", label: "About" },
 ]
 
 export function MarketingNav() {
@@ -28,7 +28,6 @@ export function MarketingNav() {
   const pathname = usePathname()
 
   function isActive(href: string) {
-    if (href.startsWith("/#")) return false
     return pathname === href || pathname.startsWith(href + "/")
   }
 
