@@ -187,7 +187,7 @@ export default function LandingPage() {
             },
           ].map((s) => (
             <div key={s.title} className="flex flex-col gap-3">
-              <div className="flex h-10 w-10 items-center justify-center bg-primary/10">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <s.icon className="h-5 w-5 text-primary" />
               </div>
               <h3 className="font-semibold">{s.title}</h3>
@@ -269,7 +269,7 @@ export default function LandingPage() {
             },
           ].map((f) => (
             <div key={f.title} className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary/10">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <f.icon className="h-5 w-5 text-primary" />
               </div>
               <div className="flex flex-col gap-1">

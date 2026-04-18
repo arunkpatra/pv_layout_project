@@ -70,7 +70,7 @@ export default function AboutPage() {
     <>
       {/* Hero */}
       <section className="flex flex-col items-center gap-6 px-6 py-20 text-center">
-        <div className="flex h-12 w-12 items-center justify-center bg-primary/10">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
           <Sun className="h-6 w-6 text-primary" />
         </div>
         <h1 className="max-w-2xl text-4xl font-bold tracking-tight">
@@ -105,7 +105,7 @@ export default function AboutPage() {
             {values.map((value) => (
               <Card key={value.title}>
                 <CardHeader>
-                  <div className="mb-1 flex h-10 w-10 items-center justify-center bg-primary/10">
+                  <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                     <value.icon
                       className="h-5 w-5 text-primary"
                     />
@@ -129,7 +129,7 @@ export default function AboutPage() {
             {team.map((member) => (
               <Card key={member.name}>
                 <CardHeader>
-                  <div className="mb-2 flex h-12 w-12 items-center justify-center bg-muted text-lg font-bold text-muted-foreground">
+                  <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-lg font-bold text-muted-foreground">
                     {member.name
                       .split(" ")
                       .map((n) => n[0])
