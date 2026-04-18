@@ -23,15 +23,10 @@ import {
   UploadSimpleIcon,
   SquaresFourIcon,
   HouseIcon,
-  FolderIcon,
 } from "@phosphor-icons/react"
+import { useUser } from "@clerk/nextjs"
 
 const data = {
-  user: {
-    name: "Arun Patra",
-    email: "arun@example.com",
-    avatar: "",
-  },
   teams: [
     {
       name: "SolarDesign Pro",
@@ -124,6 +119,13 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useUser()
+  const clerkUser = {
+    name: user?.fullName ?? user?.username ?? "User",
+    email: user?.primaryEmailAddress?.emailAddress ?? "",
+    avatar: user?.imageUrl ?? "",
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -134,7 +136,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={clerkUser} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

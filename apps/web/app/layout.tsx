@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google"
+import { Geist, JetBrains_Mono } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 
 import "@renewable-energy/ui/globals.css"
@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider afterSignOutUrl="/">
+    <ClerkProvider afterSignOutUrl="/sign-in">
       <html
         lang="en"
         suppressHydrationWarning

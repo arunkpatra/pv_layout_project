@@ -55,7 +55,7 @@ export default function LandingPage() {
             </p>
             <div className="flex items-center gap-3">
               <Button asChild size="lg">
-                <Link href="/dashboard">
+                <Link href="/sign-up">
                   Create a free account
                   <ArrowRightIcon className="ml-1.5 h-4 w-4" />
                 </Link>
@@ -465,7 +465,7 @@ export default function LandingPage() {
         </p>
         <div className="flex items-center gap-3">
           <Button asChild size="lg">
-            <Link href="/dashboard">
+            <Link href="/sign-up">
               Create a free account
               <ArrowRightIcon className="ml-1.5 h-4 w-4" />
             </Link>
