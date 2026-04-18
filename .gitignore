@@ -37,3 +37,5 @@ npm-debug.log*
 *.pem
 # next-agents-md
 .next-docs/
+
+logs/
