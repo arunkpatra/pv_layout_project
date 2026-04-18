@@ -109,7 +109,7 @@ export default function PricingPage() {
 
       {/* Trial notice */}
       <section className="mx-auto w-full max-w-5xl px-6 pb-10">
-        <div className="flex items-start gap-3 border border-primary/30 bg-primary/5 px-5 py-4">
+        <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 px-5 py-4">
           <Info
             className="mt-0.5 h-5 w-5 shrink-0 text-primary"
           />
@@ -189,7 +189,7 @@ export default function PricingPage() {
         </h2>
 
         {/* Mobile: stacked cards */}
-        <div className="flex flex-col divide-y border md:hidden">
+        <div className="flex flex-col divide-y rounded-lg border md:hidden">
           {[
             { tool: "PVsyst 8", cost: "~₹67,000", covers: "Yield simulation only", highlight: false, muted: true },
             { tool: "AutoCAD (full)", cost: "~₹1,21,000", covers: "Drafting only — no solar intelligence", highlight: false, muted: true },
@@ -207,7 +207,7 @@ export default function PricingPage() {
         </div>
 
         {/* Desktop: table */}
-        <div className="hidden overflow-hidden border md:block">
+        <div className="hidden overflow-hidden rounded-lg border md:block">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -247,7 +247,7 @@ export default function PricingPage() {
         <h2 className="mb-8 text-2xl font-bold tracking-tight">
           Feature comparison
         </h2>
-        <div className="overflow-hidden border">
+        <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
