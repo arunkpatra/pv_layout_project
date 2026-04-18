@@ -14,40 +14,67 @@ import {
   CheckIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react/dist/ssr"
+import { HeroSchematic } from "@/components/marketing/hero-schematic"
+import { HeroStats } from "@/components/marketing/hero-stats"
 
 export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="flex flex-col items-center gap-6 px-6 pb-24 pt-20 text-center">
-        <Badge variant="secondary" className="gap-1.5">
-          <LightningIcon weight="fill" className="h-3 w-3" />
-          Now in beta
-        </Badge>
-        <h1 className="max-w-3xl text-5xl font-bold tracking-tight">
-          From site boundary to bankable design package.
-          <br />
-          <span className="text-muted-foreground text-3xl">
-            Utility-scale solar design for India.
-          </span>
-        </h1>
-        <p className="max-w-2xl text-lg text-muted-foreground">
-          SolarDesign covers the full pre-bid to DPR workflow for greenfield
-          solar projects — KMZ import, shadow-free area calculation, DC/AC
-          layout, CUF and P50/P90 simulation, SLD generation, and lender-ready
-          report export. Built for design engineers and EPC teams working on
-          10 MW to 500 MW projects in India.
-        </p>
-        <div className="flex items-center gap-3">
-          <Button asChild size="lg">
-            <Link href="/dashboard">
-              Create a free account
-              <ArrowRightIcon className="ml-1.5 h-4 w-4" />
-            </Link>
-          </Button>
-          <Button variant="outline" size="lg" asChild>
-            <Link href="/solutions">View solutions</Link>
-          </Button>
+      <section
+        className="relative overflow-hidden px-6 pb-16 pt-16"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, hsl(var(--foreground) / 0.07) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      >
+        {/* Fade out dot-grid at bottom */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background" />
+
+        <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16">
+          {/* Left: text */}
+          <div className="flex flex-col gap-6 lg:max-w-xl">
+            <Badge variant="secondary" className="w-fit gap-1.5">
+              <LightningIcon weight="fill" className="h-3 w-3" />
+              Now in beta
+            </Badge>
+            <h1 className="text-5xl font-bold tracking-tight">
+              From site boundary to bankable design package.
+              <br />
+              <span className="text-3xl text-muted-foreground">
+                Utility-scale solar design for India.
+              </span>
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              SolarDesign covers the full pre-bid to DPR workflow for greenfield
+              solar projects — KMZ import, shadow-free area calculation, DC/AC
+              layout, CUF and P50/P90 simulation, SLD generation, and lender-ready
+              report export. Built for design engineers and EPC teams working on
+              10 MW to 500 MW projects in India.
+            </p>
+            <div className="flex items-center gap-3">
+              <Button asChild size="lg">
+                <Link href="/dashboard">
+                  Create a free account
+                  <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/solutions">View solutions</Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* Right: schematic */}
+          <div className="w-full lg:flex-1">
+            <HeroSchematic />
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="relative mx-auto mt-14 w-full max-w-3xl border-t pt-10">
+          <HeroStats />
         </div>
       </section>
 
