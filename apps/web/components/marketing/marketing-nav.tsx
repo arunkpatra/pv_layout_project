@@ -8,8 +8,10 @@ import {
   SheetContent,
   SheetTrigger,
   SheetClose,
+  SheetTitle,
+  SheetDescription,
 } from "@renewable-energy/ui/components/sheet"
-import { SolarPanelIcon, ListIcon, XIcon } from "@phosphor-icons/react"
+import { SolarPanelIcon, ListIcon } from "@phosphor-icons/react"
 
 const navLinks = [
   { href: "#solutions", label: "Solutions" },
@@ -58,12 +60,11 @@ export function MarketingNav() {
               <ListIcon className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-72 pt-10">
-            <SheetClose className="absolute right-4 top-4" asChild>
-              <Button variant="ghost" size="icon" aria-label="Close menu">
-                <XIcon className="h-4 w-4" />
-              </Button>
-            </SheetClose>
+          <SheetContent side="right" className="w-72 pt-12">
+            <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+            <SheetDescription className="sr-only">
+              Main navigation links
+            </SheetDescription>
             <nav className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <SheetClose key={link.href} asChild>
