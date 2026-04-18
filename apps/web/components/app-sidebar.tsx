@@ -12,7 +12,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@workspace/ui/components/sidebar"
+} from "@renewable-energy/ui/components/sidebar"
 import {
   SunIcon,
   MapTrifoldIcon,

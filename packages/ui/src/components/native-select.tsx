@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { cn } from "@workspace/ui/lib/utils"
+import { cn } from "@renewable-energy/ui/lib/utils"
 import { CaretDownIcon } from "@phosphor-icons/react"
 
 type NativeSelectProps = Omit<React.ComponentProps<"select">, "size"> & {

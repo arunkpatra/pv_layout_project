@@ -4,7 +4,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@workspace/ui/components/collapsible"
+} from "@renewable-energy/ui/components/collapsible"
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -14,7 +14,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@workspace/ui/components/sidebar"
+} from "@renewable-energy/ui/components/sidebar"
 import { CaretRightIcon } from "@phosphor-icons/react"
 
 export function NavMain({
@@ -47,7 +47,9 @@ export function NavMain({
                 <SidebarMenuButton tooltip={item.title}>
                   {item.icon}
                   <span>{item.title}</span>
-                  <CaretRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  {item.items && item.items.length > 0 && (
+                    <CaretRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  )}
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>

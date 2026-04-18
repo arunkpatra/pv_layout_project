@@ -1,6 +1,6 @@
 "use client"
 
-import { cn } from "@workspace/ui/lib/utils"
+import { cn } from "@renewable-energy/ui/lib/utils"
 import { SpinnerIcon } from "@phosphor-icons/react"
 
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {

@@ -1,16 +1,16 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import { Separator } from "@workspace/ui/components/separator"
+import { Separator } from "@renewable-energy/ui/components/separator"
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@workspace/ui/components/sidebar"
+} from "@renewable-energy/ui/components/sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
-} from "@workspace/ui/components/breadcrumb"
+} from "@renewable-energy/ui/components/breadcrumb"
 
 export default function MainLayout({
   children,

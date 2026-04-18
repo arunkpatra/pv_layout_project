@@ -187,6 +187,28 @@ If the answer is "17 files need re-editing," verify the assumption first.
 
 ---
 
+## Self-Review After Significant Work
+
+After any substantial or wide-blast change — new infrastructure, scope renames, multi-file refactors, new patterns, anything non-trivial — Claude Code **must** run a self-review using the `superpowers:code-reviewer` agent before declaring work complete.
+
+**What counts as significant:**
+- New infrastructure (test setup, CI, build config)
+- Monorepo-wide renames or refactors
+- New architectural patterns being introduced for the first time
+- Any change touching 5+ files
+- Anything where a missed file would cause a silent production failure
+
+**How to run the self-review:**
+```
+Agent(subagent_type: "superpowers:code-reviewer", prompt: "Review [what was done]...")
+```
+
+The reviewer checks for: missed files, misaligned configs, correctness issues, and consistency gaps — the class of bugs that only surface when a second pass looks at the whole picture rather than each change in isolation.
+
+**Do not skip this step** on the grounds that "tests pass" or "build passes." Static gates verify internal consistency. The self-review catches what the gates cannot: wrong assumptions, incomplete renames, config mismatches, and structural gaps.
+
+---
+
 ## Checklist for Every Implementation Session
 
 **Before starting implementation:**
@@ -199,6 +221,7 @@ If the answer is "17 files need re-editing," verify the assumption first.
 - [ ] Have all static verification gates passed (lint, typecheck, build)?
 - [ ] Has the human done a structured manual test?
 - [ ] Has Claude listed what it CAN'T verify?
+- [ ] For significant/wide-blast work: has the `superpowers:code-reviewer` self-review been run?
 
 **Before committing:**
 - [ ] All gates pass (lint, typecheck, build)

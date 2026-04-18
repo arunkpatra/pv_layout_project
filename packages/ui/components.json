@@ -11,11 +11,11 @@
   },
   "iconLibrary": "phosphor",
   "aliases": {
-    "components": "@workspace/ui/components",
-    "utils": "@workspace/ui/lib/utils",
-    "hooks": "@workspace/ui/hooks",
-    "lib": "@workspace/ui/lib",
-    "ui": "@workspace/ui/components"
+    "components": "@renewable-energy/ui/components",
+    "utils": "@renewable-energy/ui/lib/utils",
+    "hooks": "@renewable-energy/ui/hooks",
+    "lib": "@renewable-energy/ui/lib",
+    "ui": "@renewable-energy/ui/components"
   },
   "rtl": false,
   "menuColor": "default",

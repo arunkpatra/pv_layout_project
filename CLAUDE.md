@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Before doing any work, read this file in full:
 
-- **[Development Principles](./docs/claude-dev-principles.md)** — Spike-first methodology, what Claude can and cannot verify, prompt patterns, session structure, and anti-patterns. These principles govern every implementation session.
+- **[Development Principles](./docs/claude-dev-principles.md)** — Spike-first methodology, what Claude can and cannot verify, prompt patterns, session structure, anti-patterns, and the mandatory self-review protocol.
 - **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** — How to conduct browser/runtime testing with the human. Ask one question at a time, never dump a full test list.
+
+**Self-review rule**: After any significant/wide-blast work (5+ files, new infrastructure, renames, new patterns), run `superpowers:code-reviewer` before declaring complete. "Tests pass" is not sufficient — the reviewer catches what static gates cannot.
 
 ## Commands
 
@@ -18,11 +20,20 @@ bun run build        # Production build (all workspaces)
 bun run lint         # Lint all workspaces
 bun run format       # Format with Prettier
 bun run typecheck    # TypeScript check all workspaces
+bun run test         # Test all workspaces
 
-# Single workspace
+# Single workspace (cd first)
 cd apps/web && bun run dev       # Run only the web app
 cd apps/web && bun run build     # Build only the web app
 cd apps/web && bun run typecheck # Typecheck only the web app
+cd apps/web && bun run test      # Test only the web app
+cd packages/ui && bun run test   # Test only the UI package
+
+# Selective via turbo --filter (run from repo root, no cd needed)
+bunx turbo test --filter=web            # Test apps/web only
+bunx turbo test --filter=@renewable-energy/ui  # Test packages/ui only
+bunx turbo test --filter=web...         # Test web + its dependencies
+bunx turbo build --filter=web          # Any task works with --filter
 ```
 
 ## Architecture
@@ -31,7 +42,7 @@ cd apps/web && bun run typecheck # Typecheck only the web app
 
 ```
 apps/web/              → Next.js 16 App Router application (React 19)
-packages/ui/           → Shared component library (@workspace/ui)
+packages/ui/           → Shared component library (@renewable-energy/ui)
 packages/eslint-config/    → Shared ESLint configs
 packages/typescript-config/ → Shared TypeScript configs
 ```
@@ -46,7 +57,15 @@ packages/typescript-config/ → Shared TypeScript configs
 - **shadcn/ui** components in `src/components/`
 - Shared hooks in `src/hooks/`, utilities in `src/lib/` (includes `cn()`)
 - Global Tailwind CSS in `src/styles/globals.css`
-- Import as `@workspace/ui/components/button`, `@workspace/ui/lib/utils`, etc.
+- Import as `@renewable-energy/ui/components/button`, `@renewable-energy/ui/lib/utils`, etc.
+
+## Testing
+
+- **Framework**: Vitest + React Testing Library (`bun run test` runs all workspaces via Turbo)
+- **TDD is mandatory**: Write failing test first, watch it fail, then write minimal code to pass. No production code without a prior failing test.
+- **Test location**: co-locate tests with source — `utils.test.ts` beside `utils.ts`, `nav-main.test.tsx` beside `nav-main.tsx`
+- **Component test wrapper**: React components using `SidebarProvider` also need `TooltipProvider` and a `matchMedia` stub (see `apps/web/vitest.setup.ts`)
+- **vitest.setup.ts** in `apps/web` stubs `window.matchMedia` (jsdom omits it; shadcn's `useMobile` hook requires it)
 
 ## Key Conventions
 
@@ -55,7 +74,7 @@ packages/typescript-config/ → Shared TypeScript configs
 - **Phosphor Icons** (`@phosphor-icons/react`) — not Lucide
 - **Phosphor Icons TS types** use `Icon` suffix: `CaretDownIcon`, `CheckIcon`, `XIcon` (not `CaretDown`, `Check`, `X`)
 - **Prettier**: no semicolons, double quotes, trailing commas (es5), 80 char width
-- **Path aliases**: `@/*` for web app imports, `@workspace/ui/*` for shared UI
+- **Path aliases**: `@/*` for web app imports, `@renewable-energy/ui/*` for shared UI
 - **Theme**: `next-themes` with dark/light mode; press `d` key to toggle
 - **Zod** for schema validation
 - Add new UI components to `packages/ui/`, not `apps/web/components/`

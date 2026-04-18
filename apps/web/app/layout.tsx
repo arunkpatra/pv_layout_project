@@ -1,9 +1,9 @@
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google"
 
-import "@workspace/ui/globals.css"
+import "@renewable-energy/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@workspace/ui/components/tooltip"
-import { cn } from "@workspace/ui/lib/utils";
+import { TooltipProvider } from "@renewable-energy/ui/components/tooltip"
+import { cn } from "@renewable-energy/ui/lib/utils";
 
 const fontSans = Geist({
   subsets: ["latin"],

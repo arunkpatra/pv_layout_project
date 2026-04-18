@@ -9,11 +9,12 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
-    "@workspace/ui": "workspace:*",
+    "@renewable-energy/ui": "workspace:*",
     "next": "16.2.4",
     "next-themes": "^0.4.6",
     "react": "^19.2.4",
@@ -21,12 +22,17 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25.1.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
-    "@workspace/eslint-config": "workspace:^",
-    "@workspace/typescript-config": "workspace:*",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@renewable-energy/eslint-config": "workspace:^",
+    "@renewable-energy/typescript-config": "workspace:*",
     "eslint": "^9.39.2",
-    "typescript": "^5.9.3"
+    "jsdom": "^29.0.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
   }
 }

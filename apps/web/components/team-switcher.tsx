@@ -10,13 +10,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
+} from "@renewable-energy/ui/components/dropdown-menu"
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@workspace/ui/components/sidebar"
+} from "@renewable-energy/ui/components/sidebar"
 import { CaretUpDownIcon, PlusIcon } from "@phosphor-icons/react"
 
 export function TeamSwitcher({

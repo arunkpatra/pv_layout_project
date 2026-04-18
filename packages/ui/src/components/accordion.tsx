@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Accordion as AccordionPrimitive } from "radix-ui"
 
-import { cn } from "@workspace/ui/lib/utils"
+import { cn } from "@renewable-energy/ui/lib/utils"
 import { CaretDownIcon, CaretUpIcon } from "@phosphor-icons/react"
 
 function Accordion({
