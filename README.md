@@ -1,6 +1,6 @@
-# shadcn/ui monorepo template
+# SolarDesign
 
-This is a Next.js monorepo template with shadcn/ui.
+Utility-scale solar project design and management platform.
 
 ## Adding components
 
