@@ -331,14 +331,14 @@ export default function LandingPage() {
             },
             {
               name: "Professional",
-              price: "$49",
-              period: "per user / month",
+              price: "₹1,50,000",
+              period: "per user / year · ex-GST",
               highlight: true,
               badge: "Most popular",
               perks: [
                 "Up to 10 users",
-                "Unlimited projects",
-                "CUF and P50/P90 simulation",
+                "CUF and P50/P75/P90 simulation",
+                "DISCOM SLD, IS cable schedule, DPR export",
               ],
             },
             {
@@ -355,7 +355,7 @@ export default function LandingPage() {
           ].map((tier) => (
             <div
               key={tier.name}
-              className={`rounded-xl border p-6 ${tier.highlight ? "ring-2 ring-primary" : ""}`}
+              className={`flex flex-col rounded-xl border p-6 ${tier.highlight ? "ring-2 ring-primary" : ""}`}
             >
               <div className="mb-4 flex items-center justify-between">
                 <span className="font-semibold">{tier.name}</span>
@@ -365,15 +365,15 @@ export default function LandingPage() {
                   </Badge>
                 )}
               </div>
-              <div className="mb-4 flex items-baseline gap-1">
+              <div className="mb-4 flex flex-col gap-1">
                 <span className="text-3xl font-bold">{tier.price}</span>
                 {tier.period && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs leading-snug text-muted-foreground">
                     {tier.period}
                   </span>
                 )}
               </div>
-              <ul className="mb-6 flex flex-col gap-2">
+              <ul className="flex flex-1 flex-col gap-2">
                 {tier.perks.map((perk) => (
                   <li key={perk} className="flex items-center gap-2 text-sm">
                     <CheckIcon
@@ -388,9 +388,11 @@ export default function LandingPage() {
                 asChild
                 size="sm"
                 variant={tier.highlight ? "default" : "outline"}
-                className="w-full"
+                className="mt-6 w-full"
               >
-                <Link href="/pricing">View full plan</Link>
+                <Link href="/pricing">
+                  {tier.name === "Starter" ? "Create a free account" : "View full plan"}
+                </Link>
               </Button>
             </div>
           ))}
