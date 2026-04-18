@@ -107,6 +107,16 @@ Password: renewable
 - Keeping the API separate from the Next.js app gives a clean boundary: `apps/web` handles UI and auth flows, `apps/api` handles business logic and data access
 - Hono has built-in OpenAPI/Zod validation support for typed request/response contracts
 
+### Data access boundary
+
+**`apps/web` never imports `@renewable-energy/db` directly.** All data flows through the API:
+
+```
+apps/web  →  HTTP  →  apps/api  →  @renewable-energy/db  →  PostgreSQL
+```
+
+Only `apps/api` has `@renewable-energy/db` in its `package.json` dependencies. This keeps the web app a pure UI layer with no direct database coupling.
+
 ---
 
 ## Local Infrastructure: Docker Compose
@@ -127,7 +137,7 @@ The project is built incrementally. Each step is spiked and verified before the 
 | 2 | GitHub Actions CI (lint, typecheck, test, build) | Done |
 | 3 | Vitest + TDD infrastructure | Done |
 | 4 | Docker Compose (Postgres 17) | Done |
-| 5 | `packages/db` — Prisma schema + client | Next |
+| 5 | `packages/db` — Prisma schema + client | Done |
 | 6 | Clerk auth in `apps/web` — sign in, org switcher | Planned |
 | 7 | Clerk webhook handler — sync users/orgs to Postgres | Planned |
 | 8 | `apps/api` — Hono server, protected routes | Planned |

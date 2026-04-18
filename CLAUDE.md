@@ -22,6 +22,13 @@ docker compose down -v        # Stop and delete volumes (destructive — wipes D
 docker compose ps             # Check container status
 # Postgres: localhost:5432  (renewable / renewable / renewable_energy)
 
+# Database (Prisma — run from repo root)
+bun run db:generate   # Regenerate Prisma client after schema changes
+bun run db:migrate    # Create and apply a new migration (prompts for name)
+bun run db:studio     # Open Prisma Studio at http://localhost:5555
+bun run db:status     # Show migration status
+bun run db:validate   # Validate schema files
+
 # Development (all workspaces)
 bun run dev          # Start all dev servers (Turbopack)
 bun run build        # Production build (all workspaces)

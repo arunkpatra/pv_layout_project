@@ -8,7 +8,13 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "test": "turbo test",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:generate": "turbo db:generate",
+    "db:migrate": "turbo db:migrate",
+    "db:studio": "turbo db:studio",
+    "db:status": "turbo db:status",
+    "db:validate": "turbo db:validate",
+    "db:seed": "turbo db:seed"
   },
   "devDependencies": {
     "@renewable-energy/eslint-config": "workspace:*",
