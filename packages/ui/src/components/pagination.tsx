@@ -1,10 +1,8 @@
-"use client"
-
 import * as React from "react"
 
 import { cn } from "@renewable-energy/ui/lib/utils"
 import { Button } from "@renewable-energy/ui/components/button"
-import { CaretLeftIcon, CaretRightIcon, DotsThreeIcon } from "@phosphor-icons/react"
+import { CaretLeftIcon, CaretRightIcon, DotsThreeIcon } from "@phosphor-icons/react/dist/ssr"
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -113,7 +111,8 @@ function PaginationEllipsis({
       )}
       {...props}
     >
-      <DotsThreeIcon />
+      <DotsThreeIcon
+      />
       <span className="sr-only">More pages</span>
     </span>
   )

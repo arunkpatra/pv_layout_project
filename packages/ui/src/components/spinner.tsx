@@ -1,7 +1,5 @@
-"use client"
-
 import { cn } from "@renewable-energy/ui/lib/utils"
-import { SpinnerIcon } from "@phosphor-icons/react"
+import { SpinnerIcon } from "@phosphor-icons/react/dist/ssr"
 
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
   return (
@@ -9,4 +7,4 @@ function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
   )
 }
 
-export { SpinnerIcon }
+export { Spinner }
