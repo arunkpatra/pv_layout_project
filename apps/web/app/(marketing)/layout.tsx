@@ -14,10 +14,10 @@ export default function MarketingLayout({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>© 2026 SolarDesign. All rights reserved.</span>
           <div className="flex gap-4">
-            <Link href="#" className="hover:text-foreground">
+            <Link href="/privacy" className="hover:text-foreground">
               Privacy
             </Link>
-            <Link href="#" className="hover:text-foreground">
+            <Link href="/terms" className="hover:text-foreground">
               Terms
             </Link>
           </div>
