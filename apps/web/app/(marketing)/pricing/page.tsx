@@ -73,8 +73,8 @@ const tiers = [
     period: null,
     description:
       "For large IPPs and EPC organisations with multi-team access, data residency, and compliance requirements.",
-    cta: "Talk to us",
-    href: "/about",
+    cta: "Contact us",
+    href: "/contact",
     highlight: false,
     entitlements: [
       "Unlimited users",
@@ -356,7 +356,7 @@ export default function PricingPage() {
           GST invoice issued on activation.
         </p>
         <Button variant="outline" asChild>
-          <Link href="/about">Talk to us</Link>
+          <Link href="/contact">Contact us</Link>
         </Button>
       </section>
     </>

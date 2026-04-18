@@ -151,7 +151,7 @@ export default function AboutPage() {
       {/* Contact */}
       <section className="border-t px-6 py-16 text-center">
         <h2 className="mb-2 text-2xl font-bold tracking-tight">
-          Talk to the team
+          Contact us
         </h2>
         <p className="mb-6 text-muted-foreground">
           For enterprise enquiries, integration requirements, or questions about

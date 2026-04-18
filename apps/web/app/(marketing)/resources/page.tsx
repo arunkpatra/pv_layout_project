@@ -142,7 +142,7 @@ export default function ResourcesPage() {
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/about">Contact us</Link>
+            <Link href="/contact">Contact us</Link>
           </Button>
         </div>
       </section>

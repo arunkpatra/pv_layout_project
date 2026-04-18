@@ -166,7 +166,7 @@ export default function SolutionsPage() {
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/about">Talk to us</Link>
+            <Link href="/contact">Contact us</Link>
           </Button>
         </div>
       </section>
