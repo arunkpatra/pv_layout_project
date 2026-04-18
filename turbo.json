@@ -57,6 +57,15 @@
       "dependsOn": ["db:generate"],
       "persistent": true,
       "cache": false
+    },
+    "@renewable-energy/api#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": ["DATABASE_URL", "PORT", "NODE_ENV", "CORS_ORIGINS"]
+    },
+    "@renewable-energy/api#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
     }
   }
 }

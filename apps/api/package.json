@@ -1,0 +1,26 @@
+{
+  "name": "@renewable-energy/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --env-file ../../.env --hot src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "start": "bun run dist/index.js",
+    "test": "echo 'No tests yet'",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.4.0",
+    "@renewable-energy/db": "workspace:*",
+    "hono": "^4.12.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@renewable-energy/eslint-config": "workspace:*",
+    "@renewable-energy/typescript-config": "workspace:*",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
