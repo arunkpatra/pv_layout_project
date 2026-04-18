@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
   Sheet,
@@ -12,17 +13,24 @@ import {
   SheetDescription,
 } from "@renewable-energy/ui/components/sheet"
 import { SolarPanelIcon, ListIcon } from "@phosphor-icons/react"
+import { cn } from "@renewable-energy/ui/lib/utils"
 
 const navLinks = [
-  { href: "#solutions", label: "Solutions" },
-  { href: "#features", label: "Features" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#resources", label: "Resources" },
-  { href: "#about", label: "About" },
+  { href: "/solutions", label: "Solutions" },
+  { href: "/#features", label: "Features" },
+  { href: "/#pricing", label: "Pricing" },
+  { href: "/#resources", label: "Resources" },
+  { href: "/#about", label: "About" },
 ]
 
 export function MarketingNav() {
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
+
+  function isActive(href: string) {
+    if (href.startsWith("/#")) return false
+    return pathname === href || pathname.startsWith(href + "/")
+  }
 
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
@@ -38,7 +46,13 @@ export function MarketingNav() {
           <Link
             key={link.href}
             href={link.href}
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className={cn(
+              "relative text-sm transition-colors hover:text-foreground",
+              "after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:rounded-full after:bg-foreground after:transition-transform after:duration-200",
+              isActive(link.href)
+                ? "text-foreground after:scale-x-100"
+                : "text-muted-foreground",
+            )}
           >
             {link.label}
           </Link>
@@ -70,7 +84,12 @@ export function MarketingNav() {
                 <SheetClose key={link.href} asChild>
                   <Link
                     href={link.href}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className={cn(
+                      "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-foreground",
+                      isActive(link.href)
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground",
+                    )}
                   >
                     {link.label}
                   </Link>
