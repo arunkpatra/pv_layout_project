@@ -9,59 +9,59 @@ import {
 import {
   SolarPanelIcon,
   ArrowRightIcon,
-  HeartIcon,
-  TreeIcon,
+  FileTextIcon,
+  ShieldCheckIcon,
   UsersThreeIcon,
-  GlobeIcon,
+  WrenchIcon,
 } from "@phosphor-icons/react/dist/ssr"
 
 const values = [
   {
-    icon: TreeIcon,
-    title: "Built for the energy transition",
+    icon: WrenchIcon,
+    title: "Built by practitioners",
     description:
-      "Every tool we build is designed to help solar installers and developers move faster. Less time on layouts means more solar in the ground.",
+      "SolarDesign was built by engineers who have worked on EPC projects, yield consulting, and grid connection submissions in India. The workflows in the platform reflect how utility-scale projects are actually executed — not how they are described in textbooks.",
+  },
+  {
+    icon: FileTextIcon,
+    title: "India regulatory standards throughout",
+    description:
+      "ALMM compliance, DISCOM-format SLDs, IS 732 and IS 1255 cable schedules, CEIG inspection requirements, and IREDA / PFC lender formats are built into the platform — not bolted on as exports.",
   },
   {
     icon: UsersThreeIcon,
-    title: "Designed with practitioners",
+    title: "Designed with EPC and IPP teams",
     description:
-      "We work directly with solar engineers and EPC contractors to understand real-world workflows. Our roadmap is shaped by the people who use the software daily.",
+      "We work directly with design engineers, BD engineers, and project managers at Indian EPC contractors and IPPs. Feature decisions come from live project workflows, not hypothetical requirements.",
   },
   {
-    icon: GlobeIcon,
-    title: "Global from day one",
+    icon: ShieldCheckIcon,
+    title: "One file, all documents",
     description:
-      "SolarDesign is used across 40+ countries. Our irradiance data, weather models, and export formats are built for international projects.",
-  },
-  {
-    icon: HeartIcon,
-    title: "Customer success is our metric",
-    description:
-      "We measure our success by your project outcomes — not vanity metrics. Every support interaction and feature request is taken seriously.",
+      "Design changes propagate automatically to SLD, cable schedule, BoM, BoQ, and DPR. No parallel spreadsheets, no re-entry between tools, no version mismatch between the layout and the bid package.",
   },
 ]
 
 const team = [
   {
-    name: "Priya Mehta",
+    name: "Arjun Sharma",
     role: "Co-founder & CEO",
-    bio: "Former solar EPC project manager. Built SolarDesign after spending years on manual layout workflows.",
+    bio: "Former EPC project manager with 12 years on utility-scale solar projects across Rajasthan, Gujarat, and Andhra Pradesh. Built SolarDesign after managing three 100 MW projects using PVsyst, AutoCAD, and Excel in parallel.",
   },
   {
-    name: "Lukas Bauer",
+    name: "Kavitha Nair",
     role: "Co-founder & CTO",
-    bio: "10 years building geospatial and simulation software. Led engineering at a utility-scale solar developer.",
+    bio: "10 years in geospatial and simulation software. Led engineering at a utility-scale solar developer before co-founding SolarDesign.",
   },
   {
-    name: "Amara Diallo",
+    name: "Rajesh Iyer",
     role: "Head of Product",
-    bio: "Previously at a leading CAD software company. Passionate about tools that reduce friction in complex workflows.",
+    bio: "Solar consultant for 8 years — yield assessments, lender technical due diligence, and DISCOM grid connectivity submissions. Joined SolarDesign to build the tool he needed on every project.",
   },
   {
-    name: "Tom Nakamura",
+    name: "Sunita Reddy",
     role: "Head of Customer Success",
-    bio: "Spent 8 years as a solar consultant. Joined SolarDesign to make sure every customer gets maximum value from the platform.",
+    bio: "Previously led design engineering at a large EPC contractor. Works directly with customers to ensure the platform fits live project workflows.",
   },
 ]
 
@@ -70,26 +70,28 @@ export default function AboutPage() {
     <>
       {/* Hero */}
       <section className="flex flex-col items-center gap-6 px-6 py-20 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+        <div className="flex h-12 w-12 items-center justify-center bg-primary/10">
           <SolarPanelIcon weight="duotone" className="h-6 w-6 text-primary" />
         </div>
         <h1 className="max-w-2xl text-4xl font-bold tracking-tight">
-          We&apos;re on a mission to accelerate the solar industry
+          Built for India&apos;s utility-scale solar market
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          SolarDesign was founded in 2022 by a team of solar practitioners and
-          engineers who were tired of designing layouts in spreadsheets and
-          generic CAD tools.
+          SolarDesign was founded by solar practitioners who ran EPC projects
+          and yield assessments using PVsyst, AutoCAD, and Excel in parallel.
+          The platform replaces that fragmented workflow with a single tool —
+          from KMZ import to lender-ready DPR.
         </p>
       </section>
 
-      {/* Mission statement */}
+      {/* Context */}
       <section className="mx-auto w-full max-w-3xl px-6 pb-20 text-center">
         <p className="text-muted-foreground">
-          Today, teams in over 40 countries use SolarDesign to design, analyse,
-          and deliver commercial and utility-scale solar projects. We believe
-          that better software leads to more renewable energy — and we&apos;re
-          building the tools to prove it.
+          The platform is used by design engineers and EPC teams working on
+          greenfield solar projects from 10 MW to 500 MW across India.
+          Every feature — ALMM compliance, DISCOM SLD format, IS 732 / IS 1255
+          cable sizing, IREDA / PFC export format — is specific to the Indian
+          utility-scale market.
         </p>
       </section>
 
@@ -97,13 +99,13 @@ export default function AboutPage() {
       <section className="border-t px-6 py-20">
         <div className="mx-auto max-w-5xl">
           <h2 className="mb-10 text-center text-2xl font-bold tracking-tight">
-            What we stand for
+            How we build
           </h2>
           <div className="grid gap-6 md:grid-cols-2">
             {values.map((value) => (
               <Card key={value.title}>
                 <CardHeader>
-                  <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="mb-1 flex h-10 w-10 items-center justify-center bg-primary/10">
                     <value.icon
                       weight="duotone"
                       className="h-5 w-5 text-primary"
@@ -122,13 +124,13 @@ export default function AboutPage() {
       <section className="border-t px-6 py-20">
         <div className="mx-auto max-w-5xl">
           <h2 className="mb-10 text-center text-2xl font-bold tracking-tight">
-            Meet the team
+            The team
           </h2>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {team.map((member) => (
               <Card key={member.name}>
                 <CardHeader>
-                  <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-lg font-bold text-muted-foreground">
+                  <div className="mb-2 flex h-12 w-12 items-center justify-center bg-muted text-lg font-bold text-muted-foreground">
                     {member.name
                       .split(" ")
                       .map((n) => n[0])
@@ -146,19 +148,19 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* Contact */}
       <section className="border-t px-6 py-16 text-center">
         <h2 className="mb-2 text-2xl font-bold tracking-tight">
-          Want to work with us?
+          Talk to the team
         </h2>
         <p className="mb-6 text-muted-foreground">
-          We&apos;re hiring engineers, designers, and solar industry experts.
-          Or just start using the product — it&apos;s free to get started.
+          For enterprise enquiries, integration requirements, or questions about
+          the platform — reach out directly. We respond within one business day.
         </p>
         <div className="flex justify-center gap-3">
           <Button asChild>
             <Link href="/dashboard">
-              Try SolarDesign free
+              Start free trial
               <ArrowRightIcon className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>

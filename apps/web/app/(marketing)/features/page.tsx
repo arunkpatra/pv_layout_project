@@ -128,7 +128,7 @@ export default function FeaturesPage() {
           <Card key={feature.title}>
             <CardHeader>
               <div className="mb-1 flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary/10">
                   <feature.icon
                     weight="duotone"
                     className="h-5 w-5 text-primary"

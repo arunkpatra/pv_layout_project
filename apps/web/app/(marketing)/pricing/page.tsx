@@ -9,7 +9,15 @@ import {
   CardContent,
   CardFooter,
 } from "@renewable-energy/ui/components/card"
-import { CheckIcon, ArrowRightIcon, StarIcon, MinusIcon } from "@phosphor-icons/react/dist/ssr"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@renewable-energy/ui/components/table"
+import { CheckIcon, ArrowRightIcon, InfoIcon, MinusIcon } from "@phosphor-icons/react/dist/ssr"
 import { cn } from "@renewable-energy/ui/lib/utils"
 
 const tiers = [
@@ -37,8 +45,8 @@ const tiers = [
     price: "₹1,50,000",
     period: "per user / year · billed annually · ex-GST",
     description:
-      "Unlocks the full pre-bid to DPR workflow — simulation, SLD, cable schedule, ALMM library, and lender-ready exports.",
-    cta: "Upgrade to Professional",
+      "Full pre-bid to DPR workflow — simulation, SLD, cable schedule, ALMM library, and lender-ready exports. Free for 14 days, no credit card required.",
+    cta: "Start 14-day free trial",
     href: "/dashboard",
     highlight: true,
     badge: "Most popular",
@@ -95,32 +103,24 @@ export default function PricingPage() {
         <p className="max-w-xl text-lg text-muted-foreground">
           The free plan lets you evaluate the platform on real projects with no
           time limit. Professional unlocks simulation, SLD generation, ALMM
-          compliance, and lender-ready exports. All plans invoiced in INR.
+          compliance, and lender-ready exports — free for 14 days. All plans invoiced in INR.
         </p>
       </section>
 
-      {/* Founding customer banner */}
+      {/* Trial notice */}
       <section className="mx-auto w-full max-w-5xl px-6 pb-10">
-        <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 px-5 py-4">
-          <StarIcon
+        <div className="flex items-start gap-3 border border-primary/30 bg-primary/5 px-5 py-4">
+          <InfoIcon
             weight="duotone"
             className="mt-0.5 h-5 w-5 shrink-0 text-primary"
           />
           <div>
             <p className="text-sm font-semibold">
-              Founding customer programme — beta pricing
+              Professional plan — 14-day free trial
             </p>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Professional plan at{" "}
-              <span className="font-medium text-foreground">
-                ₹75,000/user/year
-              </span>{" "}
-              (50% off list) for the first cohort of customers. 12-month
-              lock-in. Includes direct access to the product team and input
-              into the roadmap.{" "}
-              <Link href="/about" className="underline underline-offset-2 hover:text-foreground">
-                Contact us to apply.
-              </Link>
+              All Professional features are available for 14 days at no cost. No credit card required to start.
+              Run a full project — simulation, SLD, cable schedule, BoM, and DPR export — before committing to a subscription.
             </p>
           </div>
         </div>
@@ -189,61 +189,38 @@ export default function PricingPage() {
         <h2 className="mb-6 text-xl font-bold tracking-tight">
           How Professional pricing compares
         </h2>
-        <div className="overflow-hidden rounded-xl border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium">Tool</th>
-                <th className="px-4 py-3 text-left font-medium">
-                  Cost / user / year
-                </th>
-                <th className="px-4 py-3 text-left font-medium">Covers</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              <tr>
-                <td className="px-4 py-3 text-muted-foreground">PVsyst 8</td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  ~₹67,000
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  Yield simulation only
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3 text-muted-foreground">
-                  AutoCAD (full)
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  ~₹1,21,000
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  Drafting only — no solar intelligence
-                </td>
-              </tr>
-              <tr className="bg-muted/20">
-                <td className="px-4 py-3 font-medium text-muted-foreground">
-                  PVsyst + AutoCAD + Excel
-                </td>
-                <td className="px-4 py-3 font-medium text-muted-foreground">
-                  ~₹2,00,000+
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  Fragmented — no data linkage between tools
-                </td>
-              </tr>
-              <tr className="bg-primary/5">
-                <td className="px-4 py-3 font-semibold">
-                  SolarDesign Professional
-                </td>
-                <td className="px-4 py-3 font-semibold">₹1,50,000</td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  Full pre-bid to DPR — KMZ, simulation, layout, SLD, cable
-                  schedule, ALMM, BoM, DPR
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="overflow-hidden border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="px-4 py-3">Tool</TableHead>
+                <TableHead className="px-4 py-3">Cost / user / year</TableHead>
+                <TableHead className="px-4 py-3">Covers</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="px-4 py-3 text-muted-foreground">PVsyst 8</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">~₹67,000</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">Yield simulation only</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="px-4 py-3 text-muted-foreground">AutoCAD (full)</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">~₹1,21,000</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">Drafting only — no solar intelligence</TableCell>
+              </TableRow>
+              <TableRow className="bg-muted/20 hover:bg-muted/20">
+                <TableCell className="px-4 py-3 font-medium text-muted-foreground">PVsyst + AutoCAD + Excel</TableCell>
+                <TableCell className="px-4 py-3 font-medium text-muted-foreground">~₹2,00,000+</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">Fragmented — no data linkage between tools</TableCell>
+              </TableRow>
+              <TableRow className="bg-primary/5 hover:bg-primary/5">
+                <TableCell className="px-4 py-3 font-semibold">SolarDesign Professional</TableCell>
+                <TableCell className="px-4 py-3 font-semibold">₹1,50,000</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">Full pre-bid to DPR — KMZ, simulation, layout, SLD, cable schedule, ALMM, BoM, DPR</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
       </section>
 
@@ -252,17 +229,17 @@ export default function PricingPage() {
         <h2 className="mb-8 text-2xl font-bold tracking-tight">
           Feature comparison
         </h2>
-        <div className="overflow-hidden rounded-xl border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium">Feature</th>
-                <th className="px-4 py-3 text-center font-medium">Free</th>
-                <th className="px-4 py-3 text-center font-medium">Professional</th>
-                <th className="px-4 py-3 text-center font-medium">Enterprise</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+        <div className="overflow-hidden border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="px-4 py-3">Feature</TableHead>
+                <TableHead className="px-4 py-3 text-center">Free</TableHead>
+                <TableHead className="px-4 py-3 text-center">Professional</TableHead>
+                <TableHead className="px-4 py-3 text-center">Enterprise</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {[
                 { group: "Site Input" },
                 { feature: "KMZ / KML site boundary import", free: true, pro: true, ent: true },
@@ -317,16 +294,16 @@ export default function PricingPage() {
               ].map((row, i) => {
                 if ("group" in row) {
                   return (
-                    <tr key={i} className="bg-muted/30">
-                      <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableRow key={i} className="bg-muted/30 hover:bg-muted/30">
+                      <TableCell colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {row.group}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 }
                 const cell = (val: boolean | string) => {
                   if (typeof val === "string") {
-                    return <span className="text-xs font-medium">{val}</span>
+                    return <span className="font-medium">{val}</span>
                   }
                   return val ? (
                     <CheckIcon weight="bold" className="mx-auto h-4 w-4 text-green-600 dark:text-green-400" />
@@ -335,16 +312,16 @@ export default function PricingPage() {
                   )
                 }
                 return (
-                  <tr key={i} className="hover:bg-muted/20">
-                    <td className="px-4 py-2.5">{row.feature}</td>
-                    <td className="px-4 py-2.5 text-center">{cell(row.free)}</td>
-                    <td className="px-4 py-2.5 text-center">{cell(row.pro)}</td>
-                    <td className="px-4 py-2.5 text-center">{cell(row.ent)}</td>
-                  </tr>
+                  <TableRow key={i}>
+                    <TableCell className="px-4 py-2.5">{row.feature}</TableCell>
+                    <TableCell className="px-4 py-2.5 text-center">{cell(row.free)}</TableCell>
+                    <TableCell className="px-4 py-2.5 text-center">{cell(row.pro)}</TableCell>
+                    <TableCell className="px-4 py-2.5 text-center">{cell(row.ent)}</TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </section>
 
@@ -354,8 +331,8 @@ export default function PricingPage() {
           Questions about pricing?
         </h2>
         <p className="mb-6 text-muted-foreground">
-          Start on the free plan — no time limit, no credit card. Upgrade to
-          Professional when you need simulation, SLD, ALMM, and DPR export.
+          Start on the free plan — no time limit, no credit card. Try Professional
+          free for 14 days to run a full project before subscribing.
           GST invoice issued on activation.
         </p>
         <Button variant="outline" asChild>

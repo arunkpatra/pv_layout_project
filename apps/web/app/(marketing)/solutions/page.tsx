@@ -114,7 +114,7 @@ export default function SolutionsPage() {
         {solutions.map((solution) => (
           <div key={solution.title} className="py-14">
             <div className="flex items-start gap-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-primary/10">
                 <solution.icon
                   weight="duotone"
                   className="h-6 w-6 text-primary"

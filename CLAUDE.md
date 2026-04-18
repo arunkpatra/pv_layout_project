@@ -9,6 +9,7 @@ Before doing any work, read this file in full:
 - **[Architecture and Decisions](./docs/architecture.md)** — Stack choices, ownership boundaries, build order, and rationale. Update when new decisions are made.
 - **[Development Principles](./docs/claude-dev-principles.md)** — Spike-first methodology, what Claude can and cannot verify, prompt patterns, session structure, anti-patterns, and the mandatory self-review protocol.
 - **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** — How to conduct browser/runtime testing with the human. Ask one question at a time, never dump a full test list.
+- **[UX Design Principles](./docs/ux-design.md)** — Industrial theme, no rounded corners, shadcn primitives for all UI elements, icon/colour/typography conventions.
 
 **Self-review rule**: After any significant/wide-blast work (5+ files, new infrastructure, renames, new patterns), run `superpowers:code-reviewer` before declaring complete. "Tests pass" is not sufficient — the reviewer catches what static gates cannot.
 
