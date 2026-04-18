@@ -185,39 +185,59 @@ export default function PricingPage() {
       </section>
 
       {/* Context */}
-      <section className="mx-auto w-full max-w-3xl px-6 pb-20">
+      <section className="mx-auto w-full max-w-4xl px-6 pb-20">
         <h2 className="mb-6 text-xl font-bold tracking-tight">
           How Professional pricing compares
         </h2>
-        <div className="overflow-hidden border">
+
+        {/* Mobile: stacked cards */}
+        <div className="flex flex-col divide-y border md:hidden">
+          {[
+            { tool: "PVsyst 8", cost: "~₹67,000", covers: "Yield simulation only", highlight: false, muted: true },
+            { tool: "AutoCAD (full)", cost: "~₹1,21,000", covers: "Drafting only — no solar intelligence", highlight: false, muted: true },
+            { tool: "PVsyst + AutoCAD + Excel", cost: "~₹2,00,000+", covers: "Fragmented — no data linkage between tools", highlight: false, muted: true, dim: true },
+            { tool: "SolarDesign Professional", cost: "₹1,50,000", covers: "Full pre-bid to DPR — KMZ, simulation, layout, SLD, cable schedule, ALMM, BoM, DPR", highlight: true, muted: false },
+          ].map((row) => (
+            <div key={row.tool} className={`px-4 py-3 ${row.highlight ? "bg-primary/5" : row.dim ? "bg-muted/20" : ""}`}>
+              <div className="flex items-baseline justify-between gap-4">
+                <span className={`text-sm ${row.highlight ? "font-semibold" : "font-medium text-muted-foreground"}`}>{row.tool}</span>
+                <span className={`shrink-0 text-sm tabular-nums ${row.highlight ? "font-semibold" : "text-muted-foreground"}`}>{row.cost}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{row.covers}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: table */}
+        <div className="hidden overflow-hidden border md:block">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="px-4 py-3">Tool</TableHead>
                 <TableHead className="px-4 py-3">Cost / user / year</TableHead>
-                <TableHead className="px-4 py-3">Covers</TableHead>
+                <TableHead className="px-4 py-3 w-1/2">Covers</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
                 <TableCell className="px-4 py-3 text-muted-foreground">PVsyst 8</TableCell>
                 <TableCell className="px-4 py-3 text-muted-foreground">~₹67,000</TableCell>
-                <TableCell className="px-4 py-3 text-muted-foreground">Yield simulation only</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground whitespace-normal">Yield simulation only</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="px-4 py-3 text-muted-foreground">AutoCAD (full)</TableCell>
                 <TableCell className="px-4 py-3 text-muted-foreground">~₹1,21,000</TableCell>
-                <TableCell className="px-4 py-3 text-muted-foreground">Drafting only — no solar intelligence</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground whitespace-normal">Drafting only — no solar intelligence</TableCell>
               </TableRow>
               <TableRow className="bg-muted/20 hover:bg-muted/20">
                 <TableCell className="px-4 py-3 font-medium text-muted-foreground">PVsyst + AutoCAD + Excel</TableCell>
                 <TableCell className="px-4 py-3 font-medium text-muted-foreground">~₹2,00,000+</TableCell>
-                <TableCell className="px-4 py-3 text-muted-foreground">Fragmented — no data linkage between tools</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground whitespace-normal">Fragmented — no data linkage between tools</TableCell>
               </TableRow>
               <TableRow className="bg-primary/5 hover:bg-primary/5">
                 <TableCell className="px-4 py-3 font-semibold">SolarDesign Professional</TableCell>
                 <TableCell className="px-4 py-3 font-semibold">₹1,50,000</TableCell>
-                <TableCell className="px-4 py-3 text-muted-foreground">Full pre-bid to DPR — KMZ, simulation, layout, SLD, cable schedule, ALMM, BoM, DPR</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground whitespace-normal">Full pre-bid to DPR — KMZ, simulation, layout, SLD, cable schedule, ALMM, BoM, DPR</TableCell>
               </TableRow>
             </TableBody>
           </Table>
