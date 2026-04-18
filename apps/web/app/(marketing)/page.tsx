@@ -27,24 +27,25 @@ export default function LandingPage() {
           Now in beta
         </Badge>
         <h1 className="max-w-3xl text-5xl font-bold tracking-tight">
-          Design solar panel layouts
+          Layout design and yield simulation
           <br />
-          <span className="text-muted-foreground">in minutes, not days.</span>
+          <span className="text-muted-foreground">for solar professionals.</span>
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          The professional tool for renewable energy companies to plan, design,
-          and optimise commercial solar installations — faster and with fewer
-          errors.
+          SolarDesign is used by solar engineers and EPC contractors to produce
+          compliant layouts, run P50/P90 yield simulations, and generate client
+          deliverables — for commercial rooftop, industrial, and utility-scale
+          projects.
         </p>
         <div className="flex items-center gap-3">
           <Button asChild size="lg">
             <Link href="/dashboard">
-              Get started free
+              Create a free account
               <ArrowRightIcon className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <Link href="/solutions">See solutions</Link>
+            <Link href="/solutions">View solutions</Link>
           </Button>
         </div>
       </section>
@@ -56,11 +57,11 @@ export default function LandingPage() {
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Built for every part of the solar industry
+              For every project type
             </h2>
             <p className="mt-2 text-muted-foreground">
-              From single rooftops to utility-scale portfolios — SolarDesign
-              fits your workflow.
+              Commercial rooftop, industrial flat-roof, or ground-mount utility.
+              SolarDesign handles the design workflow for each.
             </p>
           </div>
           <Link
@@ -120,10 +121,11 @@ export default function LandingPage() {
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Everything you need — nothing you don&apos;t
+              Design, analysis, and delivery tools
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Precision tools for design, analysis, collaboration, and delivery.
+              Layout editor, yield simulation, shading analysis, and report
+              export — in a single project file.
             </p>
           </div>
           <Link
@@ -191,10 +193,11 @@ export default function LandingPage() {
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Simple, transparent pricing
+              Three plans. No hidden charges.
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Start free. Scale as your team grows. No hidden fees.
+              Free to start. Paid plans add simulation, collaboration, and
+              export capabilities.
             </p>
           </div>
           <Link
@@ -290,10 +293,10 @@ export default function LandingPage() {
         <div className="mb-10 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Learn and get support
+              Documentation and support
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Guides, tutorials, and community to help you move faster.
+              Technical guides, video tutorials, and a practitioner community.
             </p>
           </div>
           <Link
@@ -353,13 +356,14 @@ export default function LandingPage() {
         <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-xl">
             <h2 className="text-2xl font-bold tracking-tight">
-              We&apos;re on a mission to accelerate the solar industry
+              About SolarDesign
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Founded in 2022 by solar practitioners and engineers, SolarDesign
-              is used across 40+ countries to design, analyse, and deliver
-              commercial and utility-scale projects. We build tools that put
-              more renewable energy in the ground — faster.
+              SolarDesign was built by solar practitioners and engineers in
+              2022. The platform is used in 40+ countries for commercial,
+              industrial, and utility-scale project design. Our team includes
+              people who have worked on solar EPC projects, yield consulting,
+              and grid connection submissions.
             </p>
           </div>
           <Button variant="outline" asChild className="shrink-0">
@@ -376,16 +380,16 @@ export default function LandingPage() {
       {/* Final CTA */}
       <section className="flex flex-col items-center gap-4 px-6 py-20 text-center">
         <h2 className="text-3xl font-bold tracking-tight">
-          Ready to modernise your workflow?
+          Start with a free account
         </h2>
         <p className="max-w-md text-muted-foreground">
-          Join renewable energy teams already using SolarDesign. Free to start
-          — no credit card required.
+          No credit card required. Free plan includes up to 3 active projects
+          and basic layout editing.
         </p>
         <div className="flex items-center gap-3">
           <Button asChild size="lg">
             <Link href="/dashboard">
-              Start designing free
+              Create a free account
               <ArrowRightIcon className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
