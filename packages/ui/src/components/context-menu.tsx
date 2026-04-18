@@ -4,7 +4,7 @@ import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 
 import { cn } from "@renewable-energy/ui/lib/utils"
-import { CaretRightIcon, CheckIcon } from "@phosphor-icons/react"
+import { ChevronRightIcon, CheckIcon } from "lucide-react"
 
 function ContextMenu({
   ...props
@@ -117,7 +117,7 @@ function ContextMenuSubTrigger({
       {...props}
     >
       {children}
-      <CaretRightIcon className="ml-auto" />
+      <ChevronRightIcon className="ml-auto" />
     </ContextMenuPrimitive.SubTrigger>
   )
 }

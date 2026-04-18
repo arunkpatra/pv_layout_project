@@ -5,7 +5,7 @@ import { Button } from "@renewable-energy/ui/components/button"
 import { Input } from "@renewable-energy/ui/components/input"
 import { Label } from "@renewable-energy/ui/components/label"
 import { Textarea } from "@renewable-energy/ui/components/textarea"
-import { CheckCircleIcon } from "@phosphor-icons/react"
+import { CircleCheck } from "lucide-react"
 
 type Field = {
   name: string
@@ -74,7 +74,7 @@ export function ContactForm() {
   if (submitted) {
     return (
       <div className="flex flex-col gap-4 border px-6 py-10">
-        <CheckCircleIcon weight="duotone" className="h-10 w-10 text-green-600 dark:text-green-400" />
+        <CircleCheck className="h-10 w-10 text-green-600 dark:text-green-400" />
         <h2 className="text-lg font-semibold">Message received</h2>
         <p className="text-sm text-muted-foreground">
           We have received your message and will respond to{" "}

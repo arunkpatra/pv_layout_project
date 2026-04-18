@@ -14,23 +14,23 @@ import {
   SidebarRail,
 } from "@renewable-energy/ui/components/sidebar"
 import {
-  SunIcon,
-  MapTrifoldIcon,
-  BatteryChargingIcon,
-  WindIcon,
-  ChartLineIcon,
-  GearIcon,
-  UploadSimpleIcon,
-  SquaresFourIcon,
-  HouseIcon,
-} from "@phosphor-icons/react"
+  Sun,
+  Map,
+  BatteryCharging,
+  Wind,
+  TrendingUp,
+  Settings,
+  Upload,
+  LayoutGrid,
+  Home,
+} from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 
 const data = {
   teams: [
     {
       name: "SolarDesign Pro",
-      logo: <SunIcon />,
+      logo: <Sun />,
       plan: "Workspace",
     },
   ],
@@ -38,14 +38,14 @@ const data = {
     {
       title: "Overview",
       url: "/",
-      icon: <HouseIcon />,
+      icon: <Home />,
       isActive: true,
       items: [],
     },
     {
       title: "Solar Layout",
       url: "#",
-      icon: <MapTrifoldIcon />,
+      icon: <Map />,
       items: [
         { title: "Site Setup", url: "#" },
         { title: "KMZ Upload", url: "#" },
@@ -55,7 +55,7 @@ const data = {
     {
       title: "System Design",
       url: "#",
-      icon: <SunIcon />,
+      icon: <Sun />,
       items: [
         { title: "Capacity Planning", url: "#" },
         { title: "Orientation & Tilt", url: "#" },
@@ -65,7 +65,7 @@ const data = {
     {
       title: "Battery Storage",
       url: "#",
-      icon: <BatteryChargingIcon />,
+      icon: <BatteryCharging />,
       items: [
         { title: "Storage Config", url: "#" },
         { title: "Load Profiles", url: "#" },
@@ -74,7 +74,7 @@ const data = {
     {
       title: "Wind Analysis",
       url: "#",
-      icon: <WindIcon />,
+      icon: <Wind />,
       items: [
         { title: "Wind Resource", url: "#" },
         { title: "Turbine Layout", url: "#" },
@@ -83,7 +83,7 @@ const data = {
     {
       title: "Reports",
       url: "#",
-      icon: <ChartLineIcon />,
+      icon: <TrendingUp />,
       items: [
         { title: "Generation Estimate", url: "#" },
         { title: "Export Data", url: "#" },
@@ -92,7 +92,7 @@ const data = {
     {
       title: "Settings",
       url: "#",
-      icon: <GearIcon />,
+      icon: <Settings />,
       items: [
         { title: "Project Settings", url: "#" },
         { title: "Units & Locale", url: "#" },
@@ -103,17 +103,17 @@ const data = {
     {
       name: "Site Alpha — Rajasthan",
       url: "#",
-      icon: <SquaresFourIcon />,
+      icon: <LayoutGrid />,
     },
     {
       name: "Site Beta — Gujarat",
       url: "#",
-      icon: <SquaresFourIcon />,
+      icon: <LayoutGrid />,
     },
     {
       name: "Imports",
       url: "#",
-      icon: <UploadSimpleIcon />,
+      icon: <Upload />,
     },
   ],
 }

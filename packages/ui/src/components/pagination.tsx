@@ -2,7 +2,7 @@ import * as React from "react"
 
 import { cn } from "@renewable-energy/ui/lib/utils"
 import { Button } from "@renewable-energy/ui/components/button"
-import { CaretLeftIcon, CaretRightIcon, DotsThreeIcon } from "@phosphor-icons/react/dist/ssr"
+import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -73,7 +73,7 @@ function PaginationPrevious({
       className={cn("pl-1.5!", className)}
       {...props}
     >
-      <CaretLeftIcon data-icon="inline-start" />
+      <ChevronLeftIcon data-icon="inline-start" />
       <span className="hidden sm:block">{text}</span>
     </PaginationLink>
   )
@@ -92,7 +92,7 @@ function PaginationNext({
       {...props}
     >
       <span className="hidden sm:block">{text}</span>
-      <CaretRightIcon data-icon="inline-end" />
+      <ChevronRightIcon data-icon="inline-end" />
     </PaginationLink>
   )
 }
@@ -111,7 +111,7 @@ function PaginationEllipsis({
       )}
       {...props}
     >
-      <DotsThreeIcon
+      <MoreHorizontalIcon
       />
       <span className="sr-only">More pages</span>
     </span>

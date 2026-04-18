@@ -20,7 +20,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@renewable-energy/ui/components/sidebar"
-import { CaretUpDownIcon, SparkleIcon, CheckCircleIcon, CreditCardIcon, BellIcon, SignOutIcon } from "@phosphor-icons/react"
+import { ChevronsUpDown, Sparkles, CircleCheck, CreditCard, Bell, LogOut } from "lucide-react"
 import { useClerk } from "@clerk/nextjs"
 
 export function NavUser({
@@ -54,7 +54,7 @@ export function NavUser({
                 <span className="truncate font-medium">{user.name}</span>
                 <span className="truncate text-xs">{user.email}</span>
               </div>
-              <CaretUpDownIcon className="ml-auto size-4" />
+              <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -80,7 +80,7 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <SparkleIcon
+                <Sparkles
                 />
                 Upgrade to Pro
               </DropdownMenuItem>
@@ -88,24 +88,24 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <CheckCircleIcon
+                <CircleCheck
                 />
                 Account
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCardIcon
+                <CreditCard
                 />
                 Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <BellIcon
+                <Bell
                 />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()}>
-              <SignOutIcon />
+              <LogOut />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

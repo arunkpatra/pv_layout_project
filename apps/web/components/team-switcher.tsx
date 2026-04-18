@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@renewable-energy/ui/components/sidebar"
-import { CaretUpDownIcon, PlusIcon } from "@phosphor-icons/react"
+import { ChevronsUpDown, Plus } from "lucide-react"
 
 export function TeamSwitcher({
   teams,
@@ -51,7 +51,7 @@ export function TeamSwitcher({
                 <span className="truncate font-medium">{activeTeam.name}</span>
                 <span className="truncate text-xs">{activeTeam.plan}</span>
               </div>
-              <CaretUpDownIcon className="ml-auto" />
+              <ChevronsUpDown className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -79,7 +79,7 @@ export function TeamSwitcher({
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 p-2">
               <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                <PlusIcon className="size-4" />
+                <Plus className="size-4" />
               </div>
               <div className="font-medium text-muted-foreground">Add team</div>
             </DropdownMenuItem>

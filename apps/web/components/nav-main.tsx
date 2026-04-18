@@ -15,7 +15,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@renewable-energy/ui/components/sidebar"
-import { CaretRightIcon } from "@phosphor-icons/react"
+import { ChevronRight } from "lucide-react"
 
 export function NavMain({
   items,
@@ -48,7 +48,7 @@ export function NavMain({
                   {item.icon}
                   <span>{item.title}</span>
                   {item.items && item.items.length > 0 && (
-                    <CaretRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   )}
                 </SidebarMenuButton>
               </CollapsibleTrigger>

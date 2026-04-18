@@ -8,19 +8,19 @@ import {
   CardDescription,
 } from "@renewable-energy/ui/components/card"
 import {
-  BookOpenIcon,
-  VideoIcon,
-  FileTextIcon,
-  ChatCircleIcon,
-  ArrowRightIcon,
-  GraduationCapIcon,
-  NewspaperIcon,
-  RocketLaunchIcon,
-} from "@phosphor-icons/react/dist/ssr"
+  BookOpen,
+  Video,
+  FileText,
+  MessageCircle,
+  ArrowRight,
+  GraduationCap,
+  Newspaper,
+  Rocket,
+} from "lucide-react"
 
 const resources = [
   {
-    icon: BookOpenIcon,
+    icon: BookOpen,
     badge: "Docs",
     title: "Getting started guide",
     description:
@@ -28,7 +28,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: VideoIcon,
+    icon: Video,
     badge: "Video",
     title: "Video tutorials",
     description:
@@ -36,7 +36,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: GraduationCapIcon,
+    icon: GraduationCap,
     badge: "Course",
     title: "SolarDesign Academy",
     description:
@@ -44,7 +44,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: FileTextIcon,
+    icon: FileText,
     badge: "Template",
     title: "Project templates",
     description:
@@ -52,7 +52,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: NewspaperIcon,
+    icon: Newspaper,
     badge: "Blog",
     title: "Engineering blog",
     description:
@@ -60,7 +60,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: ChatCircleIcon,
+    icon: MessageCircle,
     badge: "Community",
     title: "Community forum",
     description:
@@ -68,7 +68,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: RocketLaunchIcon,
+    icon: Rocket,
     badge: "Webinar",
     title: "Live webinars",
     description:
@@ -76,7 +76,7 @@ const resources = [
     href: "#",
   },
   {
-    icon: FileTextIcon,
+    icon: FileText,
     badge: "API",
     title: "Developer docs",
     description:
@@ -110,7 +110,6 @@ export default function ResourcesPage() {
               <div className="mb-1 flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary/10">
                   <resource.icon
-                    weight="duotone"
                     className="h-5 w-5 text-primary"
                   />
                 </div>
@@ -138,7 +137,7 @@ export default function ResourcesPage() {
           <Button asChild>
             <Link href="/dashboard">
               Get started free
-              <ArrowRightIcon className="ml-1.5 h-4 w-4" />
+              <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" asChild>

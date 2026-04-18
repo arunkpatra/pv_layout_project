@@ -13,7 +13,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@renewable-energy/ui/components/sheet"
-import { SolarPanelIcon, ListIcon } from "@phosphor-icons/react"
+import { Sun, List } from "lucide-react"
 import { cn } from "@renewable-energy/ui/lib/utils"
 
 const navLinks = [
@@ -36,7 +36,7 @@ export function MarketingNav() {
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2">
-        <SolarPanelIcon weight="duotone" className="h-5 w-5 text-primary" />
+        <Sun className="h-5 w-5 text-primary" />
         <span className="font-semibold tracking-tight">SolarDesign</span>
       </Link>
 
@@ -81,7 +81,7 @@ export function MarketingNav() {
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Open menu">
-              <ListIcon className="h-5 w-5" />
+              <List className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-72 pt-12">

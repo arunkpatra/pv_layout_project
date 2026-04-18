@@ -4,7 +4,7 @@ import * as React from "react"
 import { Menubar as MenubarPrimitive } from "radix-ui"
 
 import { cn } from "@renewable-energy/ui/lib/utils"
-import { CheckIcon, CaretRightIcon } from "@phosphor-icons/react"
+import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 function Menubar({
   className,
@@ -242,7 +242,7 @@ function MenubarSubTrigger({
       {...props}
     >
       {children}
-      <CaretRightIcon className="ml-auto size-4" />
+      <ChevronRightIcon className="ml-auto size-4" />
     </MenubarPrimitive.SubTrigger>
   )
 }
