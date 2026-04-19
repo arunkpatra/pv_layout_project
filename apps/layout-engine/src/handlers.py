@@ -173,11 +173,15 @@ def handle_layout_job(version_id: str) -> None:
                      sum(len(r.placed_tables) for r in results),
                      sum(r.total_modules for r in results))
 
-            t0 = t()
-            for r in results:
+            for i, r in enumerate(results):
+                t0 = t()
                 place_string_inverters(r, params)
+                log.info("[%s] place_string_inverters[%d] %.1fs tables=%d",
+                         version_id, i, t() - t0, len(r.placed_tables))
+                t0 = t()
                 place_lightning_arresters(r, params)
-            log.info("[%s] post_processing %.1fs", version_id, t() - t0)
+                log.info("[%s] place_lightning_arresters[%d] %.1fs",
+                         version_id, i, t() - t0)
 
             kmz_out = os.path.join(tmpdir, "layout.kmz")
             svg_out = os.path.join(tmpdir, "layout.svg")

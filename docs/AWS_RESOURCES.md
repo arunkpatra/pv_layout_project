@@ -204,7 +204,7 @@ aws iam create-access-key --user-name renewable-energy-app
 - **ARN:** `arn:aws:lambda:ap-south-1:378240665051:function:layout_engine_lambda_prod`
 - **Package type:** Container image from ECR
 - **Architecture:** arm64
-- **Memory:** 512 MB
+- **Memory:** 1769 MB (1 full vCPU)
 - **Timeout:** 600 s (10 min)
 - **Execution role:** `arn:aws:iam::378240665051:role/renewable-energy-lambda-execution`
 - **Environment variables:**
