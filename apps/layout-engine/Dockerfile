@@ -7,8 +7,8 @@ WORKDIR ${LAMBDA_TASK_ROOT}
 
 # Install production dependencies from lock file
 COPY pyproject.toml uv.lock ./
-RUN /uv export --frozen --no-dev --no-emit-project -o requirements.txt \
-    && /uv pip install --system -r requirements.txt \
+RUN uv export --frozen --no-dev --no-emit-project -o requirements.txt \
+    && uv pip install --system -r requirements.txt \
     && rm requirements.txt
 
 # Copy application source
