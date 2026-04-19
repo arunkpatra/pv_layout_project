@@ -5,7 +5,21 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"],
+      "env": [
+        "DATABASE_URL",
+        "CLERK_SECRET_KEY",
+        "CORS_ORIGINS",
+        "NODE_ENV",
+        "PORT",
+        "NODEJS_HELPERS",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -29,8 +43,7 @@
     },
     "@renewable-energy/db#build": {
       "dependsOn": ["db:generate"],
-      "outputs": ["dist/**", "tsconfig.tsbuildinfo"],
-      "env": ["DATABASE_URL"]
+      "outputs": ["dist/**", "tsconfig.tsbuildinfo"]
     },
     "db:generate": {
       "inputs": ["prisma/**/*.prisma", "prisma.config.ts"],
@@ -60,8 +73,7 @@
     },
     "@renewable-energy/api#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"],
-      "env": ["DATABASE_URL", "PORT", "NODE_ENV", "CORS_ORIGINS"]
+      "outputs": ["dist/**"]
     },
     "@renewable-energy/api#typecheck": {
       "dependsOn": ["^build"],
