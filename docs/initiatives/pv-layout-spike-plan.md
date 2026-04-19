@@ -93,7 +93,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 3d | [Hono API: Dispatch Wiring](#spike-3d--hono-api-dispatch-wiring) | complete | Spike 3c |
 | 3e | [GitHub Actions CI/CD](#spike-3e--github-actions-cicd) | complete | Spike 3d |
 | 3f | [Production End-to-End Test](#spike-3f--production-end-to-end-test) | complete | Spike 3e |
-| 3g | [Lambda Performance Investigation](#spike-3g--lambda-performance-investigation) | planned | Spike 3f |
+| 3g | [Lambda Performance Investigation](#spike-3g--lambda-performance-investigation) | complete | Spike 3f |
 | 4 | [Project and Version UI](#spike-4--project-and-version-ui) | planned | Spike 3g |
 | 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5 |
@@ -801,7 +801,7 @@ Two GitHub Actions workflows: `build-layout-engine.yml` (builds and pushes Docke
 
 ## Spike 3f — Production End-to-End Test
 
-**Status:** in-progress  
+**Status:** complete — 2026-04-20  
 **Depends on:** Spike 3e
 
 ### What we're verifying
@@ -832,10 +832,59 @@ A complete end-to-end layout job in production: create a version via the prod AP
 
 ---
 
+## Spike 3g — Lambda Performance Investigation
+
+**Status:** complete — 2026-04-20  
+**Depends on:** Spike 3f
+
+### What we investigated
+
+`place_string_inverters` took 563s on Lambda for a 740-table site (30s on local Mac M2). The full pipeline was functionally correct — this was a performance-only issue blocking production use.
+
+### Root Cause
+
+AC cable routing (inverter → ICR) had unbounded search spaces in patterns A4, B, and E. For 74 AC cables, the algorithm made **5,738,877 `_path_ok` geometry checks** (worst single cable: 1,037,117). Pattern A4 tried 113 gaps × 49 cols × 49 cols = 271,313 candidates per cable.
+
+### Fix Applied
+
+Capped search space in expensive patterns:
+- A2/A3: nearest 8 column positions (was all 49)
+- A4: nearest 5 × 5 column positions (was 49 × 49)
+- B: nearest 8 × 8 gap combinations (was 113 × 113)
+- E: max 15 waypoints, skip O(n²) two-waypoint if >10 (was ~150²)
+
+### Results
+
+| Metric | Before | After |
+|---|---|---|
+| `place_string_inverters` | 563.3s | **16.3s** (34x faster) |
+| Total Lambda duration | 572.3s | **24.9s** (23x faster) |
+| AC `_path_ok` calls | 5,738,877 | **136,715** (42x fewer) |
+| AC cable total length | 19,117.4 m | 19,298.6 m (+0.95%) |
+
+All layout stats (tables, modules, capacity, inverters, ICRs, LAs, DC cables) are identical. Only AC cable routing paths differ slightly for 16 of 74 cables. See `docs/initiatives/spike-3g-ac-cable-routing-optimization.md` for full write-up.
+
+### Acceptance Criteria
+
+- [x] Root cause identified with data (instrumented Lambda run, pattern distribution logged)
+- [x] Fix deployed and verified in production — same KMZ completes in 25s
+- [x] Layout stats identical before and after (no impact on table/module/capacity calculations)
+- [x] AC cable length impact < 1% (0.95%)
+- [x] Comprehensive optimization doc written for solar engineer review
+- [ ] Solar engineer reviews SVG/DXF outputs and confirms cable routes are acceptable
+
+### Documentation
+
+- Investigation: `docs/initiatives/spike-3g-lambda-perf-investigation.md`
+- Optimization: `docs/initiatives/spike-3g-ac-cable-routing-optimization.md`
+- Lambda log (pre-optimization): `logs/good-but-slow-lamda.txt`
+
+---
+
 ## Spike 4 — Project and Version UI
 
 **Status:** planned  
-**Depends on:** Spike 3f (local pipeline works end-to-end)
+**Depends on:** Spike 3g
 
 ### What we're building
 
@@ -1195,5 +1244,8 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 3f | Standardized S3 bucket env var to `S3_ARTIFACTS_BUCKET` across API and layout engine. Previously API used `S3_BUCKET_NAME`, layout engine used `S3_BUCKET`. | Inconsistency caused silent no-ops (API upload) and runtime crashes (Lambda KeyError). Single name across all services prevents env var confusion. |
 | 2026-04-20 | 3f | Lambda DATABASE_URL must use `sslmode=require` not `sslmode=no-verify`. The `no-verify` value is a Prisma/Node.js convention; psycopg2 does not recognize it. | Discovered during prod E2E test — Lambda crashed with `OperationalError: invalid sslmode value: "no-verify"`. |
 | 2026-04-20 | 3f | Vercel's `@vercel/node` builder auto-detects `.ts` files in `api/` and runs its own TypeScript compilation. Renamed `api/index.ts` → `api/index.js` to bypass this rogue check. | Vercel's TypeScript check uses Node.js-style module resolution which cannot traverse bun's `node_modules/.bun/` symlink structure, causing cascading type failures on AWS SDK and Prisma types. Our own `tsc --noEmit` validates types correctly. |
-| 2026-04-20 | 3f | `place_string_inverters` has pathological performance on Lambda ARM64 — 30s local vs >600s on Lambda for 740 tables. Requires dedicated investigation spike (3g). | The full pipeline (API → S3 → SQS → Lambda → DB) is functionally correct. The bottleneck is in Shapely geometry operations during DC cable routing. See `docs/initiatives/spike-3g-lambda-perf-investigation.md`. |
+| 2026-04-20 | 3f | `place_string_inverters` has pathological performance on Lambda ARM64 — 30s local vs >600s on Lambda for 740 tables. Requires dedicated investigation spike (3g). | The full pipeline (API → S3 → SQS → Lambda → DB) is functionally correct. The bottleneck is in AC cable routing (inverter → ICR) Shapely geometry operations. See `docs/initiatives/spike-3g-lambda-perf-investigation.md`. |
 | 2026-04-20 | 3f | Lambda memory bumped to 1769MB (1 full vCPU), timeout to 600s, SQS visibility timeout to 1200s. | 512MB (~1/3 vCPU) was insufficient. Even at 1769MB the performance issue persists, confirming it's algorithmic not resource-bound. |
+| 2026-04-20 | 3g | AC cable routing search space capped: A2/A3 nearest 8 cols, A4 nearest 5×5 cols, B nearest 8×8 gaps, E max 15 waypoints. Result: 563s → 16s for `place_string_inverters` (34x), total 572s → 25s (23x). AC cable length +0.95%, all other stats identical. | Root cause was 5.7M `_path_ok` calls for 74 cables. Unbounded nested loops in A4 (G×C²) and E (W²) caused combinatorial explosion. Fix prunes search to nearest candidates — cables route through nearby columns, not distant ones. Same algorithm used in desktop app; the engineer's code had the same unbounded search but M2/M3 brute-forced through it. |
+| 2026-04-20 | 3g | SQS queue needs DLQ configuration. Failed Lambda invocations leave messages in 1200s visibility timeout, blocking new messages. Discovered when stale `ver_AxKI8NoIRCU6yblHPuSzPM69rvC0BQtbN7F3` (deleted DB record) cycled indefinitely. Workaround: manual `aws sqs send-message`. Fix: add DLQ with `maxReceiveCount: 3` in Spike 10. | No DLQ configured yet. Failed messages retry until retention period (4 days) expires. |
+| 2026-04-20 | 3g | Decisions log note: `_route_ac_cable` pattern logging in investigation doc incorrectly identified DC cable routing as the bottleneck. Actual bottleneck was AC cable routing (inverter → ICR, 74 cables). DC routing (table → inverter, 740 cables) was instant because `usable_polygon` was None for DC. Corrected in investigation doc. | Important for future debugging — the `poly_verts=0` log was misleading due to a try/except swallowing the error on non-simple polygon types. |
