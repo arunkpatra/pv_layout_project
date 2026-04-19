@@ -15,6 +15,10 @@ const EnvSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().optional(),
   S3_BUCKET_NAME: z.string().optional(),
+  // Layout engine dispatch
+  USE_LOCAL_ENV: z.string().optional(),
+  LAYOUT_ENGINE_URL: z.string().default("http://localhost:8000"),
+  SQS_LAYOUT_QUEUE_URL: z.string().optional(),
 })
 
 const parsed = EnvSchema.safeParse(process.env)

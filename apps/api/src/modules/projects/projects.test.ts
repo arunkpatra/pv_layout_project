@@ -1,5 +1,18 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test"
 
+// ─── Mock layout-engine and sqs ───────────────────────────────────────────────
+
+const mockDispatchLayoutJobHttp = mock(() => undefined)
+const mockPublishLayoutJob = mock(() => Promise.resolve())
+
+mock.module("../../lib/layout-engine.js", () => ({
+  dispatchLayoutJobHttp: mockDispatchLayoutJobHttp,
+}))
+
+mock.module("../../lib/sqs.js", () => ({
+  publishLayoutJob: mockPublishLayoutJob,
+}))
+
 // ─── Mock db ───────────────────────────────────────────────────────────────────
 
 const now = new Date("2026-04-19T00:00:00.000Z")
@@ -31,6 +44,7 @@ const mockProjectFindMany = mock(() => Promise.resolve([mockDbProject]))
 const mockProjectCreate = mock(() => Promise.resolve(mockDbProject))
 const mockProjectDelete = mock(() => Promise.resolve(mockDbProject))
 const mockVersionCreate = mock(() => Promise.resolve(mockDbVersion))
+const mockVersionUpdate = mock(() => Promise.resolve(mockDbVersion))
 const mockVersionFindUnique = mock(() =>
   Promise.resolve({
     ...mockDbVersion,
@@ -82,6 +96,7 @@ mock.module("../../lib/db.js", () => ({
       findUnique: mockVersionFindUnique,
       create: mockVersionCreate,
       count: mockVersionCount,
+      update: mockVersionUpdate,
     },
     layoutJob: {
       create: mockLayoutJobCreate,
@@ -275,5 +290,57 @@ describe("getVersion", () => {
     await expect(getVersion(mockDbVersion.id, mockDbProject.userId)).rejects.toThrow(
       ForbiddenError,
     )
+  })
+})
+
+// ─── createVersion dispatch ────────────────────────────────────────────────────
+
+describe("createVersion dispatch", () => {
+  beforeEach(() => {
+    mockDispatchLayoutJobHttp.mockClear()
+    mockPublishLayoutJob.mockClear()
+    // Use mockReset to drain any unconsumed mockImplementationOnce queue
+    // left by previous tests (e.g. getVersion ForbiddenError test queues
+    // mockProjectFindUnique but getVersion never calls it)
+    mockProjectFindUnique.mockReset()
+    mockProjectFindUnique.mockImplementation(() => Promise.resolve(mockDbProject))
+    mockVersionCreate.mockClear()
+    mockVersionUpdate.mockClear()
+    mockVersionCount.mockClear()
+    mockLayoutJobCreate.mockClear()
+    mockEnergyJobCreate.mockClear()
+  })
+
+  test("calls dispatchLayoutJobHttp when USE_LOCAL_ENV is 'true'", async () => {
+    const prev = process.env.USE_LOCAL_ENV
+    process.env.USE_LOCAL_ENV = "true"
+    try {
+      await createVersion(mockDbProject.userId, {
+        projectId: mockDbProject.id,
+        inputSnapshot: {},
+      })
+    } finally {
+      if (prev !== undefined) process.env.USE_LOCAL_ENV = prev
+      else delete process.env.USE_LOCAL_ENV
+    }
+    expect(mockDispatchLayoutJobHttp).toHaveBeenCalledTimes(1)
+    expect(mockDispatchLayoutJobHttp).toHaveBeenCalledWith(mockDbVersion.id)
+    expect(mockPublishLayoutJob).not.toHaveBeenCalled()
+  })
+
+  test("calls publishLayoutJob when USE_LOCAL_ENV is not 'true'", async () => {
+    const prev = process.env.USE_LOCAL_ENV
+    delete process.env.USE_LOCAL_ENV
+    try {
+      await createVersion(mockDbProject.userId, {
+        projectId: mockDbProject.id,
+        inputSnapshot: {},
+      })
+    } finally {
+      if (prev !== undefined) process.env.USE_LOCAL_ENV = prev
+    }
+    expect(mockPublishLayoutJob).toHaveBeenCalledTimes(1)
+    expect(mockPublishLayoutJob).toHaveBeenCalledWith(mockDbVersion.id)
+    expect(mockDispatchLayoutJobHttp).not.toHaveBeenCalled()
   })
 })

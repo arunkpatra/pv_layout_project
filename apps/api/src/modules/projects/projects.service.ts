@@ -1,5 +1,7 @@
 import { db } from "../../lib/db.js"
 import { uploadToS3 } from "../../lib/s3.js"
+import { dispatchLayoutJobHttp } from "../../lib/layout-engine.js"
+import { publishLayoutJob } from "../../lib/sqs.js"
 import { NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js"
 import type {
   Project,
@@ -154,13 +156,6 @@ export async function createVersion(
 ): Promise<VersionDetail> {
   await requireProjectOwnership(input.projectId, userId)
 
-  let kmzS3Key: string | null = null
-  if (input.kmzBuffer) {
-    const { randomUUID } = await import("crypto")
-    kmzS3Key = `projects/${input.projectId}/kmz/${randomUUID()}.kmz`
-    await uploadToS3(input.kmzBuffer, kmzS3Key, "application/vnd.google-earth.kmz")
-  }
-
   const count = await db.version.count({ where: { projectId: input.projectId } })
 
   let version: Awaited<ReturnType<typeof db.version.create>>
@@ -170,7 +165,7 @@ export async function createVersion(
         projectId: input.projectId,
         number: count + 1,
         label: input.label ?? null,
-        kmzS3Key,
+        kmzS3Key: null,
         inputSnapshot: JSON.parse(JSON.stringify(input.inputSnapshot)),
       },
     })
@@ -186,12 +181,30 @@ export async function createVersion(
     throw err
   }
 
+  let kmzS3Key: string | null = null
+  if (input.kmzBuffer) {
+    kmzS3Key = `projects/${input.projectId}/versions/${version.id}/input.kmz`
+    await uploadToS3(input.kmzBuffer, kmzS3Key, "application/vnd.google-earth.kmz")
+    await db.version.update({
+      where: { id: version.id },
+      data: { kmzS3Key },
+    })
+  }
+
   const [layoutJob, energyJob] = await Promise.all([
     db.layoutJob.create({ data: { versionId: version.id } }),
     db.energyJob.create({ data: { versionId: version.id } }),
   ])
 
-  return shapeVersion({ ...version, layoutJob, energyJob })
+  if (process.env.USE_LOCAL_ENV === "true") {
+    dispatchLayoutJobHttp(version.id)
+  } else {
+    publishLayoutJob(version.id).catch((err) => {
+      console.error("SQS publish failed", err)
+    })
+  }
+
+  return shapeVersion({ ...version, kmzS3Key, layoutJob, energyJob })
 }
 
 export async function getVersion(
