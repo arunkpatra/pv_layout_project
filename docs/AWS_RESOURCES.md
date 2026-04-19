@@ -205,7 +205,7 @@ aws iam create-access-key --user-name renewable-energy-app
 - **Package type:** Container image from ECR
 - **Architecture:** arm64
 - **Memory:** 512 MB
-- **Timeout:** 180 s
+- **Timeout:** 600 s (10 min)
 - **Execution role:** `arn:aws:iam::378240665051:role/renewable-energy-lambda-execution`
 - **Environment variables:**
   - `DATABASE_URL` — prod RDS (set via AWS console / CLI, not committed)
@@ -227,7 +227,7 @@ Policies attached:
 |---|---|---|
 | prod | `re_layout_queue_prod` | `arn:aws:sqs:ap-south-1:378240665051:re_layout_queue_prod` |
 
-Standard queue, batch size 1.
+Standard queue, batch size 1, visibility timeout 1200 s (2× Lambda timeout).
 
 ---
 

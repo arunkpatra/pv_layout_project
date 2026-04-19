@@ -4,8 +4,10 @@ Layout engine handlers.
 handle_layout       — Spike 2b local contract (local KMZ path, no S3/DB).
 handle_layout_job   — Spike 2c production contract (S3 + DB).
 """
+import logging
 import os
 import tempfile
+import time
 from typing import List
 
 from core.dxf_exporter import export_dxf
@@ -126,49 +128,87 @@ def handle_layout_job(version_id: str) -> None:
     Env:
       S3_ARTIFACTS_BUCKET — bucket for both input and output
     """
+    log = logging.getLogger("layout_engine")
+    t = time.monotonic
+
     bucket = os.environ["S3_ARTIFACTS_BUCKET"]
+
+    t0 = t()
     project_id, kmz_s3_key, input_snapshot = get_version(version_id)
+    log.info("[%s] db:get_version %.1fs project=%s kmz_key=%s",
+             version_id, t() - t0, project_id, kmz_s3_key)
+
     output_prefix = f"projects/{project_id}/versions/{version_id}"
 
     try:
+        t0 = t()
         mark_layout_processing(version_id)
+        log.info("[%s] db:mark_processing %.1fs", version_id, t() - t0)
+
         with tempfile.TemporaryDirectory() as tmpdir:
             kmz_local = os.path.join(tmpdir, "input.kmz")
+
+            t0 = t()
             download_from_s3(bucket, kmz_s3_key, kmz_local)
+            kmz_size = os.path.getsize(kmz_local) if os.path.exists(kmz_local) else 0
+            log.info("[%s] s3:download %.1fs size=%d bytes",
+                     version_id, t() - t0, kmz_size)
 
             params = _params_from_dict(input_snapshot)
+
+            t0 = t()
             parse_result = parse_kmz(kmz_local)
+            log.info("[%s] parse_kmz %.1fs boundaries=%d",
+                     version_id, t() - t0, len(parse_result.boundaries))
+
+            t0 = t()
             results = run_layout_multi(
                 parse_result.boundaries,
                 params,
                 parse_result.centroid_lat,
                 parse_result.centroid_lon,
             )
+            log.info("[%s] run_layout_multi %.1fs tables=%d modules=%d",
+                     version_id, t() - t0,
+                     sum(len(r.placed_tables) for r in results),
+                     sum(r.total_modules for r in results))
 
+            t0 = t()
             for r in results:
                 place_string_inverters(r, params)
                 place_lightning_arresters(r, params)
+            log.info("[%s] post_processing %.1fs", version_id, t() - t0)
 
             kmz_out = os.path.join(tmpdir, "layout.kmz")
             svg_out = os.path.join(tmpdir, "layout.svg")
             dxf_out = os.path.join(tmpdir, "layout.dxf")
 
+            t0 = t()
             export_kmz(results, params, kmz_out)
             export_svg(results, svg_out)
             export_dxf(results, params, dxf_out)
+            def _sz(p): return os.path.getsize(p) if os.path.exists(p) else 0
+            log.info("[%s] export %.1fs kmz=%d svg=%d dxf=%d bytes",
+                     version_id, t() - t0, _sz(kmz_out), _sz(svg_out), _sz(dxf_out))
 
             kmz_key = f"{output_prefix}/layout.kmz"
             svg_key = f"{output_prefix}/layout.svg"
             dxf_key = f"{output_prefix}/layout.dxf"
 
+            t0 = t()
             upload_to_s3(bucket, kmz_out, kmz_key)
             upload_to_s3(bucket, svg_out, svg_key)
             upload_to_s3(bucket, dxf_out, dxf_key)
+            log.info("[%s] s3:upload %.1fs (3 files)", version_id, t() - t0)
 
             stats = _build_stats(results)
+            log.info("[%s] stats %s", version_id, stats)
 
+        t0 = t()
         mark_layout_complete(version_id, kmz_key, svg_key, dxf_key, stats)
+        log.info("[%s] db:mark_complete %.1fs", version_id, t() - t0)
 
     except Exception as exc:
+        log.error("[%s] FAILED: %s", version_id, exc)
         mark_layout_failed(version_id, str(exc))
         raise
