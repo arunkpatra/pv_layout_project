@@ -1,6 +1,6 @@
 # Initiative: PV Layout Engine — Cloud Platform Port
 
-**Status:** Planning  
+**Status:** In Progress  
 **Created:** 2026-04-19  
 **Spike plan:** [pv-layout-spike-plan.md](./pv-layout-spike-plan.md)  
 **Primary reference:** This document is the authoritative source for all work on this initiative. All architecture, spike, and implementation decisions must trace back to it.
@@ -122,12 +122,12 @@ User submits run (parameters + KMZ reference)
   → Hono API uploads KMZ to S3
   → Hono API writes Version record (status: QUEUED) to PostgreSQL
   → Hono API writes LayoutJob record (status: QUEUED) to PostgreSQL
-  → [Local dev]  Hono POST http://localhost:5000/layout — fire and forget → 202 Accepted
-  → [Staging/Prod] Hono sends { versionId } to SQS layout-jobs queue — fire and forget
+  → [Local dev, USE_LOCAL_ENV=true]  Hono POST http://localhost:8000/layout — fire and forget → 202 Accepted
+  → [Prod, USE_LOCAL_ENV=false] Hono sends { version_id } to SQS layout queue — fire and forget
   → Hono returns { versionId, status: "queued" } to UI immediately
   → UI reflects "queued" state and begins polling
 
-Layout engine runs (local: Python HTTP server; staging/prod: Lambda via SQS):
+Layout engine runs (local: Python HTTP server at port 8000; prod: Lambda via SQS):
   → Updates LayoutJob in DB: QUEUED → PROCESSING
   → Updates Version in DB: QUEUED → PROCESSING
   → Downloads input KMZ from S3
@@ -136,10 +136,10 @@ Layout engine runs (local: Python HTTP server; staging/prod: Lambda via SQS):
   → Uploads artifacts to S3
   → Updates LayoutJob in DB: PROCESSING → COMPLETE (artifact S3 keys + statsJson)
   → Updates Version in DB: PROCESSING → COMPLETE
-  → [Staging/Prod only] Enqueues { versionId } to SQS energy-jobs queue
+  → [Prod only] Enqueues { version_id } to SQS energy-jobs queue
   → On any error: LayoutJob = FAILED (errorDetail), Version = FAILED
 
-Energy engine runs (staging/prod: Lambda via SQS — added in Spike 8):
+Energy engine runs (prod: Lambda via SQS — added in Spike 7):
   → Fetches irradiance (PVGIS / NASA POWER)
   → Computes 25-year energy yield
   → Writes PDF artifact to S3
@@ -476,7 +476,7 @@ Displayed alongside the SVG preview in the job results view. All stats below per
 
 2. **Lambda independence.** Each job (layout, energy) is an independent Lambda invocation. The platform's Hono API does not call the Lambda directly — it enqueues to SQS. The Lambda reads from SQS, processes, and writes results to PostgreSQL + S3.
 
-2a. **Python owns DB state.** The Hono API writes the initial QUEUED records for Version and LayoutJob/EnergyJob on submit, then fires the job (HTTP in local dev, SQS in staging/prod) and returns immediately. All subsequent DB writes — status transitions (PROCESSING, COMPLETE, FAILED), artifact S3 keys, statsJson, errorDetail — are performed by the Python engine directly using psycopg2-binary (raw SQL, no ORM). Hono never updates job status after the initial dispatch.
+2a. **Python owns DB state.** The Hono API writes the initial QUEUED records for Version and LayoutJob/EnergyJob on submit, then fires the job (HTTP in local dev, SQS in prod) and returns immediately. All subsequent DB writes — status transitions (PROCESSING, COMPLETE, FAILED), artifact S3 keys, statsJson, errorDetail — are performed by the Python engine directly using psycopg2-binary (raw SQL, no ORM). Hono never updates job status after the initial dispatch.
 
 3. **Full state saved per version.** Every version record in PostgreSQL stores the complete input snapshot (all parameter values + KMZ S3 reference) and the complete output snapshot (artifact S3 URLs + computed stats). Nothing is recomputed on read.
 
@@ -532,7 +532,7 @@ The full spike plan — scope, acceptance criteria, and status for each spike �
 
 **→ [pv-layout-spike-plan.md](./pv-layout-spike-plan.md)**
 
-**Summary of spikes (12 total):**
+**Summary of spikes (11 total):**
 
 | # | Spike | Depends On |
 |---|---|---|
@@ -540,15 +540,14 @@ The full spike plan — scope, acceptance criteria, and status for each spike �
 | 2a | `apps/layout-engine` scaffold (uv, copied core, health check) | Spike 1 |
 | 2b | Layout compute local (svg_exporter, handlers, local KMZ test) | Spike 2a |
 | 2c | S3 + DB integration (s3_client, db_client, production contract, 202 fire-and-forget) | Spike 2b |
-| 3 | Job pipeline: local mode (Hono fires and forgets, Python updates DB) | Spike 2c |
-| 4 | Job pipeline: SQS + Lambda (staging, ECR, DLQ) | Spike 3 |
-| 5 | Project and version UI (forms, status polling, tooltips) | Spike 3 |
-| 6 | SVG preview + stats dashboard (zoom/pan, layer toggles) | Spike 5 |
-| 7 | KMZ download | Spike 6 |
-| 8 | Energy job (PVGIS/NASA POWER, PDF, 25-year model) | Spike 4 |
-| 9 | PDF download | Spike 8 |
-| 10 | DXF download | Spike 9 |
-| 11 | Error handling and retry UX | Spike 10 |
-| 12 | End-to-end production smoke test | Spike 11 |
+| 3 | Lambda + SQS (prod) + local HTTP wiring (USE_LOCAL_ENV, Dockerfile, ECR, CI/CD) | Spike 2c |
+| 4 | Project and version UI (forms, status polling, tooltips) | Spike 3 |
+| 5 | SVG preview + stats dashboard (zoom/pan, layer toggles) | Spike 4 |
+| 6 | KMZ download | Spike 5 |
+| 7 | Energy job (PVGIS/NASA POWER, PDF, 25-year model) | Spike 3 |
+| 8 | PDF download | Spike 7 |
+| 9 | DXF download | Spike 8 |
+| 10 | Error handling and retry UX | Spike 9 |
+| 11 | End-to-end production smoke test | Spike 10 |
 
 Do not edit spike details here. All spike detail is owned by the spike plan document. Update both documents in the same commit if a change affects both.
