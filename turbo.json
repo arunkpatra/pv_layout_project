@@ -1,25 +1,25 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "DATABASE_URL",
+    "CLERK_SECRET_KEY",
+    "CORS_ORIGINS",
+    "NODE_ENV",
+    "PORT",
+    "NODEJS_HELPERS",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"],
-      "env": [
-        "DATABASE_URL",
-        "CLERK_SECRET_KEY",
-        "CORS_ORIGINS",
-        "NODE_ENV",
-        "PORT",
-        "NODEJS_HELPERS",
-        "NEXT_PUBLIC_API_URL",
-        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
-        "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
-        "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
-        "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
-      ]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"]
     },
     "lint": {
       "dependsOn": ["^lint"]
