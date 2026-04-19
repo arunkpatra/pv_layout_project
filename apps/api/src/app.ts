@@ -7,6 +7,7 @@ import { errorHandler } from "./middleware/error-handler.js"
 import { authMiddleware } from "./middleware/auth.js"
 import type { HonoEnv } from "./middleware/auth.js"
 import { identityRoutes } from "./modules/identity/identity.routes.js"
+import { renderRoot } from "./views/root.html.js"
 
 export const app = new Hono<HonoEnv>()
 
@@ -22,6 +23,22 @@ app.use("*", requestLogger)
 app.onError(errorHandler)
 
 // ─── Routes ────────────────────────────────────────────────────────────────────
+
+app.get("/", async (c) => {
+  const status = {
+    database: "ok" as "ok" | "error",
+    timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV,
+  }
+
+  try {
+    await prisma.$queryRaw`SELECT 1`
+  } catch {
+    status.database = "error"
+  }
+
+  return c.html(renderRoot(status))
+})
 
 app.route("/", identityRoutes)
 
