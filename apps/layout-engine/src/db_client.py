@@ -85,6 +85,8 @@ def get_version(version_id: str) -> tuple[str, str, dict]:
     if row is None:
         raise ValueError(f"Version not found: {version_id}")
     project_id, kmz_s3_key, input_snapshot = row
+    if kmz_s3_key is None:
+        raise ValueError(f"Version {version_id} has no kmzS3Key — KMZ upload may not have completed")
     if input_snapshot is None:
         raise ValueError(f"Version {version_id} has no inputSnapshot")
     if isinstance(input_snapshot, str):

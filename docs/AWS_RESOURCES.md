@@ -108,14 +108,10 @@ aws s3 cp /path/to/your.kmz \
 bun run db:studio   # http://localhost:5555
 # Create a Project, then a Version (status=QUEUED), then a LayoutJob (status=QUEUED, versionId=<version_id>)
 
-# Dispatch the job
+# Dispatch the job (server.py POST /layout accepts only version_id since Spike 3c)
 curl -s -X POST http://localhost:8000/layout \
   -H "Content-Type: application/json" \
-  -d '{
-    "version_id": "<version_id>",
-    "kmz_s3_key": "projects/test_p1/versions/test_v1/input.kmz",
-    "parameters": {}
-  }'
+  -d '{"version_id": "<version_id>"}'
 # → {"accepted": true}  HTTP 202
 
 # Check DB — LayoutJob and Version should transition QUEUED → PROCESSING → COMPLETE

@@ -9,13 +9,12 @@ from handlers import handle_layout_job
 
 
 def handler(event, context):
-    errors = []
-    for record in event["Records"]:
-        try:
-            payload = json.loads(record["body"])
-            handle_layout_job(payload["version_id"])
-        except Exception as exc:
-            print(f"Failed to process record: {exc}")
-            errors.append(exc)
-    if errors:
-        raise errors[0]
+    records = event["Records"]
+    if len(records) != 1:
+        raise RuntimeError(f"Expected batch size 1, got {len(records)}")
+    try:
+        payload = json.loads(records[0]["body"])
+        handle_layout_job(payload["version_id"])
+    except Exception as exc:
+        print(f"Failed to process record: {exc}")
+        raise

@@ -96,3 +96,15 @@ def test_get_version_raises_if_not_found():
     with patch("db_client._connect", return_value=conn):
         with pytest.raises(ValueError, match="Version not found"):
             get_version("ver_nonexistent")
+
+
+def test_get_version_raises_if_kmz_key_is_none():
+    conn, cur = _mock_conn()
+    cur.fetchone.return_value = (
+        "prj_abc123",
+        None,
+        {"tilt_angle": 18.0},
+    )
+    with patch("db_client._connect", return_value=conn):
+        with pytest.raises(ValueError, match="no kmzS3Key"):
+            get_version("ver_xyz")
