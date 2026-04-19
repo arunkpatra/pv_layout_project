@@ -1,7 +1,7 @@
 # AWS Resources
 
 All resources live in a **single AWS account** (`378240665051`) in region **`ap-south-1`** (Mumbai).
-Resources are namespaced by environment.
+Resources are namespaced by environment. Last verified: 2026-04-20.
 
 ---
 
