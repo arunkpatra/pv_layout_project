@@ -5,9 +5,7 @@
     "rootDir": "src",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "typeRoots": ["../../node_modules/@types", "./node_modules/@types"],
-    "types": ["bun"]
+    "noUncheckedIndexedAccess": false
   },
   "include": ["src"],
   "exclude": ["dist", "node_modules"]
