@@ -11,7 +11,19 @@ Before doing any work, read this file in full:
 - **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** — How to conduct browser/runtime testing with the human. Ask one question at a time, never dump a full test list.
 - **[UX Design Principles](./docs/ux-design.md)** — Nova theme, rounded corners permitted, shadcn primitives for all UI elements, icon/colour/typography conventions.
 
-**Self-review rule**: After any significant/wide-blast work (5+ files, new infrastructure, renames, new patterns), run `superpowers:code-reviewer` before declaring complete. "Tests pass" is not sufficient — the reviewer catches what static gates cannot.
+## Non-Negotiable Rules for Claude
+
+**Before designing or implementing anything:**
+- Read the relevant existing code first. Do not design from memory or assume you know what is there.
+- State every unverified assumption explicitly before writing a single line. If a core assumption cannot be verified statically, flag it and wait — do not proceed on hope.
+
+**During implementation:**
+- TDD is mandatory. Write a failing test before any production code, without exception. No test, no implementation.
+- A failing gate (lint, typecheck, test, build) is a stop signal. Diagnose and fix it. Never route around it (`--no-verify`, skipping a step, treating a failure as acceptable).
+
+**Before declaring work done:**
+- "Gates pass" is not done. Done = tests written first + all gates pass + human has confirmed runtime behavior.
+- For significant work (5+ files, new infrastructure, new patterns): run `superpowers:code-reviewer` before declaring complete. "Tests pass" is not sufficient — the reviewer catches what static gates cannot.
 
 **Pre-commit gate (mandatory — run from repo root before every commit):**
 ```bash
