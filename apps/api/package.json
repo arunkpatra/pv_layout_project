@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run --env-file ../../.env --hot src/index.ts",
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build api/index.ts --outfile api/index.js --target node",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "vercel-build": "cd ../.. && bun turbo build --filter=@renewable-energy/api",
     "start": "bun run dist/index.js",
     "test": "bun test",
