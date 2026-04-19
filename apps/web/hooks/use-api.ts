@@ -10,6 +10,8 @@ const API_BASE =
 export function useApi() {
   const { getToken } = useAuth()
   return useMemo(
+    // Arrow wrapper `() => getToken()` defers resolution to call time so
+    // the client always uses the current token rather than a captured value.
     () => createWebClient(createApiClient(API_BASE, () => getToken())),
     [getToken],
   )
