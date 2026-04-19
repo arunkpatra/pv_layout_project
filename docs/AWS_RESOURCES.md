@@ -48,7 +48,7 @@ projects/<project_id>/versions/<version_id>/layout.dxf     ← written by layout
 
 | Variable | local | staging | prod |
 |---|---|---|---|
-| `S3_BUCKET` | `renewable-energy-local-artifacts` | `renewable-energy-staging-artifacts` | `renewable-energy-prod-artifacts` |
+| `S3_ARTIFACTS_BUCKET` | `renewable-energy-local-artifacts` | `renewable-energy-staging-artifacts` | `renewable-energy-prod-artifacts` |
 | `AWS_REGION` | `ap-south-1` | `ap-south-1` | `ap-south-1` |
 | `AWS_ACCESS_KEY_ID` | see `aws-creds/` | set in deployment platform | set in deployment platform |
 | `AWS_SECRET_ACCESS_KEY` | see `aws-creds/` | set in deployment platform | set in deployment platform |
@@ -209,7 +209,7 @@ aws iam create-access-key --user-name renewable-energy-app
 - **Execution role:** `arn:aws:iam::378240665051:role/renewable-energy-lambda-execution`
 - **Environment variables:**
   - `DATABASE_URL` — prod RDS (set via AWS console / CLI, not committed)
-  - `S3_BUCKET` = `renewable-energy-prod-artifacts`
+  - `S3_ARTIFACTS_BUCKET` = `renewable-energy-prod-artifacts`
   - `AWS_REGION` = `ap-south-1`
 
 ### Execution Role: `renewable-energy-lambda-execution`

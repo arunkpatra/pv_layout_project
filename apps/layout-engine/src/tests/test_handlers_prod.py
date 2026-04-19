@@ -41,7 +41,7 @@ def test_handle_layout_job_reads_version_from_db():
         patch("handlers.export_kmz"),
         patch("handlers.export_svg"),
         patch("handlers.export_dxf"),
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         handle_layout_job(_VERSION_ID)
 
@@ -64,7 +64,7 @@ def test_handle_layout_job_transitions_processing_then_complete():
         patch("handlers.export_kmz"),
         patch("handlers.export_svg"),
         patch("handlers.export_dxf"),
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         handle_layout_job(_VERSION_ID)
 
@@ -89,7 +89,7 @@ def test_handle_layout_job_uploads_three_artifacts_with_correct_prefix():
         patch("handlers.export_kmz"),
         patch("handlers.export_svg"),
         patch("handlers.export_dxf"),
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         handle_layout_job(_VERSION_ID)
 
@@ -111,7 +111,7 @@ def test_handle_layout_job_marks_failed_and_reraises_on_error():
             "handlers.download_from_s3",
             side_effect=RuntimeError("bucket not found"),
         ),
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         with pytest.raises(RuntimeError, match="bucket not found"):
             handle_layout_job(_VERSION_ID)
@@ -132,7 +132,7 @@ def test_handle_layout_job_marks_failed_if_mark_processing_raises():
         ),
         patch("handlers.mark_layout_failed") as mock_failed,
         patch("handlers.mark_layout_complete") as mock_complete,
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         with pytest.raises(RuntimeError, match="db down"):
             handle_layout_job(_VERSION_ID)
@@ -151,7 +151,7 @@ def test_handle_layout_job_marks_failed_if_get_version_raises():
         ),
         patch("handlers.mark_layout_processing") as mock_proc,
         patch("handlers.mark_layout_failed") as mock_failed,
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         with pytest.raises(ValueError, match="Version not found"):
             handle_layout_job(_VERSION_ID)
@@ -177,7 +177,7 @@ def test_handle_layout_job_processing_called_before_complete():
         patch("handlers.export_kmz"),
         patch("handlers.export_svg"),
         patch("handlers.export_dxf"),
-        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+        patch.dict(os.environ, {"S3_ARTIFACTS_BUCKET": "test-bucket"}),
     ):
         handle_layout_job(_VERSION_ID)
 

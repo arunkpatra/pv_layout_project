@@ -124,9 +124,9 @@ def handle_layout_job(version_id: str) -> None:
       projects/{project_id}/versions/{version_id}/layout.dxf
 
     Env:
-      S3_BUCKET — bucket for both input and output
+      S3_ARTIFACTS_BUCKET — bucket for both input and output
     """
-    bucket = os.environ["S3_BUCKET"]
+    bucket = os.environ["S3_ARTIFACTS_BUCKET"]
     project_id, kmz_s3_key, input_snapshot = get_version(version_id)
     output_prefix = f"projects/{project_id}/versions/{version_id}"
 
