@@ -1,11 +1,13 @@
 """
 Layout engine HTTP server.
-Spike 2a: GET /health only.
-POST /layout added in Spike 2b.
+Spike 2b: GET /health + POST /layout (local contract, synchronous).
+POST /layout becomes 202 fire-and-forget in Spike 2c.
 """
 import json
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+from handlers import handle_layout
 
 
 class LayoutEngineHandler(BaseHTTPRequestHandler):
@@ -17,6 +19,21 @@ class LayoutEngineHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        if self.path == "/layout":
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length))
+            result = handle_layout(payload)
+            response = json.dumps(result).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
         else:
             self.send_response(404)
             self.end_headers()
