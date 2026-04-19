@@ -7,6 +7,7 @@ import { errorHandler } from "./middleware/error-handler.js"
 import { authMiddleware } from "./middleware/auth.js"
 import type { HonoEnv } from "./middleware/auth.js"
 import { identityRoutes } from "./modules/identity/identity.routes.js"
+import { projectsRoutes } from "./modules/projects/projects.routes.js"
 import { renderRoot } from "./views/root.html.js"
 
 export const app = new Hono<HonoEnv>()
@@ -41,6 +42,7 @@ app.get("/", async (c) => {
 })
 
 app.route("/", identityRoutes)
+app.route("/", projectsRoutes)
 
 // ─── Health Checks ─────────────────────────────────────────────────────────────
 

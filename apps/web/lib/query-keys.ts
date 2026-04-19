@@ -11,4 +11,14 @@ export const queryKeys = {
     all: () => ["identity"] as const,
     me: () => ["identity", "me"] as const,
   },
+  projects: {
+    all: () => ["projects"] as const,
+    lists: () => ["projects", "list"] as const,
+    detail: (projectId: string) => ["projects", projectId] as const,
+    versions: {
+      all: (projectId: string) => ["projects", projectId, "versions"] as const,
+      detail: (projectId: string, versionId: string) =>
+        ["projects", projectId, "versions", versionId] as const,
+    },
+  },
 } as const

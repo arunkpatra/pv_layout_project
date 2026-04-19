@@ -7,4 +7,8 @@
  */
 export const ID_PREFIXES: Record<string, string> = {
   User: "usr",
+  Project: "prj",
+  Version: "ver",
+  LayoutJob: "ljo",
+  EnergyJob: "ejo",
 }

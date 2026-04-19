@@ -15,6 +15,29 @@ const noopPrismaClient = {
     update: () => Promise.resolve(null),
     findMany: () => Promise.resolve([]),
   },
+  project: {
+    findUnique: () => Promise.resolve(null),
+    findMany: () => Promise.resolve([]),
+    create: () => Promise.resolve(null),
+    update: () => Promise.resolve(null),
+    delete: () => Promise.resolve(null),
+  },
+  version: {
+    findUnique: () => Promise.resolve(null),
+    findMany: () => Promise.resolve([]),
+    create: () => Promise.resolve(null),
+    count: () => Promise.resolve(0),
+  },
+  layoutJob: {
+    findUnique: () => Promise.resolve(null),
+    create: () => Promise.resolve(null),
+    update: () => Promise.resolve(null),
+  },
+  energyJob: {
+    findUnique: () => Promise.resolve(null),
+    create: () => Promise.resolve(null),
+    update: () => Promise.resolve(null),
+  },
   $connect: () => Promise.resolve(),
   $disconnect: () => Promise.resolve(),
 }
