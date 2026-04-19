@@ -1,25 +1,25 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalEnv": [
-    "DATABASE_URL",
-    "CLERK_SECRET_KEY",
-    "CORS_ORIGINS",
-    "NODE_ENV",
-    "PORT",
-    "NODEJS_HELPERS",
-    "NEXT_PUBLIC_API_URL",
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-    "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
-    "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
-    "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
-    "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
-  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"],
+      "env": [
+        "DATABASE_URL",
+        "CLERK_SECRET_KEY",
+        "CORS_ORIGINS",
+        "NODE_ENV",
+        "PORT",
+        "NODEJS_HELPERS",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -43,7 +43,21 @@
     },
     "@renewable-energy/db#build": {
       "dependsOn": ["db:generate"],
-      "outputs": ["dist/**", "tsconfig.tsbuildinfo"]
+      "outputs": ["dist/**", "tsconfig.tsbuildinfo"],
+      "env": [
+        "DATABASE_URL",
+        "CLERK_SECRET_KEY",
+        "CORS_ORIGINS",
+        "NODE_ENV",
+        "PORT",
+        "NODEJS_HELPERS",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
+      ]
     },
     "db:generate": {
       "inputs": ["prisma/**/*.prisma", "prisma.config.ts"],
@@ -73,7 +87,21 @@
     },
     "@renewable-energy/api#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "env": [
+        "DATABASE_URL",
+        "CLERK_SECRET_KEY",
+        "CORS_ORIGINS",
+        "NODE_ENV",
+        "PORT",
+        "NODEJS_HELPERS",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL"
+      ]
     },
     "@renewable-energy/api#typecheck": {
       "dependsOn": ["^build"],
