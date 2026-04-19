@@ -5,12 +5,26 @@ One record per invocation (batch size = 1 on the event source mapping).
 """
 import json
 import logging
+import platform
 import time
+
+import shapely
+from shapely import geos_capi_version_string, geos_version_string
 
 from handlers import handle_layout_job
 
 logger = logging.getLogger("layout_engine")
 logger.setLevel(logging.INFO)
+
+# Cold-start diagnostics (logged once per container)
+logger.info(
+    "COLD_START shapely=%s geos=%s geos_capi=%s python=%s arch=%s",
+    shapely.__version__,
+    geos_version_string,
+    geos_capi_version_string,
+    platform.python_version(),
+    platform.machine(),
+)
 
 
 def handler(event, context):

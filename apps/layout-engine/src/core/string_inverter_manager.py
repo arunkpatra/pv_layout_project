@@ -20,6 +20,7 @@ AC cable routing (Manhattan grid only — H and V segments, no diagonals):
   Route merging: duplicate segments shared by multiple inverters going through
   the same corridor are deduplicated at draw time.
 """
+import logging
 import math
 from typing import Dict, List, Tuple
 
@@ -34,6 +35,8 @@ from models.project import (
     LayoutResult,
     PlacedStringInverter,
 )
+
+_log = logging.getLogger("layout_engine.cable_routing")
 
 INV_EW = 2.0
 INV_NS = 1.0
@@ -297,13 +300,33 @@ def _route_ac_cable(
     gap_ys: List[float],
     col_xs: List[float],
     poly,
+    _stats: dict | None = None,
 ) -> List[Tuple[float, float]]:
     """
     Route from start (inverter) to end (ICR centre) using only H/V segments
     that lie strictly inside poly.  Always returns a non-empty route.
+
+    If _stats dict is provided, records which pattern succeeded and how
+    many _path_ok calls were made (for performance investigation).
     """
     if poly is None:
+        if _stats is not None:
+            _stats["pattern"] = "none"
+            _stats["path_ok_calls"] = 0
         return [start, end]
+
+    # Counting wrapper for _path_ok
+    _poc = [0]
+
+    def _pok(pts, p):
+        _poc[0] += 1
+        return _path_ok(pts, p)
+
+    def _done(pattern, path):
+        if _stats is not None:
+            _stats["pattern"] = pattern
+            _stats["path_ok_calls"] = _poc[0]
+        return path
 
     s = _safe_pt(start, poly)
     e = _safe_pt(end,   poly)
@@ -314,40 +337,34 @@ def _route_ac_cable(
     # ---- Pattern A: V→H→V via single row gap --------------------------------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
         path = [s, (s[0], gy), (e[0], gy), e]
-        if _path_ok(path, poly):
-            return path
+        if _pok(path, poly):
+            return _done("A", path)
 
     # ---- Pattern A2: H→V→H→V -----------------------------------------------
-    # Handles the case where the straight vertical from s to gap_y crosses
-    # outside (inverter near a slanted/irregular boundary).
-    # First step H to a valid column X, then V to the gap, then H to ICR X, then V.
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        # Try known interior X positions for the intermediate column
         for tx in sorted(col_xs, key=lambda x: abs(x - s[0])):
             path = [s, (tx, s[1]), (tx, gy), (e[0], gy), e]
-            if _path_ok(path, poly):
-                return path
-        # Also try mid_x as intermediate
+            if _pok(path, poly):
+                return _done("A2", path)
         for tx in [mid_x, e[0]]:
             path = [s, (tx, s[1]), (tx, gy), (e[0], gy), e]
-            if _path_ok(path, poly):
-                return path
+            if _pok(path, poly):
+                return _done("A2", path)
 
     # ---- Pattern A3: V→H→V with horizontal escape at end -------------------
-    # Fixes the case where the final vertical to ICR exits the boundary.
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
         for tx in sorted(col_xs, key=lambda x: abs(x - e[0])):
             path = [s, (s[0], gy), (tx, gy), (tx, e[1]), e]
-            if _path_ok(path, poly):
-                return path
+            if _pok(path, poly):
+                return _done("A3", path)
 
     # ---- Pattern A4: H→V→H→V→H→V (both ends need horizontal escape) -------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
         for tx_s in sorted(col_xs, key=lambda x: abs(x - s[0])):
             for tx_e in sorted(col_xs, key=lambda x: abs(x - e[0])):
                 path = [s, (tx_s, s[1]), (tx_s, gy), (tx_e, gy), (tx_e, e[1]), e]
-                if _path_ok(path, poly):
-                    return path
+                if _pok(path, poly):
+                    return _done("A4", path)
 
     # ---- Pattern B: two gaps V→H→V→H→V ------------------------------------
     for g1 in sorted(gap_ys, key=lambda y: abs(y - s[1])):
@@ -355,28 +372,26 @@ def _route_ac_cable(
             if abs(g1 - g2) < 0.5:
                 continue
             path = [s, (s[0], g1), (mid_x, g1), (mid_x, g2), (e[0], g2), e]
-            if _path_ok(path, poly):
-                return path
-            # With horizontal escape at both ends
+            if _pok(path, poly):
+                return _done("B", path)
             for tx_s in sorted(col_xs, key=lambda x: abs(x - s[0]))[:3]:
                 for tx_e in sorted(col_xs, key=lambda x: abs(x - e[0]))[:3]:
                     path = [s, (tx_s, s[1]), (tx_s, g1), (tx_e, g1), (tx_e, g2), (e[0], g2), e]
-                    if _path_ok(path, poly):
-                        return path
+                    if _pok(path, poly):
+                        return _done("B", path)
 
     # ---- Pattern C: simple L-shapes ----------------------------------------
     for path in [
         [s, (s[0], e[1]), e],
         [s, (e[0], s[1]), e],
     ]:
-        if _path_ok(path, poly):
-            return path
+        if _pok(path, poly):
+            return _done("C", path)
 
     # ---- Pattern D: via polygon centroid ------------------------------------
     try:
         cx, cy = poly.centroid.x, poly.centroid.y
         cen = _safe_pt((cx, cy), poly)
-        # Try centroid + each gap
         for gy in sorted(gap_ys, key=lambda y: abs(y - cy)):
             for path in [
                 [s, (s[0], gy), (cx, gy), (cx, e[1]), e],
@@ -385,33 +400,30 @@ def _route_ac_cable(
                 [s, cen, (e[0], e[1]), e],
                 [s, cen, e],
             ]:
-                if _path_ok(path, poly):
-                    return path
+                if _pok(path, poly):
+                    return _done("D", path)
     except Exception:
         pass
 
     # ---- Pattern E: exhaustive 2-waypoint search ---------------------------
     try:
         cx, cy = poly.centroid.x, poly.centroid.y
-        # Collect candidate waypoints: centroid, gap midpoints, col positions
         wps = [(cx, cy)]
         for gy in gap_ys:
             for tx in col_xs[::max(1, len(col_xs)//6)]:
                 wps.append((tx, gy))
         wps = [_safe_pt(w, poly) for w in wps]
-        # Single waypoint
         for w in wps:
             path = [s, w, e]
-            if _path_ok(path, poly):
-                return path
-        # Two waypoints
+            if _pok(path, poly):
+                return _done("E", path)
         for w1 in wps:
             for w2 in wps:
                 if w1 == w2:
                     continue
                 path = [s, w1, w2, e]
-                if _path_ok(path, poly):
-                    return path
+                if _pok(path, poly):
+                    return _done("E", path)
     except Exception:
         pass
 
@@ -442,11 +454,11 @@ def _route_ac_cable(
                       for i in range(len(path)-1))
             return bad
         best = min(candidates, key=_score)
-        return best
+        return _done("F", best)
     except Exception:
         pass
 
-    return [s, e]
+    return _done("fallback", [s, e])
 
 
 def _route_length(route: List[Tuple[float, float]]) -> float:
@@ -516,10 +528,23 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     result.placed_string_inverters = placed_inverters
 
     # ---- DC cable runs (table → inverter, Manhattan-routed within boundary) --
-    # gap_ys and col_xs are needed here too; compute them early
     gap_ys = _get_row_gap_ys(tables)
     col_xs = _get_col_xs(tables)
     usable = result.usable_polygon
+
+    # Log polygon complexity and routing grid size (perf investigation)
+    poly_verts = 0
+    poly_holes = 0
+    if usable is not None:
+        try:
+            poly_verts = len(usable.exterior.coords)
+            poly_holes = len(list(usable.interiors))
+        except Exception:
+            pass
+    _log.info(
+        "ROUTING_GRID gap_ys=%d col_xs=%d poly_verts=%d poly_holes=%d tables=%d",
+        len(gap_ys), len(col_xs), poly_verts, poly_holes, len(tables),
+    )
 
     tbl_to_inv = {}
     for inv_idx, group in enumerate(groups):
@@ -527,6 +552,7 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
             tbl_to_inv[id(t)] = placed_inverters[inv_idx]
 
     dc_cables: List[CableRun] = []
+    dc_stats_all: List[dict] = []
     total_dc = 0.0
     for t in tables:
         inv = tbl_to_inv.get(id(t))
@@ -536,7 +562,12 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
         t_cy = t.y + t.height / 2
         i_cx = inv.x + INV_EW / 2
         i_cy = inv.y + INV_NS / 2
-        route     = _route_ac_cable((t_cx, t_cy), (i_cx, i_cy), gap_ys, col_xs, usable)
+        cable_stats: dict = {}
+        route     = _route_ac_cable(
+            (t_cx, t_cy), (i_cx, i_cy), gap_ys, col_xs, usable,
+            _stats=cable_stats,
+        )
+        dc_stats_all.append(cable_stats)
         path_len  = _route_length(route)
         cable_len = (path_len + 10.0) * strings_per_table
         total_dc += cable_len
@@ -546,6 +577,23 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
             index=len(dc_cables) + 1, cable_type="dc",
             length_m=round(cable_len, 1),
         ))
+
+    # Summarise DC routing patterns
+    dc_patterns: Dict[str, int] = {}
+    dc_total_pok = 0
+    dc_max_pok = 0
+    for s in dc_stats_all:
+        p = s.get("pattern", "?")
+        dc_patterns[p] = dc_patterns.get(p, 0) + 1
+        pok = s.get("path_ok_calls", 0)
+        dc_total_pok += pok
+        if pok > dc_max_pok:
+            dc_max_pok = pok
+    _log.info(
+        "DC_ROUTING cables=%d patterns=%s total_path_ok=%d max_path_ok=%d",
+        len(dc_cables), dc_patterns, dc_total_pok, dc_max_pok,
+    )
+
     result.dc_cable_runs    = dc_cables
     result.total_dc_cable_m = round(total_dc, 1)
 
@@ -573,13 +621,19 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
 
     # ---- AC cable runs (inverter → assigned ICR) ---------------------------
     ac_cables: List[CableRun] = []
+    ac_stats_all: List[dict] = []
     total_ac = 0.0
     for icr_idx, inv_group in icr_groups.items():
         icr_pt = icr_centers[icr_idx]
         for inv in inv_group:
             i_cx = inv.x + INV_EW / 2
             i_cy = inv.y + INV_NS / 2
-            route     = _route_ac_cable((i_cx, i_cy), icr_pt, gap_ys, col_xs, usable)
+            cable_stats: dict = {}
+            route     = _route_ac_cable(
+                (i_cx, i_cy), icr_pt, gap_ys, col_xs, usable,
+                _stats=cable_stats,
+            )
+            ac_stats_all.append(cable_stats)
             path_len  = _route_length(route)
             cable_len = path_len + 4.0
             total_ac += cable_len
@@ -589,6 +643,22 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
                 index=len(ac_cables) + 1, cable_type="ac",
                 length_m=round(cable_len, 1),
             ))
+
+    # Summarise AC routing patterns
+    ac_patterns: Dict[str, int] = {}
+    ac_total_pok = 0
+    ac_max_pok = 0
+    for s in ac_stats_all:
+        p = s.get("pattern", "?")
+        ac_patterns[p] = ac_patterns.get(p, 0) + 1
+        pok = s.get("path_ok_calls", 0)
+        ac_total_pok += pok
+        if pok > ac_max_pok:
+            ac_max_pok = pok
+    _log.info(
+        "AC_ROUTING cables=%d patterns=%s total_path_ok=%d max_path_ok=%d",
+        len(ac_cables), ac_patterns, ac_total_pok, ac_max_pok,
+    )
 
     result.ac_cable_runs    = ac_cables
     result.total_ac_cable_m = round(total_ac, 1)
