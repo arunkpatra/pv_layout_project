@@ -5,7 +5,7 @@
 | Environment | Database | Web | API |
 |---|---|---|---|
 | Staging | `re_staging` on shared RDS (`journium.cbuwaoikc0qr.us-east-1.rds.amazonaws.com`) | TBD (Vercel) | TBD (Vercel) |
-| Production | `re_prod` on shared RDS (`journium.cbuwaoikc0qr.us-east-1.rds.amazonaws.com`) | TBD (Vercel) | TBD (Vercel) |
+| Production | `re_prod` on shared RDS (`journium.cbuwaoikc0qr.us-east-1.rds.amazonaws.com`) | https://renewable-energy-web.vercel.app | https://renewable-energy-api.vercel.app |
 
 ---
 
@@ -175,7 +175,7 @@ cd packages/db && DATABASE_URL="postgresql://re_prod_user:<password>@journium.cb
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL` | `/dashboard` |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL` | `/dashboard` |
-| `NEXT_PUBLIC_API_URL` | `<vercel-api-production-url>` |
+| `NEXT_PUBLIC_API_URL` | `https://renewable-energy-api.vercel.app` |
 
 **API server (`apps/api`):**
 
@@ -183,7 +183,7 @@ cd packages/db && DATABASE_URL="postgresql://re_prod_user:<password>@journium.cb
 |---|---|
 | `DATABASE_URL` | `postgresql://re_prod_user:<password>@journium.cbuwaoikc0qr.us-east-1.rds.amazonaws.com:5432/re_prod` |
 | `CLERK_SECRET_KEY` | `sk_live_...` (production Clerk instance) |
-| `CORS_ORIGINS` | `<vercel-web-production-url>` |
+| `CORS_ORIGINS` | `https://renewable-energy-web.vercel.app` |
 
 > `NODE_ENV` and `PORT` are set automatically by Vercel — do not add them manually.
 
