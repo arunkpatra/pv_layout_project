@@ -90,6 +90,8 @@ When adding a new package, identify its `moduleResolution` setting first:
 
 Never point a Next.js/Turbopack path alias at NodeNext source — Turbopack cannot remap `.js` imports to `.ts` files.
 
+**turbo.json per-package overrides replace, not merge**: A `@pkg#build` entry REPLACES the global `build` task's `env` array entirely — it does not inherit from it. Always repeat the full `env` array on every per-package `#build` override.
+
 ## Cross-cutting Conventions
 
 - **Prettier**: no semicolons, double quotes, trailing commas (es5), 80 char width
