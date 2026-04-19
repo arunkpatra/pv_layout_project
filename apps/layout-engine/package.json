@@ -1,0 +1,11 @@
+{
+  "name": "layout-engine",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "uv run ruff check src/",
+    "test": "uv run pytest",
+    "typecheck": "echo 'no separate typecheck for layout-engine — ruff covers it'",
+    "build": "echo 'no build step for layout-engine'"
+  }
+}
