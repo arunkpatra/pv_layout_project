@@ -5,9 +5,7 @@ POST /layout  → 202 {"accepted": true}  (fires handle_layout_job in a daemon t
 
 Request body for POST /layout:
   {
-    "version_id":  str,   — Version.id from the DB
-    "kmz_s3_key":  str,   — S3 key of the uploaded input KMZ
-    "parameters":  dict   — layout parameters (all optional, defaults apply)
+    "version_id":  str   — Version.id from the DB
   }
 """
 import json
@@ -37,12 +35,10 @@ class LayoutEngineHandler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length))
 
             version_id = payload["version_id"]
-            kmz_s3_key = payload["kmz_s3_key"]
-            parameters = payload.get("parameters", {})
 
             t = threading.Thread(
                 target=handle_layout_job,
-                args=(version_id, kmz_s3_key, parameters),
+                args=(version_id,),
                 daemon=True,
             )
             t.start()

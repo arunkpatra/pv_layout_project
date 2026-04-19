@@ -53,8 +53,6 @@ def test_post_layout_returns_202_accepted():
 
     body = json.dumps({
         "version_id": "ver_abc123",
-        "kmz_s3_key": "projects/p1/versions/ver_abc123/input.kmz",
-        "parameters": {},
     }).encode()
 
     req = urllib.request.Request(

@@ -14,7 +14,12 @@ from core.kmz_parser import parse_kmz
 from core.la_manager import place_lightning_arresters
 from core.layout_engine import run_layout_multi
 from core.string_inverter_manager import place_string_inverters
-from db_client import mark_layout_complete, mark_layout_failed, mark_layout_processing
+from db_client import (
+    get_version,
+    mark_layout_complete,
+    mark_layout_failed,
+    mark_layout_processing,
+)
 from models.project import (
     LayoutParameters,
     LayoutResult,
@@ -103,38 +108,35 @@ def handle_layout(payload: dict) -> dict:
     return {"stats": _build_stats(results)}
 
 
-def handle_layout_job(
-    version_id: str,
-    kmz_s3_key: str,
-    parameters: dict,
-) -> None:
+def handle_layout_job(version_id: str) -> None:
     """
-    Spike 2c production contract.
+    Spike 3c production contract.
 
+    Reads project_id, kmz_s3_key, and input_snapshot from DB via get_version.
     Downloads input KMZ from S3, runs layout, uploads artifacts to S3,
     and updates LayoutJob + Version status via DB.
 
     Raises the original exception after marking the job FAILED.
 
     S3 artifact keys:
-      <dirname(kmz_s3_key)>/layout.kmz
-      <dirname(kmz_s3_key)>/layout.svg
-      <dirname(kmz_s3_key)>/layout.dxf
+      projects/{project_id}/versions/{version_id}/layout.kmz
+      projects/{project_id}/versions/{version_id}/layout.svg
+      projects/{project_id}/versions/{version_id}/layout.dxf
 
     Env:
       S3_BUCKET — bucket for both input and output
     """
     bucket = os.environ["S3_BUCKET"]
-    output_prefix = os.path.dirname(kmz_s3_key)
-
-    mark_layout_processing(version_id)
+    project_id, kmz_s3_key, input_snapshot = get_version(version_id)
+    output_prefix = f"projects/{project_id}/versions/{version_id}"
 
     try:
+        mark_layout_processing(version_id)
         with tempfile.TemporaryDirectory() as tmpdir:
             kmz_local = os.path.join(tmpdir, "input.kmz")
             download_from_s3(bucket, kmz_s3_key, kmz_local)
 
-            params = _params_from_dict(parameters)
+            params = _params_from_dict(input_snapshot)
             parse_result = parse_kmz(kmz_local)
             results = run_layout_multi(
                 parse_result.boundaries,
