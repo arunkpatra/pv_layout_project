@@ -197,7 +197,11 @@ export async function createVersion(
   ])
 
   if (process.env.USE_LOCAL_ENV === "true") {
-    dispatchLayoutJobHttp(version.id)
+    try {
+      dispatchLayoutJobHttp(version.id)
+    } catch (err) {
+      console.error("HTTP dispatch failed", err)
+    }
   } else {
     publishLayoutJob(version.id).catch((err) => {
       console.error("SQS publish failed", err)

@@ -343,4 +343,37 @@ describe("createVersion dispatch", () => {
     expect(mockPublishLayoutJob).toHaveBeenCalledWith(mockDbVersion.id)
     expect(mockDispatchLayoutJobHttp).not.toHaveBeenCalled()
   })
+
+  test("createVersion resolves successfully even when publishLayoutJob rejects", async () => {
+    mockPublishLayoutJob.mockRejectedValueOnce(new Error("SQS down"))
+    const prev = process.env.USE_LOCAL_ENV
+    delete process.env.USE_LOCAL_ENV
+    try {
+      const result = await createVersion(mockDbProject.userId, {
+        projectId: mockDbProject.id,
+        inputSnapshot: {},
+      })
+      expect(result).toBeDefined()
+    } finally {
+      if (prev !== undefined) process.env.USE_LOCAL_ENV = prev
+    }
+  })
+
+  test("createVersion resolves successfully even when dispatchLayoutJobHttp errors internally", async () => {
+    mockDispatchLayoutJobHttp.mockImplementationOnce(() => {
+      throw new Error("fetch failed")
+    })
+    const prev = process.env.USE_LOCAL_ENV
+    process.env.USE_LOCAL_ENV = "true"
+    try {
+      const result = await createVersion(mockDbProject.userId, {
+        projectId: mockDbProject.id,
+        inputSnapshot: {},
+      })
+      expect(result).toBeDefined()
+    } finally {
+      if (prev !== undefined) process.env.USE_LOCAL_ENV = prev
+      else delete process.env.USE_LOCAL_ENV
+    }
+  })
 })
