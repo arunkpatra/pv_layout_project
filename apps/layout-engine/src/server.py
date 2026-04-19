@@ -1,13 +1,21 @@
-"""
-Layout engine HTTP server.
-Spike 2b: GET /health + POST /layout (local contract, synchronous).
-POST /layout becomes 202 fire-and-forget in Spike 2c.
+"""Layout engine HTTP server.
+
+GET  /health  → 200 {"status": "ok"}
+POST /layout  → 202 {"accepted": true}  (fires handle_layout_job in a daemon thread)
+
+Request body for POST /layout:
+  {
+    "version_id":  str,   — Version.id from the DB
+    "kmz_s3_key":  str,   — S3 key of the uploaded input KMZ
+    "parameters":  dict   — layout parameters (all optional, defaults apply)
+  }
 """
 import json
 import os
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from handlers import handle_layout
+from handlers import handle_layout_job
 
 
 class LayoutEngineHandler(BaseHTTPRequestHandler):
@@ -27,19 +35,30 @@ class LayoutEngineHandler(BaseHTTPRequestHandler):
         if self.path == "/layout":
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length))
-            result = handle_layout(payload)
-            response = json.dumps(result).encode()
-            self.send_response(200)
+
+            version_id = payload["version_id"]
+            kmz_s3_key = payload["kmz_s3_key"]
+            parameters = payload.get("parameters", {})
+
+            t = threading.Thread(
+                target=handle_layout_job,
+                args=(version_id, kmz_s3_key, parameters),
+                daemon=True,
+            )
+            t.start()
+
+            body = json.dumps({"accepted": True}).encode()
+            self.send_response(202)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response)))
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(response)
+            self.wfile.write(body)
         else:
             self.send_response(404)
             self.end_headers()
 
     def log_message(self, format, *args):  # noqa: A002
-        pass  # suppress access logs
+        pass
 
 
 def run(port: int = 8000) -> None:
