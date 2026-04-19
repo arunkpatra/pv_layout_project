@@ -87,12 +87,12 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 2a | [apps/layout-engine Scaffold](#spike-2a--appslayout-engine-scaffold) | complete | Spike 1 |
 | 2b | [Layout Compute (local)](#spike-2b--layout-compute-local) | complete | Spike 2a |
 | 2c | [S3 + DB Integration](#spike-2c--s3--db-integration) | complete | Spike 2b |
-| 3a | [Dockerfile + ECR + First Image Push](#spike-3a--dockerfile--ecr--first-image-push) | planned | Spike 2c |
-| 3b | [AWS Resources (SQS, Lambda, Roles)](#spike-3b--aws-resources-sqs-lambda-roles) | planned | Spike 3a |
-| 3c | [Python: lambda_handler, handlers, db_client](#spike-3c--python-lambda_handler-handlers-db_client) | planned | Spike 3b |
-| 3d | [Hono API: Dispatch Wiring](#spike-3d--hono-api-dispatch-wiring) | planned | Spike 3c |
-| 3e | [GitHub Actions CI/CD](#spike-3e--github-actions-cicd) | planned | Spike 3d |
-| 3f | [Production End-to-End Test](#spike-3f--production-end-to-end-test) | planned | Spike 3e |
+| 3a | [Dockerfile + ECR + First Image Push](#spike-3a--dockerfile--ecr--first-image-push) | complete | Spike 2c |
+| 3b | [AWS Resources (SQS, Lambda, Roles)](#spike-3b--aws-resources-sqs-lambda-roles) | complete | Spike 3a |
+| 3c | [Python: lambda_handler, handlers, db_client](#spike-3c--python-lambda_handler-handlers-db_client) | complete | Spike 3b |
+| 3d | [Hono API: Dispatch Wiring](#spike-3d--hono-api-dispatch-wiring) | complete | Spike 3c |
+| 3e | [GitHub Actions CI/CD](#spike-3e--github-actions-cicd) | complete | Spike 3d |
+| 3f | [Production End-to-End Test](#spike-3f--production-end-to-end-test) | in-progress | Spike 3e |
 | 4 | [Project and Version UI](#spike-4--project-and-version-ui) | planned | Spike 3f |
 | 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5 |
@@ -469,7 +469,7 @@ Loaded via `.env` file at dev startup: `uv run --env-file .env python src/server
 
 ## Spike 3a — Dockerfile + ECR + First Image Push
 
-**Status:** planned  
+**Status:** complete — 2026-04-19  
 **Depends on:** Spike 2c
 
 ### What we're building
@@ -519,7 +519,7 @@ aws ecr create-repository \
 
 ## Spike 3b — AWS Resources (SQS, Lambda, Roles)
 
-**Status:** planned  
+**Status:** complete — 2026-04-19  
 **Depends on:** Spike 3a
 
 ### What we're building
@@ -569,7 +569,7 @@ All prod AWS infrastructure: SQS queue, Lambda function (from ECR image), SQS ev
 
 ## Spike 3c — Python: lambda_handler, handlers, db_client
 
-**Status:** planned  
+**Status:** complete — 2026-04-19  
 **Depends on:** Spike 3b
 
 ### What we're building
@@ -655,7 +655,7 @@ def handle_layout_job(version_id: str) -> None:
 
 ## Spike 3d — Hono API: Dispatch Wiring
 
-**Status:** planned  
+**Status:** complete — 2026-04-20  
 **Depends on:** Spike 3c
 
 ### What we're building
@@ -745,7 +745,7 @@ if (env.USE_LOCAL_ENV === "true") {
 
 ## Spike 3e — GitHub Actions CI/CD
 
-**Status:** planned  
+**Status:** complete — 2026-04-20  
 **Depends on:** Spike 3d
 
 ### What we're building
@@ -800,7 +800,7 @@ Two GitHub Actions workflows: `build-layout-engine.yml` (builds and pushes Docke
 
 ## Spike 3f — Production End-to-End Test
 
-**Status:** planned  
+**Status:** in-progress  
 **Depends on:** Spike 3e
 
 ### What we're verifying
