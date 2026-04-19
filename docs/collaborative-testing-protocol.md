@@ -39,3 +39,48 @@ Wait for response. Continue one step at a time.
 ## Exception
 
 If the human explicitly asks for a full test checklist upfront (e.g. "give me everything to test"), provide the full list. But still structure it as numbered steps they can work through sequentially, not a wall of questions.
+
+---
+
+## Spike Acceptance Testing
+
+Spike testing follows the same one-at-a-time rule, with additional structure:
+
+### Protocol
+
+When a spike (or sub-spike) is implemented and committed, begin the acceptance session by presenting **only the first verification step**. Wait for the human's result. Proceed to the next step only after confirmation.
+
+**Wrong:**
+> "Spike 2a is committed. Please verify: 1) uv sync runs, 2) server starts, 3) curl returns {"status":"ok"}, 4) ruff passes, 5) monorepo gates pass."
+
+**Right:**
+> "Spike 2a is committed. Let's verify it together.
+>
+> **Step 1 of 5 — dependency install**
+> ```bash
+> cd apps/layout-engine && uv sync
+> ```
+> Did it complete with no errors?"
+
+Wait. Then:
+> "**Step 2 of 5 — server starts**
+> ```bash
+> PYTHONPATH=src uv run python src/server.py
+> ```
+> Does it print 'Layout engine listening on port 5000' with no errors?"
+
+### Format
+
+Each step follows this pattern:
+- Label: **Step N of Total — what this checks**
+- Command block (exact command to run)
+- One yes/no question about the expected outcome
+- Nothing else
+
+### On Failure
+
+If a step fails, stop the sequence. Diagnose and fix before resuming. Do not present the next step until the current one passes.
+
+### On Completion
+
+Only after all acceptance steps pass, declare the spike complete and state what the next spike is. Do not begin the next spike until the human explicitly confirms they are ready.
