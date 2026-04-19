@@ -25,12 +25,12 @@ class LayoutEngineHandler(BaseHTTPRequestHandler):
         pass  # suppress access logs
 
 
-def run(port: int = 5000) -> None:
+def run(port: int = 8000) -> None:
     server = HTTPServer(("0.0.0.0", port), LayoutEngineHandler)
     print(f"Layout engine listening on port {port}")
     server.serve_forever()
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
+    port = int(os.environ.get("PORT", "8000"))
     run(port)
