@@ -26,11 +26,11 @@ export async function uploadToS3(
   contentType = "application/octet-stream",
 ): Promise<void> {
   const client = getS3()
-  if (!client || !env.S3_BUCKET_NAME) return
+  if (!client || !env.S3_BUCKET) return
 
   await client.send(
     new PutObjectCommand({
-      Bucket: env.S3_BUCKET_NAME,
+      Bucket: env.S3_BUCKET,
       Key: key,
       Body: buffer,
       ContentType: contentType,
@@ -43,11 +43,11 @@ export async function getPresignedUrl(
   expiresIn = 3600,
 ): Promise<string | null> {
   const client = getS3()
-  if (!client || !env.S3_BUCKET_NAME) return null
+  if (!client || !env.S3_BUCKET) return null
 
   return getSignedUrl(
     client,
-    new GetObjectCommand({ Bucket: env.S3_BUCKET_NAME, Key: key }),
+    new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }),
     { expiresIn },
   )
 }
