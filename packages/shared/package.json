@@ -1,0 +1,19 @@
+{
+  "name": "@renewable-energy/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@renewable-energy/typescript-config": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}

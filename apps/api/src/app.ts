@@ -4,7 +4,9 @@ import { env } from "./env.js"
 import { prisma } from "@renewable-energy/db"
 import { requestLogger } from "./middleware/logger.js"
 import { errorHandler } from "./middleware/error-handler.js"
+import { authMiddleware } from "./middleware/auth.js"
 import type { HonoEnv } from "./middleware/auth.js"
+import { identityRoutes } from "./modules/identity/identity.routes.js"
 
 export const app = new Hono<HonoEnv>()
 
@@ -19,6 +21,10 @@ app.use("*", cors({ origin: corsOrigins }))
 app.use("*", requestLogger)
 app.onError(errorHandler)
 
+// ─── Routes ────────────────────────────────────────────────────────────────────
+
+app.route("/", identityRoutes)
+
 // ─── Health Checks ─────────────────────────────────────────────────────────────
 
 app.get("/health/live", (c) =>
@@ -31,6 +37,15 @@ app.get("/health/live", (c) =>
     },
   }),
 )
+
+// Protected health check — verifies auth middleware is wired correctly
+app.get("/health/authed", authMiddleware, (c) => {
+  const user = c.get("user")
+  return c.json({
+    success: true,
+    data: { status: "authed", userId: user.id, clerkId: user.clerkId },
+  })
+})
 
 app.get("/health/ready", async (c) => {
   const checks: Record<string, "ok" | "error"> = {}

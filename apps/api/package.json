@@ -7,13 +7,15 @@
     "dev": "bun run --env-file ../../.env --hot src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "start": "bun run dist/index.js",
-    "test": "echo 'No tests yet'",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/backend": "^3.2.13",
     "@hono/zod-validator": "^0.4.0",
     "@renewable-energy/db": "workspace:*",
+    "@renewable-energy/shared": "workspace:*",
     "hono": "^4.12.0",
     "zod": "^3.24.0"
   },

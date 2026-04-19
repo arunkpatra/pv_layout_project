@@ -1,6 +1,6 @@
-export type ApiResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: { code: string; message: string; details?: unknown } }
+import type { ApiResponse } from "@renewable-energy/shared"
+
+export type { ApiResponse }
 
 export function ok<T>(data: T): ApiResponse<T> {
   return { success: true, data }
