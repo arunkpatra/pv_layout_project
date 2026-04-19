@@ -1,7 +1,10 @@
 """
 Database client for the layout engine.
-Uses raw psycopg2 — no ORM. Owns all LayoutJob and Version status transitions
+Uses raw psycopg2 — no ORM. Owns all layout_jobs and versions status transitions
 after the initial QUEUED write (which Hono API owns).
+
+Table names are Prisma-mapped snake_case: layout_jobs, versions.
+CamelCase column names must be quoted.
 """
 import json
 import os
@@ -14,17 +17,17 @@ def _connect():
 
 
 def mark_layout_processing(version_id: str) -> None:
-    """Transition LayoutJob and Version from QUEUED → PROCESSING."""
+    """Transition layout_jobs and versions from QUEUED → PROCESSING."""
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """UPDATE "LayoutJob"
+                """UPDATE layout_jobs
                    SET status = 'PROCESSING', "startedAt" = NOW()
                    WHERE "versionId" = %s""",
                 (version_id,),
             )
             cur.execute(
-                """UPDATE "Version"
+                """UPDATE versions
                    SET status = 'PROCESSING', "updatedAt" = NOW()
                    WHERE id = %s""",
                 (version_id,),
@@ -40,13 +43,13 @@ def mark_layout_complete(
     stats: dict,
 ) -> None:
     """
-    Transition LayoutJob PROCESSING → COMPLETE with artifact S3 keys and statsJson.
-    Also sets Version → COMPLETE (updated in Spike 8 when energy job is added).
+    Transition layout_jobs PROCESSING → COMPLETE with artifact S3 keys and statsJson.
+    Also sets versions → COMPLETE.
     """
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """UPDATE "LayoutJob"
+                """UPDATE layout_jobs
                    SET status = 'COMPLETE',
                        "kmzArtifactS3Key" = %s,
                        "svgArtifactS3Key" = %s,
@@ -57,7 +60,7 @@ def mark_layout_complete(
                 (kmz_key, svg_key, dxf_key, json.dumps(stats), version_id),
             )
             cur.execute(
-                """UPDATE "Version"
+                """UPDATE versions
                    SET status = 'COMPLETE', "updatedAt" = NOW()
                    WHERE id = %s""",
                 (version_id,),
@@ -66,11 +69,11 @@ def mark_layout_complete(
 
 
 def mark_layout_failed(version_id: str, error: str) -> None:
-    """Transition LayoutJob and Version to FAILED with error detail."""
+    """Transition layout_jobs and versions to FAILED with error detail."""
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """UPDATE "LayoutJob"
+                """UPDATE layout_jobs
                    SET status = 'FAILED',
                        "errorDetail" = %s,
                        "completedAt" = NOW()
@@ -78,7 +81,7 @@ def mark_layout_failed(version_id: str, error: str) -> None:
                 (error[:500], version_id),
             )
             cur.execute(
-                """UPDATE "Version"
+                """UPDATE versions
                    SET status = 'FAILED', "updatedAt" = NOW()
                    WHERE id = %s""",
                 (version_id,),

@@ -21,10 +21,10 @@ def test_mark_layout_processing_executes_two_updates():
 
     assert cur.execute.call_count == 2
     first_sql = cur.execute.call_args_list[0][0][0]
-    assert "LayoutJob" in first_sql
+    assert "layout_jobs" in first_sql
     assert "PROCESSING" in first_sql
     second_sql = cur.execute.call_args_list[1][0][0]
-    assert "Version" in second_sql
+    assert "versions" in second_sql
     conn.commit.assert_called_once()
 
 
