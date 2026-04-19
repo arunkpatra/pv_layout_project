@@ -33,6 +33,17 @@ Each spike is a self-contained unit of work with a defined scope and acceptance 
 
 **Status values:** `planned` · `in-progress` · `complete` · `blocked`
 
+### Definition of Done (applies to every spike)
+
+A spike is complete only when **all** of the following are true:
+
+1. All static gates pass from the repo root: `bun run lint && bun run typecheck && bun run test && bun run build`
+2. Every acceptance criterion has been verified by a human, step by step, in a running environment
+3. Verification covers every applicable environment — local dev, staging, and production — not just one
+4. No criterion is marked complete on Claude's assertion alone — "it should work" is not done
+
+Agent-assisted runtime testing (human leads, Claude assists) is the standard. There is no shortcut.
+
 ---
 
 ## Architecture Pattern Reference
@@ -41,7 +52,7 @@ Derived from the journium monorepo (`/Users/arunkpatra/codebase/journium/journiu
 
 **Local development:**
 ```
-apps/web → apps/api (Hono) → HTTP → apps/layout-engine (local HTTP server, Dockerfile.local)
+apps/web → apps/api (Hono) → HTTP → apps/layout-engine (uv run python src/server.py)
                                            ↓
                                      Real S3 bucket (artifacts)
                                            ↓
@@ -59,8 +70,8 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 
 **Key principles:**
 - `apps/layout-engine/src/handlers.py` — shared business logic, runs identically in both modes
-- `apps/layout-engine/src/lambda_handler.py` — Lambda transport (API Gateway event ↔ handler)
-- `apps/layout-engine/src/server.py` — local HTTP transport (HTTPServer ↔ handler)
+- `apps/layout-engine/src/lambda_handler.py` — Lambda transport (added in Spike 4, not Spike 2)
+- `apps/layout-engine/src/server.py` — local HTTP transport (HTTPServer ↔ handler); run with `uv run python src/server.py`, no Docker needed in local dev
 - `USE_LOCAL_ENV=true` → Hono API calls layout engine via HTTP directly (no SQS)
 - `USE_LOCAL_ENV=false` → Hono API enqueues to SQS; Lambda runs the engine
 - Real S3 buckets in all environments (local, staging, prod). No LocalStack.
@@ -73,8 +84,10 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | # | Spike | Status | Depends On |
 |---|-------|--------|------------|
 | 1 | [Data Model](#spike-1--data-model) | complete | — |
-| 2 | [apps/layout-engine Setup](#spike-2--appslayout-engine-setup) | planned | Spike 1 |
-| 3 | [Job Pipeline: Local Mode](#spike-3--job-pipeline-local-mode) | planned | Spike 2 |
+| 2a | [apps/layout-engine Scaffold](#spike-2a--appslayout-engine-scaffold) | planned | Spike 1 |
+| 2b | [Layout Compute (local)](#spike-2b--layout-compute-local) | planned | Spike 2a |
+| 2c | [S3 + DB Integration](#spike-2c--s3--db-integration) | planned | Spike 2b |
+| 3 | [Job Pipeline: Local Mode](#spike-3--job-pipeline-local-mode) | planned | Spike 2c |
 | 4 | [Job Pipeline: SQS + Lambda (Staging)](#spike-4--job-pipeline-sqs--lambda-staging) | planned | Spike 3 |
 | 5 | [Project and Version UI](#spike-5--project-and-version-ui) | planned | Spike 3 |
 | 6 | [SVG Preview + Stats Dashboard](#spike-6--svg-preview--stats-dashboard) | planned | Spike 5 |
@@ -192,14 +205,14 @@ Add typed request/response types for all endpoints above. TanStack Query hooks f
 
 ---
 
-## Spike 2 — `apps/layout-engine` Setup
+## Spike 2a — `apps/layout-engine` Scaffold
 
 **Status:** planned  
 **Depends on:** Spike 1
 
 ### What we're building
 
-The Python layout engine as a standalone app in the monorepo. This is the heart of the initiative. The compute logic from the Python desktop app (`/Users/arunkpatra/codebase/PVlayout_Advance`) is extracted, stripped of all GUI code, and packaged to run as a local HTTP server (dev) or AWS Lambda (staging/prod).
+The bare minimum Python app in the monorepo: directory structure, `pyproject.toml`, `uv` environment, copied source files from the Python desktop app, and a health-check server. No compute, no S3, no DB. The goal is a fully committed, lintable Python package that starts and responds to a health check — nothing more.
 
 ### Directory Structure
 
@@ -222,105 +235,16 @@ apps/layout-engine/
       project.py
     utils/          ← copied from PVlayout_Advance/utils/ (unchanged)
       geo_utils.py
-    handlers.py     ← NEW: shared business logic (layout + energy)
-    lambda_handler.py  ← NEW: Lambda transport
-    server.py          ← NEW: local HTTP transport
-    s3_client.py       ← NEW: S3 upload/download helpers
+    server.py       ← NEW: GET /health only; POST /layout added in Spike 2b
   pyproject.toml
   uv.lock
-  Dockerfile          ← Lambda image (multi-stage, ECR target)
-  Dockerfile.local    ← Local HTTP server
-  .dockerignore
+  ruff.toml
 ```
 
 ### What Changes in the Copied Code
 
-- **Add at top of any file that imports matplotlib:** `matplotlib.use('Agg')` before any other matplotlib import — enables headless SVG rendering with no display backend
-- **`ezdxf` added to `pyproject.toml`** — currently missing from the Python app's requirements
+- **Add `matplotlib.use('Agg')` at top of any file that imports matplotlib** — enables headless rendering with no display backend
 - **No other changes** to `core/`, `models/`, `utils/` — these are already clean of Qt
-
-### handlers.py — Shared Business Logic
-
-Two handler functions — one for layout, one for energy:
-
-```python
-def handle_layout(payload: dict) -> dict:
-    """
-    Input payload:
-      kmz_s3_key: str          -- S3 key of input KMZ
-      version_id: str          -- used to construct output S3 keys
-      parameters: dict         -- all layout + module + table + inverter params
-
-    Returns:
-      kmz_s3_key: str
-      svg_s3_key: str
-      dxf_s3_key: str
-      stats: dict              -- all layout stats (tables, MWp, ICRs, etc.)
-    """
-
-def handle_energy(payload: dict) -> dict:
-    """
-    Input payload:
-      version_id: str
-      layout_stats: dict       -- output from handle_layout (capacity, location, etc.)
-      energy_parameters: dict  -- all energy loss params + irradiance source preference
-
-    Returns:
-      pdf_s3_key: str
-      stats: dict              -- energy stats (GTI, PR, CUF, Year1 MWh, 25yr, etc.)
-      irradiance_source: str   -- "pvgis" | "nasa_power" | "manual"
-    """
-```
-
-### lambda_handler.py
-
-```python
-def lambda_handler(event, context):
-    # Parse API Gateway event body → payload dict
-    # Route on event path: /layout or /energy
-    # Call handle_layout or handle_energy
-    # Return API Gateway response: { statusCode, headers, body }
-```
-
-### server.py
-
-Local HTTP server (Python stdlib `http.server`) on configurable port (default 5000):
-- `POST /layout` → `handle_layout`
-- `POST /energy` → `handle_energy`
-- `GET /health` → `{ status: "ok" }`
-
-Same code path as Lambda — `server.py` wraps the same `handlers.py`.
-
-### Dockerfile (Lambda, Production)
-
-```dockerfile
-# Build stage
-FROM public.ecr.aws/lambda/python:3.13 AS build
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
-WORKDIR ${LAMBDA_TASK_ROOT}
-COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --no-install-project
-
-# Runtime stage
-FROM public.ecr.aws/lambda/python:3.13
-COPY --from=build ${LAMBDA_TASK_ROOT}/.venv/lib/python3.13/site-packages/ ./
-COPY src/ ./
-CMD ["lambda_handler.lambda_handler"]
-```
-
-### Dockerfile.local (Local HTTP Server)
-
-```dockerfile
-FROM python:3.13-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
-WORKDIR /app
-COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --no-install-project
-COPY src/ ./src/
-EXPOSE 5000
-ENV PORT=5000
-CMD ["uv", "run", "python", "src/server.py"]
-```
 
 ### pyproject.toml Dependencies
 
@@ -335,62 +259,245 @@ dependencies = [
     "ezdxf",
     "requests>=2.28",
     "boto3>=1.35",
+    "psycopg2-binary>=2.9",
 ]
+
+[tool.ruff]
+line-length = 88
 ```
+
+### server.py (Spike 2a scope)
+
+```python
+# GET /health → { "status": "ok" }
+# POST /layout added in Spike 2b
+```
+
+Run directly in local dev: `uv run python src/server.py`
+
+### Acceptance Criteria
+
+- [ ] `uv sync` runs cleanly — no dependency resolution errors
+- [ ] `GET /health` returns `{ "status": "ok" }` — human verifies with curl
+- [ ] `uv run python src/server.py` starts with no errors — human confirms in terminal
+- [ ] `ruff check src/` passes with zero violations
+- [ ] All monorepo static gates pass: `bun run lint && bun run typecheck && bun run test && bun run build`
+
+---
+
+## Spike 2b — Layout Compute (local)
+
+**Status:** planned  
+**Depends on:** Spike 2a
+
+### What we're building
+
+The full layout compute pipeline — `svg_exporter.py`, `handlers.py`, and `POST /layout` on `server.py` — verified locally without S3 or DB. The POST body for this spike accepts a local KMZ file path so the pipeline can be tested with only a real KMZ file. The S3 and DB contract is added in Spike 2c; this spike proves the compute logic is correct first.
+
+### New Files
+
+```
+apps/layout-engine/
+  src/
+    handlers.py     ← NEW: handle_layout (Spike 2b version — local paths, no S3/DB)
+    svg_exporter.py ← NEW: matplotlib SVG renderer with gid-tagged layer groups
+```
+
+### handlers.py — Spike 2b Version
+
+```python
+def handle_layout(payload: dict) -> dict:
+    """
+    Spike 2b contract (local testing — replaced in Spike 2c):
+      kmz_local_path: str      -- absolute path to local KMZ file
+      parameters: dict         -- all layout + module + table + inverter params
+      output_dir: str          -- absolute path to write output files
+
+    Returns:
+      stats: dict              -- all layout stats (tables, MWp, ICRs, etc.)
+    Writes to output_dir:
+      layout.kmz, layout.svg, layout.dxf
+    """
+```
+
+This contract is intentionally simplified — no S3, no DB, no `version_id`. It exists solely to verify the compute pipeline. It is replaced in full in Spike 2c.
+
+### server.py (Spike 2b additions)
+
+```
+POST /layout → accepts JSON:
+  { "kmz_local_path": "/absolute/path/to/site.kmz", "parameters": {...}, "output_dir": "/tmp" }
+  → calls handle_layout
+  → returns { "stats": {...} }
+```
+
+This POST body format is a testing convenience only. It is replaced with the production contract (`kmz_s3_key`, `version_id`) in Spike 2c.
+
+### svg_exporter.py
+
+Port of `_draw_layout()` from `PVlayout_Advance/gui/main_window.py`. Renders all layout layers using matplotlib with `gid` attributes set on each group before export so the browser SVG DOM has named groups.
+
+Named groups:
+- `boundary` — site boundary polygon
+- `obstacles` — exclusion zone polygons
+- `tables` — all placed table rectangles
+- `icrs` — ICR building rectangles + annotations
+- `inverters` — string inverter rectangles + annotations
+- `dc-cables` — DC cable routes
+- `ac-cables` — AC cable routes (hidden by default in UI)
+- `la-footprints` — LA rectangles (hidden by default in UI)
+- `la-circles` — LA protection circles (hidden by default in UI)
+- `annotations` — labels and text
+
+### Acceptance Criteria
+
+- [ ] `POST /layout` with a real KMZ local path → artifacts appear in `/tmp`: `layout.kmz`, `layout.svg`, `layout.dxf`
+- [ ] Human opens `layout.svg` in browser, inspects DOM — all 10 `gid`-tagged groups present
+- [ ] Stats dict returned in response — values are plausible for the test site
+- [ ] `matplotlib.use('Agg')` in effect — no display errors when server runs headless
+- [ ] `ruff check src/` passes with zero violations
+- [ ] All monorepo static gates pass
+
+---
+
+## Spike 2c — S3 + DB Integration
+
+**Status:** planned  
+**Depends on:** Spike 2b
+
+### What we're building
+
+Replace the local-path testing contract with the real production contract: `handle_layout` downloads the input KMZ from S3, runs the pipeline, uploads artifacts to S3, and updates the DB directly (LayoutJob + Version status transitions). The Hono API never touches DB job status after the initial QUEUED write — Python owns all subsequent state.
+
+### New Files
+
+```
+apps/layout-engine/
+  src/
+    s3_client.py    ← NEW: S3 download (input KMZ) + upload (layout.kmz, layout.svg, layout.dxf)
+    db_client.py    ← NEW: raw psycopg2 SQL — LayoutJob and Version status transitions
+```
+
+### db_client.py
+
+Raw psycopg2-binary — no ORM. Two responsibilities:
+1. Update `LayoutJob` status: `QUEUED → PROCESSING` on start; `PROCESSING → COMPLETE` (with artifact S3 keys + statsJson) or `PROCESSING → FAILED` (with errorDetail) on finish.
+2. Update `Version` status: set to `PROCESSING` when layout starts; set to `COMPLETE` or `FAILED` when layout finishes.
+
+```python
+def mark_layout_processing(version_id: str) -> None: ...
+def mark_layout_complete(version_id: str, kmz_key: str, svg_key: str, dxf_key: str, stats: dict) -> None: ...
+def mark_layout_failed(version_id: str, error: str) -> None: ...
+```
+
+### handlers.py — Spike 2c Version (production contract)
+
+```python
+def handle_layout(payload: dict) -> None:
+    """
+    Production contract (replaces Spike 2b version):
+      kmz_s3_key: str          -- S3 key of input KMZ (uploaded by Hono on version submit)
+      version_id: str          -- used to derive output S3 keys + DB record lookup
+      parameters: dict         -- all layout + module + table + inverter params
+
+    Returns: None
+    Side effects:
+      - Downloads input KMZ from S3
+      - Runs full pipeline
+      - Uploads layout.kmz, layout.svg, layout.dxf to S3
+      - Updates LayoutJob in DB (COMPLETE + artifact keys + statsJson)
+      - Updates Version in DB (COMPLETE or FAILED)
+    Raises: exception on fatal error (caller updates DB to FAILED)
+    """
+```
+
+### server.py — Spike 2c (production contract)
+
+```
+POST /layout → accepts JSON:
+  {
+    "kmz_s3_key": "projects/{projectId}/versions/{versionId}/input.kmz",
+    "version_id": "ver_...",
+    "parameters": { ...all layout params... }
+  }
+  → returns 202 Accepted immediately
+  → runs handle_layout in background thread
+  → handle_layout updates DB directly on completion or failure
+```
+
+The server returns 202 before compute begins. The caller (Hono API in Spike 3) fires and forgets.
 
 ### S3 Key Conventions
 
 ```
-projects/{projectId}/versions/{versionId}/input.kmz      ← uploaded by API on submit
+projects/{projectId}/versions/{versionId}/input.kmz      ← uploaded by Hono on version submit
 projects/{projectId}/versions/{versionId}/layout.kmz     ← written by layout engine
 projects/{projectId}/versions/{versionId}/layout.svg     ← written by layout engine
 projects/{projectId}/versions/{versionId}/layout.dxf     ← written by layout engine
-projects/{projectId}/versions/{versionId}/report.pdf     ← written by energy engine
+projects/{projectId}/versions/{versionId}/report.pdf     ← written by energy engine (Spike 8)
+```
+
+### Environment Variables (layout-engine)
+
+```bash
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+S3_BUCKET_NAME=renewable-energy-local-artifacts   # same bucket Hono uses for input KMZ
+DATABASE_URL=postgresql://renewable:renewable@localhost:5432/renewable_energy
 ```
 
 ### Acceptance Criteria
 
-- [ ] `POST /layout` with a real KMZ payload → KMZ + SVG + DXF appear in S3 → stats JSON returned
-- [ ] SVG has `gid`-tagged layer groups: `boundary`, `obstacles`, `tables`, `icrs`, `inverters`, `dc-cables`, `ac-cables`, `la-footprints`, `la-circles`, `annotations`
-- [ ] `GET /health` returns `{ status: "ok" }`
-- [ ] Server runs correctly via `docker compose up layout-engine`
-- [ ] All gates pass: `bun run lint && bun run typecheck && bun run test && bun run build` (Python linting via ruff in project.json)
-- [ ] `ezdxf` is in `pyproject.toml` and DXF export works
-- [ ] `matplotlib.use('Agg')` confirmed — no display errors in headless environment
+- [ ] `POST /layout` with real `{kmz_s3_key, version_id, parameters}` → returns 202 immediately (human verifies with curl, no waiting)
+- [ ] KMZ + SVG + DXF appear in S3 under correct keys (human verifies in AWS console or aws CLI)
+- [ ] LayoutJob DB record transitions: `QUEUED → PROCESSING → COMPLETE` — human verifies with `bun run db:studio`
+- [ ] Version DB record transitions: `QUEUED → PROCESSING → COMPLETE`
+- [ ] `statsJson` populated correctly in LayoutJob record — human checks a sample stat value
+- [ ] DXF artifact opens correctly in a DXF viewer
+- [ ] Deliberate failure (invalid KMZ): LayoutJob status = `FAILED`, `errorDetail` populated
+- [ ] All monorepo static gates pass
 
 ---
 
 ## Spike 3 — Job Pipeline: Local Mode
 
 **Status:** planned  
-**Depends on:** Spike 2
+**Depends on:** Spike 2c
 
 ### What we're building
 
-Wire the Hono API to call the layout engine via HTTP in local development. No SQS. No Lambda. Full end-to-end job execution on the developer's laptop.
+Wire the Hono API to call the layout engine via HTTP in local development. No SQS. No Lambda. Hono fires and forgets — it does not wait for the result and it does not update DB job status. The Python engine owns all DB state after the initial QUEUED write.
 
 ### Local Architecture
 
 ```
-POST /projects/:id/versions
+POST /projects/:id/versions (Hono)
   → Upload KMZ to S3
-  → Write Version + LayoutJob (status: QUEUED) to DB
-  → Return { versionId } to client immediately
-  → [background] Call http://localhost:5000/layout
-       → Layout engine runs
-       → Writes KMZ + SVG + DXF to S3
-       → Returns stats JSON
-  → Update LayoutJob (status: COMPLETE, artifact keys, stats)
-  → Update Version (status: PROCESSING — energy job pending)
-  → [background] Call http://localhost:5000/energy
-       → Energy engine runs (PVGIS / NASA POWER fetch)
-       → Writes PDF to S3
-       → Returns energy stats JSON
-  → Update EnergyJob (status: COMPLETE, pdf key, stats)
-  → Update Version (status: COMPLETE)
+  → Write Version (status: QUEUED) to DB
+  → Write LayoutJob (status: QUEUED) to DB
+  → Return { versionId, status: "queued" } to client immediately
+  → [background, fire-and-forget] POST http://localhost:5000/layout
+       { kmz_s3_key, version_id, parameters }
+       → 202 Accepted (Hono ignores body, does not await completion)
+
+Layout engine (background, runs independently):
+  → Updates LayoutJob: QUEUED → PROCESSING in DB
+  → Downloads KMZ from S3
+  → Runs full layout pipeline
+  → Uploads KMZ + SVG + DXF to S3
+  → Updates LayoutJob: PROCESSING → COMPLETE (artifact keys + statsJson) in DB
+  → Updates Version: COMPLETE in DB
+  → On any error: LayoutJob = FAILED, Version = FAILED, errorDetail written to DB
+
+UI polls GET /projects/:id/versions/:versionId
+  → Reads status from DB → shows transitions as they happen
+
+Note: Energy job local wiring (http://localhost:5000/energy) is added in Spike 8
+when handle_energy and POST /energy exist.
 ```
 
-### Environment Variables (Local)
+### Environment Variables (Local — Hono API)
 
 ```bash
 USE_LOCAL_ENV=true
@@ -401,39 +508,29 @@ AWS_ACCESS_KEY_ID=...       # real AWS credentials for S3
 AWS_SECRET_ACCESS_KEY=...
 ```
 
-### docker-compose addition
+### Local dev startup
 
-```yaml
-layout-engine:
-  build:
-    context: ./apps/layout-engine
-    dockerfile: Dockerfile.local
-  ports:
-    - "5000:5000"
-  environment:
-    - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    - AWS_REGION=${AWS_REGION}
-  env_file:
-    - ../../.env
+In local dev, the layout engine is started directly (no Docker):
+```bash
+cd apps/layout-engine
+uv run python src/server.py
 ```
+The Hono API calls it at `LAYOUT_ENGINE_URL` (default `http://localhost:5000`).
 
 ### Hono API Changes
 
-- `modules/layout/layout.service.ts` — `dispatchLayoutJob(versionId)`:
-  - If `USE_LOCAL_ENV=true`: call `LAYOUT_ENGINE_URL/layout` via HTTP, await, update DB
-  - If `USE_LOCAL_ENV=false`: enqueue to SQS (Spike 4)
-- Background dispatch: fire-and-forget after API returns `{ versionId }` — do not block the HTTP response
+- `modules/layout/layout.service.ts` — `dispatchLayoutJob(versionId, kmzS3Key, parameters)`:
+  - If `USE_LOCAL_ENV=true`: POST `LAYOUT_ENGINE_URL/layout` with `{ kmz_s3_key, version_id, parameters }`, fire-and-forget (do not await, do not handle response body)
+  - If `USE_LOCAL_ENV=false`: send `{ versionId }` to SQS layout-jobs queue (Spike 4)
+- Hono never updates LayoutJob or Version status after the initial QUEUED write — Python owns all subsequent DB state
 
 ### Acceptance Criteria
 
-- [ ] `POST /versions` returns immediately with `{ versionId, status: "queued" }`
-- [ ] Layout engine runs in background; DB status transitions: `QUEUED → PROCESSING → COMPLETE`
-- [ ] All three artifacts (KMZ, SVG, DXF) appear in S3 under correct keys
-- [ ] `GET /versions/:versionId` returns artifact pre-signed URLs and stats once complete
-- [ ] Energy job runs after layout completes; PDF appears in S3; energy stats on Version
-- [ ] Full pipeline verified with a real KMZ file
+- [ ] `POST /versions` returns immediately with `{ versionId, status: "queued" }` — Hono does not block
+- [ ] DB transitions observed: `QUEUED → PROCESSING → COMPLETE` on LayoutJob and Version — human verifies in Prisma Studio as job runs
+- [ ] All three artifacts (KMZ, SVG, DXF) appear in S3 under correct keys — human verifies in AWS console
+- [ ] `GET /versions/:versionId` returns artifact pre-signed URLs and layout stats once complete
+- [ ] Full layout pipeline verified with a real KMZ file end-to-end (human confirmed in browser)
 
 ---
 
@@ -445,6 +542,46 @@ layout-engine:
 ### What we're building
 
 Replace the local HTTP dispatch with SQS + Lambda for staging and production environments. The layout engine Docker image is pushed to ECR and runs as a Lambda function triggered by SQS.
+
+### New files added to `apps/layout-engine` in this spike
+
+These were deliberately deferred from Spike 2 — they cannot be runtime-tested until Lambda is available:
+
+```
+apps/layout-engine/
+  src/
+    lambda_handler.py   ← NEW: Lambda transport (SQS event → handle_layout)
+  Dockerfile            ← NEW: Lambda image (multi-stage, ECR target)
+  .dockerignore         ← NEW
+  scripts/
+    push-to-ecr.sh      ← NEW: ECR push helper
+```
+
+**`lambda_handler.py`:**
+```python
+def lambda_handler(event, context):
+    # Parse versionId from SQS event.Records[0].body
+    # Fetch Version + inputSnapshot from DB (to get kmzS3Key + parameters)
+    # Call handle_layout({ kmz_s3_key, version_id, parameters })
+    #   → handle_layout owns: S3 download, compute, S3 upload, all DB updates
+    # Enqueue { versionId } to energy-jobs SQS queue
+```
+
+**`Dockerfile` (Lambda, multi-stage):**
+```dockerfile
+# Build stage
+FROM public.ecr.aws/lambda/python:3.13 AS build
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+WORKDIR ${LAMBDA_TASK_ROOT}
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev --no-install-project
+
+# Runtime stage
+FROM public.ecr.aws/lambda/python:3.13
+COPY --from=build ${LAMBDA_TASK_ROOT}/.venv/lib/python3.13/site-packages/ ./
+COPY src/ ./
+CMD ["lambda_handler.lambda_handler"]
+```
 
 ### AWS Resources to Provision
 
@@ -471,12 +608,16 @@ The Lambda fetches all input data from DB + S3 using `versionId`. SQS message ca
 ```
 SQS event → lambda_handler(event, context)
   → parse versionId from event.Records[0].body
-  → fetch Version + inputSnapshot from DB
-  → download KMZ from S3 (kmzS3Key)
-  → run handle_layout(payload)
-  → write artifacts to S3
-  → update LayoutJob in DB (COMPLETE + artifact keys + stats)
-  → update Version in DB (PROCESSING)
+  → fetch Version + inputSnapshot from DB (to get kmzS3Key + parameters)
+  → call handle_layout({ kmz_s3_key: version.kmzS3Key, version_id, parameters: inputSnapshot })
+       ↳ handle_layout internally:
+            → updates LayoutJob: QUEUED → PROCESSING in DB
+            → downloads KMZ from S3
+            → runs full pipeline
+            → uploads KMZ + SVG + DXF to S3
+            → updates LayoutJob: PROCESSING → COMPLETE (artifact keys + statsJson) in DB
+            → updates Version: still PROCESSING (energy job not yet run) in DB
+            → on error: LayoutJob = FAILED, Version = FAILED in DB
   → enqueue { versionId } to energy-jobs SQS queue
 ```
 
@@ -704,16 +845,19 @@ Input payload:
 ```
 
 Processing:
-1. Fetch irradiance from PVGIS (primary): `ghi`, `gti`
-2. On PVGIS failure: fallback to NASA POWER with Hay-Davies tilt correction
-3. Compute PR from all loss parameters
-4. Compute 25-year energy model (Year 1 with LID, Years 2–25 with annual degradation)
-5. Render PDF (3 pages via `core/pdf_exporter.py`):
+1. Updates EnergyJob in DB: QUEUED → PROCESSING
+2. Fetch irradiance from PVGIS (primary): `ghi`, `gti`
+3. On PVGIS failure: fallback to NASA POWER with Hay-Davies tilt correction
+4. Compute PR from all loss parameters
+5. Compute 25-year energy model (Year 1 with LID, Years 2–25 with annual degradation)
+6. Render PDF (3 pages via `core/pdf_exporter.py`):
    - Page 1: layout drawing (SVG → matplotlib figure)
    - Page 2: summary stats table
    - Page 3: energy yield report
-6. Upload PDF to S3
-7. Return energy stats JSON + pdf S3 key + irradiance source used
+7. Upload PDF to S3
+8. Updates EnergyJob in DB: PROCESSING → COMPLETE (pdf S3 key + statsJson + irradiance source)
+9. Updates Version in DB: COMPLETE (both layout and energy jobs done)
+Returns: None. All state written directly to DB. On any error: EnergyJob = FAILED, errorDetail set.
 
 ### PVGIS Fallback Logic
 
@@ -878,3 +1022,5 @@ Record decisions made during spike execution that affect future spikes.
 | Date | Spike | Decision | Rationale |
 |------|-------|----------|-----------|
 | 2026-04-19 | 1 | Prisma semantic ID extension does not fire on nested `create: {}` calls. LayoutJob and EnergyJob must be created as separate top-level `db.layoutJob.create` / `db.energyJob.create` calls after the Version is created. Never use nested creates for models that require semantic IDs. | Discovered during runtime testing — nested creates bypass the extension middleware. |
+| 2026-04-19 | 2 | Python engine owns all DB state after the initial QUEUED write. Hono API writes Version (QUEUED) + LayoutJob (QUEUED) on submit, fires the job (HTTP or SQS), and returns immediately. All subsequent status transitions (PROCESSING, COMPLETE, FAILED), artifact S3 keys, and statsJson are written by Python directly via psycopg2. Hono never polls or updates job status again. | Layout jobs are long-running. Hono cannot hold a connection open waiting for completion. Python is already the compute authority — it is the correct owner of compute state. |
+| 2026-04-19 | 2 | Spike 2 decomposed into three sub-spikes (2a Scaffold, 2b Compute, 2c S3+DB). Spike 2b uses a local-path POST contract to isolate compute verification from S3/DB dependencies. That contract is replaced in Spike 2c with the production contract. | Each sub-spike must be independently testable by a human. Bundling scaffold + compute + S3 + DB into one spike makes failures harder to isolate and requires AWS credentials and a running DB just to test compute logic. |

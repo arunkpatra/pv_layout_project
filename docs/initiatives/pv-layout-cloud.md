@@ -119,30 +119,42 @@ From the user's perspective, these are one work unit — one version. Internally
 
 ```
 User submits run (parameters + KMZ reference)
-  → API writes Version record (status: queued) to PostgreSQL
-  → API enqueues Layout Job message to SQS
-  → UI reflects "queued" state
+  → Hono API uploads KMZ to S3
+  → Hono API writes Version record (status: QUEUED) to PostgreSQL
+  → Hono API writes LayoutJob record (status: QUEUED) to PostgreSQL
+  → [Local dev]  Hono POST http://localhost:5000/layout — fire and forget → 202 Accepted
+  → [Staging/Prod] Hono sends { versionId } to SQS layout-jobs queue — fire and forget
+  → Hono returns { versionId, status: "queued" } to UI immediately
+  → UI reflects "queued" state and begins polling
 
-SQS delivers Layout Job to Lambda
-  → Dockerized Python Lambda runs layout engine
-  → Writes KMZ + DXF + SVG artifacts to S3
-  → Updates Version record (layout_status: complete, artifact URLs)
-  → Enqueues Energy Job message to SQS
+Layout engine runs (local: Python HTTP server; staging/prod: Lambda via SQS):
+  → Updates LayoutJob in DB: QUEUED → PROCESSING
+  → Updates Version in DB: QUEUED → PROCESSING
+  → Downloads input KMZ from S3
+  → Runs full layout pipeline
+  → Generates KMZ + SVG + DXF artifacts
+  → Uploads artifacts to S3
+  → Updates LayoutJob in DB: PROCESSING → COMPLETE (artifact S3 keys + statsJson)
+  → Updates Version in DB: PROCESSING → COMPLETE
+  → [Staging/Prod only] Enqueues { versionId } to SQS energy-jobs queue
+  → On any error: LayoutJob = FAILED (errorDetail), Version = FAILED
 
-SQS delivers Energy Job to Lambda
-  → Dockerized Python Lambda fetches irradiance (PVGIS / NASA POWER)
-  → Computes energy yield
+Energy engine runs (staging/prod: Lambda via SQS — added in Spike 8):
+  → Fetches irradiance (PVGIS / NASA POWER)
+  → Computes 25-year energy yield
   → Writes PDF artifact to S3
-  → Updates Version record (energy_status: complete, pdf_url)
-  → Version overall status → complete
+  → Updates EnergyJob in DB: COMPLETE (pdf S3 key + statsJson)
+  → Updates Version in DB: COMPLETE (overall)
 
-UI polls Version status (or receives push notification)
+UI polls GET /projects/:id/versions/:versionId
   → Shows results: SVG preview + stats dashboard + download links
 ```
 
+**DB ownership:** Hono API owns only the initial QUEUED writes. All subsequent state — status transitions, artifact S3 keys, statsJson, errorDetail — is written by the Python engine directly via psycopg2. Hono never polls or updates job status after firing the job.
+
 **Retry semantics:** Lambda failures trigger SQS visibility timeout → automatic retry. Each job retries independently. Failed versions are marked with status and error detail — user can re-trigger.
 
-**Notifications:** In-app only (status polling / push). Email notifications are a future initiative.
+**Notifications:** In-app only (status polling). Email notifications are a future initiative.
 
 ---
 
@@ -464,6 +476,8 @@ Displayed alongside the SVG preview in the job results view. All stats below per
 
 2. **Lambda independence.** Each job (layout, energy) is an independent Lambda invocation. The platform's Hono API does not call the Lambda directly — it enqueues to SQS. The Lambda reads from SQS, processes, and writes results to PostgreSQL + S3.
 
+2a. **Python owns DB state.** The Hono API writes the initial QUEUED records for Version and LayoutJob/EnergyJob on submit, then fires the job (HTTP in local dev, SQS in staging/prod) and returns immediately. All subsequent DB writes — status transitions (PROCESSING, COMPLETE, FAILED), artifact S3 keys, statsJson, errorDetail — are performed by the Python engine directly using psycopg2-binary (raw SQL, no ORM). Hono never updates job status after the initial dispatch.
+
 3. **Full state saved per version.** Every version record in PostgreSQL stores the complete input snapshot (all parameter values + KMZ S3 reference) and the complete output snapshot (artifact S3 URLs + computed stats). Nothing is recomputed on read.
 
 4. **Artifacts in S3.** KMZ, PDF, DXF, and SVG files are stored in S3. The database stores only S3 URLs. Pre-signed URLs are used for client downloads.
@@ -523,8 +537,10 @@ The full spike plan — scope, acceptance criteria, and status for each spike �
 | # | Spike | Depends On |
 |---|---|---|
 | 1 | Data model (Prisma schema, API endpoints) | Platform foundation |
-| 2 | `apps/layout-engine` setup (Docker, headless engine, S3) | Spike 1 |
-| 3 | Job pipeline: local mode (HTTP dispatch, docker-compose) | Spike 2 |
+| 2a | `apps/layout-engine` scaffold (uv, copied core, health check) | Spike 1 |
+| 2b | Layout compute local (svg_exporter, handlers, local KMZ test) | Spike 2a |
+| 2c | S3 + DB integration (s3_client, db_client, production contract, 202 fire-and-forget) | Spike 2b |
+| 3 | Job pipeline: local mode (Hono fires and forgets, Python updates DB) | Spike 2c |
 | 4 | Job pipeline: SQS + Lambda (staging, ECR, DLQ) | Spike 3 |
 | 5 | Project and version UI (forms, status polling, tooltips) | Spike 3 |
 | 6 | SVG preview + stats dashboard (zoom/pan, layer toggles) | Spike 5 |
