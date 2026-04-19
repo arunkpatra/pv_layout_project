@@ -59,12 +59,8 @@ Use shadcn `Table` primitives with `overflow-hidden border` on the wrapper div.
 
 ## Icons
 
-Use **Phosphor Icons** exclusively (`@phosphor-icons/react/dist/ssr` for server components).
-Do not mix Lucide or Heroicons.
-
-- Prefer `weight="duotone"` for feature icons
-- Prefer `weight="bold"` for inline indicators (check marks, arrows)
-- Prefer `weight="regular"` for list item markers
+Use **Lucide React** exclusively: `import { ChevronDown } from "lucide-react"`  
+Do not use Phosphor Icons, Heroicons, or any other icon library.
 
 ---
 
