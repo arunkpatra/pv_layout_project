@@ -197,15 +197,19 @@ export async function createVersion(
   ])
 
   if (process.env.USE_LOCAL_ENV === "true") {
+    console.info(`[dispatch] USE_LOCAL_ENV=true, HTTP dispatch for ${version.id}`)
     try {
       dispatchLayoutJobHttp(version.id)
     } catch (err) {
-      console.error("HTTP dispatch failed", err)
+      console.error("[dispatch] HTTP dispatch failed", err)
     }
   } else {
-    publishLayoutJob(version.id).catch((err) => {
-      console.error("SQS publish failed", err)
-    })
+    console.info(`[dispatch] SQS publish for ${version.id}`)
+    publishLayoutJob(version.id)
+      .then(() => console.info(`[dispatch] SQS publish OK for ${version.id}`))
+      .catch((err) => {
+        console.error(`[dispatch] SQS publish FAILED for ${version.id}`, err)
+      })
   }
 
   return shapeVersion({ ...version, kmzS3Key, layoutJob, energyJob })
