@@ -1,7 +1,14 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from db_client import mark_layout_complete, mark_layout_failed, mark_layout_processing
+import pytest
+
+from db_client import (
+    get_version,
+    mark_layout_complete,
+    mark_layout_failed,
+    mark_layout_processing,
+)
 
 
 def _mock_conn():
@@ -61,3 +68,31 @@ def test_mark_layout_failed_sets_error_detail():
     assert "FAILED" in first_sql
     assert "errorDetail" in first_sql
     conn.commit.assert_called_once()
+
+
+def test_get_version_returns_project_id_kmz_key_and_snapshot():
+    conn, cur = _mock_conn()
+    cur.fetchone.return_value = (
+        "prj_abc123",
+        "projects/prj_abc123/versions/ver_xyz/input.kmz",
+        {"tilt_angle": 18.0, "modules_in_row": 28},
+    )
+    with patch("db_client._connect", return_value=conn):
+        project_id, kmz_s3_key, snapshot = get_version("ver_xyz")
+
+    assert project_id == "prj_abc123"
+    assert kmz_s3_key == "projects/prj_abc123/versions/ver_xyz/input.kmz"
+    assert snapshot == {"tilt_angle": 18.0, "modules_in_row": 28}
+    assert cur.execute.call_count == 1
+    sql = cur.execute.call_args_list[0][0][0]
+    assert "versions" in sql
+    assert "projectId" in sql
+    assert "kmzS3Key" in sql
+
+
+def test_get_version_raises_if_not_found():
+    conn, cur = _mock_conn()
+    cur.fetchone.return_value = None
+    with patch("db_client._connect", return_value=conn):
+        with pytest.raises(ValueError, match="Version not found"):
+            get_version("ver_nonexistent")

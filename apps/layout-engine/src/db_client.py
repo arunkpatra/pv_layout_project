@@ -68,6 +68,28 @@ def mark_layout_complete(
         conn.commit()
 
 
+def get_version(version_id: str) -> tuple[str, str, dict]:
+    """
+    Returns (project_id, kmz_s3_key, input_snapshot) for the given version.
+    Raises ValueError if version not found.
+    """
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT "projectId", "kmzS3Key", "inputSnapshot"
+                   FROM versions
+                   WHERE id = %s""",
+                (version_id,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        raise ValueError(f"Version not found: {version_id}")
+    project_id, kmz_s3_key, input_snapshot = row
+    if isinstance(input_snapshot, str):
+        input_snapshot = json.loads(input_snapshot)
+    return project_id, kmz_s3_key, input_snapshot
+
+
 def mark_layout_failed(version_id: str, error: str) -> None:
     """Transition layout_jobs and versions to FAILED with error detail."""
     with _connect() as conn:
