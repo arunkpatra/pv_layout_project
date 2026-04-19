@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun run --env-file ../../.env --hot src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "vercel-build": "cd ../.. && bun turbo build --filter=@renewable-energy/api",
     "start": "bun run dist/index.js",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
@@ -13,6 +14,7 @@
   },
   "dependencies": {
     "@clerk/backend": "^3.2.13",
+    "@hono/node-server": "^1.19.14",
     "@hono/zod-validator": "^0.4.0",
     "@renewable-energy/db": "workspace:*",
     "@renewable-energy/shared": "workspace:*",

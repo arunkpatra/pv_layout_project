@@ -19,6 +19,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@clerk/backend": "^3.2.13",
+        "@hono/node-server": "^1.19.14",
         "@hono/zod-validator": "^0.4.0",
         "@renewable-energy/db": "workspace:*",
         "@renewable-energy/shared": "workspace:*",
