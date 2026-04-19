@@ -69,7 +69,7 @@ projects/<project_id>/versions/<version_id>/layout.dxf     ← written by layout
 source aws-creds/renewable-energy-app.env
 
 # From apps/layout-engine
-S3_BUCKET=renewable-energy-local-artifacts \
+S3_ARTIFACTS_BUCKET=renewable-energy-local-artifacts \
 DATABASE_URL=postgresql://renewable:renewable@localhost:5432/renewable_energy \
 PYTHONPATH=src uv run python src/server.py
 ```
@@ -77,7 +77,7 @@ PYTHONPATH=src uv run python src/server.py
 Or using bun (picks up env from shell):
 ```bash
 source aws-creds/renewable-energy-app.env
-export S3_BUCKET=renewable-energy-local-artifacts
+export S3_ARTIFACTS_BUCKET=renewable-energy-local-artifacts
 export DATABASE_URL=postgresql://renewable:renewable@localhost:5432/renewable_energy
 
 cd apps/layout-engine
@@ -128,7 +128,7 @@ Set the following in your deployment platform (Vercel, Railway, etc.) for the la
 AWS_ACCESS_KEY_ID=<same key — or rotate and create a separate key>
 AWS_SECRET_ACCESS_KEY=<secret>
 AWS_REGION=ap-south-1
-S3_BUCKET=renewable-energy-staging-artifacts
+S3_ARTIFACTS_BUCKET=renewable-energy-staging-artifacts
 DATABASE_URL=<staging DB connection string>
 ```
 
@@ -142,7 +142,7 @@ Set the following in your deployment platform for the production layout-engine s
 AWS_ACCESS_KEY_ID=<same key — or rotate and create a separate key>
 AWS_SECRET_ACCESS_KEY=<secret>
 AWS_REGION=ap-south-1
-S3_BUCKET=renewable-energy-prod-artifacts
+S3_ARTIFACTS_BUCKET=renewable-energy-prod-artifacts
 DATABASE_URL=<prod DB connection string>
 ```
 
