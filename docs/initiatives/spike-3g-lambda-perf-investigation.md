@@ -92,10 +92,67 @@ The latest deployed image includes per-phase timing logs in `handlers.py`:
 
 CloudWatch log group: `/aws/lambda/layout_engine_lambda_prod`
 
+## Investigation Results (2026-04-20)
+
+### Instrumented Lambda Run: `ver_bqI0JNWZOM8EnPK0HGnHW68v19n2ZQfnMt81`
+
+Full log saved: `logs/good-but-slow-lamda.txt`
+
+**Environment:** shapely=2.1.2, geos=3.13.1, python=3.13.12, arch=aarch64
+
+**Timing breakdown:**
+
+| Phase | Time | Notes |
+|---|---|---|
+| Cold start | 4.2s | Init duration |
+| db:get_version | 2.2s | Cross-region Mumbai→Virginia |
+| db:mark_processing | 2.4s | Cross-region |
+| s3:download | 0.3s | 2280 bytes |
+| parse_kmz | 0.0s | 1 boundary |
+| run_layout_multi | 0.2s | 740 tables, 41440 modules |
+| **place_string_inverters** | **563.3s** | **99% of total time** |
+| place_lightning_arresters | 0.0s | |
+| export (kmz+svg+dxf) | 1.2s | |
+| s3:upload (3 files) | 0.2s | |
+| db:mark_complete | 2.4s | Cross-region |
+| **Total** | **572.3s** | |
+
+### Root Cause: AC Cable Routing Combinatorial Explosion
+
+**DC routing** (table → inverter): 740 cables, all resolved on Pattern A, 740 total `_path_ok` calls. **~2 seconds.** Not the problem.
+
+**AC routing** (inverter → ICR): 74 cables, **5,738,877 total `_path_ok` calls**, worst single cable: **1,037,117 calls**. **~560 seconds.**
+
+| Pattern | Cables | Description |
+|---|---|---|
+| A | 43 | Fast — 1 check each |
+| A2 | 9 | Moderate |
+| A3 | 14 | Moderate |
+| A4 | 2 | Expensive — gap_ys × col_xs × col_xs |
+| E | 1 | Exhaustive 2-waypoint search |
+| F | 5 | Fell through all patterns to best-effort |
+
+**Routing grid dimensions:** 113 gap_ys × 49 col_xs. Pattern A4 search space per cable: 113 × 49 × 49 = **271,313 candidates**. The 5 cables reaching Pattern F exhausted all patterns before F, accumulating millions of geometry checks.
+
+### Hypothesis Verdict
+
+- **H1 (Shapely ARM64 slow):** Partially confirmed. Graviton is ~2-2.5x slower per-op than M2, but this only explains 2.5x of the 15x slowdown. Not the primary cause.
+- **H2 (Algorithmic explosion):** **CONFIRMED. Primary cause.** 5.7M geometry checks for 74 cables is pathological. The nested loops in A4/B/E compound the per-op slowdown.
+- **H3 (Complex polygon):** `poly_verts=0` logged (instrumentation bug — polygon exists but vertex count failed on non-simple geometry type). The polygon IS being used for AC routing. Needs investigation but secondary to H2.
+- **H4 (Cross-region DB):** 2.2-2.4s per call, ~9s total. Not material vs 563s.
+- **H5 (Python GC):** Not investigated. Irrelevant given H2 finding.
+
+### Fix Strategy
+
+Reduce AC routing `_path_ok` calls from 5.7M to <10K by:
+1. Limit `col_xs` to nearest 5-10 in patterns A2, A3, A4, B (currently uses all 49)
+2. Cap Pattern E waypoint count or remove the O(n²) two-waypoint search
+3. Add early-exit timeout per cable — fall through to Pattern F after N attempts
+
 ## Suggested Investigation Order
 
-1. Add Shapely version + GEOS version logging
-2. Add per-cable routing pattern logging inside `_route_ac_cable` (which pattern succeeded, attempt count)
+1. ~~Add Shapely version + GEOS version logging~~ ✅ Done
+2. ~~Add per-cable routing pattern logging inside `_route_ac_cable`~~ ✅ Done
 3. Profile `place_string_inverters` locally with the same KMZ to get baseline per-phase timing
 4. Compare local vs Lambda Shapely geometry operation speed with a microbenchmark
-5. If Shapely is confirmed slow on Lambda ARM64, consider precompiled wheels or x86 architecture switch
+5. ~~If Shapely is confirmed slow on Lambda ARM64, consider precompiled wheels or x86 architecture switch~~ Not needed — algorithmic fix is primary

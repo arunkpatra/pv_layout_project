@@ -334,6 +334,14 @@ def _route_ac_cable(
     mid_y = (s[1] + e[1]) / 2.0
     mid_x = (s[0] + e[0]) / 2.0
 
+    # Pre-sort col_xs by proximity to start/end (used by multiple patterns)
+    _MAX_COL = 8
+    _MAX_COL_A4 = 5
+    cols_near_s = sorted(col_xs, key=lambda x: abs(x - s[0]))[:_MAX_COL]
+    cols_near_e = sorted(col_xs, key=lambda x: abs(x - e[0]))[:_MAX_COL]
+    cols_near_s_a4 = cols_near_s[:_MAX_COL_A4]
+    cols_near_e_a4 = cols_near_e[:_MAX_COL_A4]
+
     # ---- Pattern A: V→H→V via single row gap --------------------------------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
         path = [s, (s[0], gy), (e[0], gy), e]
@@ -342,7 +350,7 @@ def _route_ac_cable(
 
     # ---- Pattern A2: H→V→H→V -----------------------------------------------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        for tx in sorted(col_xs, key=lambda x: abs(x - s[0])):
+        for tx in cols_near_s:
             path = [s, (tx, s[1]), (tx, gy), (e[0], gy), e]
             if _pok(path, poly):
                 return _done("A2", path)
@@ -353,29 +361,32 @@ def _route_ac_cable(
 
     # ---- Pattern A3: V→H→V with horizontal escape at end -------------------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        for tx in sorted(col_xs, key=lambda x: abs(x - e[0])):
+        for tx in cols_near_e:
             path = [s, (s[0], gy), (tx, gy), (tx, e[1]), e]
             if _pok(path, poly):
                 return _done("A3", path)
 
     # ---- Pattern A4: H→V→H→V→H→V (both ends need horizontal escape) -------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        for tx_s in sorted(col_xs, key=lambda x: abs(x - s[0])):
-            for tx_e in sorted(col_xs, key=lambda x: abs(x - e[0])):
+        for tx_s in cols_near_s_a4:
+            for tx_e in cols_near_e_a4:
                 path = [s, (tx_s, s[1]), (tx_s, gy), (tx_e, gy), (tx_e, e[1]), e]
                 if _pok(path, poly):
                     return _done("A4", path)
 
     # ---- Pattern B: two gaps V→H→V→H→V ------------------------------------
-    for g1 in sorted(gap_ys, key=lambda y: abs(y - s[1])):
-        for g2 in sorted(gap_ys, key=lambda y: abs(y - e[1])):
+    _MAX_GAPS_B = 8
+    gaps_near_s = sorted(gap_ys, key=lambda y: abs(y - s[1]))[:_MAX_GAPS_B]
+    gaps_near_e = sorted(gap_ys, key=lambda y: abs(y - e[1]))[:_MAX_GAPS_B]
+    for g1 in gaps_near_s:
+        for g2 in gaps_near_e:
             if abs(g1 - g2) < 0.5:
                 continue
             path = [s, (s[0], g1), (mid_x, g1), (mid_x, g2), (e[0], g2), e]
             if _pok(path, poly):
                 return _done("B", path)
-            for tx_s in sorted(col_xs, key=lambda x: abs(x - s[0]))[:3]:
-                for tx_e in sorted(col_xs, key=lambda x: abs(x - e[0]))[:3]:
+            for tx_s in cols_near_s[:3]:
+                for tx_e in cols_near_e[:3]:
                     path = [s, (tx_s, s[1]), (tx_s, g1), (tx_e, g1), (tx_e, g2), (e[0], g2), e]
                     if _pok(path, poly):
                         return _done("B", path)
@@ -405,25 +416,28 @@ def _route_ac_cable(
     except Exception:
         pass
 
-    # ---- Pattern E: exhaustive 2-waypoint search ---------------------------
+    # ---- Pattern E: sampled waypoint search --------------------------------
+    _MAX_WPS = 15
     try:
         cx, cy = poly.centroid.x, poly.centroid.y
         wps = [(cx, cy)]
         for gy in gap_ys:
             for tx in col_xs[::max(1, len(col_xs)//6)]:
                 wps.append((tx, gy))
-        wps = [_safe_pt(w, poly) for w in wps]
+        wps = [_safe_pt(w, poly) for w in wps[:_MAX_WPS]]
         for w in wps:
             path = [s, w, e]
             if _pok(path, poly):
                 return _done("E", path)
-        for w1 in wps:
-            for w2 in wps:
-                if w1 == w2:
-                    continue
-                path = [s, w1, w2, e]
-                if _pok(path, poly):
-                    return _done("E", path)
+        # Two-waypoint: only try if waypoint count is small
+        if len(wps) <= 10:
+            for w1 in wps:
+                for w2 in wps:
+                    if w1 == w2:
+                        continue
+                    path = [s, w1, w2, e]
+                    if _pok(path, poly):
+                        return _done("E", path)
     except Exception:
         pass
 
