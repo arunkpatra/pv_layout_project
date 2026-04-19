@@ -198,3 +198,64 @@ aws iam attach-user-policy \
   --policy-arn arn:aws:iam::378240665051:policy/renewable-energy-app-s3
 aws iam create-access-key --user-name renewable-energy-app
 ```
+
+---
+
+## Lambda
+
+### Function: `layout_engine_lambda_prod`
+
+- **ARN:** `arn:aws:lambda:ap-south-1:378240665051:function:layout_engine_lambda_prod`
+- **Package type:** Container image from ECR
+- **Architecture:** arm64
+- **Memory:** 512 MB
+- **Timeout:** 180 s
+- **Execution role:** `arn:aws:iam::378240665051:role/renewable-energy-lambda-execution`
+- **Environment variables:**
+  - `DATABASE_URL` — prod RDS (set via AWS console / CLI, not committed)
+  - `S3_BUCKET` = `renewable-energy-prod-artifacts`
+  - `AWS_REGION` = `ap-south-1`
+
+### Execution Role: `renewable-energy-lambda-execution`
+
+Policies attached:
+- `AWSLambdaBasicExecutionRole` (managed)
+- `renewable-energy-app-s3` (managed, allows S3 read/write on artifact buckets)
+- `sqs-layout-queue-prod` (inline, allows SQS receive/delete/attributes on `re_layout_queue_prod`)
+
+---
+
+## SQS
+
+| Environment | Queue Name | ARN |
+|---|---|---|
+| prod | `re_layout_queue_prod` | `arn:aws:sqs:ap-south-1:378240665051:re_layout_queue_prod` |
+
+Standard queue, batch size 1.
+
+---
+
+## ECR
+
+- **Repository:** `renewable-energy/layout-engine`
+- **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/renewable-energy/layout-engine`
+
+Tags:
+- `prod` — latest prod image (updated by CI on push to main)
+- `{git-sha}` — per-commit tag
+- `buildcache` — Docker layer cache (managed by CI)
+
+---
+
+## GitHub Actions OIDC
+
+### Role: `renewable-energy-github-actions`
+
+- **ARN:** `arn:aws:iam::378240665051:role/renewable-energy-github-actions`
+- **Policy:** `renewable-energy-github-actions-policy` (ECR push + Lambda update)
+- **Trust:** GitHub OIDC, scoped to `repo:arunkpatra/renewable_energy:*`
+
+**GitHub Actions configuration:**
+- Secret `AWS_ROLE_ARN` = `arn:aws:iam::378240665051:role/renewable-energy-github-actions`
+- Variable `AWS_ACCOUNT_ID` = `378240665051`
+- Variable `AWS_REGION` = `ap-south-1`
