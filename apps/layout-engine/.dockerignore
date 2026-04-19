@@ -6,3 +6,8 @@ src/tests
 *.pyc
 *.pyo
 .ruff_cache
+.git
+.venv
+.pytest_cache
+dist
+build
