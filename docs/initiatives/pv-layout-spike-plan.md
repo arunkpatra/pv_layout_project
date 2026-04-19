@@ -72,7 +72,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 
 | # | Spike | Status | Depends On |
 |---|-------|--------|------------|
-| 1 | [Data Model](#spike-1--data-model) | planned | — |
+| 1 | [Data Model](#spike-1--data-model) | complete | — |
 | 2 | [apps/layout-engine Setup](#spike-2--appslayout-engine-setup) | planned | Spike 1 |
 | 3 | [Job Pipeline: Local Mode](#spike-3--job-pipeline-local-mode) | planned | Spike 2 |
 | 4 | [Job Pipeline: SQS + Lambda (Staging)](#spike-4--job-pipeline-sqs--lambda-staging) | planned | Spike 3 |
@@ -89,7 +89,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 
 ## Spike 1 — Data Model
 
-**Status:** planned  
+**Status:** complete — 2026-04-19  
 **Depends on:** Platform foundation (Prisma + Hono API already in place)
 
 ### What we're building
@@ -877,4 +877,4 @@ Record decisions made during spike execution that affect future spikes.
 
 | Date | Spike | Decision | Rationale |
 |------|-------|----------|-----------|
-| — | — | — | — |
+| 2026-04-19 | 1 | Prisma semantic ID extension does not fire on nested `create: {}` calls. LayoutJob and EnergyJob must be created as separate top-level `db.layoutJob.create` / `db.energyJob.create` calls after the Version is created. Never use nested creates for models that require semantic IDs. | Discovered during runtime testing — nested creates bypass the extension middleware. |
