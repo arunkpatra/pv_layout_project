@@ -184,6 +184,7 @@ If the answer is "17 files need re-editing," verify the assumption first.
 | **"The docs say it works"** — Docs describe general capabilities, not your specific edge case. | Spike and verify. |
 | **"Claude is confident so it must be right"** — High confidence is not a reliability signal. | Treat every assertion about runtime behavior as a hypothesis until verified. |
 | **"Let Claude handle everything"** — Claude cannot test runtime behavior. | You are the runtime verification layer. Own that role. |
+| **"Local gates passed so CI will pass"** — Local gates run against whatever artifacts exist on disk. Stale build outputs can satisfy the gate even when the underlying wiring is broken. CI starts clean and exposes the gap. | When a commit touches build infrastructure (package wiring, build config, turbo pipeline, tsconfig paths), always verify against a clean environment: delete all build artifacts and re-run the full gate before declaring done. |
 
 ---
 
@@ -234,6 +235,13 @@ All four must pass across all workspaces. Never commit if any step fails.
 - [ ] `bun run build` — production build succeeds for all packages
 - [ ] Manual browser testing confirms the feature works
 - [ ] No "it should work" — only "I tested it and it works"
+
+**If the commit touches build infrastructure** (package.json exports, tsconfig paths, turbo pipeline, build config, new workspace packages) — gate against a clean environment, not local artifacts:
+```bash
+rm -rf packages/*/dist apps/*/dist apps/web/.next && \
+  bun run lint && bun run typecheck && bun run test && bun run build
+```
+Local artifacts left over from previous builds can satisfy the gate even when the wiring is broken. A clean run replicates CI and catches it locally.
 
 ---
 

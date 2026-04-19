@@ -15,7 +15,8 @@
     "db:seed": "bun run prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:status": "prisma migrate status",
-    "db:validate": "prisma validate"
+    "db:validate": "prisma validate",
+    "test": "bun test"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@renewable-energy/typescript-config": "workspace:*",
+    "@types/bun": "^1.3.12",
     "@types/node": "^22.0.0",
     "prisma": "^7.7.0",
     "typescript": "^5.9.3"

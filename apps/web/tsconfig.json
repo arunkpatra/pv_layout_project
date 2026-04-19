@@ -4,7 +4,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@renewable-energy/ui/*": ["../../packages/ui/src/*"]
+      "@renewable-energy/ui/*": ["../../packages/ui/src/*"],
+      "@renewable-energy/shared": ["../../packages/shared/src/index.ts"]
     },
     "plugins": [
       {

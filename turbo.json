@@ -66,6 +66,10 @@
     "@renewable-energy/api#typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
+    },
+    "@renewable-energy/web#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
     }
   }
 }

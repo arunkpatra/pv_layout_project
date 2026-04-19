@@ -3,8 +3,9 @@ import { ClerkProvider } from "@clerk/nextjs"
 
 import "@renewable-energy/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { QueryProvider } from "@/components/query-provider"
 import { TooltipProvider } from "@renewable-energy/ui/components/tooltip"
-import { cn } from "@renewable-energy/ui/lib/utils";
+import { cn } from "@renewable-energy/ui/lib/utils"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -30,7 +31,9 @@ export default function RootLayout({
       >
         <body>
           <ThemeProvider>
-            <TooltipProvider>{children}</TooltipProvider>
+            <QueryProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+            </QueryProvider>
           </ThemeProvider>
         </body>
       </html>

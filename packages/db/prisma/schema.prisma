@@ -6,11 +6,20 @@ datasource db {
   provider = "postgresql"
 }
 
-// Spike table — proves Prisma connects and migrates.
-// Full schema will be designed incrementally as features are built.
-model SolarSite {
-  id        String   @id @default(cuid())
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id        String     @id @default("")
+  clerkId   String     @unique
+  email     String?    @unique
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  avatarUrl String?
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("users")
 }

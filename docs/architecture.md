@@ -66,7 +66,7 @@ packages/
 | Organizations (teams), memberships, roles | All domain/business data |
 | Invitations and auth flows | Anything referenced by `orgId` or `userId` |
 
-Clerk fires webhooks on user/org lifecycle events (created, updated, deleted). The API handles these webhooks and syncs the relevant data into Postgres so that Prisma queries can join against real user and org records.
+User sync is no-webhook. On the first authenticated request (`GET /auth/me`), the API auth middleware verifies the Clerk JWT, looks up the user by `clerkId`, and upserts the record if it doesn't exist (fetching the Clerk profile via `@clerk/backend`). No webhook infrastructure is required.
 
 ---
 
@@ -138,6 +138,6 @@ The project is built incrementally. Each step is spiked and verified before the 
 | 3 | Vitest + TDD infrastructure | Done |
 | 4 | Docker Compose (Postgres 17) | Done |
 | 5 | `packages/db` — Prisma schema + client | Done |
-| 6 | Clerk auth in `apps/web` — sign in, org switcher | Planned |
-| 7 | Clerk webhook handler — sync users/orgs to Postgres | Planned |
-| 8 | `apps/api` — Hono server, protected routes | Planned |
+| 6 | Clerk auth in `apps/web` — sign in/up, middleware, dashboard redirect | Done |
+| 7 | `apps/api` — Hono server, Clerk JWT auth, no-webhook user sync on first `GET /auth/me` | Done |
+| 8 | `packages/api-client` — typed HTTP client; TanStack Query wiring in `apps/web` | Done |
