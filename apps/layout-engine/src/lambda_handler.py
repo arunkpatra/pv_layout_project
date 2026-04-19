@@ -9,6 +9,13 @@ from handlers import handle_layout_job
 
 
 def handler(event, context):
+    errors = []
     for record in event["Records"]:
-        payload = json.loads(record["body"])
-        handle_layout_job(payload["version_id"])
+        try:
+            payload = json.loads(record["body"])
+            handle_layout_job(payload["version_id"])
+        except Exception as exc:
+            print(f"Failed to process record: {exc}")
+            errors.append(exc)
+    if errors:
+        raise errors[0]

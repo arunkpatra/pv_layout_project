@@ -130,9 +130,8 @@ def handle_layout_job(version_id: str) -> None:
     project_id, kmz_s3_key, input_snapshot = get_version(version_id)
     output_prefix = f"projects/{project_id}/versions/{version_id}"
 
-    mark_layout_processing(version_id)
-
     try:
+        mark_layout_processing(version_id)
         with tempfile.TemporaryDirectory() as tmpdir:
             kmz_local = os.path.join(tmpdir, "input.kmz")
             download_from_s3(bucket, kmz_s3_key, kmz_local)

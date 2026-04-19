@@ -120,3 +120,65 @@ def test_handle_layout_job_marks_failed_and_reraises_on_error():
     assert mock_failed.call_args[0][0] == _VERSION_ID
     assert "bucket not found" in mock_failed.call_args[0][1]
     mock_complete.assert_not_called()
+
+
+def test_handle_layout_job_marks_failed_if_mark_processing_raises():
+    """If mark_layout_processing raises, job failure is recorded and exception re-raised."""
+    with (
+        patch("handlers.get_version", return_value=(_PROJECT_ID, _KMZ_KEY, {})),
+        patch(
+            "handlers.mark_layout_processing",
+            side_effect=RuntimeError("db down"),
+        ),
+        patch("handlers.mark_layout_failed") as mock_failed,
+        patch("handlers.mark_layout_complete") as mock_complete,
+        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+    ):
+        with pytest.raises(RuntimeError, match="db down"):
+            handle_layout_job(_VERSION_ID)
+
+    mock_failed.assert_called_once()
+    assert mock_failed.call_args[0][0] == _VERSION_ID
+    mock_complete.assert_not_called()
+
+
+def test_handle_layout_job_marks_failed_if_get_version_raises():
+    """If get_version raises ValueError, exception propagates (job stays QUEUED — no DB record)."""
+    with (
+        patch(
+            "handlers.get_version",
+            side_effect=ValueError("Version not found: ver_missing"),
+        ),
+        patch("handlers.mark_layout_processing") as mock_proc,
+        patch("handlers.mark_layout_failed") as mock_failed,
+        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+    ):
+        with pytest.raises(ValueError, match="Version not found"):
+            handle_layout_job(_VERSION_ID)
+
+    mock_proc.assert_not_called()
+    mock_failed.assert_not_called()
+
+
+def test_handle_layout_job_processing_called_before_complete():
+    """mark_layout_processing is called before mark_layout_complete."""
+    call_order = []
+    with (
+        patch("handlers.get_version", return_value=(_PROJECT_ID, _KMZ_KEY, {})),
+        patch("handlers.mark_layout_processing", side_effect=lambda *a: call_order.append("processing")),
+        patch("handlers.mark_layout_complete", side_effect=lambda *a: call_order.append("complete")),
+        patch("handlers.mark_layout_failed"),
+        patch("handlers.download_from_s3"),
+        patch("handlers.upload_to_s3"),
+        patch("handlers.parse_kmz", return_value=_make_parse_result()),
+        patch("handlers.run_layout_multi", return_value=[]),
+        patch("handlers.place_string_inverters"),
+        patch("handlers.place_lightning_arresters"),
+        patch("handlers.export_kmz"),
+        patch("handlers.export_svg"),
+        patch("handlers.export_dxf"),
+        patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}),
+    ):
+        handle_layout_job(_VERSION_ID)
+
+    assert call_order == ["processing", "complete"]
