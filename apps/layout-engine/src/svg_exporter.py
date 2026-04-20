@@ -26,8 +26,8 @@ def export_svg(results: List[LayoutResult], output_path: str) -> None:
     fig, ax = plt.subplots(figsize=(20, 16))
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_facecolor("#1a1a2e")
-    fig.patch.set_facecolor("#1a1a2e")
+    ax.set_facecolor("none")
+    fig.patch.set_facecolor("none")
 
     for result in results:
         _draw_result(ax, result)
