@@ -23,6 +23,12 @@ import {
 } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { useProjects } from "@/hooks/use-projects"
+import { Skeleton } from "@renewable-energy/ui/components/skeleton"
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@renewable-energy/ui/components/sidebar"
 
 const navMain = [
   {
@@ -91,7 +97,7 @@ const navMain = [
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useUser()
+  const { isLoaded, user } = useUser()
   const { data, isLoading } = useProjects()
 
   const clerkUser = {
@@ -114,7 +120,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavProjects projects={data?.items ?? []} isLoading={isLoading} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={clerkUser} />
+        {!isLoaded || !user ? (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" disabled>
+                <Skeleton className="h-8 w-8 rounded-lg" />
+                <div className="grid flex-1 gap-1">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-2.5 w-32" />
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        ) : (
+          <NavUser user={clerkUser} />
+        )}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
