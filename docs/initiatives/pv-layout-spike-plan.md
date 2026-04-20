@@ -98,7 +98,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | complete | Spike 4a |
 | 4c | [Version Submission Form](#spike-4c--version-submission-form) | complete | Spike 4b |
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | complete | Spike 4c |
-| 4e | [Pagination UI](#spike-4e--pagination-ui) | planned | Spike 4d |
+| 4e | [Pagination UI](#spike-4e--pagination-ui) | complete | Spike 4d |
 | 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5 |
 | 7 | [Energy Job](#spike-7--energy-job) | planned | Spike 3f |
@@ -1037,7 +1037,7 @@ The version detail page and project detail page, with live polling that follows 
 - [x] Breadcrumbs correct: Projects › [Project name] › Run #N
 - [x] Verified in local dev and production
 - [ ] Input summary (27 inputSnapshot params) — deferred to Spike 5
-- [ ] Project detail page (versions list) — Spike 4e
+- [x] Project detail page (versions list) — Spike 4e
 
 ### Implementation Plan
 
@@ -1047,27 +1047,27 @@ See `docs/superpowers/plans/2026-04-20-spike-4d-version-detail-polling.md`.
 
 ## Spike 4e — Pagination UI
 
-**Status:** planned  
+**Status:** complete  
 **Depends on:** Spike 4d
 
-### What we're building
+### What we built
 
-Pagination controls on the projects list page and project detail page. The API already returns paginated data from Spike 4a.
+URL-based pagination (`?page=N&pageSize=N`) on both the projects list and project detail pages. Page size persisted to `localStorage` (`"re_page_size"`) and synced into URL on first mount.
 
-**Scope:**
-- `PaginationControls` component using shadcn `Pagination` primitives (Previous / page numbers / Next)
-- Wire to projects list page (`useProjects` with page param)
-- Wire to project detail page (`useVersions` with page param)
-- URL `?page=N` query param so pages are bookmarkable and browser back/forward work
-- Show page controls only when `totalPages > 1`
+**Delivered:**
+- `apps/web/hooks/use-versions.ts` — `useVersions(projectId, { page, pageSize })` TanStack Query hook
+- `apps/web/components/pagination-controls.tsx` — `PaginationControls` component + `getPageNumbers` pure function; shadcn `Pagination` primitives; page size `Select`; `<Suspense>` self-wrapped
+- `apps/web/app/(main)/dashboard/projects/[projectId]/page.tsx` — new project detail page with versions list (loading/error/empty/list states), "New run" button, breadcrumbs
+- `apps/web/app/(main)/dashboard/projects/page.tsx` — modified to add `PaginationControls` and URL pagination
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] Projects list: pagination controls appear when total > 20; correct page loads on click
-- [ ] Project detail: pagination controls appear when version count > 20
-- [ ] Page number reflected in URL (`?page=2`)
-- [ ] Navigating back preserves page number
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] Projects list: pagination controls appear when totalPages > 1; page size selector always visible
+- [x] Project detail: versions list with status badges; pagination footer
+- [x] Page/pageSize reflected in URL; browser back/forward preserved
+- [x] Page size persists across page loads via localStorage
+- [x] Verified local, CI, and production (2026-04-20)
 
 ---
 
