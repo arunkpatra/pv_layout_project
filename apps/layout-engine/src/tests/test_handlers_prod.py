@@ -203,8 +203,9 @@ def test_handle_layout_job_processing_called_before_complete():
 
 def test_build_stats_includes_all_12_fields():
     """_build_stats returns row_pitch_m, gcr_achieved, inverter_capacity_kwp from results[0]."""
-    from handlers import _build_stats
     from unittest.mock import MagicMock
+
+    from handlers import _build_stats
 
     r = MagicMock()
     r.placed_tables = [object(), object(), object()]  # len 3

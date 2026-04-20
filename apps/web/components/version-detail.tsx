@@ -20,6 +20,9 @@ interface LayoutStats {
   total_dc_cable_m: number
   total_ac_cable_m: number
   num_las: number
+  row_pitch_m: number
+  gcr_achieved: number
+  inverter_capacity_kwp: number
 }
 
 const METRIC_LABELS: {
@@ -31,7 +34,10 @@ const METRIC_LABELS: {
   { key: "total_modules", label: "Modules", unit: "" },
   { key: "total_tables", label: "Tables", unit: "" },
   { key: "total_area_acres", label: "Area", unit: "acres" },
+  { key: "row_pitch_m", label: "Row pitch", unit: "m" },
+  { key: "gcr_achieved", label: "GCR", unit: "" },
   { key: "num_string_inverters", label: "String inverters", unit: "" },
+  { key: "inverter_capacity_kwp", label: "Inverter capacity", unit: "kWp" },
   { key: "num_icrs", label: "ICRs", unit: "" },
   { key: "num_las", label: "Lightning arresters", unit: "" },
   { key: "total_dc_cable_m", label: "DC cable", unit: "m" },

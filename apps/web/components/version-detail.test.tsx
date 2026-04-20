@@ -38,6 +38,9 @@ const COMPLETE_VERSION: VersionDetailType = {
       total_dc_cable_m: 5200.5,
       total_ac_cable_m: 800.2,
       num_las: 12,
+      row_pitch_m: 6.5,
+      gcr_achieved: 0.346,
+      inverter_capacity_kwp: 29.12,
     },
     errorDetail: null,
     startedAt: "2026-04-20T00:00:00Z",
@@ -205,4 +208,21 @@ test("renders error state when data is undefined and not loading", () => {
     wrapper: createWrapper(),
   })
   expect(screen.getByText(/failed to load run details/i)).toBeInTheDocument()
+})
+
+test("renders row pitch, GCR, and inverter capacity stat cards when COMPLETE", () => {
+  mockUseVersion.mockReturnValue({
+    data: COMPLETE_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.getByText("Row pitch")).toBeInTheDocument()
+  expect(screen.getByText("6.5 m")).toBeInTheDocument()
+  expect(screen.getByText("GCR")).toBeInTheDocument()
+  expect(screen.getByText("0.346")).toBeInTheDocument()
+  expect(screen.getByText("Inverter capacity")).toBeInTheDocument()
+  expect(screen.getByText("29.12 kWp")).toBeInTheDocument()
 })
