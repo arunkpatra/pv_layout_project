@@ -93,11 +93,17 @@ const navMain = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useUser()
   const { data, isLoading } = useProjects()
-  const clerkUser = {
-    name: user?.fullName ?? user?.username ?? "User",
-    email: user?.primaryEmailAddress?.emailAddress ?? "",
-    avatar: user?.imageUrl || undefined,
+
+  // Latch last known user so sign-out transition doesn't flicker to defaults
+  const latchedUser = React.useRef({ name: "User", email: "", avatar: undefined as string | undefined })
+  if (user) {
+    latchedUser.current = {
+      name: user.fullName ?? user.username ?? "User",
+      email: user.primaryEmailAddress?.emailAddress ?? "",
+      avatar: user.imageUrl || undefined,
+    }
   }
+  const clerkUser = latchedUser.current
 
   return (
     <Sidebar collapsible="icon" {...props}>
