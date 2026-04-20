@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@renewable-energy/ui/components/select"
+import { Switch } from "@renewable-energy/ui/components/switch"
 
 // ─── Zod schema ──────────────────────────────────────────────────────────────
 
@@ -130,6 +131,60 @@ function NumericField({
   )
 }
 
+// ─── OverrideField helper ─────────────────────────────────────────────────────
+
+function OverrideField({
+  id,
+  label,
+  unit,
+  enabled,
+  onToggle,
+  field,
+  error,
+}: {
+  id: string
+  label: string
+  unit?: string
+  enabled: boolean
+  onToggle: (on: boolean) => void
+  field: { value: number | null; onChange: (v: number | null) => void }
+  error?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <Switch
+          id={`${id}-switch`}
+          checked={enabled}
+          onCheckedChange={onToggle}
+          aria-label={`Override ${label}`}
+        />
+        <Label htmlFor={id} className={enabled ? "" : "text-muted-foreground"}>
+          {label}
+        </Label>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          id={id}
+          type="number"
+          step="any"
+          disabled={!enabled}
+          placeholder="Auto"
+          value={field.value ?? ""}
+          onChange={(e) =>
+            field.onChange(e.target.value ? Number(e.target.value) : null)
+          }
+          className="flex-1"
+        />
+        {unit && (
+          <span className="text-sm text-muted-foreground shrink-0">{unit}</span>
+        )}
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function NewVersionForm({ projectId }: { projectId: string }) {
@@ -148,7 +203,6 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
   const [rowSpacingOverride, setRowSpacingOverride] = React.useState(false)
   const [gcrOverride, setGcrOverride] = React.useState(false)
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { handleSubmit, register, control, setValue, formState: { errors } } =
     useForm<NewVersionFormValues>({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -278,14 +332,6 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
       )}
     </Button>
   )
-
-  // Suppress unused variable warnings for state setters used in later tasks
-  void tiltOverride
-  void setTiltOverride
-  void rowSpacingOverride
-  void setRowSpacingOverride
-  void gcrOverride
-  void setGcrOverride
 
   return (
     <div className="flex gap-8">
@@ -475,9 +521,69 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
             </div>
           </section>
           <section id="layout">
-            <h2 className="text-base font-semibold mb-4 pb-2 border-b">
-              Layout
-            </h2>
+            <h2 className="text-base font-semibold mb-4 pb-2 border-b">Layout</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Controller
+                control={control}
+                name="tilt_angle"
+                render={({ field }) => (
+                  <OverrideField
+                    id="tilt-angle"
+                    label="Tilt angle"
+                    unit="°"
+                    enabled={tiltOverride}
+                    onToggle={(on) => {
+                      setTiltOverride(on)
+                      setValue("tilt_angle", on ? 20 : null)
+                    }}
+                    field={field}
+                    error={errors.tilt_angle?.message}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="row_spacing"
+                render={({ field }) => (
+                  <OverrideField
+                    id="row-spacing"
+                    label="Row pitch"
+                    unit="m"
+                    enabled={rowSpacingOverride}
+                    onToggle={(on) => {
+                      setRowSpacingOverride(on)
+                      setValue("row_spacing", on ? 7.0 : null)
+                    }}
+                    field={field}
+                    error={errors.row_spacing?.message}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="gcr"
+                render={({ field }) => (
+                  <OverrideField
+                    id="gcr"
+                    label="GCR"
+                    enabled={gcrOverride}
+                    onToggle={(on) => {
+                      setGcrOverride(on)
+                      setValue("gcr", on ? 0.40 : null)
+                    }}
+                    field={field}
+                    error={errors.gcr?.message}
+                  />
+                )}
+              />
+              <NumericField
+                id="road-width"
+                label="Perimeter road width"
+                unit="m"
+                register={register("perimeter_road_width", { valueAsNumber: true })}
+                error={errors.perimeter_road_width?.message}
+              />
+            </div>
           </section>
           <section id="inverter">
             <h2 className="text-base font-semibold mb-4 pb-2 border-b">Inverter</h2>

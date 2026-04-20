@@ -64,3 +64,23 @@ test("pre-fills module defaults", () => {
   const wattageInput = screen.getByLabelText(/wattage/i) as HTMLInputElement
   expect(wattageInput.value).toBe("580")
 })
+
+test("tilt_angle, row_spacing, gcr are null when auto-override switches are off", async () => {
+  render(<NewVersionForm projectId="prj_1" />, { wrapper: createWrapper() })
+  const file = new File(["x"], "site.kmz", {})
+  await act(async () => {
+    fireEvent.change(
+      document.querySelector('input[type="file"]') as HTMLInputElement,
+      { target: { files: [file] } },
+    )
+  })
+  const form = document.querySelector("form")!
+  await act(async () => { fireEvent.submit(form) })
+  await waitFor(() => expect(mockMutateAsync).toHaveBeenCalled())
+  const call = mockMutateAsync.mock.calls[0]
+  expect(call).toBeDefined()
+  const { inputSnapshot } = call![0]
+  expect(inputSnapshot.tilt_angle).toBeNull()
+  expect(inputSnapshot.row_spacing).toBeNull()
+  expect(inputSnapshot.gcr).toBeNull()
+})
