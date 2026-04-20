@@ -24,7 +24,7 @@ export default function VersionDetailPage() {
       },
       { label: version ? `Run #${version.number}` : "Run" },
     ])
-  }, [setBreadcrumbs, project?.name, projectId, version])
+  }, [setBreadcrumbs, project?.name, projectId, version?.number])
 
   return (
     <div className="flex flex-col gap-6">
