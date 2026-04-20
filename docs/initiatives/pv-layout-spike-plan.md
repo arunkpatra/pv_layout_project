@@ -95,7 +95,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 3f | [Production End-to-End Test](#spike-3f--production-end-to-end-test) | complete | Spike 3e |
 | 3g | [Lambda Performance Investigation](#spike-3g--lambda-performance-investigation) | complete | Spike 3f |
 | 4a | [API + api-client Data Layer](#spike-4a--api--api-client-data-layer) | complete | Spike 3g |
-| 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | in-progress | Spike 4a |
+| 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | complete | Spike 4a |
 | 4c | [Version Submission Form](#spike-4c--version-submission-form) | planned | Spike 4b |
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | planned | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | planned | Spike 4d |
@@ -923,7 +923,7 @@ See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 1–
 
 ## Spike 4b — Projects List + Create Project
 
-**Status:** in-progress  
+**Status:** complete — verified in local dev and production on 2026-04-20  
 **Depends on:** Spike 4a
 
 ### What we're building
@@ -940,16 +940,16 @@ The projects list page, the "New project" modal, dynamic breadcrumbs wired to ev
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] `/dashboard` shows the cockpit overview page (not a redirect)
-- [ ] `/dashboard/projects` shows the projects list
-- [ ] Projects list shows real projects from API (name, version count, latest status)
-- [ ] Sidebar "Projects" section shows real project names with correct links
-- [ ] "New project" modal opens, accepts name, creates project via API, redirects to project detail
-- [ ] Breadcrumb shows "Projects" on the list page; updates dynamically on nested pages
-- [ ] Skeleton state shown while projects are loading
-- [ ] Sidebar footer shows skeleton while Clerk loads and during sign-out (no "User" text flash)
-- [ ] Verified in local dev and production
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] `/dashboard` shows the cockpit overview page (not a redirect)
+- [x] `/dashboard/projects` shows the projects list
+- [x] Projects list shows real projects from API (name, version count, latest status)
+- [x] Sidebar "Projects" section shows real project names with correct links
+- [x] "New project" modal opens, accepts name, creates project via API, redirects to project detail
+- [x] Breadcrumb shows "Projects" on the list page; updates dynamically on nested pages
+- [x] Skeleton state shown while projects are loading
+- [x] Sidebar footer shows skeleton while Clerk loads and during sign-out (no "User" text flash)
+- [x] Verified in local dev and production
 
 ### Implementation Plan
 
@@ -1386,4 +1386,5 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 4a | `paginationArgs` extended to return `{ skip, take, page, pageSize }` so callers use the normalised values directly. Service functions must destructure all four values — never re-derive `page` or `pageSize` inline after calling `paginationArgs`. | Duplicate inline clamping would diverge from `paginationArgs` if defaults ever change. Single source of truth prevents silent pagination bugs. |
 | 2026-04-20 | 4b | `/dashboard` is the cockpit (stats, quick navigation), not a redirect to `/dashboard/projects`. The original 4b plan specified a server-side redirect, but the product intent is for `/dashboard` to be the top-level overview — a command centre the user lands on after login — with `/dashboard/projects` as one section within the app. The cockpit page will be built out with real stats and navigation in a future spike. | Raised during spike 4b local verification. A redirect wastes the route and gives the user no landing context. The cockpit pattern is standard in B2B SaaS (Stripe, Vercel, Linear all have a top-level overview distinct from sub-section lists). |
 | 2026-04-20 | 4b | `NavUser` sidebar footer uses `!isLoaded \|\| !user` guard to show a skeleton rather than the "User" fallback. Clerk's `useUser()` returns `user: null` on both initial client hydration and during sign-out. Without the guard, the fallback text flashes on every page load and every sign-out. | Discovered during spike 4b local and production verification. The fix follows Clerk's recommended `isLoaded` check pattern. |
+| 2026-04-20 | 4b | `SidebarMenuSkeleton` (shadcn) uses `Math.random()` inside its `useState` initializer to randomise the skeleton width. This runs on the server and again on the client during hydration, producing different values and a React hydration mismatch. Fix: the `mounted` guard must live inside the component that renders `SidebarMenuSkeleton` (`NavProjects`), not in a parent prop. When `mounted=false` (SSR and before first client paint), the skeleton branch is skipped entirely — server HTML never contains a `SidebarMenuSkeleton`. | Any shadcn component that uses `Math.random()` or `Date.now()` in a `useState` initializer will cause hydration mismatch if rendered during SSR. The guard must be co-located with the render site, not hoisted to a parent. |
 | 2026-04-20 | 4 | Version detail polling follows ADR-003: `refetchInterval` is a function receiving `query.state.data`; returns `false` at terminal state (COMPLETE/FAILED), `~3000 ms` (with 10% jitter) otherwise. `staleTime` 1 s active / 2 min terminal. No retry on 4xx; up to 3 retries on 5xx. | ADR-003 establishes the project polling standard. Consistent with how Journium handles long-running process polling. Jitter prevents thundering herd from multiple browser tabs. |
