@@ -8,7 +8,7 @@ import { Switch } from "@renewable-energy/ui/components/switch"
 import {
   TransformWrapper,
   TransformComponent,
-  type ReactZoomPanPinchRef,
+  type ReactZoomPanPinchContentRef,
 } from "react-zoom-pan-pinch"
 
 type Rotation = 0 | 90 | 180 | 270
@@ -57,7 +57,7 @@ export function SvgPreview({ svgUrl }: SvgPreviewProps) {
     new Set(),
   )
 
-  const transformRef = React.useRef<ReactZoomPanPinchRef>(null)
+  const transformRef = React.useRef<ReactZoomPanPinchContentRef>(null)
   const svgWrapperRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
