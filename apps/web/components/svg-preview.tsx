@@ -37,9 +37,6 @@ export function SvgPreview({ svgUrl }: SvgPreviewProps) {
 
   React.useEffect(() => {
     let cancelled = false
-    setStatus("loading")
-    setSvgContent("")
-    setDims(null)
 
     fetch(svgUrl)
       .then((res) => {
@@ -116,7 +113,12 @@ export function SvgPreview({ svgUrl }: SvgPreviewProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setRetryCount((c) => c + 1)}
+            onClick={() => {
+              setStatus("loading")
+              setSvgContent("")
+              setDims(null)
+              setRetryCount((c) => c + 1)
+            }}
           >
             Retry
           </Button>
