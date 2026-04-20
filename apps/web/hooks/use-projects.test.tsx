@@ -39,5 +39,5 @@ test("returns paginated project list", async () => {
   const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() })
   await waitFor(() => expect(result.current.isSuccess).toBe(true))
   expect(result.current.data?.items).toHaveLength(1)
-  expect(result.current.data?.items[0].name).toBe("Alpha Site")
+  expect(result.current.data?.items[0]?.name).toBe("Alpha Site")
 })
