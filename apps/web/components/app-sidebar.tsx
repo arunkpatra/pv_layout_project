@@ -94,23 +94,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useUser()
   const { data, isLoading } = useProjects()
 
-  // Latch last known user so sign-out transition doesn't flicker to defaults
-  const [clerkUser, setClerkUser] = React.useState({
-    name: "User",
-    email: "",
-    avatar: undefined as string | undefined,
-  })
-  React.useEffect(() => {
-    if (user) {
-      // Syncing external Clerk state to local state — intentional pattern
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setClerkUser({
-        name: user.fullName ?? user.username ?? "User",
-        email: user.primaryEmailAddress?.emailAddress ?? "",
-        avatar: user.imageUrl || undefined,
-      })
-    }
-  }, [user])
+  const clerkUser = {
+    name: user?.fullName ?? user?.username ?? "User",
+    email: user?.primaryEmailAddress?.emailAddress ?? "",
+    avatar: user?.imageUrl || undefined,
+  }
 
   return (
     <Sidebar collapsible="icon" {...props}>
