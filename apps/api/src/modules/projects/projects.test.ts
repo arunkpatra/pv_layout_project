@@ -186,9 +186,8 @@ describe("listProjects", () => {
     expect(result.items[0]!.versionCount).toBe(0)
   })
 
-  test("passes pagination params through", async () => {
+  test("passes pagination params through $transaction", async () => {
     await listProjects(mockDbProject.userId, { page: 2, pageSize: 5 })
-    expect(result => result).toBeDefined() // transaction was called
     expect(mockDbTransaction).toHaveBeenCalledTimes(1)
   })
 })
