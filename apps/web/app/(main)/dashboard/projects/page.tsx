@@ -48,14 +48,13 @@ function ProjectsPageInner() {
     setBreadcrumbs([{ label: "Projects" }])
   }, [setBreadcrumbs])
 
-  const searchParamsString = searchParams.toString()
   React.useEffect(() => {
     if (data && data.totalPages > 0 && page > data.totalPages) {
-      const p = new URLSearchParams(searchParamsString)
+      const p = new URLSearchParams(searchParams.toString())
       p.set("page", String(data.totalPages))
       router.replace(`/dashboard/projects?${p.toString()}`)
     }
-  }, [data, page, router, searchParamsString])
+  }, [data, page, router, searchParams])
 
   function handleCreated(project: Project) {
     router.push(`/dashboard/projects/${project.id}`)

@@ -47,14 +47,13 @@ function ProjectDetailInner() {
     ])
   }, [setBreadcrumbs, project?.name])
 
-  const searchParamsString = searchParams.toString()
   React.useEffect(() => {
     if (data && data.totalPages > 0 && page > data.totalPages) {
-      const p = new URLSearchParams(searchParamsString)
+      const p = new URLSearchParams(searchParams.toString())
       p.set("page", String(data.totalPages))
       router.replace(`/dashboard/projects/${projectId}?${p.toString()}`)
     }
-  }, [data, page, router, searchParamsString, projectId])
+  }, [data, page, router, searchParams, projectId])
 
   return (
     <div className="flex flex-col gap-6">
