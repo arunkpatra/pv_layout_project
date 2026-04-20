@@ -1,5 +1,16 @@
-import type { Project, VersionDetail, CreateProjectInput } from "@renewable-energy/shared"
+import type {
+  Project,
+  ProjectSummary,
+  VersionDetail,
+  CreateProjectInput,
+  PaginatedResponse,
+} from "@renewable-energy/shared"
 import type { ApiClient } from "./client.js"
+
+export interface PaginationParams {
+  page?: number
+  pageSize?: number
+}
 
 export interface CreateVersionParams {
   projectId: string
@@ -8,12 +19,28 @@ export interface CreateVersionParams {
   kmzFile?: File
 }
 
+function buildUrl(
+  base: string,
+  params: Record<string, string | number | undefined>,
+): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value))
+  }
+  const qs = search.toString()
+  return qs ? `${base}?${qs}` : base
+}
+
 export function createProjectsClient(client: ApiClient) {
   const { request, upload } = client
 
   return {
-    listProjects(): Promise<Project[]> {
-      return request<Project[]>("/projects")
+    listProjects(
+      params?: PaginationParams,
+    ): Promise<PaginatedResponse<ProjectSummary>> {
+      return request<PaginatedResponse<ProjectSummary>>(
+        buildUrl("/projects", { page: params?.page, pageSize: params?.pageSize }),
+      )
     },
 
     getProject(projectId: string): Promise<Project> {
@@ -29,6 +56,18 @@ export function createProjectsClient(client: ApiClient) {
 
     deleteProject(projectId: string): Promise<null> {
       return request<null>(`/projects/${projectId}`, { method: "DELETE" })
+    },
+
+    listVersions(
+      projectId: string,
+      params?: PaginationParams,
+    ): Promise<PaginatedResponse<VersionDetail>> {
+      return request<PaginatedResponse<VersionDetail>>(
+        buildUrl(`/projects/${projectId}/versions`, {
+          page: params?.page,
+          pageSize: params?.pageSize,
+        }),
+      )
     },
 
     createVersion(params: CreateVersionParams): Promise<VersionDetail> {
