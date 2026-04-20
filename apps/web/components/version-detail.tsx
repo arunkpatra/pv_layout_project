@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Loader2 } from "lucide-react"
+import { Download, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@renewable-energy/ui/components/alert"
 import { Button } from "@renewable-energy/ui/components/button"
 import { VersionStatusBadge } from "./version-status-badge"
@@ -150,6 +150,34 @@ function CompleteState({ version }: { version: VersionDetailType }) {
         <>
           {version.svgPresignedUrl && (
             <SvgPreview svgUrl={version.svgPresignedUrl} />
+          )}
+          {(version.kmzDownloadUrl || version.dxfDownloadUrl || version.svgDownloadUrl) && (
+            <div className="flex gap-2">
+              {version.kmzDownloadUrl && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={version.kmzDownloadUrl} download="layout.kmz">
+                    <Download className="mr-2 h-4 w-4" />
+                    KMZ
+                  </a>
+                </Button>
+              )}
+              {version.dxfDownloadUrl && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={version.dxfDownloadUrl} download="layout.dxf">
+                    <Download className="mr-2 h-4 w-4" />
+                    DXF
+                  </a>
+                </Button>
+              )}
+              {version.svgDownloadUrl && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={version.svgDownloadUrl} download="layout.svg">
+                    <Download className="mr-2 h-4 w-4" />
+                    SVG
+                  </a>
+                </Button>
+              )}
+            </div>
           )}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {METRIC_LABELS.map(({ key, label, unit }) => (
