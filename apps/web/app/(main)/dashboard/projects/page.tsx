@@ -2,10 +2,12 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { useProjects } from "@/hooks/use-projects"
 import { useBreadcrumbs } from "@/contexts/breadcrumbs-context"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
+import { PaginationControls } from "@/components/pagination-controls"
 import { Badge } from "@renewable-energy/ui/components/badge"
 import { Skeleton } from "@renewable-energy/ui/components/skeleton"
 import { LayoutGrid } from "lucide-react"
@@ -29,14 +31,30 @@ function StatusBadge({ status }: { status: string | null }) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>
 }
 
-export default function ProjectsPage() {
+function ProjectsPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { setBreadcrumbs } = useBreadcrumbs()
-  const { data, isLoading } = useProjects()
+
+  const rawPage = parseInt(searchParams.get("page") ?? "", 10)
+  const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1
+  const rawPageSize = parseInt(searchParams.get("pageSize") ?? "", 10)
+  const pageSize =
+    Number.isFinite(rawPageSize) ? Math.min(100, Math.max(5, rawPageSize)) : 10
+
+  const { data, isLoading } = useProjects({ page, pageSize })
 
   React.useEffect(() => {
     setBreadcrumbs([{ label: "Projects" }])
   }, [setBreadcrumbs])
+
+  React.useEffect(() => {
+    if (data && data.totalPages > 0 && page > data.totalPages) {
+      const p = new URLSearchParams(searchParams.toString())
+      p.set("page", String(data.totalPages))
+      router.replace(`/dashboard/projects?${p.toString()}`)
+    }
+  }, [data, page, router, searchParams])
 
   function handleCreated(project: Project) {
     router.push(`/dashboard/projects/${project.id}`)
@@ -63,25 +81,41 @@ export default function ProjectsPage() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {data.items.map((project) => (
-            <Link
-              key={project.id}
-              href={`/dashboard/projects/${project.id}`}
-              className="flex items-center justify-between rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{project.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {project.versionCount}{" "}
-                  {project.versionCount === 1 ? "version" : "versions"}
-                </span>
-              </div>
-              <StatusBadge status={project.latestVersionStatus} />
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-2">
+            {data.items.map((project) => (
+              <Link
+                key={project.id}
+                href={`/dashboard/projects/${project.id}`}
+                className="flex items-center justify-between rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent"
+              >
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium">{project.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {project.versionCount}{" "}
+                    {project.versionCount === 1 ? "version" : "versions"}
+                  </span>
+                </div>
+                <StatusBadge status={project.latestVersionStatus} />
+              </Link>
+            ))}
+          </div>
+          <PaginationControls
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            totalPages={data.totalPages}
+          />
+        </>
       )}
     </div>
+  )
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense>
+      <ProjectsPageInner />
+    </Suspense>
   )
 }
