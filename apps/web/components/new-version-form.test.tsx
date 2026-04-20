@@ -56,3 +56,11 @@ test("displays filename after KMZ file is selected", async () => {
   })
   expect(screen.getByText(/site\.kmz/)).toBeDefined()
 })
+
+test("pre-fills module defaults", () => {
+  render(<NewVersionForm projectId="prj_1" />, { wrapper: createWrapper() })
+  const moduleLengthInput = screen.getByLabelText(/module length/i) as HTMLInputElement
+  expect(moduleLengthInput.value).toBe("2.38")
+  const wattageInput = screen.getByLabelText(/wattage/i) as HTMLInputElement
+  expect(wattageInput.value).toBe("580")
+})

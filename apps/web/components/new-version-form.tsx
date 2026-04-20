@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useRouter } from "next/navigation"
@@ -12,6 +12,13 @@ import { Input } from "@renewable-energy/ui/components/input"
 import { Label } from "@renewable-energy/ui/components/label"
 import { cn } from "@renewable-energy/ui/lib/utils"
 import { Upload, X } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@renewable-energy/ui/components/select"
 
 // ─── Zod schema ──────────────────────────────────────────────────────────────
 
@@ -94,6 +101,34 @@ const SECTIONS = [
   { id: "inverter", label: "Inverter" },
   { id: "energy-losses", label: "Energy losses" },
 ] as const
+
+// ─── NumericField helper ──────────────────────────────────────────────────────
+
+function NumericField({
+  id,
+  label,
+  unit,
+  register: reg,
+  error,
+}: {
+  id: string
+  label: string
+  unit?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  register: any
+  error?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input id={id} type="number" step="any" className="flex-1" {...reg} />
+        {unit && <span className="text-sm text-muted-foreground shrink-0">{unit}</span>}
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -372,14 +407,72 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
             </div>
           </section>
           <section id="module">
-            <h2 className="text-base font-semibold mb-4 pb-2 border-b">
-              Module
-            </h2>
+            <h2 className="text-base font-semibold mb-4 pb-2 border-b">Module</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <NumericField
+                id="module-length"
+                label="Module length"
+                unit="m"
+                register={register("module_length", { valueAsNumber: true })}
+                error={errors.module_length?.message}
+              />
+              <NumericField
+                id="module-width"
+                label="Module width"
+                unit="m"
+                register={register("module_width", { valueAsNumber: true })}
+                error={errors.module_width?.message}
+              />
+              <NumericField
+                id="module-wattage"
+                label="Wattage"
+                unit="Wp"
+                register={register("module_wattage", { valueAsNumber: true })}
+                error={errors.module_wattage?.message}
+              />
+            </div>
           </section>
           <section id="table-config">
-            <h2 className="text-base font-semibold mb-4 pb-2 border-b">
-              Table config
-            </h2>
+            <h2 className="text-base font-semibold mb-4 pb-2 border-b">Table config</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="orientation">Orientation</Label>
+                <Controller
+                  control={control}
+                  name="orientation"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="orientation">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="portrait">Portrait</SelectItem>
+                        <SelectItem value="landscape">Landscape</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <NumericField
+                id="modules-in-row"
+                label="Modules per row"
+                register={register("modules_in_row", { valueAsNumber: true })}
+                error={errors.modules_in_row?.message}
+              />
+              <NumericField
+                id="rows-per-table"
+                label="Rows per table"
+                register={register("rows_per_table", { valueAsNumber: true })}
+                error={errors.rows_per_table?.message}
+              />
+              <NumericField
+                id="table-gap-ew"
+                label="East–west gap"
+                unit="m"
+                register={register("table_gap_ew", { valueAsNumber: true })}
+                error={errors.table_gap_ew?.message}
+              />
+            </div>
           </section>
           <section id="layout">
             <h2 className="text-base font-semibold mb-4 pb-2 border-b">
@@ -387,9 +480,15 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
             </h2>
           </section>
           <section id="inverter">
-            <h2 className="text-base font-semibold mb-4 pb-2 border-b">
-              Inverter
-            </h2>
+            <h2 className="text-base font-semibold mb-4 pb-2 border-b">Inverter</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <NumericField
+                id="max-strings"
+                label="Max strings per inverter"
+                register={register("max_strings_per_inverter", { valueAsNumber: true })}
+                error={errors.max_strings_per_inverter?.message}
+              />
+            </div>
           </section>
           <section id="energy-losses">
             <h2 className="text-base font-semibold mb-4 pb-2 border-b">
