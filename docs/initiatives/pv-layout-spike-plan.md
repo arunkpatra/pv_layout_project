@@ -96,7 +96,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 3g | [Lambda Performance Investigation](#spike-3g--lambda-performance-investigation) | complete | Spike 3f |
 | 4a | [API + api-client Data Layer](#spike-4a--api--api-client-data-layer) | complete | Spike 3g |
 | 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | complete | Spike 4a |
-| 4c | [Version Submission Form](#spike-4c--version-submission-form) | planned | Spike 4b |
+| 4c | [Version Submission Form](#spike-4c--version-submission-form) | complete | Spike 4b |
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | planned | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | planned | Spike 4d |
 | 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
@@ -959,7 +959,7 @@ See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 7–
 
 ## Spike 4c — Version Submission Form
 
-**Status:** planned  
+**Status:** complete — verified local + production 2026-04-20  
 **Depends on:** Spike 4b
 
 ### What we're building
@@ -986,14 +986,14 @@ The 27-parameter version submission form at `/dashboard/projects/[projectId]/new
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] All 27 parameters visible with correct defaults on page load
-- [ ] Every parameter has a tooltip — verified by clicking each one
-- [ ] KMZ drag-and-drop: drop a `.kmz` file → filename and size displayed
-- [ ] Submitting with defaults → version created → redirected to version detail page
-- [ ] Desktop (≥1024 px): sticky left-nav visible and scrolls to section on click
-- [ ] Tablet (768 px): chip nav visible, left-nav hidden
-- [ ] Error on failed submission: domain-specific message, not raw HTTP error
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] All 27 parameters visible with correct defaults on page load
+- [x] Every parameter has a tooltip — verified by clicking each one
+- [x] KMZ drag-and-drop: drop a `.kmz` file → filename and size displayed
+- [x] Submitting with defaults → version created → redirected to version detail page
+- [x] Desktop (≥1024 px): sticky left-nav visible and scrolls to section on click
+- [x] Tablet (768 px): chip nav visible, left-nav hidden
+- [x] Error on failed submission: domain-specific message, not raw HTTP error
 
 ### Implementation Plan
 
@@ -1382,6 +1382,8 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 4 | Version submission form uses a sticky left-nav section-jump pattern (desktop) and horizontal chip nav (tablet/mobile) rather than accordion or tabs. | Solar engineers submit forms with ~27 fields spanning 5 logical sections. Section-jump nav lets them orient quickly, skip to the section they want to override, and keeps the submit button always visible without scrolling. Accordion/tabs hide content and require extra clicks. This pattern is standard in modern multi-section forms (Stripe, Notion). |
 | 2026-04-20 | 4 | `irradiance_source` is excluded from `LayoutInputSnapshot` / the version form. It is set by the energy engine (Spike 7) based on which irradiance source (PVGIS / NASA POWER / manual) was actually used, and stored on `EnergyJob.irradianceSource`. Users do not choose the irradiance source — the engine chooses automatically with fallback logic. | Including it in the form would give the user false control: they cannot force PVGIS if it is down, and the fallback sequence is an engine implementation detail. If manual override is needed in future, it can be added as an explicit feature. |
 | 2026-04-20 | 4 | `LayoutInputSnapshot` field names use Python `energy_calculator.py` `EnergyParameters` dataclass field names exactly (e.g. `inverter_eff_pct`, `dc_loss_pct`). All 27 input keys are typed fields on the interface, not `Record<string, unknown>`. | Typed snapshot catches mistakes at compile time. Using Python field names exactly means the Lambda function can deserialize `inputSnapshot` directly with zero key mapping. Consistency across the stack removes a class of bugs. |
+| 2026-04-20 | 4c | `BreadcrumbSeparator` is a `<li>` element (shadcn). Placing it inside `<BreadcrumbItem>` (also `<li>`) causes a `<li>` in `<li>` hydration error. Fix: render separator as a sibling of `BreadcrumbItem` using `React.Fragment`, not as a child. | shadcn's breadcrumb component follows WAI-ARIA where separator and item are both `<li>` siblings inside `<ol>`. Nesting them breaks HTML validity and triggers React hydration mismatches. |
+| 2026-04-20 | 4c | `zod@4.x` + `@hookform/resolvers@5.x` type-compatibility: `zodResolver(schema as any)` cast required. Runtime works correctly; TypeScript objects due to minor version mismatch in internal zod/v4/core types. | Cast is the minimal fix. Will resolve when hookform/resolvers ships a compatible type update. |
 | 2026-04-20 | 4a | `LayoutInputSnapshot` initial draft used descriptive TypeScript names (e.g. `module_long`, `tilt_deg`, `road_width_m`) that did not match the Python Lambda's `_params_from_dict` keys. 16 of 27 fields were wrong — would have caused silent default fallbacks in production. Corrected to exact Python names: `module_length`, `tilt_angle`, `perimeter_road_width`, etc. | Cross-verified against `apps/layout-engine/src/handlers.py` `_params_from_dict` and `/Users/arunkpatra/codebase/PVlayout_Advance/models/project.py` `EnergyParameters`. Field names must be verified against Python source, not inferred. |
 | 2026-04-20 | 4a | `paginationArgs` extended to return `{ skip, take, page, pageSize }` so callers use the normalised values directly. Service functions must destructure all four values — never re-derive `page` or `pageSize` inline after calling `paginationArgs`. | Duplicate inline clamping would diverge from `paginationArgs` if defaults ever change. Single source of truth prevents silent pagination bugs. |
 | 2026-04-20 | 4b | `/dashboard` is the cockpit (stats, quick navigation), not a redirect to `/dashboard/projects`. The original 4b plan specified a server-side redirect, but the product intent is for `/dashboard` to be the top-level overview — a command centre the user lands on after login — with `/dashboard/projects` as one section within the app. The cockpit page will be built out with real stats and navigation in a future spike. | Raised during spike 4b local verification. A redirect wastes the route and gives the user no landing context. The cockpit pattern is standard in B2B SaaS (Stripe, Vercel, Linear all have a top-level overview distinct from sub-section lists). |
