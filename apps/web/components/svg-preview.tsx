@@ -174,9 +174,13 @@ export function SvgPreview({ svgUrl }: SvgPreviewProps) {
         {status === "loaded" && (
           <TransformWrapper ref={transformRef}>
             <TransformComponent
-              wrapperStyle={{ position: "absolute", inset: 0 }}
+              wrapperStyle={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+              }}
               contentStyle={{
-                position: "relative",
                 width: "100%",
                 height: "100%",
               }}
