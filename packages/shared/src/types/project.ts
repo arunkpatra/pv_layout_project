@@ -44,6 +44,7 @@ export interface VersionDetail {
   energyJob: EnergyJobSummary | null
   createdAt: string
   updatedAt: string
+  svgPresignedUrl: string | null
 }
 
 export interface ProjectSummary extends Project {

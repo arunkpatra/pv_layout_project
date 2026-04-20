@@ -17,6 +17,7 @@ const BASE_VERSION: VersionDetailType = {
   energyJob: null,
   createdAt: new Date(Date.now() - 30_000).toISOString(),
   updatedAt: new Date(Date.now() - 30_000).toISOString(),
+  svgPresignedUrl: null,
 }
 
 const COMPLETE_VERSION: VersionDetailType = {

@@ -62,6 +62,7 @@ function makeVersion(overrides: Partial<VersionDetail> = {}): VersionDetail {
     energyJob: null,
     createdAt: "2026-04-20T00:00:00Z",
     updatedAt: "2026-04-20T00:00:00Z",
+    svgPresignedUrl: null,
     ...overrides,
   }
 }

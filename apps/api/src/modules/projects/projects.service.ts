@@ -1,5 +1,5 @@
 import { db } from "../../lib/db.js"
-import { uploadToS3 } from "../../lib/s3.js"
+import { uploadToS3, getPresignedUrl } from "../../lib/s3.js"
 import { dispatchLayoutJobHttp } from "../../lib/layout-engine.js"
 import { publishLayoutJob } from "../../lib/sqs.js"
 import { NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js"
@@ -116,7 +116,7 @@ function shapeVersion(v: {
   energyJob: Parameters<typeof shapeEnergyJob>[0]
   createdAt: Date
   updatedAt: Date
-}): VersionDetail {
+}): Omit<VersionDetail, "svgPresignedUrl"> {
   return {
     id: v.id,
     projectId: v.projectId,
@@ -204,7 +204,10 @@ export async function listVersions(
   ])
 
   return {
-    items: (versions as Parameters<typeof shapeVersion>[0][]).map(shapeVersion),
+    items: (versions as Parameters<typeof shapeVersion>[0][]).map((v) => ({
+      ...shapeVersion(v),
+      svgPresignedUrl: null,
+    })),
     ...paginationMeta({ total: total as number, page, pageSize }),
   }
 }
@@ -288,7 +291,7 @@ export async function createVersion(
       })
   }
 
-  return shapeVersion({ ...version, kmzS3Key, layoutJob, energyJob })
+  return { ...shapeVersion({ ...version, kmzS3Key, layoutJob, energyJob }), svgPresignedUrl: null }
 }
 
 export async function getVersion(
@@ -307,5 +310,11 @@ export async function getVersion(
   if (!version) throw new NotFoundError("Version", versionId)
   if (version.project.userId !== userId) throw new ForbiddenError()
 
-  return shapeVersion(version)
+  const shaped = shapeVersion(version)
+  return {
+    ...shaped,
+    svgPresignedUrl: version.layoutJob?.svgArtifactS3Key
+      ? await getPresignedUrl(version.layoutJob.svgArtifactS3Key)
+      : null,
+  }
 }
