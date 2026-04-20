@@ -58,7 +58,11 @@ function useElapsed(since: string): string {
 }
 
 function ActiveState({ version }: { version: VersionDetailType }) {
-  const elapsed = useElapsed(version.createdAt)
+  const elapsedBase =
+    version.status === "PROCESSING"
+      ? (version.layoutJob?.startedAt ?? version.createdAt)
+      : version.createdAt
+  const elapsed = useElapsed(elapsedBase)
   const message =
     version.status === "QUEUED"
       ? "Your run is queued…"
@@ -104,7 +108,7 @@ function CompleteState({ version }: { version: VersionDetailType }) {
   return (
     <div className="flex flex-col gap-6">
       <VersionStatusBadge status="COMPLETE" />
-      {stats && (
+      {stats ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           {METRIC_LABELS.map(({ key, label, unit }) => (
             <div key={key} className="rounded-lg border p-4">
@@ -116,6 +120,10 @@ function CompleteState({ version }: { version: VersionDetailType }) {
             </div>
           ))}
         </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Layout complete. Statistics are not available for this run.
+        </p>
       )}
     </div>
   )

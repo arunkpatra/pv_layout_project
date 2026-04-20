@@ -65,7 +65,7 @@ test("renders spinner and queued message when status is QUEUED", () => {
     wrapper: createWrapper(),
   })
   expect(screen.getByText(/your run is queued/i)).toBeInTheDocument()
-  expect(document.querySelector(".animate-spin")).toBeDefined()
+  expect(document.querySelector(".animate-spin")).toBeInTheDocument()
 })
 
 test("renders spinner and processing message when status is PROCESSING", () => {
@@ -78,7 +78,7 @@ test("renders spinner and processing message when status is PROCESSING", () => {
     wrapper: createWrapper(),
   })
   expect(screen.getByText(/calculating layout/i)).toBeInTheDocument()
-  expect(document.querySelector(".animate-spin")).toBeDefined()
+  expect(document.querySelector(".animate-spin")).toBeInTheDocument()
 })
 
 test("renders error alert and start new run link when status is FAILED", () => {
@@ -141,6 +141,36 @@ test("renders results grid with capacity and modules when COMPLETE", () => {
   expect(screen.getByText("120")).toBeInTheDocument()
 })
 
+test("renders complete badge with no grid when statsJson is null", () => {
+  mockUseVersion.mockReturnValue({
+    data: {
+      ...BASE_VERSION,
+      status: "COMPLETE",
+      layoutJob: {
+        id: "lj_1",
+        status: "COMPLETE",
+        kmzArtifactS3Key: "output/layout.kmz",
+        svgArtifactS3Key: "output/layout.svg",
+        dxfArtifactS3Key: "output/layout.dxf",
+        statsJson: null,
+        errorDetail: null,
+        startedAt: "2026-04-20T00:00:00Z",
+        completedAt: "2026-04-20T00:05:00Z",
+      },
+      energyJob: null,
+    },
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.queryByText("Capacity")).not.toBeInTheDocument()
+  expect(
+    screen.getByText(/statistics are not available/i),
+  ).toBeInTheDocument()
+})
+
 test("renders loading state", () => {
   mockUseVersion.mockReturnValue({
     data: undefined,
@@ -158,6 +188,18 @@ test("renders error state on query failure", () => {
     data: undefined,
     isLoading: false,
     isError: true,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.getByText(/failed to load run details/i)).toBeInTheDocument()
+})
+
+test("renders error state when data is undefined and not loading", () => {
+  mockUseVersion.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: false,
   } as ReturnType<typeof useVersion>)
   render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
     wrapper: createWrapper(),
