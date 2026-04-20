@@ -99,7 +99,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 4c | [Version Submission Form](#spike-4c--version-submission-form) | complete | Spike 4b |
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | complete | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | complete | Spike 4d |
-| 5a | [Stats Dashboard](#spike-5a--stats-dashboard) | planned | Spike 4 |
+| 5a | [Stats Dashboard](#spike-5a--stats-dashboard) | complete | Spike 4 |
 | 5b | [SVG Fetch + Render](#spike-5b--svg-fetch--render) | complete | Spike 5a |
 | 5c | [Zoom/Pan + Layer Toggles](#spike-5c--zoompan--layer-toggles) | complete | Spike 5b |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5b |
@@ -1075,7 +1075,7 @@ URL-based pagination (`?page=N&pageSize=N`) on both the projects list and projec
 
 ## Spike 5a — Stats Dashboard
 
-**Status:** planned  
+**Status:** complete  
 **Depends on:** Spike 4
 
 ### What we're building
@@ -1117,10 +1117,10 @@ Shown once `energyJob.status === "COMPLETE"`. Shown as a "pending" card section 
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] All layout stat cards display correct values (verified against a real completed run)
-- [ ] Energy stats section shows "pending" state when energy job not yet complete
-- [ ] Energy stats section populates correctly when `energyJob.statsJson` is present
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] All layout stat cards display correct values (verified against a real completed run)
+- [x] Energy stats section shows "pending" state when energy job not yet complete
+- [ ] Energy stats section populates correctly when `energyJob.statsJson` is present (pending Spike 7)
 
 ---
 
