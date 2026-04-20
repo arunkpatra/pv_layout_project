@@ -70,6 +70,9 @@ def _build_stats(results: List[LayoutResult]) -> dict:
         "total_dc_cable_m": round(sum(r.total_dc_cable_m for r in results), 1),
         "total_ac_cable_m": round(sum(r.total_ac_cable_m for r in results), 1),
         "num_las": sum(r.num_las for r in results),
+        "row_pitch_m": round(results[0].row_pitch_m, 2),
+        "gcr_achieved": round(results[0].gcr_achieved, 3),
+        "inverter_capacity_kwp": round(results[0].inverter_capacity_kwp, 2),
     }
 
 

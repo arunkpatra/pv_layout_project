@@ -20,6 +20,23 @@ def _make_parse_result():
     return r
 
 
+def _make_layout_result():
+    r = MagicMock()
+    r.placed_tables = [object()]
+    r.total_modules = 100
+    r.total_capacity_mwp = 0.05
+    r.total_area_acres = 1.0
+    r.placed_icrs = [object()]
+    r.num_string_inverters = 2
+    r.total_dc_cable_m = 400.0
+    r.total_ac_cable_m = 100.0
+    r.num_las = 2
+    r.row_pitch_m = 6.5
+    r.gcr_achieved = 0.3456
+    r.inverter_capacity_kwp = 25.0
+    return r
+
+
 _VERSION_ID = "ver_abc"
 _PROJECT_ID = "prj_xyz"
 _KMZ_KEY = f"projects/{_PROJECT_ID}/versions/{_VERSION_ID}/input.kmz"
@@ -35,7 +52,7 @@ def test_handle_layout_job_reads_version_from_db():
         patch("handlers.download_from_s3"),
         patch("handlers.upload_to_s3"),
         patch("handlers.parse_kmz", return_value=_make_parse_result()),
-        patch("handlers.run_layout_multi", return_value=[]),
+        patch("handlers.run_layout_multi", return_value=[_make_layout_result()]),
         patch("handlers.place_string_inverters"),
         patch("handlers.place_lightning_arresters"),
         patch("handlers.export_kmz"),
@@ -58,7 +75,7 @@ def test_handle_layout_job_transitions_processing_then_complete():
         patch("handlers.download_from_s3"),
         patch("handlers.upload_to_s3"),
         patch("handlers.parse_kmz", return_value=_make_parse_result()),
-        patch("handlers.run_layout_multi", return_value=[]),
+        patch("handlers.run_layout_multi", return_value=[_make_layout_result()]),
         patch("handlers.place_string_inverters"),
         patch("handlers.place_lightning_arresters"),
         patch("handlers.export_kmz"),
@@ -83,7 +100,7 @@ def test_handle_layout_job_uploads_three_artifacts_with_correct_prefix():
         patch("handlers.download_from_s3"),
         patch("handlers.upload_to_s3") as mock_ul,
         patch("handlers.parse_kmz", return_value=_make_parse_result()),
-        patch("handlers.run_layout_multi", return_value=[]),
+        patch("handlers.run_layout_multi", return_value=[_make_layout_result()]),
         patch("handlers.place_string_inverters"),
         patch("handlers.place_lightning_arresters"),
         patch("handlers.export_kmz"),
@@ -171,7 +188,7 @@ def test_handle_layout_job_processing_called_before_complete():
         patch("handlers.download_from_s3"),
         patch("handlers.upload_to_s3"),
         patch("handlers.parse_kmz", return_value=_make_parse_result()),
-        patch("handlers.run_layout_multi", return_value=[]),
+        patch("handlers.run_layout_multi", return_value=[_make_layout_result()]),
         patch("handlers.place_string_inverters"),
         patch("handlers.place_lightning_arresters"),
         patch("handlers.export_kmz"),
@@ -182,3 +199,39 @@ def test_handle_layout_job_processing_called_before_complete():
         handle_layout_job(_VERSION_ID)
 
     assert call_order == ["processing", "complete"]
+
+
+def test_build_stats_includes_all_12_fields():
+    """_build_stats returns row_pitch_m, gcr_achieved, inverter_capacity_kwp from results[0]."""
+    from handlers import _build_stats
+    from unittest.mock import MagicMock
+
+    r = MagicMock()
+    r.placed_tables = [object(), object(), object()]  # len 3
+    r.total_modules = 100
+    r.total_capacity_mwp = 0.058
+    r.total_area_acres = 1.5
+    r.placed_icrs = [object()]  # len 1
+    r.num_string_inverters = 4
+    r.total_dc_cable_m = 500.0
+    r.total_ac_cable_m = 120.0
+    r.num_las = 3
+    r.row_pitch_m = 6.5
+    r.gcr_achieved = 0.3456
+    r.inverter_capacity_kwp = 29.12
+
+    stats = _build_stats([r])
+
+    assert stats["total_tables"] == 3
+    assert stats["total_modules"] == 100
+    assert stats["total_capacity_mwp"] == 0.058
+    assert stats["total_area_acres"] == 1.5
+    assert stats["num_icrs"] == 1
+    assert stats["num_string_inverters"] == 4
+    assert stats["total_dc_cable_m"] == 500.0
+    assert stats["total_ac_cable_m"] == 120.0
+    assert stats["num_las"] == 3
+    assert stats["row_pitch_m"] == 6.5
+    assert stats["gcr_achieved"] == 0.346
+    assert stats["inverter_capacity_kwp"] == 29.12
+    assert len(stats) == 12
