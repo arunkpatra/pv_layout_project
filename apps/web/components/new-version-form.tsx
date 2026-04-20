@@ -8,7 +8,10 @@ import { useRouter } from "next/navigation"
 import { useCreateVersion } from "@/hooks/use-create-version"
 import { Button } from "@renewable-energy/ui/components/button"
 import { Alert, AlertDescription } from "@renewable-energy/ui/components/alert"
+import { Input } from "@renewable-energy/ui/components/input"
+import { Label } from "@renewable-energy/ui/components/label"
 import { cn } from "@renewable-energy/ui/lib/utils"
+import { Upload, X } from "lucide-react"
 
 // ─── Zod schema ──────────────────────────────────────────────────────────────
 
@@ -242,8 +245,6 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
   )
 
   // Suppress unused variable warnings for state setters used in later tasks
-  void setKmzFile
-  void setKmzError
   void tiltOverride
   void setTiltOverride
   void rowSpacingOverride
@@ -305,9 +306,70 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
           )}
 
           <section id="run-setup">
-            <h2 className="text-base font-semibold mb-4 pb-2 border-b">
-              Run setup
-            </h2>
+            <h2 className="text-base font-semibold mb-4 pb-2 border-b">Run setup</h2>
+            <div className="space-y-4">
+
+              {/* KMZ upload */}
+              <div className="space-y-1.5">
+                <Label>KMZ boundary file</Label>
+                {kmzFile ? (
+                  <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                    <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate">{kmzFile.name}</span>
+                    <span className="text-muted-foreground shrink-0">
+                      {(kmzFile.size / 1024).toFixed(0)} KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setKmzFile(null); setKmzError(null) }}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Remove file"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-6 py-8 text-center cursor-pointer transition-colors hover:bg-muted/20",
+                      kmzError && "border-destructive",
+                    )}
+                  >
+                    <Upload className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Drop KMZ file here or click to browse
+                    </span>
+                    <input
+                      type="file"
+                      accept=".kmz"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null
+                        setKmzFile(f)
+                        if (f) setKmzError(null)
+                      }}
+                    />
+                  </label>
+                )}
+                {kmzError && (
+                  <p className="text-xs text-destructive">{kmzError}</p>
+                )}
+              </div>
+
+              {/* Run label */}
+              <div className="space-y-1.5">
+                <Label htmlFor="run-label">
+                  Run label{" "}
+                  <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="run-label"
+                  placeholder="e.g. Phase 1 baseline"
+                  {...register("label")}
+                />
+              </div>
+
+            </div>
           </section>
           <section id="module">
             <h2 className="text-base font-semibold mb-4 pb-2 border-b">
