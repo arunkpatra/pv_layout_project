@@ -1,4 +1,4 @@
-import { test, expect, vi, afterEach, beforeEach } from "vitest"
+import { test, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
 import { createWrapper } from "@/tests/test-utils"
 
@@ -17,6 +17,7 @@ import DOMPurify from "dompurify"
 const mockSanitize = vi.mocked(DOMPurify.sanitize)
 
 const SVG_TEXT = `<svg viewBox="0 0 800 600" width="800" height="600"><rect x="0" y="0" width="800" height="600"/></svg>`
+const WIDE_SVG_TEXT = `<svg viewBox="0 0 1200 400" width="1200" height="400"><rect x="0" y="0" width="1200" height="400"/></svg>`
 
 function makeFetch(body: string, ok = true) {
   return vi.fn(() =>
@@ -136,14 +137,43 @@ test("rotate button cycles rotation: 0 → 90 → 180 → 270 → 0", async () =
   expect(wrapper).toHaveStyle("transform: rotate(0deg)")
 
   fireEvent.click(rotateBtn)
-  expect(wrapper).toHaveStyle("transform: rotate(90deg)")
+  expect(wrapper).toHaveStyle(
+    "transform: translate(-50%, -50%) rotate(90deg)",
+  )
 
   fireEvent.click(rotateBtn)
   expect(wrapper).toHaveStyle("transform: rotate(180deg)")
 
   fireEvent.click(rotateBtn)
-  expect(wrapper).toHaveStyle("transform: rotate(270deg)")
+  expect(wrapper).toHaveStyle(
+    "transform: translate(-50%, -50%) rotate(270deg)",
+  )
 
   fireEvent.click(rotateBtn)
   expect(wrapper).toHaveStyle("transform: rotate(0deg)")
+})
+
+test("wrapper geometry swaps at 90° and restores at 180°", async () => {
+  mockSanitize.mockReturnValue(WIDE_SVG_TEXT)
+  vi.stubGlobal("fetch", makeFetch(WIDE_SVG_TEXT))
+
+  render(<SvgPreview svgUrl="https://s3.example.com/layout.svg" />, {
+    wrapper: createWrapper(),
+  })
+
+  await waitFor(() => screen.getByTestId("svg-wrapper"))
+  const wrapper = screen.getByTestId("svg-wrapper")
+  const rotateBtn = screen.getByRole("button", { name: /rotate/i })
+
+  // At 0°: non-transposed, uses inset:0 (no explicit width/height)
+  expect(wrapper).not.toHaveStyle("top: 50%")
+
+  // Rotate to 90°: transposed, wrapper uses w/h swapped percentages
+  fireEvent.click(rotateBtn)
+  expect(wrapper).toHaveStyle("top: 50%")
+  expect(wrapper).toHaveStyle("left: 50%")
+
+  // Rotate to 180°: non-transposed again
+  fireEvent.click(rotateBtn)
+  expect(wrapper).not.toHaveStyle("top: 50%")
 })

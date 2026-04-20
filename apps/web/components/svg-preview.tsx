@@ -80,13 +80,23 @@ export function SvgPreview({ svgUrl }: SvgPreviewProps) {
 
   const rotate = () => setRotation((r) => (((r + 90) % 360) as Rotation))
 
-  const wrapperStyle: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    transform: `rotate(${rotation}deg)`,
-    transition: "transform 300ms ease",
-    transformOrigin: "center center",
-  }
+  const wrapperStyle: React.CSSProperties =
+    isTransposed && dims
+      ? {
+          position: "absolute",
+          width: `${(dims.w / dims.h) * 100}%`,
+          height: `${(dims.h / dims.w) * 100}%`,
+          top: "50%",
+          left: "50%",
+          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+          transition: "transform 300ms ease",
+        }
+      : {
+          position: "absolute",
+          inset: 0,
+          transform: `rotate(${rotation}deg)`,
+          transition: "transform 300ms ease",
+        }
 
   return (
     <div
