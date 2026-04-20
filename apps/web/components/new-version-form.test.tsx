@@ -94,3 +94,56 @@ test("pre-fills energy loss defaults", () => {
   const lifetime = screen.getByLabelText(/plant lifetime/i) as HTMLInputElement
   expect(lifetime.value).toBe("25")
 })
+
+test("calls mutateAsync with correct inputSnapshot and redirects on success", async () => {
+  render(<NewVersionForm projectId="prj_1" />, { wrapper: createWrapper() })
+  const file = new File(["x"], "boundary.kmz", {})
+  await act(async () => {
+    fireEvent.change(
+      document.querySelector('input[type="file"]') as HTMLInputElement,
+      { target: { files: [file] } },
+    )
+  })
+  await act(async () => { fireEvent.submit(document.querySelector("form")!) })
+  await waitFor(() =>
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "prj_1",
+        kmzFile: file,
+        inputSnapshot: expect.objectContaining({
+          module_length: 2.38,
+          module_width: 1.13,
+          module_wattage: 580,
+          orientation: "portrait",
+          tilt_angle: null,
+          row_spacing: null,
+          gcr: null,
+          perimeter_road_width: 6.0,
+          max_strings_per_inverter: 20,
+          inverter_efficiency_pct: 97.0,
+        }),
+      }),
+    ),
+  )
+  expect(mockPush).toHaveBeenCalledWith("/dashboard/projects/prj_1/versions/ver_1")
+})
+
+test("shows network error alert when API call fails with NETWORK_ERROR", async () => {
+  mockMutateAsync.mockRejectedValueOnce(
+    Object.assign(new Error("fail"), { code: "NETWORK_ERROR", name: "ApiError" }),
+  )
+  render(<NewVersionForm projectId="prj_1" />, { wrapper: createWrapper() })
+  const file = new File(["x"], "boundary.kmz", {})
+  await act(async () => {
+    fireEvent.change(
+      document.querySelector('input[type="file"]') as HTMLInputElement,
+      { target: { files: [file] } },
+    )
+  })
+  await act(async () => { fireEvent.submit(document.querySelector("form")!) })
+  await waitFor(() =>
+    expect(
+      screen.getByText(/Layout submission failed.*Could not reach/i),
+    ).toBeDefined(),
+  )
+})
