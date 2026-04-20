@@ -74,7 +74,6 @@ const mockVersionFindMany = mock(() =>
     },
   ]),
 )
-const mockVersionCountForList = mock(() => Promise.resolve(1))
 
 const mockLayoutJobCreate = mock(() =>
   Promise.resolve({
@@ -162,6 +161,18 @@ describe("listProjects", () => {
   })
 
   test("returns PaginatedResponse with items and pagination meta", async () => {
+    mockDbTransaction.mockImplementationOnce(() =>
+      Promise.resolve([
+        1,
+        [
+          {
+            ...mockDbProject,
+            _count: { versions: 2 },
+            versions: [{ status: "COMPLETE" }],
+          },
+        ],
+      ]),
+    )
     const result = await listProjects(mockDbProject.userId)
     expect(result.items).toHaveLength(1)
     expect(result.items[0]!.id).toBe(mockDbProject.id)
@@ -186,9 +197,18 @@ describe("listProjects", () => {
     expect(result.items[0]!.versionCount).toBe(0)
   })
 
-  test("passes pagination params through $transaction", async () => {
-    await listProjects(mockDbProject.userId, { page: 2, pageSize: 5 })
+  test("returns correct pagination meta for page 2 pageSize 5", async () => {
+    mockDbTransaction.mockImplementationOnce(() =>
+      Promise.resolve([
+        11,
+        [{ ...mockDbProject, _count: { versions: 0 }, versions: [] }],
+      ]),
+    )
+    const result = await listProjects(mockDbProject.userId, { page: 2, pageSize: 5 })
     expect(mockDbTransaction).toHaveBeenCalledTimes(1)
+    expect(result.page).toBe(2)
+    expect(result.pageSize).toBe(5)
+    expect(result.totalPages).toBe(3) // ceil(11/5)
   })
 })
 
@@ -198,7 +218,6 @@ describe("listVersions", () => {
   beforeEach(() => {
     mockProjectFindUnique.mockClear()
     mockVersionFindMany.mockClear()
-    mockVersionCountForList.mockClear()
     mockDbTransaction.mockClear()
   })
 

@@ -94,7 +94,11 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 3e | [GitHub Actions CI/CD](#spike-3e--github-actions-cicd) | complete | Spike 3d |
 | 3f | [Production End-to-End Test](#spike-3f--production-end-to-end-test) | complete | Spike 3e |
 | 3g | [Lambda Performance Investigation](#spike-3g--lambda-performance-investigation) | complete | Spike 3f |
-| 4 | [Project and Version UI](#spike-4--project-and-version-ui) | planned | Spike 3g |
+| 4a | [API + api-client Data Layer](#spike-4a--api--api-client-data-layer) | planned | Spike 3g |
+| 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | planned | Spike 4a |
+| 4c | [Version Submission Form](#spike-4c--version-submission-form) | planned | Spike 4b |
+| 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | planned | Spike 4c |
+| 4e | [Pagination UI](#spike-4e--pagination-ui) | planned | Spike 4d |
 | 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5 |
 | 7 | [Energy Job](#spike-7--energy-job) | planned | Spike 3f |
@@ -881,65 +885,184 @@ All layout stats (tables, modules, capacity, inverters, ICRs, LAs, DC cables) ar
 
 ---
 
-## Spike 4 — Project and Version UI
+## Spike 4a — API + api-client Data Layer
 
 **Status:** planned  
 **Depends on:** Spike 3g
 
 ### What we're building
 
-The full user-facing UI for creating projects, submitting versions, and tracking job status. This is the first time a user can use the feature through the browser.
+All backend and API client changes that the UI sub-spikes (4b–4e) depend on. No UI work in this sub-spike. Verified by tests and curl smoke-tests against the running dev API.
 
-### Pages and Components
+**API changes:**
+- `packages/shared`: add `ProjectSummary` type (extends `Project` with `versionCount`, `latestVersionStatus`) and `LayoutInputSnapshot` interface (all 27 typed fields)
+- `apps/api/src/lib/paginate.ts`: `paginationArgs()` + `paginationMeta()` utilities
+- `listProjects` returns `PaginatedResponse<ProjectSummary>` (Prisma `$transaction([count, findMany])` with `_count.versions` + latest version status)
+- New `listVersions(projectId, userId, query)` service function
+- `GET /projects` accepts `page`/`pageSize` query params
+- New `GET /projects/:projectId/versions` route
+- `packages/api-client`: `buildUrl()` helper, `listProjects(params?)` returning `PaginatedResponse<ProjectSummary>`, `listVersions(projectId, params?)` returning `PaginatedResponse<VersionDetail>`, `PaginationParams` interface exported
 
-**Projects list** (`/dashboard/projects`):
-- List of user's projects: name, created date, version count, latest version status
-- "New project" button → create project modal
-
-**Create project flow:**
-1. Modal: enter project name
-2. On create → redirect to project detail page
-
-**Project detail** (`/dashboard/projects/[projectId]`):
-- Project name + metadata
-- "New run" button → version submission form
-- Version list: version number, label, submitted date, status badge, quick link to version detail
-
-**Version submission form** (`/dashboard/projects/[projectId]/new-version`):
-- KMZ file upload (drag-and-drop + click)
-- Parameter sections (accordion or tabs):
-  - **Module** — long side, short side, wattage
-  - **Table configuration** — orientation, modules/row, rows/table, E-W gap
-  - **Layout** — tilt (auto/manual), row pitch (auto/GCR/manual), perimeter road width
-  - **Inverter** — max strings per inverter
-  - **Energy losses** — all 10 loss parameters + degradation + lifetime
-- Every parameter has a tooltip/popover explaining it, its default, and when to override
-- All defaults pre-filled matching the Python app
-- Submit button → POST /versions → redirect to version detail
-
-**Version detail** (`/dashboard/projects/[projectId]/versions/[versionId]`):
-- Status banner: queued / processing layout / processing energy / complete / failed
-- Polls `GET /versions/:versionId` every 3 seconds until terminal state
-- On complete: SVG preview + stats dashboard (Spike 5) + download buttons (Spikes 6, 8, 9)
-- Input summary: shows the parameters used for this version (from `inputSnapshot`)
-
-### UX Requirements
-
-- Fully responsive (desktop + tablet)
-- Nova theme throughout
-- Status badges: colour-coded (queued=grey, processing=amber, complete=green, failed=red)
-- Tooltip/popover on every parameter — no exceptions
-- Defaults pre-filled — user only changes what is non-standard
+**Key type:** `PaginatedResponse<T>` already exists in `packages/shared/src/types/api.ts` with shape `{ items: T[], total, page, pageSize, totalPages }`.
 
 ### Acceptance Criteria
 
-- [ ] User can create a project, submit a version, and reach the version detail page
-- [ ] Version detail page polls and shows correct status transitions
-- [ ] All parameters have tooltips
-- [ ] All defaults are pre-filled correctly (matching Python app defaults)
-- [ ] KMZ file upload works (drag-and-drop + click)
-- [ ] Version list shows all versions for a project in correct order
-- [ ] Fully responsive on desktop and tablet
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass from repo root
+- [ ] `GET /projects?page=1&pageSize=5` returns `{ success: true, data: { items: [...], total, page, pageSize, totalPages } }` — human verifies with curl
+- [ ] `GET /projects/:projectId/versions?page=1&pageSize=20` returns `PaginatedResponse<VersionDetail>` — human verifies with curl
+- [ ] Each `ProjectSummary` item includes `versionCount` (correct count) and `latestVersionStatus` (most recent version's status or null)
+
+### Implementation Plan
+
+See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 1–6.
+
+---
+
+## Spike 4b — Projects List + Create Project
+
+**Status:** planned  
+**Depends on:** Spike 4a
+
+### What we're building
+
+The projects list page, the "New project" modal, dynamic breadcrumbs wired to every page, sidebar showing live projects, and the dashboard redirect.
+
+**Pages and components:**
+- `BreadcrumbsProvider` context + `DynamicBreadcrumbs` component — replaces hardcoded "Overview" in layout header
+- `/dashboard/projects` — projects list page: shows name, version count, latest status badge; empty state with call to action
+- `CreateProjectDialog` — modal with project name input; on create → redirects to `/dashboard/projects/:projectId`
+- `/dashboard` — server-side redirect to `/dashboard/projects`
+- `AppSidebar` — wired to `useProjects()` for real project data (first 5 projects, "All projects" link)
+- `NavProjects` — accepts real `ProjectSummary[]` + `isLoading` prop; skeleton state during load
+
+### Acceptance Criteria
+
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] `/dashboard` redirects to `/dashboard/projects` — human verifies in browser
+- [ ] Projects list shows real projects from API (name, version count, latest status)
+- [ ] Sidebar "Projects" section shows real project names with correct links
+- [ ] "New project" modal opens, accepts name, creates project via API, redirects to project detail
+- [ ] Breadcrumb shows "Projects" on the list page; updates dynamically on nested pages
+- [ ] Skeleton state shown while projects are loading
+- [ ] Verified in local dev and production
+
+### Implementation Plan
+
+See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 7–11.
+
+---
+
+## Spike 4c — Version Submission Form
+
+**Status:** planned  
+**Depends on:** Spike 4b
+
+### What we're building
+
+The 27-parameter version submission form at `/dashboard/projects/[projectId]/new-version`.
+
+**Form design:**
+- Sticky left-nav on desktop (200 px) with section links (Module / Table config / Layout / Inverter / Energy losses) and "Run layout" submit button always visible
+- Horizontal scrollable chip nav on tablet/mobile; submit button at bottom
+- All 27 parameters pre-filled with Python app defaults; user changes only what is non-standard
+- Every parameter has a tooltip/popover with explanation, default, and when to override
+- KMZ file upload: drag-and-drop zone + click to browse
+- Optional run label input
+- On submit: `POST /projects/:projectId/versions` (multipart form with `params` JSON + optional `kmz` file) → redirect to version detail page
+
+**27 parameters (5 sections):**
+- Module (3): `module_long`, `module_short`, `wattage_wp`
+- Table config (4): `orientation`, `modules_in_row`, `rows_per_table`, `table_gap_ew`
+- Layout (4): `tilt_deg` (nullable/auto), `row_pitch_m` (nullable/auto), `gcr` (nullable), `road_width_m`
+- Inverter (1): `max_strings_per_inverter`
+- Energy losses (15): `ghi_kwh_m2_yr`, `gti_kwh_m2_yr`, `inverter_eff_pct`, `dc_loss_pct`, `ac_loss_pct`, `soiling_pct`, `temp_loss_pct`, `mismatch_pct`, `shading_pct`, `availability_pct`, `transformer_loss_pct`, `other_loss_pct`, `first_year_lid_pct`, `annual_deg_pct`, `lifetime_years`
+
+**Error display:** Functional domain-specific messages. `[What failed]. [Reason]. [Action].` structure. Never surface HTTP error codes or TypeScript stack traces to the user.
+
+### Acceptance Criteria
+
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] All 27 parameters visible with correct defaults on page load
+- [ ] Every parameter has a tooltip — verified by clicking each one
+- [ ] KMZ drag-and-drop: drop a `.kmz` file → filename and size displayed
+- [ ] Submitting with defaults → version created → redirected to version detail page
+- [ ] Desktop (≥1024 px): sticky left-nav visible and scrolls to section on click
+- [ ] Tablet (768 px): chip nav visible, left-nav hidden
+- [ ] Error on failed submission: domain-specific message, not raw HTTP error
+
+### Implementation Plan
+
+See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 12–14.
+
+---
+
+## Spike 4d — Version Detail + Polling
+
+**Status:** planned  
+**Depends on:** Spike 4c
+
+### What we're building
+
+The version detail page and project detail page, with live polling that follows ADR-003.
+
+**Polling (ADR-003):**
+- `createVersionPollingInterval(data)` utility: returns `false` for COMPLETE/FAILED (stops polling), `~3000 ms` with 10% jitter for QUEUED/PROCESSING
+- `useVersion` hook: `refetchInterval` uses the polling utility; `staleTime` 1 s active / 2 min terminal; intelligent retry (no retry on 4xx, up to 3 retries on 5xx)
+
+**Version detail page** (`/dashboard/projects/[projectId]/versions/[versionId]`):
+- Breadcrumbs: Projects › [Project name] › v[N]
+- `VersionStatusBanner`: contextual state-machine banner — queued (grey), processing (blue + spinner), complete (green + checkmark), failed (red + domain error message from `errorDetail`)
+- Input summary: all 27 `inputSnapshot` parameters displayed in a grid
+- Results placeholder: "SVG preview and stats coming in Spike 5" (shown only when status = COMPLETE)
+- "New run" button linking to new-version page
+
+**Project detail page** (`/dashboard/projects/[projectId]`):
+- Breadcrumbs: Projects › [Project name]
+- Version list: version number, optional label, submission timestamp, `VersionStatusBadge`; newest first
+- Empty state with link to new-version page
+- "New run" button always visible
+
+### Acceptance Criteria
+
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] Version detail page shows correct status banner for QUEUED / PROCESSING / COMPLETE / FAILED
+- [ ] Live polling: status transitions QUEUED → PROCESSING → COMPLETE visible in browser without page refresh
+- [ ] Polling stops once terminal state reached — no further network requests (confirmed in DevTools Network tab)
+- [ ] FAILED version: error message is domain-specific, derived from `errorDetail` field (not a generic "error" message)
+- [ ] Input summary shows all 27 parameters from `inputSnapshot`
+- [ ] Project detail page lists all versions in correct order (newest first)
+- [ ] Breadcrumbs correct on all pages
+- [ ] Verified in local dev and production
+
+### Implementation Plan
+
+See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 15–18.
+
+---
+
+## Spike 4e — Pagination UI
+
+**Status:** planned  
+**Depends on:** Spike 4d
+
+### What we're building
+
+Pagination controls on the projects list page and project detail page. The API already returns paginated data from Spike 4a.
+
+**Scope:**
+- `PaginationControls` component using shadcn `Pagination` primitives (Previous / page numbers / Next)
+- Wire to projects list page (`useProjects` with page param)
+- Wire to project detail page (`useVersions` with page param)
+- URL `?page=N` query param so pages are bookmarkable and browser back/forward work
+- Show page controls only when `totalPages > 1`
+
+### Acceptance Criteria
+
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] Projects list: pagination controls appear when total > 20; correct page loads on click
+- [ ] Project detail: pagination controls appear when version count > 20
+- [ ] Page number reflected in URL (`?page=2`)
+- [ ] Navigating back preserves page number
 
 ---
 
@@ -1249,3 +1372,9 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 3g | AC cable routing search space capped: A2/A3 nearest 8 cols, A4 nearest 5×5 cols, B nearest 8×8 gaps, E max 15 waypoints. Result: 563s → 16s for `place_string_inverters` (34x), total 572s → 25s (23x). AC cable length +0.95%, all other stats identical. | Root cause was 5.7M `_path_ok` calls for 74 cables. Unbounded nested loops in A4 (G×C²) and E (W²) caused combinatorial explosion. Fix prunes search to nearest candidates — cables route through nearby columns, not distant ones. Same algorithm used in desktop app; the engineer's code had the same unbounded search but M2/M3 brute-forced through it. |
 | 2026-04-20 | 3g | SQS queue needs DLQ configuration. Failed Lambda invocations leave messages in 1200s visibility timeout, blocking new messages. Discovered when stale `ver_AxKI8NoIRCU6yblHPuSzPM69rvC0BQtbN7F3` (deleted DB record) cycled indefinitely. Workaround: manual `aws sqs send-message`. Fix: add DLQ with `maxReceiveCount: 3` in Spike 10. | No DLQ configured yet. Failed messages retry until retention period (4 days) expires. |
 | 2026-04-20 | 3g | Decisions log note: `_route_ac_cable` pattern logging in investigation doc incorrectly identified DC cable routing as the bottleneck. Actual bottleneck was AC cable routing (inverter → ICR, 74 cables). DC routing (table → inverter, 740 cables) was instant because `usable_polygon` was None for DC. Corrected in investigation doc. | Important for future debugging — the `poly_verts=0` log was misleading due to a try/except swallowing the error on non-simple polygon types. |
+| 2026-04-20 | 4 | Spike 4 decomposed into 5 sub-spikes: 4a (API data layer), 4b (projects list + create), 4c (version form), 4d (version detail + polling), 4e (pagination UI). Sub-spike 4a contains all API and api-client changes; subsequent sub-spikes are UI-only and can be reviewed independently. | Following the Spike 2/3 pattern: each sub-spike produces independently testable, human-verifiable software. Bundling API changes with UI changes makes failures harder to isolate. |
+| 2026-04-20 | 4 | `PaginatedResponse<T>` already defined in `packages/shared/src/types/api.ts` with `{ items: T[], total, page, pageSize, totalPages }`. This is the canonical shape for all paginated API responses. API returns pagination from day one; pagination UI (4e) is deferred. | Retrofitting pagination later would require a breaking API change. The backend cost is negligible; the UI can show page 1 until 4e is implemented. |
+| 2026-04-20 | 4 | Version submission form uses a sticky left-nav section-jump pattern (desktop) and horizontal chip nav (tablet/mobile) rather than accordion or tabs. | Solar engineers submit forms with ~27 fields spanning 5 logical sections. Section-jump nav lets them orient quickly, skip to the section they want to override, and keeps the submit button always visible without scrolling. Accordion/tabs hide content and require extra clicks. This pattern is standard in modern multi-section forms (Stripe, Notion). |
+| 2026-04-20 | 4 | `irradiance_source` is excluded from `LayoutInputSnapshot` / the version form. It is set by the energy engine (Spike 7) based on which irradiance source (PVGIS / NASA POWER / manual) was actually used, and stored on `EnergyJob.irradianceSource`. Users do not choose the irradiance source — the engine chooses automatically with fallback logic. | Including it in the form would give the user false control: they cannot force PVGIS if it is down, and the fallback sequence is an engine implementation detail. If manual override is needed in future, it can be added as an explicit feature. |
+| 2026-04-20 | 4 | `LayoutInputSnapshot` field names use Python `energy_calculator.py` `EnergyParameters` dataclass field names exactly (e.g. `inverter_eff_pct`, `dc_loss_pct`). All 27 input keys are typed fields on the interface, not `Record<string, unknown>`. | Typed snapshot catches mistakes at compile time. Using Python field names exactly means the Lambda function can deserialize `inputSnapshot` directly with zero key mapping. Consistency across the stack removes a class of bugs. |
+| 2026-04-20 | 4 | Version detail polling follows ADR-003: `refetchInterval` is a function receiving `query.state.data`; returns `false` at terminal state (COMPLETE/FAILED), `~3000 ms` (with 10% jitter) otherwise. `staleTime` 1 s active / 2 min terminal. No retry on 4xx; up to 3 retries on 5xx. | ADR-003 establishes the project polling standard. Consistent with how Journium handles long-running process polling. Jitter prevents thundering herd from multiple browser tabs. |

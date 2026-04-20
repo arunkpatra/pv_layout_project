@@ -6,10 +6,12 @@ export interface PaginationQuery {
 export function paginationArgs(query: PaginationQuery): {
   skip: number
   take: number
+  page: number
+  pageSize: number
 } {
   const page = Math.max(1, query.page ?? 1)
   const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20))
-  return { skip: (page - 1) * pageSize, take: pageSize }
+  return { skip: (page - 1) * pageSize, take: pageSize, page, pageSize }
 }
 
 export function paginationMeta(opts: {

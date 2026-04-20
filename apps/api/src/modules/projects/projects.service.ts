@@ -150,9 +150,7 @@ export async function listProjects(
   userId: string,
   query: { page?: number; pageSize?: number } = {},
 ): Promise<PaginatedResponse<ProjectSummary>> {
-  const { skip, take } = paginationArgs(query)
-  const page = Math.max(1, query.page ?? 1)
-  const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20))
+  const { skip, take, page, pageSize } = paginationArgs(query)
 
   const [total, projects] = await db.$transaction([
     db.project.count({ where: { userId } }),
@@ -192,9 +190,7 @@ export async function listVersions(
 ): Promise<PaginatedResponse<VersionDetail>> {
   await requireProjectOwnership(projectId, userId)
 
-  const { skip, take } = paginationArgs(query)
-  const page = Math.max(1, query.page ?? 1)
-  const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20))
+  const { skip, take, page, pageSize } = paginationArgs(query)
 
   const [total, versions] = await db.$transaction([
     db.version.count({ where: { projectId } }),
