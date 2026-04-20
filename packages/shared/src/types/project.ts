@@ -46,6 +46,46 @@ export interface VersionDetail {
   updatedAt: string
 }
 
+export interface ProjectSummary extends Project {
+  versionCount: number
+  latestVersionStatus: VersionStatus | null
+}
+
+export interface LayoutInputSnapshot {
+  // Module specification
+  module_length: number
+  module_width: number
+  module_wattage: number
+  // Table configuration
+  orientation: "portrait" | "landscape"
+  modules_in_row: number
+  rows_per_table: number
+  table_gap_ew: number
+  // Layout parameters
+  tilt_angle: number | null
+  row_spacing: number | null
+  gcr: number | null
+  perimeter_road_width: number
+  // Inverter configuration
+  max_strings_per_inverter: number
+  // Energy parameters
+  ghi_kwh_m2_yr: number
+  gti_kwh_m2_yr: number
+  inverter_efficiency_pct: number
+  dc_cable_loss_pct: number
+  ac_cable_loss_pct: number
+  soiling_loss_pct: number
+  temperature_loss_pct: number
+  mismatch_loss_pct: number
+  shading_loss_pct: number
+  availability_pct: number
+  transformer_loss_pct: number
+  other_loss_pct: number
+  first_year_degradation_pct: number
+  annual_degradation_pct: number
+  plant_lifetime_years: number
+}
+
 export interface CreateProjectInput {
   name: string
 }

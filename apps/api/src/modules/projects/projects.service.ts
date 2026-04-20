@@ -3,16 +3,19 @@ import { uploadToS3 } from "../../lib/s3.js"
 import { dispatchLayoutJobHttp } from "../../lib/layout-engine.js"
 import { publishLayoutJob } from "../../lib/sqs.js"
 import { NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js"
+import { paginationArgs, paginationMeta } from "../../lib/paginate.js"
 import type {
   Project,
+  ProjectSummary,
   VersionDetail,
   LayoutJobSummary,
   EnergyJobSummary,
   CreateProjectInput,
   CreateVersionInput,
+  PaginatedResponse,
 } from "@renewable-energy/shared"
 
-// ─── Shappers ──────────────────────────────────────────────────────────────────
+// ─── Shapers ───────────────────────────────────────────────────────────────────
 
 function shapeProject(p: {
   id: string
@@ -27,6 +30,29 @@ function shapeProject(p: {
     name: p.name,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+  }
+}
+
+function shapeProjectSummary(p: {
+  id: string
+  userId: string
+  name: string
+  createdAt: Date
+  updatedAt: Date
+  _count: { versions: number }
+  versions: Array<{ status: string }>
+}): ProjectSummary {
+  return {
+    id: p.id,
+    userId: p.userId,
+    name: p.name,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+    versionCount: p._count.versions,
+    latestVersionStatus:
+      p.versions[0]?.status != null
+        ? (p.versions[0].status as ProjectSummary["latestVersionStatus"])
+        : null,
   }
 }
 
@@ -120,17 +146,67 @@ async function requireProjectOwnership(
 
 // ─── Projects ──────────────────────────────────────────────────────────────────
 
-export async function listProjects(userId: string): Promise<Project[]> {
-  const projects = await db.project.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-  })
-  return projects.map(shapeProject)
+export async function listProjects(
+  userId: string,
+  query: { page?: number; pageSize?: number } = {},
+): Promise<PaginatedResponse<ProjectSummary>> {
+  const { skip, take, page, pageSize } = paginationArgs(query)
+
+  const [total, projects] = await db.$transaction([
+    db.project.count({ where: { userId } }),
+    db.project.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take,
+      include: {
+        _count: { select: { versions: true } },
+        versions: {
+          orderBy: { number: "desc" },
+          take: 1,
+          select: { status: true },
+        },
+      },
+    }),
+  ])
+
+  return {
+    items: (projects as Parameters<typeof shapeProjectSummary>[0][]).map(
+      shapeProjectSummary,
+    ),
+    ...paginationMeta({ total: total as number, page, pageSize }),
+  }
 }
 
 export async function getProject(projectId: string, userId: string): Promise<Project> {
   const project = await requireProjectOwnership(projectId, userId)
   return shapeProject(project)
+}
+
+export async function listVersions(
+  projectId: string,
+  userId: string,
+  query: { page?: number; pageSize?: number } = {},
+): Promise<PaginatedResponse<VersionDetail>> {
+  await requireProjectOwnership(projectId, userId)
+
+  const { skip, take, page, pageSize } = paginationArgs(query)
+
+  const [total, versions] = await db.$transaction([
+    db.version.count({ where: { projectId } }),
+    db.version.findMany({
+      where: { projectId },
+      orderBy: { number: "desc" },
+      skip,
+      take,
+      include: { layoutJob: true, energyJob: true },
+    }),
+  ])
+
+  return {
+    items: (versions as Parameters<typeof shapeVersion>[0][]).map(shapeVersion),
+    ...paginationMeta({ total: total as number, page, pageSize }),
+  }
 }
 
 export async function createProject(

@@ -9,6 +9,7 @@ import {
   deleteProject,
   createVersion,
   getVersion,
+  listVersions,
 } from "./projects.service.js"
 import type { HonoEnv } from "../../middleware/auth.js"
 
@@ -21,8 +22,13 @@ projectsRoutes.use("/projects", authMiddleware)
 // GET /projects — list all projects for the authenticated user
 projectsRoutes.get("/projects", async (c) => {
   const { id: userId } = c.get("user")
-  const projects = await listProjects(userId)
-  return c.json(ok(projects))
+  const page = Number(c.req.query("page") ?? "1")
+  const pageSize = Number(c.req.query("pageSize") ?? "20")
+  const result = await listProjects(userId, {
+    page: isNaN(page) ? 1 : page,
+    pageSize: isNaN(pageSize) ? 20 : pageSize,
+  })
+  return c.json(ok(result))
 })
 
 // POST /projects — create a new project
@@ -50,6 +56,19 @@ projectsRoutes.delete("/projects/:projectId", async (c) => {
   const { projectId } = c.req.param()
   await deleteProject(projectId, userId)
   return c.json(ok(null))
+})
+
+// GET /projects/:projectId/versions — list versions for a project
+projectsRoutes.get("/projects/:projectId/versions", async (c) => {
+  const { id: userId } = c.get("user")
+  const { projectId } = c.req.param()
+  const page = Number(c.req.query("page") ?? "1")
+  const pageSize = Number(c.req.query("pageSize") ?? "20")
+  const result = await listVersions(projectId, userId, {
+    page: isNaN(page) ? 1 : page,
+    pageSize: isNaN(pageSize) ? 20 : pageSize,
+  })
+  return c.json(ok(result))
 })
 
 // POST /projects/:projectId/versions — submit a new version (with optional KMZ upload)

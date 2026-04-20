@@ -378,6 +378,44 @@ All parameters the Python app exposes are exposed in V1. Same defaults as the Py
 | Annual degradation | 0.5%/yr | Compounded from Year 2 onwards |
 | Plant lifetime | 25 years | |
 
+### `inputSnapshot` Key Reference
+
+Every `Version` record stores a complete `inputSnapshot` at submission time. The snapshot is immutable after creation. The following table maps every key to its Python source field, TypeScript type, and default value.
+
+The full TypeScript type is `LayoutInputSnapshot` in `packages/shared/src/types/project.ts`.
+
+| Key | Python field | Type | Default | Notes |
+|-----|-------------|------|---------|-------|
+| `module_long` | `ModuleSpec.long_side` | `number` | 2.38 | Module long dimension, metres |
+| `module_short` | `ModuleSpec.short_side` | `number` | 1.13 | Module short dimension, metres |
+| `wattage_wp` | `ModuleSpec.wattage` | `number` | 580 | Module rated power, Wp |
+| `orientation` | `TableConfig.orientation` | `"portrait" \| "landscape"` | `"portrait"` | Portrait = long side N-S |
+| `modules_in_row` | `TableConfig.modules_in_row` | `number` | 28 | Modules along table width (E-W) |
+| `rows_per_table` | `TableConfig.rows_per_table` | `number` | 2 | Rows along table height (N-S); = strings/table |
+| `table_gap_ew` | `TableConfig.gap_ew` | `number` | 1.0 | E-W gap between adjacent tables, metres |
+| `tilt_deg` | `LayoutParams.tilt_deg` | `number \| null` | `null` | `null` = auto (0.76×\|lat\|+3.1, clipped 5–40°) |
+| `row_pitch_m` | `LayoutParams.row_pitch` | `number \| null` | `null` | `null` = auto (shadow-free formula); overridden by GCR if set |
+| `gcr` | `LayoutParams.gcr` | `number \| null` | `null` | `null` = not set; overrides shadow formula → pitch = table_height / GCR |
+| `road_width_m` | `LayoutParams.road_width` | `number` | 6.0 | Perimeter road setback, metres |
+| `max_strings_per_inverter` | `InverterConfig.max_strings` | `number` | 20 | Controls inverter cluster size |
+| `ghi_kwh_m2_yr` | `EnergyParameters.ghi` | `number` | 0 | 0 = auto-fetch from PVGIS |
+| `gti_kwh_m2_yr` | `EnergyParameters.gti` | `number` | 0 | 0 = auto-fetch from PVGIS |
+| `inverter_eff_pct` | `EnergyParameters.inverter_eff` | `number` | 97 | Inverter conversion efficiency % |
+| `dc_loss_pct` | `EnergyParameters.dc_loss` | `number` | 2 | DC cable resistive losses % |
+| `ac_loss_pct` | `EnergyParameters.ac_loss` | `number` | 1 | AC cable resistive losses % |
+| `soiling_pct` | `EnergyParameters.soiling` | `number` | 4 | Soiling losses % |
+| `temp_loss_pct` | `EnergyParameters.temp_loss` | `number` | 6 | Temperature losses % |
+| `mismatch_pct` | `EnergyParameters.mismatch` | `number` | 2 | Module mismatch losses % |
+| `shading_pct` | `EnergyParameters.shading` | `number` | 2 | Near-horizon shading losses % |
+| `availability_pct` | `EnergyParameters.availability` | `number` | 98 | Plant availability % |
+| `transformer_loss_pct` | `EnergyParameters.transformer_loss` | `number` | 1 | Transformer losses % |
+| `other_loss_pct` | `EnergyParameters.other_loss` | `number` | 1 | Other losses % |
+| `first_year_lid_pct` | `EnergyParameters.first_year_lid` | `number` | 2 | Year 1 LID % (p-type silicon) |
+| `annual_deg_pct` | `EnergyParameters.annual_deg` | `number` | 0.5 | Annual module degradation %/yr |
+| `lifetime_years` | `EnergyParameters.lifetime` | `number` | 25 | Plant lifetime for energy forecast |
+
+**Not in snapshot:** `irradiance_source` — set by the energy engine (Spike 7) after irradiance fetch and stored on `EnergyJob.irradianceSource`. It is an engine output, not a user input.
+
 ---
 
 ## 8. Output Artifacts
@@ -467,6 +505,10 @@ Displayed alongside the SVG preview in the job results view. All stats below per
 5. **V1 is configure-and-generate. V2 is interactive.** V1 architecture must not foreclose V2. The layout data model, the SVG layer structure, and the API contract should be designed with future interactivity in mind — even though V1 does not implement it.
 
 6. **Jobs are transparent.** The user always knows: what state is their version in (queued / processing / complete / failed), which step is running (layout or energy), and why it failed if it fails.
+
+7. **Multi-section parameter forms use a sticky section-jump nav.** When a form has 5+ labelled sections (e.g., the version submission form's 27 parameters), the layout is: sticky left-nav on desktop (≥1024 px) listing section names with the submit button always visible; horizontal scrollable chip nav on tablet/mobile with submit at the bottom. This pattern avoids accordion/tab hiding and keeps the engineer oriented without hunting for the submit button. Reference: Spike 4c implementation.
+
+8. **Error messages are domain-specific.** All user-facing error messages follow `[What failed]. [Reason]. [Action].` structure using solar engineering terminology. "Layout run failed: KMZ polygon has no valid interior area after setback." not "500 Internal Server Error". See `docs/brand-voice.md` for the full standard.
 
 ---
 
