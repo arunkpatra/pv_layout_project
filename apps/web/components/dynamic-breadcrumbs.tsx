@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useBreadcrumbs } from "@/contexts/breadcrumbs-context"
 import {
   Breadcrumb,
@@ -20,18 +21,18 @@ export function DynamicBreadcrumbs() {
     <Breadcrumb>
       <BreadcrumbList>
         {breadcrumbs.map((crumb, index) => (
-          <BreadcrumbItem key={crumb.label}>
-            {index < breadcrumbs.length - 1 ? (
-              <>
+          <React.Fragment key={crumb.label}>
+            <BreadcrumbItem>
+              {index < breadcrumbs.length - 1 ? (
                 <BreadcrumbLink asChild>
                   <Link href={crumb.href ?? "#"}>{crumb.label}</Link>
                 </BreadcrumbLink>
-                <BreadcrumbSeparator />
-              </>
-            ) : (
-              <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-            )}
-          </BreadcrumbItem>
+              ) : (
+                <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+            {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+          </React.Fragment>
         ))}
       </BreadcrumbList>
     </Breadcrumb>
