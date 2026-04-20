@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import {
   SidebarGroup,
@@ -19,16 +20,22 @@ export function NavProjects({
   projects: ProjectSummary[]
   isLoading: boolean
 }) {
+  // SidebarMenuSkeleton uses Math.random() in its useState initializer.
+  // Rendering it on the server produces a different value than the client,
+  // causing a hydration mismatch. Gate skeleton rendering to client-only.
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Projects</SidebarGroupLabel>
       <SidebarMenu>
-        {isLoading ? (
+        {mounted && isLoading ? (
           <>
             <SidebarMenuSkeleton />
             <SidebarMenuSkeleton />
           </>
-        ) : (
+        ) : !isLoading ? (
           projects.slice(0, 5).map((project) => (
             <SidebarMenuItem key={project.id}>
               <SidebarMenuButton asChild>
@@ -39,7 +46,7 @@ export function NavProjects({
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))
-        )}
+        ) : null}
         <SidebarMenuItem>
           <SidebarMenuButton asChild>
             <Link href="/dashboard/projects">

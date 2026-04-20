@@ -99,8 +99,6 @@ const navMain = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isLoaded, user } = useUser()
   const { data, isLoading } = useProjects()
-  const [mounted, setMounted] = React.useState(false)
-  React.useEffect(() => setMounted(true), [])
 
   const clerkUser = {
     name: user?.fullName || user?.username || "User",
@@ -121,7 +119,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navMain} />
         <NavProjects
           projects={data?.items ?? []}
-          isLoading={!mounted || !isLoaded || isLoading}
+          isLoading={!isLoaded || isLoading}
         />
       </SidebarContent>
       <SidebarFooter>
