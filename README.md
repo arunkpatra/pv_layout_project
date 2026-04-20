@@ -20,4 +20,4 @@ To use the components in your app, import them from the `ui` package.
 import { Button } from "@renewable-energy/ui/components/button";
 ```
 
-dummy line
+dummy line.
