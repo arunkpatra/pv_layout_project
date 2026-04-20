@@ -923,30 +923,32 @@ See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 1–
 
 ## Spike 4b — Projects List + Create Project
 
-**Status:** planned  
+**Status:** in-progress  
 **Depends on:** Spike 4a
 
 ### What we're building
 
-The projects list page, the "New project" modal, dynamic breadcrumbs wired to every page, sidebar showing live projects, and the dashboard redirect.
+The projects list page, the "New project" modal, dynamic breadcrumbs wired to every page, and sidebar showing live projects.
 
 **Pages and components:**
 - `BreadcrumbsProvider` context + `DynamicBreadcrumbs` component — replaces hardcoded "Overview" in layout header
 - `/dashboard/projects` — projects list page: shows name, version count, latest status badge; empty state with call to action
 - `CreateProjectDialog` — modal with project name input; on create → redirects to `/dashboard/projects/:projectId`
-- `/dashboard` — server-side redirect to `/dashboard/projects`
-- `AppSidebar` — wired to `useProjects()` for real project data (first 5 projects, "All projects" link)
+- `/dashboard` — cockpit overview page (stats, quick navigation placeholder); **not** a redirect (see Decisions Log 2026-04-20 4b)
+- `AppSidebar` — wired to `useProjects()` for real project data (first 5 projects, "All projects" link); skeleton footer while Clerk loads
 - `NavProjects` — accepts real `ProjectSummary[]` + `isLoading` prop; skeleton state during load
 
 ### Acceptance Criteria
 
 - [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] `/dashboard` redirects to `/dashboard/projects` — human verifies in browser
+- [ ] `/dashboard` shows the cockpit overview page (not a redirect)
+- [ ] `/dashboard/projects` shows the projects list
 - [ ] Projects list shows real projects from API (name, version count, latest status)
 - [ ] Sidebar "Projects" section shows real project names with correct links
 - [ ] "New project" modal opens, accepts name, creates project via API, redirects to project detail
 - [ ] Breadcrumb shows "Projects" on the list page; updates dynamically on nested pages
 - [ ] Skeleton state shown while projects are loading
+- [ ] Sidebar footer shows skeleton while Clerk loads and during sign-out (no "User" text flash)
 - [ ] Verified in local dev and production
 
 ### Implementation Plan
@@ -1382,4 +1384,6 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 4 | `LayoutInputSnapshot` field names use Python `energy_calculator.py` `EnergyParameters` dataclass field names exactly (e.g. `inverter_eff_pct`, `dc_loss_pct`). All 27 input keys are typed fields on the interface, not `Record<string, unknown>`. | Typed snapshot catches mistakes at compile time. Using Python field names exactly means the Lambda function can deserialize `inputSnapshot` directly with zero key mapping. Consistency across the stack removes a class of bugs. |
 | 2026-04-20 | 4a | `LayoutInputSnapshot` initial draft used descriptive TypeScript names (e.g. `module_long`, `tilt_deg`, `road_width_m`) that did not match the Python Lambda's `_params_from_dict` keys. 16 of 27 fields were wrong — would have caused silent default fallbacks in production. Corrected to exact Python names: `module_length`, `tilt_angle`, `perimeter_road_width`, etc. | Cross-verified against `apps/layout-engine/src/handlers.py` `_params_from_dict` and `/Users/arunkpatra/codebase/PVlayout_Advance/models/project.py` `EnergyParameters`. Field names must be verified against Python source, not inferred. |
 | 2026-04-20 | 4a | `paginationArgs` extended to return `{ skip, take, page, pageSize }` so callers use the normalised values directly. Service functions must destructure all four values — never re-derive `page` or `pageSize` inline after calling `paginationArgs`. | Duplicate inline clamping would diverge from `paginationArgs` if defaults ever change. Single source of truth prevents silent pagination bugs. |
+| 2026-04-20 | 4b | `/dashboard` is the cockpit (stats, quick navigation), not a redirect to `/dashboard/projects`. The original 4b plan specified a server-side redirect, but the product intent is for `/dashboard` to be the top-level overview — a command centre the user lands on after login — with `/dashboard/projects` as one section within the app. The cockpit page will be built out with real stats and navigation in a future spike. | Raised during spike 4b local verification. A redirect wastes the route and gives the user no landing context. The cockpit pattern is standard in B2B SaaS (Stripe, Vercel, Linear all have a top-level overview distinct from sub-section lists). |
+| 2026-04-20 | 4b | `NavUser` sidebar footer uses `!isLoaded \|\| !user` guard to show a skeleton rather than the "User" fallback. Clerk's `useUser()` returns `user: null` on both initial client hydration and during sign-out. Without the guard, the fallback text flashes on every page load and every sign-out. | Discovered during spike 4b local and production verification. The fix follows Clerk's recommended `isLoaded` check pattern. |
 | 2026-04-20 | 4 | Version detail polling follows ADR-003: `refetchInterval` is a function receiving `query.state.data`; returns `false` at terminal state (COMPLETE/FAILED), `~3000 ms` (with 10% jitter) otherwise. `staleTime` 1 s active / 2 min terminal. No retry on 4xx; up to 3 retries on 5xx. | ADR-003 establishes the project polling standard. Consistent with how Journium handles long-running process polling. Jitter prevents thundering herd from multiple browser tabs. |
