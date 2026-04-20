@@ -94,8 +94,8 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 3e | [GitHub Actions CI/CD](#spike-3e--github-actions-cicd) | complete | Spike 3d |
 | 3f | [Production End-to-End Test](#spike-3f--production-end-to-end-test) | complete | Spike 3e |
 | 3g | [Lambda Performance Investigation](#spike-3g--lambda-performance-investigation) | complete | Spike 3f |
-| 4a | [API + api-client Data Layer](#spike-4a--api--api-client-data-layer) | planned | Spike 3g |
-| 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | planned | Spike 4a |
+| 4a | [API + api-client Data Layer](#spike-4a--api--api-client-data-layer) | complete | Spike 3g |
+| 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | in-progress | Spike 4a |
 | 4c | [Version Submission Form](#spike-4c--version-submission-form) | planned | Spike 4b |
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | planned | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | planned | Spike 4d |
@@ -887,30 +887,33 @@ All layout stats (tables, modules, capacity, inverters, ICRs, LAs, DC cables) ar
 
 ## Spike 4a — API + api-client Data Layer
 
-**Status:** planned  
+**Status:** complete — 2026-04-20  
 **Depends on:** Spike 3g
 
-### What we're building
+### What we built
 
-All backend and API client changes that the UI sub-spikes (4b–4e) depend on. No UI work in this sub-spike. Verified by tests and curl smoke-tests against the running dev API.
+All backend and API client changes that the UI sub-spikes (4b–4e) depend on.
 
-**API changes:**
-- `packages/shared`: add `ProjectSummary` type (extends `Project` with `versionCount`, `latestVersionStatus`) and `LayoutInputSnapshot` interface (all 27 typed fields)
-- `apps/api/src/lib/paginate.ts`: `paginationArgs()` + `paginationMeta()` utilities
-- `listProjects` returns `PaginatedResponse<ProjectSummary>` (Prisma `$transaction([count, findMany])` with `_count.versions` + latest version status)
+- `packages/shared`: added `ProjectSummary` (extends `Project` with `versionCount`, `latestVersionStatus`) and `LayoutInputSnapshot` (27 typed fields with exact Python `_params_from_dict` key names)
+- `apps/api/src/lib/paginate.ts`: `paginationArgs()` + `paginationMeta()` — single source of truth for pagination clamping; `paginationArgs` returns `{ skip, take, page, pageSize }`
+- `listProjects` returns `PaginatedResponse<ProjectSummary>` via `$transaction([count, findMany])` with `_count.versions` and latest version status
 - New `listVersions(projectId, userId, query)` service function
 - `GET /projects` accepts `page`/`pageSize` query params
 - New `GET /projects/:projectId/versions` route
-- `packages/api-client`: `buildUrl()` helper, `listProjects(params?)` returning `PaginatedResponse<ProjectSummary>`, `listVersions(projectId, params?)` returning `PaginatedResponse<VersionDetail>`, `PaginationParams` interface exported
+- `packages/api-client`: `buildUrl()` helper, `listProjects(params?)`, `listVersions(projectId, params?)`, `PaginationParams` interface exported
 
-**Key type:** `PaginatedResponse<T>` already exists in `packages/shared/src/types/api.ts` with shape `{ items: T[], total, page, pageSize, totalPages }`.
+### Key decisions
+
+- `LayoutInputSnapshot` field names must exactly match Python `_params_from_dict` in `apps/layout-engine/src/handlers.py` — wrong names send silent defaults to the Lambda
+- `paginationArgs` returns normalised `page`/`pageSize` to prevent duplicate inline clamping in callers
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass from repo root
-- [ ] `GET /projects?page=1&pageSize=5` returns `{ success: true, data: { items: [...], total, page, pageSize, totalPages } }` — human verifies with curl
-- [ ] `GET /projects/:projectId/versions?page=1&pageSize=20` returns `PaginatedResponse<VersionDetail>` — human verifies with curl
-- [ ] Each `ProjectSummary` item includes `versionCount` (correct count) and `latestVersionStatus` (most recent version's status or null)
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass from repo root
+- [x] `GET /projects` returns `PaginatedResponse<ProjectSummary>` with `versionCount` and `latestVersionStatus` — verified local + production
+- [x] `GET /projects/:projectId/versions?page=1&pageSize=2` returns 2 items, correct `total`, `totalPages` — verified local + production
+- [x] Page 2 returns the correct offset items — verified local + production
+- [x] Non-existent project returns `NOT_FOUND` 404 — verified local + production
 
 ### Implementation Plan
 
@@ -920,30 +923,32 @@ See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 1–
 
 ## Spike 4b — Projects List + Create Project
 
-**Status:** planned  
+**Status:** in-progress  
 **Depends on:** Spike 4a
 
 ### What we're building
 
-The projects list page, the "New project" modal, dynamic breadcrumbs wired to every page, sidebar showing live projects, and the dashboard redirect.
+The projects list page, the "New project" modal, dynamic breadcrumbs wired to every page, and sidebar showing live projects.
 
 **Pages and components:**
 - `BreadcrumbsProvider` context + `DynamicBreadcrumbs` component — replaces hardcoded "Overview" in layout header
 - `/dashboard/projects` — projects list page: shows name, version count, latest status badge; empty state with call to action
 - `CreateProjectDialog` — modal with project name input; on create → redirects to `/dashboard/projects/:projectId`
-- `/dashboard` — server-side redirect to `/dashboard/projects`
-- `AppSidebar` — wired to `useProjects()` for real project data (first 5 projects, "All projects" link)
+- `/dashboard` — cockpit overview page (stats, quick navigation placeholder); **not** a redirect (see Decisions Log 2026-04-20 4b)
+- `AppSidebar` — wired to `useProjects()` for real project data (first 5 projects, "All projects" link); skeleton footer while Clerk loads
 - `NavProjects` — accepts real `ProjectSummary[]` + `isLoading` prop; skeleton state during load
 
 ### Acceptance Criteria
 
 - [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] `/dashboard` redirects to `/dashboard/projects` — human verifies in browser
+- [ ] `/dashboard` shows the cockpit overview page (not a redirect)
+- [ ] `/dashboard/projects` shows the projects list
 - [ ] Projects list shows real projects from API (name, version count, latest status)
 - [ ] Sidebar "Projects" section shows real project names with correct links
 - [ ] "New project" modal opens, accepts name, creates project via API, redirects to project detail
 - [ ] Breadcrumb shows "Projects" on the list page; updates dynamically on nested pages
 - [ ] Skeleton state shown while projects are loading
+- [ ] Sidebar footer shows skeleton while Clerk loads and during sign-out (no "User" text flash)
 - [ ] Verified in local dev and production
 
 ### Implementation Plan
@@ -1377,4 +1382,8 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 4 | Version submission form uses a sticky left-nav section-jump pattern (desktop) and horizontal chip nav (tablet/mobile) rather than accordion or tabs. | Solar engineers submit forms with ~27 fields spanning 5 logical sections. Section-jump nav lets them orient quickly, skip to the section they want to override, and keeps the submit button always visible without scrolling. Accordion/tabs hide content and require extra clicks. This pattern is standard in modern multi-section forms (Stripe, Notion). |
 | 2026-04-20 | 4 | `irradiance_source` is excluded from `LayoutInputSnapshot` / the version form. It is set by the energy engine (Spike 7) based on which irradiance source (PVGIS / NASA POWER / manual) was actually used, and stored on `EnergyJob.irradianceSource`. Users do not choose the irradiance source — the engine chooses automatically with fallback logic. | Including it in the form would give the user false control: they cannot force PVGIS if it is down, and the fallback sequence is an engine implementation detail. If manual override is needed in future, it can be added as an explicit feature. |
 | 2026-04-20 | 4 | `LayoutInputSnapshot` field names use Python `energy_calculator.py` `EnergyParameters` dataclass field names exactly (e.g. `inverter_eff_pct`, `dc_loss_pct`). All 27 input keys are typed fields on the interface, not `Record<string, unknown>`. | Typed snapshot catches mistakes at compile time. Using Python field names exactly means the Lambda function can deserialize `inputSnapshot` directly with zero key mapping. Consistency across the stack removes a class of bugs. |
+| 2026-04-20 | 4a | `LayoutInputSnapshot` initial draft used descriptive TypeScript names (e.g. `module_long`, `tilt_deg`, `road_width_m`) that did not match the Python Lambda's `_params_from_dict` keys. 16 of 27 fields were wrong — would have caused silent default fallbacks in production. Corrected to exact Python names: `module_length`, `tilt_angle`, `perimeter_road_width`, etc. | Cross-verified against `apps/layout-engine/src/handlers.py` `_params_from_dict` and `/Users/arunkpatra/codebase/PVlayout_Advance/models/project.py` `EnergyParameters`. Field names must be verified against Python source, not inferred. |
+| 2026-04-20 | 4a | `paginationArgs` extended to return `{ skip, take, page, pageSize }` so callers use the normalised values directly. Service functions must destructure all four values — never re-derive `page` or `pageSize` inline after calling `paginationArgs`. | Duplicate inline clamping would diverge from `paginationArgs` if defaults ever change. Single source of truth prevents silent pagination bugs. |
+| 2026-04-20 | 4b | `/dashboard` is the cockpit (stats, quick navigation), not a redirect to `/dashboard/projects`. The original 4b plan specified a server-side redirect, but the product intent is for `/dashboard` to be the top-level overview — a command centre the user lands on after login — with `/dashboard/projects` as one section within the app. The cockpit page will be built out with real stats and navigation in a future spike. | Raised during spike 4b local verification. A redirect wastes the route and gives the user no landing context. The cockpit pattern is standard in B2B SaaS (Stripe, Vercel, Linear all have a top-level overview distinct from sub-section lists). |
+| 2026-04-20 | 4b | `NavUser` sidebar footer uses `!isLoaded \|\| !user` guard to show a skeleton rather than the "User" fallback. Clerk's `useUser()` returns `user: null` on both initial client hydration and during sign-out. Without the guard, the fallback text flashes on every page load and every sign-out. | Discovered during spike 4b local and production verification. The fix follows Clerk's recommended `isLoaded` check pattern. |
 | 2026-04-20 | 4 | Version detail polling follows ADR-003: `refetchInterval` is a function receiving `query.state.data`; returns `false` at terminal state (COMPLETE/FAILED), `~3000 ms` (with 10% jitter) otherwise. `staleTime` 1 s active / 2 min terminal. No retry on 4xx; up to 3 retries on 5xx. | ADR-003 establishes the project polling standard. Consistent with how Journium handles long-running process polling. Jitter prevents thundering herd from multiple browser tabs. |

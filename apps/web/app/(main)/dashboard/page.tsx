@@ -1,14 +1,19 @@
 "use client"
 
-import { useCurrentUser } from "@/hooks/use-current-user"
+import { useBreadcrumbs } from "@/contexts/breadcrumbs-context"
+import * as React from "react"
 
-export default function Page() {
-  const { data: user, isLoading } = useCurrentUser()
+export default function DashboardPage() {
+  const { setBreadcrumbs } = useBreadcrumbs()
+
+  React.useEffect(() => {
+    setBreadcrumbs([{ label: "Overview" }])
+  }, [setBreadcrumbs])
 
   return (
     <div className="grid auto-rows-min gap-4 md:grid-cols-3">
       <div className="col-span-3 rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">
-        {isLoading ? "Loading…" : user ? `Signed in as ${user.name}` : null}
+        Dashboard overview — stats and quick navigation coming soon.
       </div>
       <div className="aspect-video rounded-xl bg-muted/50" />
       <div className="aspect-video rounded-xl bg-muted/50" />

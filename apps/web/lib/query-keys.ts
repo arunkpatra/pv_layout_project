@@ -13,10 +13,13 @@ export const queryKeys = {
   },
   projects: {
     all: () => ["projects"] as const,
-    lists: () => ["projects", "list"] as const,
+    lists: (params?: { page?: number; pageSize?: number }) =>
+      ["projects", "list", params] as const,
     detail: (projectId: string) => ["projects", projectId] as const,
     versions: {
       all: (projectId: string) => ["projects", projectId, "versions"] as const,
+      lists: (projectId: string, params?: { page?: number; pageSize?: number }) =>
+        ["projects", projectId, "versions", "list", params] as const,
       detail: (projectId: string, versionId: string) =>
         ["projects", projectId, "versions", versionId] as const,
     },

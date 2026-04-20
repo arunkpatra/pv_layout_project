@@ -1,83 +1,58 @@
 "use client"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@renewable-energy/ui/components/dropdown-menu"
+import * as React from "react"
+import Link from "next/link"
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
+  SidebarMenuSkeleton,
 } from "@renewable-energy/ui/components/sidebar"
-import { Ellipsis, Folder, Share2, Trash2 } from "lucide-react"
+import { LayoutGrid, Plus } from "lucide-react"
+import type { ProjectSummary } from "@renewable-energy/shared"
 
 export function NavProjects({
   projects,
+  isLoading,
 }: {
-  projects: {
-    name: string
-    url: string
-    icon: React.ReactNode
-  }[]
+  projects: ProjectSummary[]
+  isLoading: boolean
 }) {
-  const { isMobile } = useSidebar()
+  // SidebarMenuSkeleton uses Math.random() in its useState initializer.
+  // Rendering it on the server produces a different value than the client,
+  // causing a hydration mismatch. Gate skeleton rendering to client-only.
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Projects</SidebarGroupLabel>
       <SidebarMenu>
-        {projects.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <a href={item.url}>
-                {item.icon}
-                <span>{item.name}</span>
-              </a>
-            </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction
-                  showOnHover
-                  className="aria-expanded:bg-muted"
-                >
-                  <Ellipsis
-                  />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-48 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <Folder className="text-muted-foreground" />
-                  <span>View Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Share2 className="text-muted-foreground" />
-                  <span>Share Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
-                  <span>Delete Project</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        ))}
+        {mounted && isLoading ? (
+          <>
+            <SidebarMenuSkeleton />
+            <SidebarMenuSkeleton />
+          </>
+        ) : !isLoading ? (
+          projects.slice(0, 5).map((project) => (
+            <SidebarMenuItem key={project.id}>
+              <SidebarMenuButton asChild>
+                <Link href={`/dashboard/projects/${project.id}`}>
+                  <LayoutGrid />
+                  <span>{project.name}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))
+        ) : null}
         <SidebarMenuItem>
-          <SidebarMenuButton className="text-sidebar-foreground/70">
-            <Ellipsis className="text-sidebar-foreground/70" />
-            <span>More</span>
+          <SidebarMenuButton asChild>
+            <Link href="/dashboard/projects">
+              <Plus />
+              <span>All projects</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
