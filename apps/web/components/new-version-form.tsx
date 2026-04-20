@@ -11,7 +11,12 @@ import { Alert, AlertDescription } from "@renewable-energy/ui/components/alert"
 import { Input } from "@renewable-energy/ui/components/input"
 import { Label } from "@renewable-energy/ui/components/label"
 import { cn } from "@renewable-energy/ui/lib/utils"
-import { Upload, X } from "lucide-react"
+import { Upload, X, Info } from "lucide-react"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@renewable-energy/ui/components/tooltip"
 import {
   Select,
   SelectContent,
@@ -109,19 +114,31 @@ function NumericField({
   id,
   label,
   unit,
+  tooltip,
   register: reg,
   error,
 }: {
   id: string
   label: string
   unit?: string
+  tooltip?: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register: any
   error?: string
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={id}>{label}</Label>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[260px] text-xs">{tooltip}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <Input id={id} type="number" step="any" className="flex-1" {...reg} />
         {unit && <span className="text-sm text-muted-foreground shrink-0">{unit}</span>}
@@ -137,6 +154,7 @@ function OverrideField({
   id,
   label,
   unit,
+  tooltip,
   enabled,
   onToggle,
   field,
@@ -145,6 +163,7 @@ function OverrideField({
   id: string
   label: string
   unit?: string
+  tooltip?: string
   enabled: boolean
   onToggle: (on: boolean) => void
   field: { value: number | null; onChange: (v: number | null) => void }
@@ -159,9 +178,19 @@ function OverrideField({
           onCheckedChange={onToggle}
           aria-label={`Override ${label}`}
         />
-        <Label htmlFor={id} className={enabled ? "" : "text-muted-foreground"}>
-          {label}
-        </Label>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor={id} className={enabled ? "" : "text-muted-foreground"}>
+            {label}
+          </Label>
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[260px] text-xs">{tooltip}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <Input
@@ -459,6 +488,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                 id="module-length"
                 label="Module length"
                 unit="m"
+                tooltip="Length of the module along the long side (2-up portrait). Typical: 2.3–2.5 m for 72-cell modules."
                 register={register("module_length", { valueAsNumber: true })}
                 error={errors.module_length?.message}
               />
@@ -466,6 +496,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                 id="module-width"
                 label="Module width"
                 unit="m"
+                tooltip="Width of the module along the short side. Typical: 1.0–1.2 m."
                 register={register("module_width", { valueAsNumber: true })}
                 error={errors.module_width?.message}
               />
@@ -473,6 +504,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                 id="module-wattage"
                 label="Wattage"
                 unit="Wp"
+                tooltip="Module peak wattage under standard test conditions (STC). Used for capacity and energy calculations."
                 register={register("module_wattage", { valueAsNumber: true })}
                 error={errors.module_wattage?.message}
               />
@@ -502,12 +534,14 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
               <NumericField
                 id="modules-in-row"
                 label="Modules per row"
+                tooltip="Number of modules connected in series within a single string (one row of a table)."
                 register={register("modules_in_row", { valueAsNumber: true })}
                 error={errors.modules_in_row?.message}
               />
               <NumericField
                 id="rows-per-table"
                 label="Rows per table"
+                tooltip="Number of parallel strings stacked in a table. 2 rows = 2-portrait, 1 row = 1-portrait."
                 register={register("rows_per_table", { valueAsNumber: true })}
                 error={errors.rows_per_table?.message}
               />
@@ -515,6 +549,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                 id="table-gap-ew"
                 label="East–west gap"
                 unit="m"
+                tooltip="Horizontal gap between adjacent tables in the east–west direction. Allows maintenance access."
                 register={register("table_gap_ew", { valueAsNumber: true })}
                 error={errors.table_gap_ew?.message}
               />
@@ -531,6 +566,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                     id="tilt-angle"
                     label="Tilt angle"
                     unit="°"
+                    tooltip="Panel tilt from horizontal. Auto-computes the optimal tilt from site latitude using 0.76 × |lat| + 3.1°, clipped to 5–40°. Override only if project specs require a fixed tilt."
                     enabled={tiltOverride}
                     onToggle={(on) => {
                       setTiltOverride(on)
@@ -549,6 +585,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                     id="row-spacing"
                     label="Row pitch"
                     unit="m"
+                    tooltip="Centre-to-centre distance between table rows. Auto-computes from shadow geometry at winter solstice. Override to match a specific GCR or spacing constraint."
                     enabled={rowSpacingOverride}
                     onToggle={(on) => {
                       setRowSpacingOverride(on)
@@ -566,6 +603,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   <OverrideField
                     id="gcr"
                     label="GCR"
+                    tooltip="Ground Coverage Ratio: table height ÷ row pitch. If set, overrides the auto-computed row pitch. Higher GCR = denser layout; typical range 0.3–0.5."
                     enabled={gcrOverride}
                     onToggle={(on) => {
                       setGcrOverride(on)
@@ -580,6 +618,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                 id="road-width"
                 label="Perimeter road width"
                 unit="m"
+                tooltip="Width of the perimeter road inset from the site boundary. The engine excludes this band from panel placement."
                 register={register("perimeter_road_width", { valueAsNumber: true })}
                 error={errors.perimeter_road_width?.message}
               />
@@ -591,6 +630,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
               <NumericField
                 id="max-strings"
                 label="Max strings per inverter"
+                tooltip="Maximum number of solar strings connectable to a single inverter. 1 string = 1 row of modules in a table. Check your inverter datasheet."
                 register={register("max_strings_per_inverter", { valueAsNumber: true })}
                 error={errors.max_strings_per_inverter?.message}
               />
@@ -611,6 +651,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="ghi"
                   label="GHI"
                   unit="kWh/m²/yr"
+                  tooltip="Global Horizontal Irradiance — annual solar energy on a horizontal surface. Obtain from PVGIS or NASA POWER for the site location."
                   register={register("ghi_kwh_m2_yr", { valueAsNumber: true })}
                   error={errors.ghi_kwh_m2_yr?.message}
                 />
@@ -618,6 +659,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="gti"
                   label="GTI (in-plane)"
                   unit="kWh/m²/yr"
+                  tooltip="Global Tilted Irradiance — annual in-plane irradiance at the panel tilt. Higher than GHI for optimally tilted surfaces. Obtain from PVGIS or enter manually."
                   register={register("gti_kwh_m2_yr", { valueAsNumber: true })}
                   error={errors.gti_kwh_m2_yr?.message}
                 />
@@ -638,6 +680,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="inverter-efficiency"
                   label="Inverter efficiency"
                   unit="%"
+                  tooltip="Inverter DC→AC conversion efficiency. Typical: 96–98 % for modern string inverters."
                   register={register("inverter_efficiency_pct", {
                     valueAsNumber: true,
                   })}
@@ -647,6 +690,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="dc-cable-loss"
                   label="DC cable losses"
                   unit="%"
+                  tooltip="DC wiring losses from module terminals to inverter input. Typical: 1.5–2.5 %."
                   register={register("dc_cable_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -656,6 +700,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="ac-cable-loss"
                   label="AC cable losses"
                   unit="%"
+                  tooltip="AC wiring losses from inverter output to metering point. Typical: 0.5–1.5 %."
                   register={register("ac_cable_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -665,6 +710,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="soiling-loss"
                   label="Soiling losses"
                   unit="%"
+                  tooltip="Losses from dust, bird droppings, and surface contamination. Typical: 2–6 % in Indian conditions."
                   register={register("soiling_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -674,6 +720,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="temperature-loss"
                   label="Temperature losses"
                   unit="%"
+                  tooltip="Module power derating at elevated cell temperature. Typical: 5–8 % in hot climates. Depends on NOCT and temperature coefficient."
                   register={register("temperature_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -683,6 +730,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="mismatch-loss"
                   label="Module mismatch"
                   unit="%"
+                  tooltip="Power loss from mismatch between modules in a string. Typical: 1–3 %."
                   register={register("mismatch_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -692,6 +740,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="shading-loss"
                   label="Shading losses"
                   unit="%"
+                  tooltip="Near-shading losses from obstructions and horizon profile. Typical: 1–3 % in open sites."
                   register={register("shading_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -701,6 +750,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="availability"
                   label="Availability"
                   unit="%"
+                  tooltip="Plant availability factor accounting for scheduled and unscheduled downtime. Typical: 97–99 %."
                   register={register("availability_pct", {
                     valueAsNumber: true,
                   })}
@@ -710,6 +760,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="transformer-loss"
                   label="Transformer losses"
                   unit="%"
+                  tooltip="MV transformer losses. Typical: 0.5–1.5 %."
                   register={register("transformer_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -719,6 +770,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="other-loss"
                   label="Other losses"
                   unit="%"
+                  tooltip="Monitoring, auxiliary consumption, and miscellaneous losses. Typical: 0.5–1 %."
                   register={register("other_loss_pct", {
                     valueAsNumber: true,
                   })}
@@ -737,6 +789,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="first-year-deg"
                   label="1st year degradation"
                   unit="%"
+                  tooltip="First-year LID (Light Induced Degradation). Typical: 1.5–3 % for mono-PERC and HJT modules."
                   register={register("first_year_degradation_pct", {
                     valueAsNumber: true,
                   })}
@@ -746,6 +799,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="annual-deg"
                   label="Annual degradation"
                   unit="%/yr"
+                  tooltip="Annual power degradation from Year 2 onwards. Typical: 0.4–0.7 %/year for premium modules."
                   register={register("annual_degradation_pct", {
                     valueAsNumber: true,
                   })}
@@ -755,6 +809,7 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
                   id="plant-lifetime"
                   label="Plant lifetime"
                   unit="years"
+                  tooltip="Design lifetime for energy yield forecasting. Standard: 25 years. Use 30 for bankability projections."
                   register={register("plant_lifetime_years", {
                     valueAsNumber: true,
                   })}
