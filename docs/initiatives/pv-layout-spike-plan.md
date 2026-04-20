@@ -100,8 +100,8 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | complete | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | complete | Spike 4d |
 | 5a | [Stats Dashboard](#spike-5a--stats-dashboard) | planned | Spike 4 |
-| 5b | [SVG Fetch + Render](#spike-5b--svg-fetch--render) | in-progress | Spike 5a |
-| 5c | [Zoom/Pan + Layer Toggles](#spike-5c--zoompan--layer-toggles) | in-progress | Spike 5b |
+| 5b | [SVG Fetch + Render](#spike-5b--svg-fetch--render) | complete | Spike 5a |
+| 5c | [Zoom/Pan + Layer Toggles](#spike-5c--zoompan--layer-toggles) | complete | Spike 5b |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5b |
 | 7 | [Energy Job](#spike-7--energy-job) | planned | Spike 3f |
 | 8 | [PDF Download](#spike-8--pdf-download) | planned | Spike 7 |
@@ -1126,7 +1126,7 @@ Shown once `energyJob.status === "COMPLETE"`. Shown as a "pending" card section 
 
 ## Spike 5b — SVG Fetch + Render
 
-**Status:** in-progress — local dev verified 2026-04-20, CI/CD and production pending  
+**Status:** complete — verified local dev, CI/CD, and production 2026-04-20  
 **Depends on:** Spike 5a (built concurrently with 5c; stats dashboard deferred)
 
 ### What we're building
@@ -1143,17 +1143,17 @@ Add a pre-signed SVG URL to the version detail API response and render the SVG i
 ### Acceptance Criteria
 
 - [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [x] SVG renders correctly for a real completed run — verified local dev
+- [x] SVG renders correctly for a real completed run — verified local dev and production
 - [x] SVG is not shown for runs that have no SVG artifact
 - [x] Pre-signed URL is correctly generated server-side
-- [ ] Verified in CI/CD
-- [ ] Verified in production
+- [x] Verified in CI/CD
+- [x] Verified in production
 
 ---
 
 ## Spike 5c — Zoom/Pan + Layer Toggles
 
-**Status:** in-progress — local dev verified 2026-04-20, CI/CD and production pending  
+**Status:** complete — verified local dev, CI/CD, and production 2026-04-20  
 **Depends on:** Spike 5b
 
 ### What we're building
@@ -1180,15 +1180,15 @@ Add interactivity to the static SVG preview from Spike 5b: zoom/pan and layer to
 ### Acceptance Criteria
 
 - [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [x] Zoom/pan works smoothly on a real layout SVG — verified local dev
-- [x] Reset Zoom button snaps back to default — verified local dev
-- [x] Rotate button cycles 0 → 90 → 180 → 270 → 0 — verified local dev
-- [x] AC Cables toggle shows/hides correct SVG group — verified local dev
-- [x] DC Cables toggle shows/hides correct SVG group — verified local dev
-- [x] Lightning Arresters toggle shows/hides both `#la-footprints` and `#la-circles` — verified local dev
-- [x] Toggles default to off (layers hidden on load) — verified local dev
-- [ ] Verified in CI/CD
-- [ ] Verified in production
+- [x] Zoom/pan works smoothly on a real layout SVG — verified local dev and production
+- [x] Reset Zoom button snaps back to default — verified local dev and production
+- [x] Rotate button cycles 0 → 90 → 180 → 270 → 0 — verified local dev and production
+- [x] AC Cables toggle shows/hides correct SVG group — verified local dev and production
+- [x] DC Cables toggle shows/hides correct SVG group — verified local dev and production
+- [x] Lightning Arresters toggle shows/hides both `#la-footprints` and `#la-circles` — verified local dev and production
+- [x] Toggles default to off (layers hidden on load) — verified local dev and production
+- [x] Verified in CI/CD
+- [x] Verified in production
 
 ---
 
