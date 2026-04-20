@@ -83,14 +83,15 @@ If a step fails, stop the sequence. Diagnose and fix before resuming. Do not pre
 
 ### Definition of Done for a Spike
 
-A spike (or sub-spike) is **not done** until all four of the following are confirmed — in this order:
+A spike (or sub-spike) is **not done** until all five of the following are confirmed — in this order:
 
 1. **Automated gates** — `bun run lint && bun run typecheck && bun run test && bun run build` all pass from repo root
 2. **Human local verification** — human has run each acceptance step in a real local environment and confirmed each one
 3. **CI/CD checks pass** — human pushes the branch and confirms all CI checks pass in the pipeline
-4. **Explicit human sign-off** — human says the spike is done; Claude never declares a spike complete unilaterally
+4. **Production verification** — merge to main, wait for production deployment, then repeat the same verification steps against the production API/UI
+5. **Explicit human sign-off** — human says the spike is done; Claude never declares a spike complete unilaterally
 
-Do not begin the next spike until the human has confirmed all four. Wait — do not prompt.
+Do not begin the next spike until the human has confirmed all five. Wait — do not prompt.
 
 ### On Completion
 

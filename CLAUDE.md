@@ -25,6 +25,20 @@ Each app and package has its own `CLAUDE.md` with specifics — read it when wor
 - "Gates pass" is not done. Done = tests written first + all gates pass + human has confirmed runtime behavior.
 - For significant work (5+ files, new infrastructure, new patterns): run `superpowers:code-reviewer` before declaring complete.
 
+## ⛔ NON-NEGOTIABLE: Spike / Sub-Spike Definition of Done
+
+> See full protocol: **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)**
+
+A spike or sub-spike is **NEVER done** until ALL FIVE conditions are confirmed — in this exact order. Do not skip any step. Do not declare done early.
+
+1. **Automated gates** — `bun run lint && bun run typecheck && bun run test && bun run build` all pass from repo root
+2. **Human local verification** — human runs every acceptance step in local dev and confirms each one, one step at a time
+3. **CI/CD passes** — human pushes the branch and confirms all pipeline checks pass
+4. **Production verification** — merge to main, wait for production deployment, repeat every acceptance step against the production environment
+5. **Explicit human sign-off** — human says the spike is done; Claude never declares it complete
+
+**Violations of this protocol are process failures. No exceptions.**
+
 ## Pre-commit Gate
 
 Run from repo root before every commit — all four must pass:
