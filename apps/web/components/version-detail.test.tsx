@@ -73,8 +73,17 @@ const ENERGY_COMPLETE_VERSION: VersionDetailType = {
   },
 }
 
+const SVG_VERSION: VersionDetailType = {
+  ...COMPLETE_VERSION,
+  svgPresignedUrl: "https://s3.example.com/layout.svg?X-Amz-Expires=3600",
+}
+
 vi.mock("@/hooks/use-version", () => ({
   useVersion: vi.fn(),
+}))
+
+vi.mock("./svg-preview", () => ({
+  SvgPreview: () => <div data-testid="svg-preview" />,
 }))
 
 import { useVersion } from "@/hooks/use-version"
@@ -282,4 +291,28 @@ test("renders energy stat cards when energyJob is COMPLETE", () => {
   expect(screen.getByText("19.7 %")).toBeInTheDocument()
   expect(screen.getByText("Irradiance source")).toBeInTheDocument()
   expect(screen.getByText("PVGIS")).toBeInTheDocument()
+})
+
+test("renders SvgPreview when svgPresignedUrl is set", () => {
+  mockUseVersion.mockReturnValue({
+    data: SVG_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.getByTestId("svg-preview")).toBeInTheDocument()
+})
+
+test("does not render SvgPreview when svgPresignedUrl is null", () => {
+  mockUseVersion.mockReturnValue({
+    data: COMPLETE_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.queryByTestId("svg-preview")).not.toBeInTheDocument()
 })
