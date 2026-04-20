@@ -17,6 +17,8 @@ import type {
 
 // ─── Shapers ───────────────────────────────────────────────────────────────────
 
+type ShapedVersion = Omit<VersionDetail, "svgPresignedUrl">
+
 function shapeProject(p: {
   id: string
   userId: string
@@ -116,7 +118,7 @@ function shapeVersion(v: {
   energyJob: Parameters<typeof shapeEnergyJob>[0]
   createdAt: Date
   updatedAt: Date
-}): Omit<VersionDetail, "svgPresignedUrl"> {
+}): ShapedVersion {
   return {
     id: v.id,
     projectId: v.projectId,
