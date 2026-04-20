@@ -72,3 +72,11 @@ test("does not fetch when versionId is empty", () => {
   expect(result.current.fetchStatus).toBe("idle")
   expect(mockGetVersion).not.toHaveBeenCalled()
 })
+
+test("does not fetch when projectId is empty", () => {
+  const { result } = renderHook(() => useVersion("", "ver_1"), {
+    wrapper: createWrapper(),
+  })
+  expect(result.current.fetchStatus).toBe("idle")
+  expect(mockGetVersion).not.toHaveBeenCalled()
+})
