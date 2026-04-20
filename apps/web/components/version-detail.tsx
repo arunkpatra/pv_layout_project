@@ -44,6 +44,32 @@ const METRIC_LABELS: {
   { key: "total_ac_cable_m", label: "AC cable", unit: "m" },
 ]
 
+interface EnergyStats {
+  irradiance_source: string
+  ghi_kwh_m2_yr: number
+  gti_kwh_m2_yr: number
+  performance_ratio: number
+  specific_yield_kwh_kwp_yr: number
+  year1_energy_mwh: number
+  cuf_pct: number
+  lifetime_energy_mwh: number
+}
+
+const ENERGY_LABELS: {
+  key: keyof EnergyStats
+  label: string
+  unit: string
+}[] = [
+  { key: "irradiance_source", label: "Irradiance source", unit: "" },
+  { key: "ghi_kwh_m2_yr", label: "GHI", unit: "kWh/m²/yr" },
+  { key: "gti_kwh_m2_yr", label: "GTI (in-plane)", unit: "kWh/m²/yr" },
+  { key: "performance_ratio", label: "Performance ratio", unit: "" },
+  { key: "specific_yield_kwh_kwp_yr", label: "Specific yield", unit: "kWh/kWp/yr" },
+  { key: "year1_energy_mwh", label: "Year 1 energy", unit: "MWh" },
+  { key: "cuf_pct", label: "CUF", unit: "%" },
+  { key: "lifetime_energy_mwh", label: "25-year energy", unit: "MWh" },
+]
+
 function calcElapsed(since: string): string {
   const secs = Math.max(
     0,
@@ -111,6 +137,11 @@ function FailedState({
 
 function CompleteState({ version }: { version: VersionDetailType }) {
   const stats = version.layoutJob?.statsJson as LayoutStats | null
+  const energyStats =
+    version.energyJob?.status === "COMPLETE"
+      ? (version.energyJob.statsJson as EnergyStats | null)
+      : null
+
   return (
     <div className="flex flex-col gap-6">
       <VersionStatusBadge status="COMPLETE" />
@@ -131,6 +162,26 @@ function CompleteState({ version }: { version: VersionDetailType }) {
           Layout complete. Statistics are not available for this run.
         </p>
       )}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-muted-foreground">Energy</p>
+        {energyStats ? (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {ENERGY_LABELS.map(({ key, label, unit }) => (
+              <div key={key} className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {String(energyStats[key])}
+                  {unit ? ` ${unit}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            Energy calculation not yet available
+          </div>
+        )}
+      </div>
     </div>
   )
 }
