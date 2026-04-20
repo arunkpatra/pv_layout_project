@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/hooks/use-projects"
 import { useBreadcrumbs } from "@/contexts/breadcrumbs-context"
@@ -64,9 +65,9 @@ export default function ProjectsPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {data.items.map((project) => (
-            <button
+            <Link
               key={project.id}
-              onClick={() => router.push(`/dashboard/projects/${project.id}`)}
+              href={`/dashboard/projects/${project.id}`}
               className="flex items-center justify-between rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent"
             >
               <div className="flex flex-col gap-0.5">
@@ -77,7 +78,7 @@ export default function ProjectsPage() {
                 </span>
               </div>
               <StatusBadge status={project.latestVersionStatus} />
-            </button>
+            </Link>
           ))}
         </div>
       )}
