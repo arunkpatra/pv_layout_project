@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@renewable-energy/ui/components/alert"
 import { Button } from "@renewable-energy/ui/components/button"
 import { VersionStatusBadge } from "./version-status-badge"
+import { SvgPreview } from "./svg-preview"
 import { useVersion } from "@/hooks/use-version"
 import type { VersionDetail as VersionDetailType } from "@renewable-energy/shared"
 
@@ -147,6 +148,9 @@ function CompleteState({ version }: { version: VersionDetailType }) {
       <VersionStatusBadge status="COMPLETE" />
       {stats ? (
         <>
+          {version.svgPresignedUrl && (
+            <SvgPreview svgUrl={version.svgPresignedUrl} />
+          )}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {METRIC_LABELS.map(({ key, label, unit }) => (
               <div key={key} className="rounded-lg border p-4">

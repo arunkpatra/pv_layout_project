@@ -135,9 +135,12 @@ mock.module("../../lib/db.js", () => ({
   },
 }))
 
+const mockGetPresignedUrl = mock(() =>
+  Promise.resolve("https://s3.example.com/presigned-url"),
+)
 mock.module("../../lib/s3.js", () => ({
   uploadToS3: mock(() => Promise.resolve()),
-  getPresignedUrl: mock(() => Promise.resolve(null)),
+  getPresignedUrl: mockGetPresignedUrl,
 }))
 
 import {
@@ -369,6 +372,7 @@ describe("getVersion", () => {
   beforeEach(() => {
     mockProjectFindUnique.mockClear()
     mockVersionFindUnique.mockClear()
+    mockGetPresignedUrl.mockClear()
   })
 
   test("returns version detail when owned by user", async () => {
@@ -399,6 +403,35 @@ describe("getVersion", () => {
     await expect(getVersion(mockDbVersion.id, mockDbProject.userId)).rejects.toThrow(
       ForbiddenError,
     )
+  })
+
+  test("getVersion includes svgPresignedUrl: null when svgArtifactS3Key is null", async () => {
+    // mockVersionFindUnique default returns layoutJob: null — so svgArtifactS3Key is absent
+    const result = await getVersion(mockDbVersion.id, mockDbProject.userId)
+    expect(result.svgPresignedUrl).toBeNull()
+  })
+
+  test("getVersion includes svgPresignedUrl when svgArtifactS3Key is set", async () => {
+    mockGetPresignedUrl.mockResolvedValueOnce("https://s3.example.com/presigned-url")
+    mockVersionFindUnique.mockResolvedValueOnce({
+      ...mockDbVersion,
+      project: { userId: mockDbProject.userId },
+      layoutJob: {
+        id: "ljo_testLayoutJob000000000000000000000000",
+        status: "COMPLETE",
+        kmzArtifactS3Key: null,
+        svgArtifactS3Key: "output/layout.svg",
+        dxfArtifactS3Key: null,
+        statsJson: null,
+        errorDetail: null,
+        startedAt: null,
+        completedAt: null,
+      },
+      energyJob: null,
+    } as any)
+    const result = await getVersion(mockDbVersion.id, mockDbProject.userId)
+    expect(result.svgPresignedUrl).toBe("https://s3.example.com/presigned-url")
+    expect(mockGetPresignedUrl).toHaveBeenCalledWith("output/layout.svg")
   })
 })
 
