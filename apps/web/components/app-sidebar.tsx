@@ -117,7 +117,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavProjects projects={data?.items ?? []} isLoading={isLoading} />
+        <NavProjects
+          projects={data?.items ?? []}
+          isLoading={!isLoaded || isLoading}
+        />
       </SidebarContent>
       <SidebarFooter>
         {!isLoaded || !user ? (
