@@ -42,6 +42,68 @@ If the human explicitly asks for a full test checklist upfront (e.g. "give me ev
 
 ---
 
+## Environment URLs
+
+**ALWAYS read these from source before giving any URL to the human. Never guess or remember URLs.**
+
+| Environment | How to find the URL |
+|---|---|
+| Local API | `http://localhost:3001` (default Hono dev port) |
+| Local Web | `http://localhost:3000` (default Next.js dev port) |
+| Production API | Read `NEXT_PUBLIC_API_URL` from `.env.production` at repo root |
+| Production Web | Read `CORS_ORIGINS` from `.env.production` at repo root |
+
+**Current production values (verify against `.env.production` before using):**
+- API: `https://renewable-energy-api.vercel.app`
+- Web: `https://renewable-energy-web.vercel.app`
+
+---
+
+## Starting Individual Apps for Testing
+
+Never use `bun run dev` from repo root during testing — it starts all apps. Start only what is needed:
+
+```bash
+# From repo root — start API only
+bunx turbo dev --filter=@renewable-energy/api
+
+# From repo root — start web only
+bunx turbo dev --filter=@renewable-energy/web
+```
+
+Always tell the human which directory to run the command from.
+
+---
+
+## Making Authenticated API Calls from the Browser Console
+
+The API requires a valid Clerk JWT. **Never use a hardcoded Bearer token.** Always get a real token from the running web app session.
+
+**Pattern for all browser console API calls:**
+
+```javascript
+const t = await window.Clerk.session.getToken();
+const r = await fetch('<API_URL>/<endpoint>', { headers: { Authorization: `Bearer ${t}` } });
+console.log(await r.json())
+```
+
+**Local example:**
+```javascript
+const t = await window.Clerk.session.getToken(); const r = await fetch('http://localhost:3001/projects', { headers: { Authorization: `Bearer ${t}` } }); console.log(await r.json())
+```
+
+**Production example:**
+```javascript
+const t = await window.Clerk.session.getToken(); const r = await fetch('https://renewable-energy-api.vercel.app/projects', { headers: { Authorization: `Bearer ${t}` } }); console.log(await r.json())
+```
+
+**Requirements:**
+- Must be run in the browser console on the running web app (local or production)
+- The user must be signed in — `window.Clerk.session` must be non-null
+- Production console: open the production web app URL, sign in, then run from the console
+
+---
+
 ## Spike Acceptance Testing
 
 Spike testing follows the same one-at-a-time rule, with additional structure:
@@ -73,7 +135,7 @@ Wait. Then:
 
 Each step follows this pattern:
 - Label: **Step N of Total — what this checks**
-- Command block (exact command to run)
+- Command block (exact command to run, with directory prefix if not repo root)
 - One yes/no question about the expected outcome
 - Nothing else
 
@@ -88,11 +150,11 @@ A spike (or sub-spike) is **not done** until all five of the following are confi
 1. **Automated gates** — `bun run lint && bun run typecheck && bun run test && bun run build` all pass from repo root
 2. **Human local verification** — human has run each acceptance step in a real local environment and confirmed each one
 3. **CI/CD checks pass** — human pushes the branch and confirms all CI checks pass in the pipeline
-4. **Production verification** — merge to main, wait for production deployment, then repeat the same verification steps against the production API/UI
+4. **Production verification** — merge to main, wait for production deployment, repeat every acceptance step against the production environment
 5. **Explicit human sign-off** — human says the spike is done; Claude never declares a spike complete unilaterally
 
 Do not begin the next spike until the human has confirmed all five. Wait — do not prompt.
 
 ### On Completion
 
-Only after all four definition-of-done conditions are met, state what the next spike is. Do not begin it until the human explicitly says to proceed.
+Only after all five definition-of-done conditions are met, state what the next spike is. Do not begin it until the human explicitly says to proceed.

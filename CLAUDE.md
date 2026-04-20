@@ -6,8 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 - **[Architecture and Decisions](./docs/architecture.md)** — Stack, ownership boundaries, build order, rationale.
 - **[Development Principles](./docs/claude-dev-principles.md)** — Spike-first, verification protocol, anti-patterns, self-review.
-- **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** — One question at a time. Never dump a test list.
+- **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** — One question at a time. Never dump a test list. Environment URLs. Browser console auth pattern. Definition of done.
 - **[UX Design Principles](./docs/ux-design.md)** — Nova theme, shadcn primitives, icon/colour/typography conventions.
+
+## ⛔ NON-NEGOTIABLE: Environment URLs
+
+**NEVER hardcode or guess environment URLs.** Always read from `.env.production` at repo root before giving any URL to the human.
+
+| Environment | URL source |
+|---|---|
+| Production API | `NEXT_PUBLIC_API_URL` in `.env.production` |
+| Production Web | `CORS_ORIGINS` in `.env.production` |
+| Local API | `http://localhost:3001` |
+| Local Web | `http://localhost:3000` |
+
+## ⛔ NON-NEGOTIABLE: Browser Console API Testing
+
+All authenticated API calls from the browser console must use a real Clerk token — never a hardcoded string. See **[Collaborative Testing Protocol](./docs/collaborative-testing-protocol.md)** for the exact pattern.
 
 Each app and package has its own `CLAUDE.md` with specifics — read it when working in that directory.
 
