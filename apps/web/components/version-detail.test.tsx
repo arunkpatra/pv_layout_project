@@ -38,12 +38,38 @@ const COMPLETE_VERSION: VersionDetailType = {
       total_dc_cable_m: 5200.5,
       total_ac_cable_m: 800.2,
       num_las: 12,
+      row_pitch_m: 6.5,
+      gcr_achieved: 0.346,
+      inverter_capacity_kwp: 29.12,
     },
     errorDetail: null,
     startedAt: "2026-04-20T00:00:00Z",
     completedAt: "2026-04-20T00:05:00Z",
   },
   energyJob: null,
+}
+
+const ENERGY_COMPLETE_VERSION: VersionDetailType = {
+  ...COMPLETE_VERSION,
+  energyJob: {
+    id: "ej_1",
+    status: "COMPLETE",
+    pdfArtifactS3Key: "output/report.pdf",
+    statsJson: {
+      irradiance_source: "PVGIS",
+      ghi_kwh_m2_yr: 1850,
+      gti_kwh_m2_yr: 2100,
+      performance_ratio: 0.82,
+      specific_yield_kwh_kwp_yr: 1722,
+      year1_energy_mwh: 3356.7,
+      cuf_pct: 19.7,
+      lifetime_energy_mwh: 77450,
+    },
+    irradianceSource: "PVGIS",
+    errorDetail: null,
+    startedAt: "2026-04-20T00:05:00Z",
+    completedAt: "2026-04-20T00:06:00Z",
+  },
 }
 
 vi.mock("@/hooks/use-version", () => ({
@@ -205,4 +231,54 @@ test("renders error state when data is undefined and not loading", () => {
     wrapper: createWrapper(),
   })
   expect(screen.getByText(/failed to load run details/i)).toBeInTheDocument()
+})
+
+test("renders row pitch, GCR, and inverter capacity stat cards when COMPLETE", () => {
+  mockUseVersion.mockReturnValue({
+    data: COMPLETE_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.getByText("Row pitch")).toBeInTheDocument()
+  expect(screen.getByText("6.5 m")).toBeInTheDocument()
+  expect(screen.getByText("GCR")).toBeInTheDocument()
+  expect(screen.getByText("0.346")).toBeInTheDocument()
+  expect(screen.getByText("Inverter capacity")).toBeInTheDocument()
+  expect(screen.getByText("29.12 kWp")).toBeInTheDocument()
+})
+
+test("renders energy pending state when energyJob is null", () => {
+  mockUseVersion.mockReturnValue({
+    data: COMPLETE_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(
+    screen.getByText(/energy calculation not yet available/i),
+  ).toBeInTheDocument()
+})
+
+test("renders energy stat cards when energyJob is COMPLETE", () => {
+  mockUseVersion.mockReturnValue({
+    data: ENERGY_COMPLETE_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(<VersionDetail projectId="prj_123" versionId="ver_1" />, {
+    wrapper: createWrapper(),
+  })
+  expect(screen.getByText("Year 1 energy")).toBeInTheDocument()
+  expect(screen.getByText("3356.7 MWh")).toBeInTheDocument()
+  expect(screen.getByText("GHI")).toBeInTheDocument()
+  expect(screen.getByText("1850 kWh/m²/yr")).toBeInTheDocument()
+  expect(screen.getByText("CUF")).toBeInTheDocument()
+  expect(screen.getByText("19.7 %")).toBeInTheDocument()
+  expect(screen.getByText("Irradiance source")).toBeInTheDocument()
+  expect(screen.getByText("PVGIS")).toBeInTheDocument()
 })

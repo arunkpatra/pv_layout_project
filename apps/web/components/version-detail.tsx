@@ -20,6 +20,9 @@ interface LayoutStats {
   total_dc_cable_m: number
   total_ac_cable_m: number
   num_las: number
+  row_pitch_m: number
+  gcr_achieved: number
+  inverter_capacity_kwp: number
 }
 
 const METRIC_LABELS: {
@@ -31,11 +34,40 @@ const METRIC_LABELS: {
   { key: "total_modules", label: "Modules", unit: "" },
   { key: "total_tables", label: "Tables", unit: "" },
   { key: "total_area_acres", label: "Area", unit: "acres" },
+  { key: "row_pitch_m", label: "Row pitch", unit: "m" },
+  { key: "gcr_achieved", label: "GCR", unit: "" },
   { key: "num_string_inverters", label: "String inverters", unit: "" },
+  { key: "inverter_capacity_kwp", label: "Inverter capacity", unit: "kWp" },
   { key: "num_icrs", label: "ICRs", unit: "" },
   { key: "num_las", label: "Lightning arresters", unit: "" },
   { key: "total_dc_cable_m", label: "DC cable", unit: "m" },
   { key: "total_ac_cable_m", label: "AC cable", unit: "m" },
+]
+
+interface EnergyStats {
+  irradiance_source: string
+  ghi_kwh_m2_yr: number
+  gti_kwh_m2_yr: number
+  performance_ratio: number
+  specific_yield_kwh_kwp_yr: number
+  year1_energy_mwh: number
+  cuf_pct: number
+  lifetime_energy_mwh: number
+}
+
+const ENERGY_LABELS: {
+  key: keyof EnergyStats
+  label: string
+  unit: string
+}[] = [
+  { key: "irradiance_source", label: "Irradiance source", unit: "" },
+  { key: "ghi_kwh_m2_yr", label: "GHI", unit: "kWh/m²/yr" },
+  { key: "gti_kwh_m2_yr", label: "GTI (in-plane)", unit: "kWh/m²/yr" },
+  { key: "performance_ratio", label: "Performance ratio", unit: "" },
+  { key: "specific_yield_kwh_kwp_yr", label: "Specific yield", unit: "kWh/kWp/yr" },
+  { key: "year1_energy_mwh", label: "Year 1 energy", unit: "MWh" },
+  { key: "cuf_pct", label: "CUF", unit: "%" },
+  { key: "lifetime_energy_mwh", label: "25-year energy", unit: "MWh" },
 ]
 
 function calcElapsed(since: string): string {
@@ -105,21 +137,48 @@ function FailedState({
 
 function CompleteState({ version }: { version: VersionDetailType }) {
   const stats = version.layoutJob?.statsJson as LayoutStats | null
+  const energyStats =
+    version.energyJob?.status === "COMPLETE"
+      ? (version.energyJob.statsJson as EnergyStats | null)
+      : null
+
   return (
     <div className="flex flex-col gap-6">
       <VersionStatusBadge status="COMPLETE" />
       {stats ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {METRIC_LABELS.map(({ key, label, unit }) => (
-            <div key={key} className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="mt-1 text-lg font-semibold">
-                {stats[key]}
-                {unit ? ` ${unit}` : ""}
-              </p>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {METRIC_LABELS.map(({ key, label, unit }) => (
+              <div key={key} className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {stats[key]}
+                  {unit ? ` ${unit}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-muted-foreground">Energy</p>
+            {energyStats ? (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                {ENERGY_LABELS.map(({ key, label, unit }) => (
+                  <div key={key} className="rounded-lg border p-4">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-lg font-semibold">
+                      {String(energyStats[key])}
+                      {unit ? ` ${unit}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Energy calculation not yet available
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">
           Layout complete. Statistics are not available for this run.

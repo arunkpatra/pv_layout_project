@@ -99,8 +99,10 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 4c | [Version Submission Form](#spike-4c--version-submission-form) | complete | Spike 4b |
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | complete | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | complete | Spike 4d |
-| 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
-| 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5 |
+| 5a | [Stats Dashboard](#spike-5a--stats-dashboard) | planned | Spike 4 |
+| 5b | [SVG Fetch + Render](#spike-5b--svg-fetch--render) | planned | Spike 5a |
+| 5c | [Zoom/Pan + Layer Toggles](#spike-5c--zoompan--layer-toggles) | planned | Spike 5b |
+| 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5b |
 | 7 | [Energy Job](#spike-7--energy-job) | planned | Spike 3f |
 | 8 | [PDF Download](#spike-8--pdf-download) | planned | Spike 7 |
 | 9 | [DXF Download](#spike-9--dxf-download) | planned | Spike 8 |
@@ -1071,78 +1073,111 @@ URL-based pagination (`?page=N&pageSize=N`) on both the projects list and projec
 
 ---
 
-## Spike 5 — SVG Preview + Stats Dashboard
+## Spike 5a — Stats Dashboard
 
 **Status:** planned  
 **Depends on:** Spike 4
 
 ### What we're building
 
-The results view on the version detail page once a layout job completes: an interactive SVG preview with zoom/pan and layer toggles, plus a stats dashboard with all layout and energy stats.
+Expand the version detail page `CompleteState` to show all layout stats and add an energy stats section. No API changes — all data already flows through `statsJson`.
 
-### SVG Preview
+**Key finding:** The layout engine produces aggregated totals only across all boundaries. Multi-boundary sites are transparent at the UI level (one set of totals, same code path as single-boundary).
 
-- Fetch SVG from S3 via pre-signed URL (from `GET /versions/:versionId`)
-- Render inline in browser (not `<img>` — needs DOM access for layer toggles)
-- Zoom/pan: `react-zoom-pan-pinch` or `panzoom` — evaluate at spike time
-- Layer toggle controls (toggle buttons, off by default):
-  - **AC Cables** — toggles visibility of `<g id="ac-cables">` in SVG DOM
-  - **Lightning Arresters** — toggles visibility of `<g id="la-footprints">` and `<g id="la-circles">`
-- Toggle implementation: set `display: none` / `display: ''` on SVG group elements client-side — no server round-trip, no re-fetch
+### Layout stats (all fields from `layoutJob.statsJson`)
 
-### Stats Dashboard
+| Stat | Key | Unit |
+|------|-----|------|
+| Total capacity | `total_capacity_mwp` | MWp DC |
+| Total modules | `total_modules` | count |
+| Tables placed | `total_tables` | count |
+| Total area | `total_area_acres` | acres |
+| Row pitch | `row_pitch_m` | m |
+| GCR achieved | `gcr_achieved` | ratio |
+| String inverters | `num_string_inverters` | count |
+| ICRs | `num_icrs` | count |
+| Lightning arresters | `num_las` | count |
+| DC cable length | `total_dc_cable_m` | m |
+| AC cable length | `total_ac_cable_m` | m |
 
-Two sections, displayed as stat cards alongside the SVG:
+### Energy stats (from `energyJob.statsJson`)
 
-**Layout stats** (visible as soon as layout job completes):
+Shown once `energyJob.status === "COMPLETE"`. Shown as a "pending" card section otherwise (energy job implemented in Spike 7).
 
-| Stat | Unit |
-|------|------|
-| Total area | acres |
-| Tables placed | count |
-| Total modules | count |
-| Total capacity | MWp DC |
-| Row pitch | m |
-| GCR achieved | ratio |
-| ICRs | count |
-| String inverters | count |
-| Inverter capacity | kWp |
-| DC cable length | m |
-| AC cable length | m |
-| Lightning arresters | count |
-
-**Energy stats** (visible once energy job completes — shown as loading/pending until then):
-
-| Stat | Unit |
-|------|------|
-| Irradiance source | PVGIS / NASA POWER / manual |
-| GHI | kWh/m²/yr |
-| GTI (in-plane) | kWh/m²/yr |
-| Performance Ratio | ratio |
-| Specific yield | kWh/kWp/yr |
-| Year 1 energy | MWh |
-| CUF | % |
-| 25-year lifetime energy | MWh |
-
-For multi-boundary sites: per-boundary breakdown + site totals.
+| Stat | Key | Unit |
+|------|-----|------|
+| Irradiance source | `irradiance_source` | PVGIS / NASA POWER / manual |
+| GHI | `ghi_kwh_m2_yr` | kWh/m²/yr |
+| GTI (in-plane) | `gti_kwh_m2_yr` | kWh/m²/yr |
+| Performance Ratio | `performance_ratio` | ratio |
+| Specific yield | `specific_yield_kwh_kwp_yr` | kWh/kWp/yr |
+| Year 1 energy | `year1_energy_mwh` | MWh |
+| CUF | `cuf_pct` | % |
+| 25-year lifetime energy | `lifetime_energy_mwh` | MWh |
 
 ### Acceptance Criteria
 
-- [ ] SVG renders correctly for a real layout job output
-- [ ] Zoom/pan works smoothly
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] All layout stat cards display correct values (verified against a real completed run)
+- [ ] Energy stats section shows "pending" state when energy job not yet complete
+- [ ] Energy stats section populates correctly when `energyJob.statsJson` is present
+
+---
+
+## Spike 5b — SVG Fetch + Render
+
+**Status:** planned  
+**Depends on:** Spike 5a
+
+### What we're building
+
+Add a pre-signed SVG URL to the version detail API response and render the SVG inline in the browser on the version detail page.
+
+**Key finding:** The layout engine produces ONE composite SVG (`layout.svg`) for all boundaries — multi-boundary is transparent. SVG uses `gid` attributes for group layers (`ac-cables`, `la-footprints`, `la-circles`, etc.) ready for Spike 5c toggles.
+
+- API: add `svgPresignedUrl: string | null` to `VersionDetail` response (touches API → shared types → api-client → web)
+- Fetch SVG text client-side, sanitize with DOMPurify, render inline inside a sized container
+- No zoom/pan yet (Spike 5c) — static render, fit-to-container
+- Shown only when `layoutJob.status === "COMPLETE"` and `svgPresignedUrl` is non-null
+
+### Acceptance Criteria
+
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] SVG renders correctly for a real completed run
+- [ ] SVG is not shown for runs that have no SVG artifact
+- [ ] Pre-signed URL is correctly generated server-side
+
+---
+
+## Spike 5c — Zoom/Pan + Layer Toggles
+
+**Status:** planned  
+**Depends on:** Spike 5b
+
+### What we're building
+
+Add interactivity to the static SVG preview from Spike 5b: zoom/pan and layer toggle controls.
+
+- Zoom/pan: evaluate `react-zoom-pan-pinch` vs `panzoom` at spike time; wrap SVG container
+- Layer toggles (toggle buttons, off by default):
+  - **AC Cables** — toggles `<g gid="ac-cables">`
+  - **Lightning Arresters** — toggles `<g gid="la-footprints">` and `<g gid="la-circles">`
+- Toggle implementation: set `display: none` / `display: ''` on SVG group elements via `querySelector` — no server round-trip, no re-fetch
+
+### Acceptance Criteria
+
+- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [ ] Zoom/pan works smoothly on a real layout SVG
 - [ ] AC Cables toggle shows/hides correct SVG group
 - [ ] Lightning Arresters toggle shows/hides correct SVG groups
-- [ ] All layout stats display correct values (verified against PDF summary)
-- [ ] Energy stats section appears and populates once energy job completes
-- [ ] Energy stats polling continues independently after layout stats appear
-- [ ] Multi-boundary sites show per-boundary breakdown + totals
+- [ ] Toggles default to off (layers hidden on load)
 
 ---
 
 ## Spike 6 — KMZ Download
 
 **Status:** planned  
-**Depends on:** Spike 5
+**Depends on:** Spike 5b
 
 ### What we're building
 
