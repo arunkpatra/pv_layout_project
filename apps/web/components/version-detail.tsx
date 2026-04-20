@@ -146,42 +146,44 @@ function CompleteState({ version }: { version: VersionDetailType }) {
     <div className="flex flex-col gap-6">
       <VersionStatusBadge status="COMPLETE" />
       {stats ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {METRIC_LABELS.map(({ key, label, unit }) => (
-            <div key={key} className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="mt-1 text-lg font-semibold">
-                {stats[key]}
-                {unit ? ` ${unit}` : ""}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Layout complete. Statistics are not available for this run.
-        </p>
-      )}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium text-muted-foreground">Energy</p>
-        {energyStats ? (
+        <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            {ENERGY_LABELS.map(({ key, label, unit }) => (
+            {METRIC_LABELS.map(({ key, label, unit }) => (
               <div key={key} className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="mt-1 text-lg font-semibold">
-                  {String(energyStats[key])}
+                  {stats[key]}
                   {unit ? ` ${unit}` : ""}
                 </p>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            Energy calculation not yet available
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-muted-foreground">Energy</p>
+            {energyStats ? (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                {ENERGY_LABELS.map(({ key, label, unit }) => (
+                  <div key={key} className="rounded-lg border p-4">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-lg font-semibold">
+                      {String(energyStats[key])}
+                      {unit ? ` ${unit}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Energy calculation not yet available
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Layout complete. Statistics are not available for this run.
+        </p>
+      )}
     </div>
   )
 }
