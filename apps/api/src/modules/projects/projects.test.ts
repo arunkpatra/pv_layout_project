@@ -442,6 +442,7 @@ describe("getVersion", () => {
   test("getVersion includes null download URLs when all artifact keys are null", async () => {
     // mockVersionFindUnique default returns layoutJob: null
     const result = await getVersion(mockDbVersion.id, mockDbProject.userId)
+    expect(result.svgPresignedUrl).toBeNull()
     expect(result.kmzDownloadUrl).toBeNull()
     expect(result.dxfDownloadUrl).toBeNull()
     expect(result.svgDownloadUrl).toBeNull()
