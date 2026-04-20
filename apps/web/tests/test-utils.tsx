@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { TooltipProvider } from "@renewable-energy/ui/components/tooltip"
 
 export function createWrapper() {
   const queryClient = new QueryClient({
@@ -6,7 +7,9 @@ export function createWrapper() {
   })
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>{children}</TooltipProvider>
+      </QueryClientProvider>
     )
   }
 }
