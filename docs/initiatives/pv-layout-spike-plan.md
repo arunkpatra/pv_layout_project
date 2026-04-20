@@ -100,8 +100,8 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | complete | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | complete | Spike 4d |
 | 5a | [Stats Dashboard](#spike-5a--stats-dashboard) | planned | Spike 4 |
-| 5b | [SVG Fetch + Render](#spike-5b--svg-fetch--render) | planned | Spike 5a |
-| 5c | [Zoom/Pan + Layer Toggles](#spike-5c--zoompan--layer-toggles) | planned | Spike 5b |
+| 5b | [SVG Fetch + Render](#spike-5b--svg-fetch--render) | in-progress | Spike 5a |
+| 5c | [Zoom/Pan + Layer Toggles](#spike-5c--zoompan--layer-toggles) | in-progress | Spike 5b |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5b |
 | 7 | [Energy Job](#spike-7--energy-job) | planned | Spike 3f |
 | 8 | [PDF Download](#spike-8--pdf-download) | planned | Spike 7 |
@@ -1126,8 +1126,8 @@ Shown once `energyJob.status === "COMPLETE"`. Shown as a "pending" card section 
 
 ## Spike 5b — SVG Fetch + Render
 
-**Status:** planned  
-**Depends on:** Spike 5a
+**Status:** in-progress — local dev verified 2026-04-20, CI/CD and production pending  
+**Depends on:** Spike 5a (built concurrently with 5c; stats dashboard deferred)
 
 ### What we're building
 
@@ -1142,16 +1142,18 @@ Add a pre-signed SVG URL to the version detail API response and render the SVG i
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] SVG renders correctly for a real completed run
-- [ ] SVG is not shown for runs that have no SVG artifact
-- [ ] Pre-signed URL is correctly generated server-side
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] SVG renders correctly for a real completed run — verified local dev
+- [x] SVG is not shown for runs that have no SVG artifact
+- [x] Pre-signed URL is correctly generated server-side
+- [ ] Verified in CI/CD
+- [ ] Verified in production
 
 ---
 
 ## Spike 5c — Zoom/Pan + Layer Toggles
 
-**Status:** planned  
+**Status:** in-progress — local dev verified 2026-04-20, CI/CD and production pending  
 **Depends on:** Spike 5b
 
 ### What we're building
@@ -1164,13 +1166,29 @@ Add interactivity to the static SVG preview from Spike 5b: zoom/pan and layer to
   - **Lightning Arresters** — toggles `<g gid="la-footprints">` and `<g gid="la-circles">`
 - Toggle implementation: set `display: none` / `display: ''` on SVG group elements via `querySelector` — no server round-trip, no re-fetch
 
+### What we built
+
+- `react-zoom-pan-pinch` v4 (`TransformWrapper` + `TransformComponent`) wrapping the SVG
+- Reset Zoom button (toolbar, top-right of preview container)
+- Rotate button with animated icon — 0° → 90° → 180° → 270° → 0° cycle; container aspect ratio swaps at 90°/270°
+- Layer toggle switches below the preview (DC Cables added in addition to spec; AC Cables off by default):
+  - **AC Cables** — toggles `#ac-cables`
+  - **DC Cables** — toggles `#dc-cables`
+  - **Lightning Arresters** — toggles `#la-footprints` and `#la-circles`
+- DOM manipulation via `useRef` + `useEffect`; no re-fetch on toggle
+
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] Zoom/pan works smoothly on a real layout SVG
-- [ ] AC Cables toggle shows/hides correct SVG group
-- [ ] Lightning Arresters toggle shows/hides correct SVG groups
-- [ ] Toggles default to off (layers hidden on load)
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] Zoom/pan works smoothly on a real layout SVG — verified local dev
+- [x] Reset Zoom button snaps back to default — verified local dev
+- [x] Rotate button cycles 0 → 90 → 180 → 270 → 0 — verified local dev
+- [x] AC Cables toggle shows/hides correct SVG group — verified local dev
+- [x] DC Cables toggle shows/hides correct SVG group — verified local dev
+- [x] Lightning Arresters toggle shows/hides both `#la-footprints` and `#la-circles` — verified local dev
+- [x] Toggles default to off (layers hidden on load) — verified local dev
+- [ ] Verified in CI/CD
+- [ ] Verified in production
 
 ---
 
