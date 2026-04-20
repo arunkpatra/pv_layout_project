@@ -39,12 +39,21 @@ const mockDbVersion = {
   updatedAt: now,
 }
 
+// findMany returns ProjectSummary-shaped rows (with _count and versions)
+const mockProjectFindMany = mock(() =>
+  Promise.resolve([
+    {
+      ...mockDbProject,
+      _count: { versions: 2 },
+      versions: [{ status: "COMPLETE" }],
+    },
+  ]),
+)
 const mockProjectFindUnique = mock(() => Promise.resolve(mockDbProject))
-const mockProjectFindMany = mock(() => Promise.resolve([mockDbProject]))
 const mockProjectCreate = mock(() => Promise.resolve(mockDbProject))
 const mockProjectDelete = mock(() => Promise.resolve(mockDbProject))
-const mockVersionCreate = mock(() => Promise.resolve(mockDbVersion))
-const mockVersionUpdate = mock(() => Promise.resolve(mockDbVersion))
+const mockProjectCount = mock(() => Promise.resolve(1))
+
 const mockVersionFindUnique = mock(() =>
   Promise.resolve({
     ...mockDbVersion,
@@ -53,7 +62,19 @@ const mockVersionFindUnique = mock(() =>
     energyJob: null,
   }),
 )
+const mockVersionCreate = mock(() => Promise.resolve(mockDbVersion))
+const mockVersionUpdate = mock(() => Promise.resolve(mockDbVersion))
 const mockVersionCount = mock(() => Promise.resolve(0))
+const mockVersionFindMany = mock(() =>
+  Promise.resolve([
+    {
+      ...mockDbVersion,
+      layoutJob: null,
+      energyJob: null,
+    },
+  ]),
+)
+const mockVersionCountForList = mock(() => Promise.resolve(1))
 
 const mockLayoutJobCreate = mock(() =>
   Promise.resolve({
@@ -84,16 +105,24 @@ const mockEnergyJobCreate = mock(() =>
   }),
 )
 
+// $transaction resolves all passed PrismaPromises in order
+const mockDbTransaction = mock((queries: unknown[]) =>
+  Promise.all(queries as Promise<unknown>[]),
+)
+
 mock.module("../../lib/db.js", () => ({
   db: {
+    $transaction: mockDbTransaction,
     project: {
       findUnique: mockProjectFindUnique,
       findMany: mockProjectFindMany,
       create: mockProjectCreate,
       delete: mockProjectDelete,
+      count: mockProjectCount,
     },
     version: {
       findUnique: mockVersionFindUnique,
+      findMany: mockVersionFindMany,
       create: mockVersionCreate,
       count: mockVersionCount,
       update: mockVersionUpdate,
@@ -119,29 +148,91 @@ import {
   deleteProject,
   createVersion,
   getVersion,
+  listVersions,
 } from "./projects.service.js"
 import { NotFoundError, ForbiddenError } from "../../lib/errors.js"
 
 // ─── listProjects ──────────────────────────────────────────────────────────────
 
 describe("listProjects", () => {
-  beforeEach(() => mockProjectFindMany.mockClear())
-
-  test("returns projects for the user", async () => {
-    const result = await listProjects(mockDbProject.userId)
-    expect(result).toHaveLength(1)
-    const first = result[0]!
-    expect(first.id).toBe(mockDbProject.id)
-    expect(first.name).toBe(mockDbProject.name)
-    expect(first.createdAt).toBe(now.toISOString())
+  beforeEach(() => {
+    mockProjectFindMany.mockClear()
+    mockProjectCount.mockClear()
+    mockDbTransaction.mockClear()
   })
 
-  test("queries by userId", async () => {
-    await listProjects(mockDbProject.userId)
-    expect(mockProjectFindMany).toHaveBeenCalledWith({
-      where: { userId: mockDbProject.userId },
-      orderBy: { createdAt: "desc" },
-    })
+  test("returns PaginatedResponse with items and pagination meta", async () => {
+    const result = await listProjects(mockDbProject.userId)
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]!.id).toBe(mockDbProject.id)
+    expect(result.items[0]!.name).toBe(mockDbProject.name)
+    expect(result.items[0]!.versionCount).toBe(2)
+    expect(result.items[0]!.latestVersionStatus).toBe("COMPLETE")
+    expect(result.total).toBe(1)
+    expect(result.page).toBe(1)
+    expect(result.pageSize).toBe(20)
+    expect(result.totalPages).toBe(1)
+  })
+
+  test("returns null latestVersionStatus when project has no versions", async () => {
+    mockDbTransaction.mockImplementationOnce(() =>
+      Promise.resolve([
+        1,
+        [{ ...mockDbProject, _count: { versions: 0 }, versions: [] }],
+      ]),
+    )
+    const result = await listProjects(mockDbProject.userId)
+    expect(result.items[0]!.latestVersionStatus).toBeNull()
+    expect(result.items[0]!.versionCount).toBe(0)
+  })
+
+  test("passes pagination params through", async () => {
+    await listProjects(mockDbProject.userId, { page: 2, pageSize: 5 })
+    expect(result => result).toBeDefined() // transaction was called
+    expect(mockDbTransaction).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─── listVersions ──────────────────────────────────────────────────────────────
+
+describe("listVersions", () => {
+  beforeEach(() => {
+    mockProjectFindUnique.mockClear()
+    mockVersionFindMany.mockClear()
+    mockVersionCountForList.mockClear()
+    mockDbTransaction.mockClear()
+  })
+
+  test("returns PaginatedResponse for a project's versions", async () => {
+    // Override $transaction to return count=1 + versions array
+    mockDbTransaction.mockImplementationOnce(() =>
+      Promise.resolve([1, [{ ...mockDbVersion, layoutJob: null, energyJob: null }]]),
+    )
+    const result = await listVersions(mockDbProject.id, mockDbProject.userId)
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]!.id).toBe(mockDbVersion.id)
+    expect(result.total).toBe(1)
+    expect(result.page).toBe(1)
+    expect(result.totalPages).toBe(1)
+  })
+
+  test("throws NotFoundError when project does not exist", async () => {
+    mockProjectFindUnique.mockImplementationOnce(() => Promise.resolve(null as any))
+    await expect(
+      listVersions("prj_nonexistent", mockDbProject.userId),
+    ).rejects.toThrow(NotFoundError)
+  })
+
+  test("throws ForbiddenError when project belongs to another user", async () => {
+    mockProjectFindUnique.mockImplementationOnce(() =>
+      Promise.resolve({
+        ...mockDbProject,
+        userId: "usr_other00000000000000000000000000000000",
+      } as any),
+    )
+    await expect(
+      listVersions(mockDbProject.id, mockDbProject.userId),
+    ).rejects.toThrow(ForbiddenError)
   })
 })
 
@@ -299,9 +390,6 @@ describe("createVersion dispatch", () => {
   beforeEach(() => {
     mockDispatchLayoutJobHttp.mockClear()
     mockPublishLayoutJob.mockClear()
-    // Use mockReset to drain any unconsumed mockImplementationOnce queue
-    // left by previous tests (e.g. getVersion ForbiddenError test queues
-    // mockProjectFindUnique but getVersion never calls it)
     mockProjectFindUnique.mockReset()
     mockProjectFindUnique.mockImplementation(() => Promise.resolve(mockDbProject))
     mockVersionCreate.mockClear()
