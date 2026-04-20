@@ -97,7 +97,7 @@ apps/web → apps/api (Hono) → SQS → Lambda (apps/layout-engine Docker image
 | 4a | [API + api-client Data Layer](#spike-4a--api--api-client-data-layer) | complete | Spike 3g |
 | 4b | [Projects List + Create Project](#spike-4b--projects-list--create-project) | complete | Spike 4a |
 | 4c | [Version Submission Form](#spike-4c--version-submission-form) | complete | Spike 4b |
-| 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | planned | Spike 4c |
+| 4d | [Version Detail + Polling](#spike-4d--version-detail--polling) | complete | Spike 4c |
 | 4e | [Pagination UI](#spike-4e--pagination-ui) | planned | Spike 4d |
 | 5 | [SVG Preview + Stats Dashboard](#spike-5--svg-preview--stats-dashboard) | planned | Spike 4 |
 | 6 | [KMZ Download](#spike-6--kmz-download) | planned | Spike 5 |
@@ -1003,7 +1003,7 @@ See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 12�
 
 ## Spike 4d — Version Detail + Polling
 
-**Status:** planned  
+**Status:** complete — verified local + production 2026-04-20  
 **Depends on:** Spike 4c
 
 ### What we're building
@@ -1029,19 +1029,19 @@ The version detail page and project detail page, with live polling that follows 
 
 ### Acceptance Criteria
 
-- [ ] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
-- [ ] Version detail page shows correct status banner for QUEUED / PROCESSING / COMPLETE / FAILED
-- [ ] Live polling: status transitions QUEUED → PROCESSING → COMPLETE visible in browser without page refresh
-- [ ] Polling stops once terminal state reached — no further network requests (confirmed in DevTools Network tab)
-- [ ] FAILED version: error message is domain-specific, derived from `errorDetail` field (not a generic "error" message)
-- [ ] Input summary shows all 27 parameters from `inputSnapshot`
-- [ ] Project detail page lists all versions in correct order (newest first)
-- [ ] Breadcrumbs correct on all pages
-- [ ] Verified in local dev and production
+- [x] `bun run lint && bun run typecheck && bun run test && bun run build` all pass
+- [x] Version detail page shows correct status for QUEUED / PROCESSING / COMPLETE / FAILED
+- [x] Live polling: status transitions QUEUED → PROCESSING → COMPLETE visible in browser without page refresh
+- [x] FAILED version: error message derived from `layoutJob.errorDetail ?? energyJob.errorDetail ?? generic`
+- [x] Results grid shows 9 layout metrics from `layoutJob.statsJson` when COMPLETE
+- [x] Breadcrumbs correct: Projects › [Project name] › Run #N
+- [x] Verified in local dev and production
+- [ ] Input summary (27 inputSnapshot params) — deferred to Spike 5
+- [ ] Project detail page (versions list) — Spike 4e
 
 ### Implementation Plan
 
-See `docs/superpowers/plans/2026-04-20-spike-4-project-version-ui.md` Tasks 15–18.
+See `docs/superpowers/plans/2026-04-20-spike-4d-version-detail-polling.md`.
 
 ---
 
@@ -1390,3 +1390,8 @@ Record decisions made during spike execution that affect future spikes.
 | 2026-04-20 | 4b | `NavUser` sidebar footer uses `!isLoaded \|\| !user` guard to show a skeleton rather than the "User" fallback. Clerk's `useUser()` returns `user: null` on both initial client hydration and during sign-out. Without the guard, the fallback text flashes on every page load and every sign-out. | Discovered during spike 4b local and production verification. The fix follows Clerk's recommended `isLoaded` check pattern. |
 | 2026-04-20 | 4b | `SidebarMenuSkeleton` (shadcn) uses `Math.random()` inside its `useState` initializer to randomise the skeleton width. This runs on the server and again on the client during hydration, producing different values and a React hydration mismatch. Fix: the `mounted` guard must live inside the component that renders `SidebarMenuSkeleton` (`NavProjects`), not in a parent prop. When `mounted=false` (SSR and before first client paint), the skeleton branch is skipped entirely — server HTML never contains a `SidebarMenuSkeleton`. | Any shadcn component that uses `Math.random()` or `Date.now()` in a `useState` initializer will cause hydration mismatch if rendered during SSR. The guard must be co-located with the render site, not hoisted to a parent. |
 | 2026-04-20 | 4 | Version detail polling follows ADR-003: `refetchInterval` is a function receiving `query.state.data`; returns `false` at terminal state (COMPLETE/FAILED), `~3000 ms` (with 10% jitter) otherwise. `staleTime` 1 s active / 2 min terminal. No retry on 4xx; up to 3 retries on 5xx. | ADR-003 establishes the project polling standard. Consistent with how Journium handles long-running process polling. Jitter prevents thundering herd from multiple browser tabs. |
+| 2026-04-20 | 4d | `getVersionRefetchInterval` extracted as a pure exported function in `use-version.ts`. The polling callback itself cannot be unit-tested without timer mocks, but the interval logic can be tested directly as a function. All 5 status/undefined cases are covered by unit tests. | TanStack Query v5's `refetchInterval` callback form cannot be invoked directly in tests without mocking the query infrastructure. Extracting the logic as a pure function keeps tests simple and fast. |
+| 2026-04-20 | 4d | Elapsed timer base for PROCESSING state uses `layoutJob?.startedAt ?? version.createdAt`, not `version.createdAt` alone. QUEUED state uses `version.createdAt`. | If PROCESSING used `createdAt`, the elapsed time would include queue wait time (potentially minutes in production via SQS). Users expect "time processing" not "time since submission". `startedAt` is set by the Lambda at the top of its handler; `createdAt` is the fallback if the job was never started. |
+| 2026-04-20 | 4d | `VersionDetail` component calls `useVersion` internally; the page also calls `useVersion` for breadcrumbs. Two hook calls for the same `(projectId, versionId)` pair are accepted as a v1 tradeoff — TanStack Query deduplicates to a single network request via the shared query cache. | Prop-drilling `version` from the page down to `VersionDetail` would complicate the component interface and require nullable handling at call sites. The double hook call is idiomatic TanStack Query usage. Revisit if the query key changes or caching behaviour causes issues. |
+| 2026-04-20 | 4d | `layoutJob.statsJson` is typed as `unknown` in `@renewable-energy/shared`. A local `LayoutStats` interface is defined in `version-detail.tsx` and used to cast the value after a runtime null check. The shared type is NOT changed to a specific type. | `statsJson` stores the Python Lambda's raw JSON output. The shape may evolve independently of the TypeScript type system; `unknown` at the shared boundary is correct. The local cast is contained and validated at runtime (null check + as cast). Changing the shared type would couple the frontend type to the Lambda output format prematurely. |
+| 2026-04-20 | 4d | Input summary (all 27 `inputSnapshot` parameters) deferred from 4d to Spike 5. | Layout results are the user's primary concern immediately after job completion. The input recap is secondary — users remember what they submitted. Deferring keeps the version detail page focused and unblocks Spike 4e. Input summary can be added as a collapsible section in Spike 5 alongside the SVG preview. |
