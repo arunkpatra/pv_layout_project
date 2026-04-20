@@ -51,3 +51,22 @@ export async function getPresignedUrl(
     { expiresIn },
   )
 }
+
+export async function getPresignedDownloadUrl(
+  key: string,
+  filename: string,
+  expiresIn = 3600,
+): Promise<string | null> {
+  const client = getS3()
+  if (!client || !env.S3_ARTIFACTS_BUCKET) return null
+
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({
+      Bucket: env.S3_ARTIFACTS_BUCKET,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${filename}"`,
+    }),
+    { expiresIn },
+  )
+}
