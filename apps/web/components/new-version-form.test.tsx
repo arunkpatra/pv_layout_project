@@ -84,3 +84,13 @@ test("tilt_angle, row_spacing, gcr are null when auto-override switches are off"
   expect(inputSnapshot.row_spacing).toBeNull()
   expect(inputSnapshot.gcr).toBeNull()
 })
+
+test("pre-fills energy loss defaults", () => {
+  render(<NewVersionForm projectId="prj_1" />, { wrapper: createWrapper() })
+  const invEff = screen.getByLabelText(/inverter efficiency/i) as HTMLInputElement
+  expect(invEff.value).toBe("97")
+  const soiling = screen.getByLabelText(/soiling/i) as HTMLInputElement
+  expect(soiling.value).toBe("4")
+  const lifetime = screen.getByLabelText(/plant lifetime/i) as HTMLInputElement
+  expect(lifetime.value).toBe("25")
+})

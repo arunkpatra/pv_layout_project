@@ -600,6 +600,168 @@ export function NewVersionForm({ projectId }: { projectId: string }) {
             <h2 className="text-base font-semibold mb-4 pb-2 border-b">
               Energy losses
             </h2>
+
+            {/* Irradiance */}
+            <div className="mb-6">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+                Irradiance
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <NumericField
+                  id="ghi"
+                  label="GHI"
+                  unit="kWh/m²/yr"
+                  register={register("ghi_kwh_m2_yr", { valueAsNumber: true })}
+                  error={errors.ghi_kwh_m2_yr?.message}
+                />
+                <NumericField
+                  id="gti"
+                  label="GTI (in-plane)"
+                  unit="kWh/m²/yr"
+                  register={register("gti_kwh_m2_yr", { valueAsNumber: true })}
+                  error={errors.gti_kwh_m2_yr?.message}
+                />
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Enter site irradiance values. Leave 0 to skip energy
+                calculation.
+              </p>
+            </div>
+
+            {/* Performance ratio breakdown */}
+            <div className="mb-6">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+                Performance ratio breakdown
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <NumericField
+                  id="inverter-efficiency"
+                  label="Inverter efficiency"
+                  unit="%"
+                  register={register("inverter_efficiency_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.inverter_efficiency_pct?.message}
+                />
+                <NumericField
+                  id="dc-cable-loss"
+                  label="DC cable losses"
+                  unit="%"
+                  register={register("dc_cable_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.dc_cable_loss_pct?.message}
+                />
+                <NumericField
+                  id="ac-cable-loss"
+                  label="AC cable losses"
+                  unit="%"
+                  register={register("ac_cable_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.ac_cable_loss_pct?.message}
+                />
+                <NumericField
+                  id="soiling-loss"
+                  label="Soiling losses"
+                  unit="%"
+                  register={register("soiling_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.soiling_loss_pct?.message}
+                />
+                <NumericField
+                  id="temperature-loss"
+                  label="Temperature losses"
+                  unit="%"
+                  register={register("temperature_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.temperature_loss_pct?.message}
+                />
+                <NumericField
+                  id="mismatch-loss"
+                  label="Module mismatch"
+                  unit="%"
+                  register={register("mismatch_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.mismatch_loss_pct?.message}
+                />
+                <NumericField
+                  id="shading-loss"
+                  label="Shading losses"
+                  unit="%"
+                  register={register("shading_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.shading_loss_pct?.message}
+                />
+                <NumericField
+                  id="availability"
+                  label="Availability"
+                  unit="%"
+                  register={register("availability_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.availability_pct?.message}
+                />
+                <NumericField
+                  id="transformer-loss"
+                  label="Transformer losses"
+                  unit="%"
+                  register={register("transformer_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.transformer_loss_pct?.message}
+                />
+                <NumericField
+                  id="other-loss"
+                  label="Other losses"
+                  unit="%"
+                  register={register("other_loss_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.other_loss_pct?.message}
+                />
+              </div>
+            </div>
+
+            {/* Degradation */}
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+                Degradation
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <NumericField
+                  id="first-year-deg"
+                  label="1st year degradation"
+                  unit="%"
+                  register={register("first_year_degradation_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.first_year_degradation_pct?.message}
+                />
+                <NumericField
+                  id="annual-deg"
+                  label="Annual degradation"
+                  unit="%/yr"
+                  register={register("annual_degradation_pct", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.annual_degradation_pct?.message}
+                />
+                <NumericField
+                  id="plant-lifetime"
+                  label="Plant lifetime"
+                  unit="years"
+                  register={register("plant_lifetime_years", {
+                    valueAsNumber: true,
+                  })}
+                  error={errors.plant_lifetime_years?.message}
+                />
+              </div>
+            </div>
           </section>
         </form>
 
