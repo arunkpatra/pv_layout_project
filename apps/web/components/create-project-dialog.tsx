@@ -23,15 +23,21 @@ export function CreateProjectDialog({
 }) {
   const [open, setOpen] = React.useState(false)
   const [name, setName] = React.useState("")
+  const [error, setError] = React.useState<string | null>(null)
   const { mutateAsync, isPending } = useCreateProject()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    const project = await mutateAsync(name.trim())
-    setOpen(false)
-    setName("")
-    onCreated(project)
+    setError(null)
+    try {
+      const project = await mutateAsync(name.trim())
+      setOpen(false)
+      setName("")
+      onCreated(project)
+    } catch {
+      setError("Failed to create project. Please try again.")
+    }
   }
 
   return (
@@ -56,6 +62,9 @@ export function CreateProjectDialog({
               onChange={(e) => setName(e.target.value)}
               autoFocus
             />
+            {error && (
+              <p className="text-xs text-destructive">{error}</p>
+            )}
           </div>
           <DialogFooter>
             <Button type="submit" disabled={!name.trim() || isPending}>

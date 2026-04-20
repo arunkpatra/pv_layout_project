@@ -95,21 +95,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data, isLoading } = useProjects()
 
   // Latch last known user so sign-out transition doesn't flicker to defaults
-  const latchedUser = React.useRef({ name: "User", email: "", avatar: undefined as string | undefined })
-  if (user) {
-    latchedUser.current = {
-      name: user.fullName ?? user.username ?? "User",
-      email: user.primaryEmailAddress?.emailAddress ?? "",
-      avatar: user.imageUrl || undefined,
+  const [clerkUser, setClerkUser] = React.useState({
+    name: "User",
+    email: "",
+    avatar: undefined as string | undefined,
+  })
+  React.useEffect(() => {
+    if (user) {
+      // Syncing external Clerk state to local state — intentional pattern
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setClerkUser({
+        name: user.fullName ?? user.username ?? "User",
+        email: user.primaryEmailAddress?.emailAddress ?? "",
+        avatar: user.imageUrl || undefined,
+      })
     }
-  }
-  const clerkUser = latchedUser.current
+  }, [user])
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher
-          teams={[{ name: "SolarDesign Pro", logo: <Sun />, plan: "Workspace" }]}
+          teams={[
+            { name: "SolarDesign Pro", logo: <Sun />, plan: "Workspace" },
+          ]}
         />
       </SidebarHeader>
       <SidebarContent>
