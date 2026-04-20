@@ -27,7 +27,7 @@ import { useProjects } from "@/hooks/use-projects"
 const navMain = [
   {
     title: "Overview",
-    url: "/dashboard/projects",
+    url: "/dashboard",
     icon: <Home />,
     isActive: true,
     items: [],
