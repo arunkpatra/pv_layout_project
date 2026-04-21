@@ -140,6 +140,22 @@
       "env": [
         "MVP_DATABASE_URL",
         "MVP_S3_DOWNLOADS_BUCKET",
+        "NODEJS_HELPERS",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION"
+      ]
+    },
+    "@renewable-energy/mvp-api#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": [
+        "MVP_DATABASE_URL",
+        "MVP_CORS_ORIGINS",
+        "MVP_S3_DOWNLOADS_BUCKET",
+        "NODEJS_HELPERS",
+        "NODE_ENV",
+        "PORT",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_REGION"
