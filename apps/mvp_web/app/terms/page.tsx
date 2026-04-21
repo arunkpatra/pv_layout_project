@@ -18,10 +18,6 @@ export default function TermsPage() {
           Effective date: 21 April 2026 &middot; Last updated: 21 April 2026
         </p>
 
-        <p className="mt-6 rounded-md border border-yellow-400/40 bg-yellow-50/60 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-950/30 dark:text-yellow-200">
-          These terms are preliminary and subject to legal review.
-        </p>
-
         <h2 className="mt-10 text-2xl font-semibold tracking-tight text-foreground">
           1. Acceptance of Terms
         </h2>

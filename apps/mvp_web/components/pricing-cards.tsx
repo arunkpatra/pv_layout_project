@@ -7,12 +7,6 @@ import {
 } from "@renewable-energy/ui/components/card"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from "@renewable-energy/ui/components/tooltip"
-import {
   Table,
   TableHeader,
   TableBody,
@@ -133,22 +127,13 @@ export function PricingCards() {
               </p>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col justify-end">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full cursor-not-allowed opacity-60"
-                      disabled
-                    >
-                      Buy Now
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Payment coming soon</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button
+                variant="outline"
+                className="w-full cursor-not-allowed opacity-60"
+                disabled
+              >
+                Buy Now
+              </Button>
             </CardContent>
           </Card>
         ))}
@@ -219,11 +204,8 @@ export function PricingCards() {
       {/* Top-up note */}
       <div className="rounded-lg border border-border bg-card p-6 text-center">
         <p className="text-muted-foreground">
-          <strong className="text-foreground">
-            Need more calculations?
-          </strong>{" "}
-          Top up anytime at the same rate. Payment system coming in
-          Phase 2.
+          <strong className="text-foreground">Need more calculations?</strong>{" "}
+          Top up anytime at the same rate.
         </p>
       </div>
     </div>

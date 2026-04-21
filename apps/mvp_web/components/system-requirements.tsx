@@ -21,7 +21,7 @@ const requirements = [
   { requirement: "Additional Software", details: "None required" },
   {
     requirement: "Internet Connection",
-    details: "Required for entitlement validation (Phase 2)",
+    details: "Required for licence validation",
   },
 ]
 

@@ -42,7 +42,7 @@ const faqData: FaqCategory[] = [
       {
         question: "Does it work offline?",
         answer:
-          "The layout calculation runs entirely on your machine. Internet is only needed for entitlement validation (coming in Phase 2).",
+          "The layout calculation runs entirely on your machine. An internet connection is required for licence validation.",
       },
     ],
   },
@@ -100,16 +100,16 @@ const faqData: FaqCategory[] = [
       {
         question: "How do I purchase?",
         answer:
-          "Payment processing is coming soon. Currently, trial access is available.",
+          "Sign up at dashboard.solarlayout.in to purchase a plan and get your licence key.",
       },
       {
         question: "What payment methods?",
-        answer: "To be announced — we are integrating a payment gateway.",
+        answer: "We accept major credit and debit cards via Stripe.",
       },
       {
         question: "Will I receive a receipt?",
         answer:
-          "Yes, a confirmation email will be sent on purchase (coming in Phase 2).",
+          "Yes, a confirmation email is sent after purchase.",
       },
     ],
   },
