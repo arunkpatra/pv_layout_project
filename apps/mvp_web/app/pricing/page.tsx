@@ -4,7 +4,7 @@ import { PricingCards } from "@/components/pricing-cards"
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Simple, transparent pricing for SolarLayout PV design tools. One-time purchase, usage-based entitlements.",
+    "Simple, transparent pricing for SolarLayout PV design solutions. One-time purchase, usage-based entitlements.",
 }
 
 export default function PricingPage() {

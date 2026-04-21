@@ -15,11 +15,11 @@ export default function AboutPage() {
         </h1>
 
         <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-          SolarLayout has been developed by a team of experienced
-          professionals with deep roots in the solar and renewable energy
-          industry. With years of hands-on experience in large-scale PV
-          plant development, land acquisition, and project engineering, we
-          built the tools we always wished we had.
+          SolarLayout has been developed by a team of experienced professionals
+          with deep roots in the solar and renewable energy industry. With years
+          of hands-on experience in large-scale PV plant development, land
+          acquisition, and project engineering, we built the solutions we always
+          wished we had.
         </p>
 
         <h2 className="mt-10 text-2xl font-semibold tracking-tight text-foreground">
@@ -27,9 +27,9 @@ export default function AboutPage() {
         </h2>
 
         <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-          Our mission is to put powerful, automated layout design tools in
-          the hands of every solar professional — saving hours of manual
-          work and enabling faster, smarter project decisions.
+          Our mission is to put powerful, automated layout design solutions in
+          the hands of every solar professional — saving hours of manual work
+          and enabling faster, smarter project decisions.
         </p>
       </div>
     </div>

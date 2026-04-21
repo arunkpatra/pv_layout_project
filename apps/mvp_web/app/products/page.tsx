@@ -4,7 +4,7 @@ import { ProductCard } from "@/components/product-card"
 export const metadata: Metadata = {
   title: "Products",
   description:
-    "Download PV Layout Basic, Pro, or Pro Plus — automated solar plant layout design tools for Windows.",
+    "Download PV Layout Basic, Pro, or Pro Plus — automated solar plant layout design solutions for Windows.",
 }
 
 const products = [
@@ -56,9 +56,9 @@ export default function ProductsPage() {
             Our Products
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Three desktop tools for every stage of utility-scale solar
-            PV plant development. From quick capacity estimates to
-            detailed bankable layouts with energy yield analysis.
+            Three desktop solutions for every stage of utility-scale solar PV
+            plant development. From quick capacity estimates to detailed
+            bankable layouts with energy yield analysis.
           </p>
         </div>
 

@@ -24,7 +24,7 @@ const faqData: FaqCategory[] = [
       {
         question: "What is SolarLayout?",
         answer:
-          "SolarLayout is a suite of Windows desktop tools that automate utility-scale fixed-tilt PV solar plant layout design. Upload a KMZ boundary, configure parameters, and get a complete layout with table placement, cable routing, and energy yield.",
+          "SolarLayout is a suite of Windows desktop solutions that automate utility-scale fixed-tilt PV solar plant layout design. Upload a KMZ boundary, configure parameters, and get a complete layout with table placement, cable routing, and energy yield.",
       },
       {
         question: "What file format do I need?",
@@ -37,7 +37,7 @@ const faqData: FaqCategory[] = [
       },
       {
         question: "Do I need other software?",
-        answer: "No. The tools are standalone executables.",
+        answer: "No. The solutions are standalone executables.",
       },
       {
         question: "Does it work offline?",
@@ -50,8 +50,7 @@ const faqData: FaqCategory[] = [
     title: "Products & Downloads",
     items: [
       {
-        question:
-          "What's the difference between the three products?",
+        question: "What's the difference between the three products?",
         answer:
           "Basic: layout only. Pro: layout + cable routing. Pro Plus: layout + cables + energy yield analysis.",
       },
@@ -67,8 +66,7 @@ const faqData: FaqCategory[] = [
       },
       {
         question: "Can I try before I buy?",
-        answer:
-          "Yes — trial access is available from the Products page.",
+        answer: "Yes — trial access is available from the Products page.",
       },
     ],
   },
@@ -87,8 +85,7 @@ const faqData: FaqCategory[] = [
       },
       {
         question: "Can I top up?",
-        answer:
-          "Yes. Top-up packs are available from the Pricing page.",
+        answer: "Yes. Top-up packs are available from the Pricing page.",
       },
       {
         question: "Is my entitlement tied to one machine?",
@@ -107,8 +104,7 @@ const faqData: FaqCategory[] = [
       },
       {
         question: "What payment methods?",
-        answer:
-          "To be announced — we are integrating a payment gateway.",
+        answer: "To be announced — we are integrating a payment gateway.",
       },
       {
         question: "Will I receive a receipt?",
@@ -122,8 +118,7 @@ const faqData: FaqCategory[] = [
     items: [
       {
         question: "How do I contact support?",
-        answer:
-          "Email support@solarlayout.in or use the Contact page.",
+        answer: "Email support@solarlayout.in or use the Contact page.",
       },
       {
         question: "What if the software crashes?",
@@ -144,17 +139,10 @@ export function FaqAccordion() {
           </h2>
           <Accordion type="multiple">
             {category.items.map((item) => (
-              <AccordionItem
-                key={item.question}
-                value={item.question}
-              >
-                <AccordionTrigger>
-                  {item.question}
-                </AccordionTrigger>
+              <AccordionItem key={item.question} value={item.question}>
+                <AccordionTrigger>{item.question}</AccordionTrigger>
                 <AccordionContent>
-                  <p className="text-muted-foreground">
-                    {item.answer}
-                  </p>
+                  <p className="text-muted-foreground">{item.answer}</p>
                 </AccordionContent>
               </AccordionItem>
             ))}

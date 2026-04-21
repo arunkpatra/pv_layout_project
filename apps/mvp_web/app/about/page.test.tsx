@@ -15,9 +15,7 @@ test("renders page heading", () => {
 test("renders body text", () => {
   render(<AboutPage />)
   expect(
-    screen.getAllByText(
-      /deep roots in the solar and renewable energy/i
-    ).length
+    screen.getAllByText(/deep roots in the solar and renewable energy/i).length
   ).toBeGreaterThanOrEqual(1)
 })
 
@@ -29,8 +27,6 @@ test("renders mission statement", () => {
   })
   expect(missionHeadings.length).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText(
-      /powerful, automated layout design tools/i
-    ).length
+    screen.getAllByText(/powerful, automated layout design solutions/i).length
   ).toBeGreaterThanOrEqual(1)
 })

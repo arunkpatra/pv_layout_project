@@ -15,11 +15,11 @@ const fontSans = Geist({
 
 export const metadata: Metadata = {
   title: {
-    default: "SolarLayout — PV Layout Design Tools",
+    default: "SolarLayout — PV Layout Design Solutions",
     template: "%s | SolarLayout",
   },
   description:
-    "Automated PV plant layout design tools for solar professionals. Upload KMZ, generate layouts, export results.",
+    "Automated PV plant layout design solutions for solar professionals. Upload KMZ, generate layouts, export results.",
 }
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${fontSans.variable} antialiased font-sans`}>
+    <html lang="en" className={`${fontSans.variable} font-sans antialiased`}>
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <Header />
         <main className="flex-1">{children}</main>

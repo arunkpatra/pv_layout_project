@@ -4,7 +4,7 @@ import { FaqAccordion } from "@/components/faq-accordion"
 export const metadata: Metadata = {
   title: "FAQ",
   description:
-    "Frequently asked questions about SolarLayout PV design tools — software, downloads, pricing, entitlements, and support.",
+    "Frequently asked questions about SolarLayout PV design solutions — software, downloads, pricing, entitlements, and support.",
 }
 
 export default function FaqPage() {
