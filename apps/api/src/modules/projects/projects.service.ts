@@ -1,5 +1,5 @@
 import { db } from "../../lib/db.js"
-import { uploadToS3, getPresignedUrl } from "../../lib/s3.js"
+import { uploadToS3, getPresignedUrl, getPresignedDownloadUrl } from "../../lib/s3.js"
 import { dispatchLayoutJobHttp } from "../../lib/layout-engine.js"
 import { publishLayoutJob } from "../../lib/sqs.js"
 import { NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js"
@@ -17,7 +17,7 @@ import type {
 
 // ─── Shapers ───────────────────────────────────────────────────────────────────
 
-type ShapedVersion = Omit<VersionDetail, "svgPresignedUrl">
+type ShapedVersion = Omit<VersionDetail, "svgPresignedUrl" | "kmzDownloadUrl" | "dxfDownloadUrl" | "svgDownloadUrl">
 
 function shapeProject(p: {
   id: string
@@ -209,6 +209,9 @@ export async function listVersions(
     items: (versions as Parameters<typeof shapeVersion>[0][]).map((v) => ({
       ...shapeVersion(v),
       svgPresignedUrl: null,
+      kmzDownloadUrl: null,
+      dxfDownloadUrl: null,
+      svgDownloadUrl: null,
     })),
     ...paginationMeta({ total: total as number, page, pageSize }),
   }
@@ -293,7 +296,13 @@ export async function createVersion(
       })
   }
 
-  return { ...shapeVersion({ ...version, kmzS3Key, layoutJob, energyJob }), svgPresignedUrl: null }
+  return {
+    ...shapeVersion({ ...version, kmzS3Key, layoutJob, energyJob }),
+    svgPresignedUrl: null,
+    kmzDownloadUrl: null,
+    dxfDownloadUrl: null,
+    svgDownloadUrl: null,
+  }
 }
 
 export async function getVersion(
@@ -313,10 +322,14 @@ export async function getVersion(
   if (version.project.userId !== userId) throw new ForbiddenError()
 
   const shaped = shapeVersion(version)
+  const svgKey = version.layoutJob?.svgArtifactS3Key ?? null
+  const kmzKey = version.layoutJob?.kmzArtifactS3Key ?? null
+  const dxfKey = version.layoutJob?.dxfArtifactS3Key ?? null
   return {
     ...shaped,
-    svgPresignedUrl: version.layoutJob?.svgArtifactS3Key
-      ? await getPresignedUrl(version.layoutJob.svgArtifactS3Key)
-      : null,
+    svgPresignedUrl: svgKey ? await getPresignedUrl(svgKey) : null,
+    svgDownloadUrl: svgKey ? await getPresignedDownloadUrl(svgKey, "layout.svg") : null,
+    kmzDownloadUrl: kmzKey ? await getPresignedDownloadUrl(kmzKey, "layout.kmz") : null,
+    dxfDownloadUrl: dxfKey ? await getPresignedDownloadUrl(dxfKey, "layout.dxf") : null,
   }
 }

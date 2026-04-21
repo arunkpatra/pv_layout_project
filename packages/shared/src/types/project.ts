@@ -45,6 +45,9 @@ export interface VersionDetail {
   createdAt: string
   updatedAt: string
   svgPresignedUrl: string | null
+  kmzDownloadUrl: string | null
+  dxfDownloadUrl: string | null
+  svgDownloadUrl: string | null
 }
 
 export interface ProjectSummary extends Project {

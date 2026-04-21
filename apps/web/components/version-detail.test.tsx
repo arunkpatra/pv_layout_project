@@ -18,6 +18,9 @@ const BASE_VERSION: VersionDetailType = {
   createdAt: new Date(Date.now() - 30_000).toISOString(),
   updatedAt: new Date(Date.now() - 30_000).toISOString(),
   svgPresignedUrl: null,
+  kmzDownloadUrl: null,
+  dxfDownloadUrl: null,
+  svgDownloadUrl: null,
 }
 
 const COMPLETE_VERSION: VersionDetailType = {
@@ -76,6 +79,15 @@ const ENERGY_COMPLETE_VERSION: VersionDetailType = {
 const SVG_VERSION: VersionDetailType = {
   ...COMPLETE_VERSION,
   svgPresignedUrl: "https://s3.example.com/layout.svg?X-Amz-Expires=3600",
+}
+
+const DOWNLOAD_VERSION: VersionDetailType = {
+  ...COMPLETE_VERSION,
+  svgPresignedUrl: "https://s3.example.com/layout.svg?X-Amz-Expires=3600",
+  kmzDownloadUrl: "https://s3.example.com/layout.kmz?X-Amz-Expires=3600",
+  dxfDownloadUrl: "https://s3.example.com/layout.dxf?X-Amz-Expires=3600",
+  svgDownloadUrl:
+    "https://s3.example.com/layout-dl.svg?download=1&X-Amz-Expires=3600",
 }
 
 vi.mock("@/hooks/use-version", () => ({
@@ -315,4 +327,64 @@ test("does not render SvgPreview when svgPresignedUrl is null", () => {
     wrapper: createWrapper(),
   })
   expect(screen.queryByTestId("svg-preview")).not.toBeInTheDocument()
+})
+
+test("renders all three download buttons when all download URLs are set", () => {
+  mockUseVersion.mockReturnValue({
+    data: DOWNLOAD_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(
+    <VersionDetail projectId="prj_123" versionId="ver_1" />,
+    { wrapper: createWrapper() },
+  )
+  expect(screen.getByRole("link", { name: /kmz/i })).toBeInTheDocument()
+  expect(screen.getByRole("link", { name: /dxf/i })).toBeInTheDocument()
+  expect(screen.getByRole("link", { name: /^svg$/i })).toBeInTheDocument()
+})
+
+test("KMZ download link has correct href and download attribute", () => {
+  mockUseVersion.mockReturnValue({
+    data: DOWNLOAD_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(
+    <VersionDetail projectId="prj_123" versionId="ver_1" />,
+    { wrapper: createWrapper() },
+  )
+  const kmzLink = screen.getByRole("link", { name: /kmz/i })
+  expect(kmzLink).toHaveAttribute("href", DOWNLOAD_VERSION.kmzDownloadUrl)
+  expect(kmzLink).toHaveAttribute("download", "layout.kmz")
+})
+
+test("download toolbar not rendered when all download URLs are null", () => {
+  mockUseVersion.mockReturnValue({
+    data: COMPLETE_VERSION,
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(
+    <VersionDetail projectId="prj_123" versionId="ver_1" />,
+    { wrapper: createWrapper() },
+  )
+  expect(screen.queryByRole("link", { name: /kmz/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole("link", { name: /dxf/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole("link", { name: /^svg$/i })).not.toBeInTheDocument()
+})
+
+test("only renders buttons for non-null download URLs", () => {
+  mockUseVersion.mockReturnValue({
+    data: { ...DOWNLOAD_VERSION, dxfDownloadUrl: null },
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof useVersion>)
+  render(
+    <VersionDetail projectId="prj_123" versionId="ver_1" />,
+    { wrapper: createWrapper() },
+  )
+  expect(screen.getByRole("link", { name: /kmz/i })).toBeInTheDocument()
+  expect(screen.queryByRole("link", { name: /dxf/i })).not.toBeInTheDocument()
+  expect(screen.getByRole("link", { name: /^svg$/i })).toBeInTheDocument()
 })

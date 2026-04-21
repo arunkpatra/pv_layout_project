@@ -138,9 +138,13 @@ mock.module("../../lib/db.js", () => ({
 const mockGetPresignedUrl = mock(() =>
   Promise.resolve("https://s3.example.com/presigned-url"),
 )
+const mockGetPresignedDownloadUrl = mock(() =>
+  Promise.resolve("https://s3.example.com/download-url"),
+)
 mock.module("../../lib/s3.js", () => ({
   uploadToS3: mock(() => Promise.resolve()),
   getPresignedUrl: mockGetPresignedUrl,
+  getPresignedDownloadUrl: mockGetPresignedDownloadUrl,
 }))
 
 import {
@@ -373,6 +377,7 @@ describe("getVersion", () => {
     mockProjectFindUnique.mockClear()
     mockVersionFindUnique.mockClear()
     mockGetPresignedUrl.mockClear()
+    mockGetPresignedDownloadUrl.mockClear()
   })
 
   test("returns version detail when owned by user", async () => {
@@ -432,6 +437,48 @@ describe("getVersion", () => {
     const result = await getVersion(mockDbVersion.id, mockDbProject.userId)
     expect(result.svgPresignedUrl).toBe("https://s3.example.com/presigned-url")
     expect(mockGetPresignedUrl).toHaveBeenCalledWith("output/layout.svg")
+  })
+
+  test("getVersion includes null download URLs when all artifact keys are null", async () => {
+    // mockVersionFindUnique default returns layoutJob: null
+    const result = await getVersion(mockDbVersion.id, mockDbProject.userId)
+    expect(result.svgPresignedUrl).toBeNull()
+    expect(result.kmzDownloadUrl).toBeNull()
+    expect(result.dxfDownloadUrl).toBeNull()
+    expect(result.svgDownloadUrl).toBeNull()
+  })
+
+  test("getVersion generates kmzDownloadUrl, dxfDownloadUrl, svgDownloadUrl when artifact keys are set", async () => {
+    mockGetPresignedUrl.mockResolvedValueOnce("https://s3.example.com/svg-preview-url")
+    mockGetPresignedDownloadUrl
+      .mockResolvedValueOnce("https://s3.example.com/svg-download-url")
+      .mockResolvedValueOnce("https://s3.example.com/kmz-download-url")
+      .mockResolvedValueOnce("https://s3.example.com/dxf-download-url")
+    mockVersionFindUnique.mockResolvedValueOnce({
+      ...mockDbVersion,
+      project: { userId: mockDbProject.userId },
+      layoutJob: {
+        id: "ljo_testLayoutJob000000000000000000000000",
+        status: "COMPLETE",
+        kmzArtifactS3Key: "output/layout.kmz",
+        svgArtifactS3Key: "output/layout.svg",
+        dxfArtifactS3Key: "output/layout.dxf",
+        statsJson: null,
+        errorDetail: null,
+        startedAt: null,
+        completedAt: null,
+      },
+      energyJob: null,
+    } as any)
+    const result = await getVersion(mockDbVersion.id, mockDbProject.userId)
+    expect(result.svgPresignedUrl).toBe("https://s3.example.com/svg-preview-url")
+    expect(result.svgDownloadUrl).toBe("https://s3.example.com/svg-download-url")
+    expect(result.kmzDownloadUrl).toBe("https://s3.example.com/kmz-download-url")
+    expect(result.dxfDownloadUrl).toBe("https://s3.example.com/dxf-download-url")
+    expect(mockGetPresignedUrl).toHaveBeenCalledWith("output/layout.svg")
+    expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith("output/layout.svg", "layout.svg")
+    expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith("output/layout.kmz", "layout.kmz")
+    expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith("output/layout.dxf", "layout.dxf")
   })
 })
 

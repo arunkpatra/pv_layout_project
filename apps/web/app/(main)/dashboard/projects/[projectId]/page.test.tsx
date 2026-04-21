@@ -63,6 +63,9 @@ function makeVersion(overrides: Partial<VersionDetail> = {}): VersionDetail {
     createdAt: "2026-04-20T00:00:00Z",
     updatedAt: "2026-04-20T00:00:00Z",
     svgPresignedUrl: null,
+    kmzDownloadUrl: null,
+    dxfDownloadUrl: null,
+    svgDownloadUrl: null,
     ...overrides,
   }
 }
