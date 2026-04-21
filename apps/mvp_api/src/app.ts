@@ -8,6 +8,7 @@ import type { MvpHonoEnv } from "./middleware/error-handler.js"
 import { renderRoot } from "./views/root.html.js"
 import { downloadsRoutes } from "./modules/downloads/downloads.routes.js"
 import { contactRoutes } from "./modules/contact/contact.routes.js"
+import { dashboardRoutes } from "./modules/dashboard/dashboard.routes.js"
 
 export const app = new Hono<MvpHonoEnv>()
 
@@ -16,7 +17,7 @@ export const app = new Hono<MvpHonoEnv>()
 // CORS — must be first so OPTIONS preflight requests are handled before logging
 const corsOrigins = env.MVP_CORS_ORIGINS
   ? env.MVP_CORS_ORIGINS.split(",").map((o) => o.trim())
-  : ["http://localhost:3002"] // mvp_web dev default
+  : ["http://localhost:3002", "http://localhost:3004"] // mvp_web and mvp_dashboard dev defaults
 
 app.use(
   "*",
@@ -33,6 +34,7 @@ app.onError(errorHandler)
 
 app.route("/", downloadsRoutes)
 app.route("/", contactRoutes)
+app.route("/", dashboardRoutes)
 
 app.get("/", async (c) => {
   const status = {
