@@ -46,28 +46,37 @@ A spike is complete only when **all** of the following are true:
 | # | Spike | Scope | Status | Completed |
 |---|---|---|---|---|
 | 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | in-progress | — |
-| 2 | Download registration API | Prisma model, Hono endpoint, wire Products modal, S3 presigned download | planned | — |
-| 3 | Contact form API | Prisma model, Hono endpoint, wire Contact form | planned | — |
+| 2 | MVP API scaffold + download registration | New `apps/mvp_api` Hono server, Prisma models, download-register endpoint, wire Products modal | planned | — |
+| 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | planned | — |
 | 4 | Legal pages (full content) | T&C (IT Act), Privacy (DPDP Act), cookie consent banner | planned | — |
 | 5 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | planned | — |
 | 6 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | planned | — |
-| 7 | Domain + production deployment | Vercel project, solarlayout.in, SSL, production verification | planned | — |
+| 7 | Domain + production deployment | Vercel projects for mvp_web + mvp_api, solarlayout.in, api.solarlayout.in | planned | — |
+| 8 | Dashboard app + license key generation | `apps/mvp_dashboard` (Clerk auth), license key CRUD, display entitlements | planned | — |
+| 9 | Entitlement validation + usage reporting API | API key auth middleware, entitlement check endpoint, usage recording | planned | — |
+| 10 | Python app integration guide | `keyring` storage, API call pattern, usage reporting, reference implementation | planned | — |
 
 ---
 
 ## Architecture
 
 ```
-apps/mvp_web/     → Next.js 16 App Router — public marketing site (solarlayout.in)
-apps/api/         → Hono API server — new unauthenticated /mvp/* routes (Spikes 2-3)
-packages/ui/      → Shared shadcn/ui components (reused with solar palette overrides)
-packages/db/      → Prisma schema — new models for download registration + contact (Spikes 2-3)
+apps/mvp_web/         → Next.js 16 App Router — public marketing site (solarlayout.in)
+apps/mvp_api/         → Hono API on Bun — MVP backend (api.solarlayout.in)
+apps/mvp_dashboard/   → Next.js 16 App Router — user dashboard (dashboard.solarlayout.in) [Spike 8]
+packages/ui/          → Shared shadcn/ui components (reused with solar palette overrides)
+packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-3, 8-9)
 ```
 
 **Key boundaries:**
-- `apps/mvp_web` has NO Clerk, NO auth, NO TanStack Query, NO api-client
-- Reuses `packages/ui` components with CSS variable overrides for the solar brand palette
-- Backend routes in `apps/api` under `/mvp` prefix are unauthenticated (separate from existing Clerk-authenticated routes)
+- `apps/mvp_web` — public, NO auth, NO Clerk. Calls `apps/mvp_api` for download registration + contact
+- `apps/mvp_api` — standalone Hono server (same tech stack as `apps/api`). Two auth modes:
+  - Unauthenticated: download-register, contact form
+  - API key auth: entitlement validation, usage reporting (called by desktop Python apps)
+  - Clerk auth: dashboard API routes (Spike 8)
+- `apps/mvp_dashboard` — Clerk-authenticated, where users view license keys and entitlements
+- Desktop Python apps store license key (API key) via `keyring` (OS-native credential store)
+- `apps/mvp_api` is separate from `apps/api` — different auth models, different domain concerns
 - Same S3 bucket, `downloads/` key prefix for exe files
 
 ---
@@ -107,14 +116,18 @@ packages/db/      → Prisma schema — new models for download registration + c
 
 ---
 
-## Spike 2: Download Registration API
+## Spike 2: MVP API Scaffold + Download Registration
 
 **Status:** planned
 
 **Scope:**
+- New Hono API server: `apps/mvp_api` (same tech stack as `apps/api` — Hono v4, Bun, Prisma, Zod)
+  - package.json, tsconfig, env, middleware, error handler, response helpers
+  - Modelled on `apps/api` patterns but independent codebase
+  - Vercel deployment entry point
 - New Prisma model: `DownloadRegistration` (name, email, mobile, product, ipAddress, timestamp)
 - DB migration
-- New unauthenticated Hono route: `POST /mvp/download-register`
+- Unauthenticated route: `POST /download-register`
   - Validates input (Zod)
   - Saves registration to DB
   - Returns S3 presigned download URL for the selected product exe
@@ -125,7 +138,8 @@ packages/db/      → Prisma schema — new models for download registration + c
 
 **Acceptance Criteria:**
 - [ ] Gates pass
-- [ ] POST to `/mvp/download-register` with valid data returns presigned URL
+- [ ] `apps/mvp_api` builds and starts on its own port (e.g. 3003)
+- [ ] POST to `/download-register` with valid data returns presigned URL
 - [ ] Registration saved to DB (verify in Prisma Studio)
 - [ ] Products page modal submits and triggers file download
 - [ ] Invalid input returns appropriate error
@@ -140,7 +154,7 @@ packages/db/      → Prisma schema — new models for download registration + c
 **Scope:**
 - New Prisma model: `ContactSubmission` (name, email, subject, message, ipAddress, timestamp)
 - DB migration
-- New unauthenticated Hono route: `POST /mvp/contact`
+- New unauthenticated route in `apps/mvp_api`: `POST /contact`
   - Validates input (Zod)
   - Saves submission to DB
 - Wire Contact page form to call the API
@@ -148,7 +162,7 @@ packages/db/      → Prisma schema — new models for download registration + c
 
 **Acceptance Criteria:**
 - [ ] Gates pass
-- [ ] POST to `/mvp/contact` with valid data returns success
+- [ ] POST to `/contact` with valid data returns success
 - [ ] Submission saved to DB
 - [ ] Contact page form submits and shows success message
 - [ ] Invalid input returns appropriate error
@@ -232,20 +246,104 @@ packages/db/      → Prisma schema — new models for download registration + c
 **Status:** planned
 
 **Scope:**
-- New Vercel project for `apps/mvp_web`
-- Domain `solarlayout.in` configured in Vercel
-- SSL certificate (automatic via Vercel)
-- Environment variables configured
-- Production build and deployment
-- All pages verified in production
+- New Vercel project for `apps/mvp_web` → `solarlayout.in`
+- New Vercel project for `apps/mvp_api` → `api.solarlayout.in`
+- SSL certificates (automatic via Vercel)
+- Environment variables configured (DB, S3, CORS)
+- Production build and deployment for both
+- All pages + API endpoints verified in production
 
 **Acceptance Criteria:**
 - [ ] `solarlayout.in` resolves to the MVP website
-- [ ] HTTPS working (SSL certificate active)
+- [ ] `api.solarlayout.in` resolves to the MVP API
+- [ ] HTTPS working on both domains
 - [ ] All 9 pages load correctly in production
-- [ ] Download registration works in production (after Spike 2)
-- [ ] Contact form works in production (after Spike 3)
+- [ ] Download registration works end-to-end in production
+- [ ] Contact form works end-to-end in production
 - [ ] Core Web Vitals within acceptable range
+
+---
+
+## Spike 8: Dashboard App + License Key Generation
+
+**Status:** planned
+
+**Scope:**
+- New Next.js 16 app: `apps/mvp_dashboard` — deployed to `dashboard.solarlayout.in`
+  - Clerk authentication (user signup/login)
+  - Solar brand palette (shared with `mvp_web`)
+  - Reuses `packages/ui` components
+- New Prisma models:
+  - `LicenseKey` (key, userId, email, product, createdAt, revokedAt)
+  - `Entitlement` (userId, product, totalCalculations, usedCalculations, purchasedAt)
+- Dashboard pages:
+  - Home: overview of license keys and remaining entitlements
+  - License Keys: generate, view, revoke API keys
+  - Entitlements: view purchased plans, remaining calculations per product
+- License key generation: cryptographically random, prefixed (e.g. `sl_live_...`)
+- API routes in `apps/mvp_api` for dashboard CRUD (Clerk-authenticated)
+
+**Acceptance Criteria:**
+- [ ] Gates pass
+- [ ] User can sign up / sign in at `dashboard.solarlayout.in`
+- [ ] User can generate a license key
+- [ ] User can view their license key(s)
+- [ ] User can see their entitlement balances
+- [ ] License key is displayed once at creation (copy-to-clipboard)
+
+---
+
+## Spike 9: Entitlement Validation + Usage Reporting API
+
+**Status:** planned
+
+**Scope:**
+- API key auth middleware in `apps/mvp_api` — validates `Authorization: Bearer sl_live_...` header
+  - Looks up `LicenseKey` → resolves userId → loads entitlements
+  - Rejects revoked/invalid keys
+- New authenticated-by-API-key routes:
+  - `GET /entitlements` — returns remaining calculations per product for this key's user
+  - `POST /usage/report` — records a successful generation (product, timestamp, metadata)
+    - Decrements remaining calculations
+    - Returns updated balance
+  - `GET /usage/history` — returns usage history for this key's user
+- New Prisma model: `UsageRecord` (userId, product, licenseKeyId, metadata, timestamp)
+
+**Acceptance Criteria:**
+- [ ] Gates pass
+- [ ] Valid API key returns entitlements
+- [ ] Invalid/revoked API key returns 401
+- [ ] Usage report decrements entitlement count
+- [ ] Usage report rejects when entitlement exhausted (0 remaining)
+- [ ] Usage history returns chronological records
+
+---
+
+## Spike 10: Python App Integration Guide + Reference Implementation
+
+**Status:** planned
+
+**Scope:**
+- Python reference module (`solarlayout_client/`) demonstrating:
+  - License key storage via `keyring` (cross-platform: Windows Credential Locker, macOS Keychain, Linux Secret Service)
+  - First-run prompt: ask user for license key → store in keyring
+  - Subsequent runs: retrieve silently from keyring
+  - API client: check entitlements before generation, report usage after successful generation
+  - Error handling: expired key, exhausted entitlements, network failure
+- Integration guide document for Prasanta's Python apps:
+  - `pip install keyring` + usage pattern
+  - API endpoint reference
+  - Example code for each API call
+  - Platform-specific notes (Windows UAC, macOS Keychain access prompt, Linux Secret Service setup)
+- Modify one of Prasanta's apps as reference (or provide a standalone demo script)
+
+**Acceptance Criteria:**
+- [ ] Reference module stores/retrieves license key on all 3 platforms
+- [ ] `keyring.get_password("solarlayout", "license_key")` returns stored key
+- [ ] Entitlement check works before generation
+- [ ] Usage reporting works after generation
+- [ ] Integration guide document reviewed by Prasanta
+- [ ] At least one Python app demonstrates the full flow end-to-end
 
 ---
 
@@ -255,10 +353,14 @@ packages/db/      → Prisma schema — new models for download registration + c
 |---|---|---|---|
 | D1 | 2026-04-21 | New standalone app `apps/mvp_web` | Different audience, no auth, different brand — clean separation from `apps/web` |
 | D2 | 2026-04-21 | Reuse `packages/ui` with CSS variable overrides | Avoids rebuilding shadcn primitives; theme override keeps brand distinct |
-| D3 | 2026-04-21 | Backend routes in existing `apps/api` under `/mvp` prefix | Reuses Prisma, S3, deployment infra; unauthenticated routes separated by prefix |
+| D3 | ~~2026-04-21~~ 2026-04-22 | ~~Backend routes in existing `apps/api`~~ → New standalone `apps/mvp_api` | Different auth models (API key vs Clerk JWT), different domain concerns (license mgmt vs layout engine), cleaner separation — supersedes original D3 |
 | D4 | 2026-04-21 | Same S3 bucket, `downloads/` key prefix | Simpler infra, no new bucket needed |
 | D5 | 2026-04-21 | Same Prisma schema, new models | Consistent DB access patterns, shared migration pipeline |
 | D6 | 2026-04-21 | Spike-by-spike delivery | Incremental verification; most important content ships first |
 | D7 | 2026-04-21 | All pages in Spike 1 (stubbed API) | Get full visual product out fast; wire up backend incrementally |
 | D8 | 2026-04-21 | Legal templates generated by developer, lawyer-reviewed before launch | Faster delivery; legal review happens in parallel |
 | D9 | 2026-04-21 | SSG for all pages in Spike 1 | Best Core Web Vitals and SEO; no dynamic data needed yet |
+| D10 | 2026-04-22 | New standalone `apps/mvp_api` instead of adding routes to `apps/api` | Different auth models (unauthenticated + API key + Clerk), different domain (license/entitlement vs layout engine), independent deployment at api.solarlayout.in |
+| D11 | 2026-04-22 | `apps/mvp_dashboard` as separate Clerk-authenticated app | Users manage license keys and view entitlements at dashboard.solarlayout.in |
+| D12 | 2026-04-22 | Python `keyring` library for license key storage in desktop apps | Uses OS-native credential stores (Windows Credential Locker, macOS Keychain, Linux Secret Service) — secure, cross-platform, no custom encryption |
+| D13 | 2026-04-22 | License key = API key with `sl_live_` prefix | Simple bearer token auth for desktop apps; tied to user identity via dashboard |
