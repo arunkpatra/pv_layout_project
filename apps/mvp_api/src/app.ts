@@ -13,11 +13,18 @@ export const app = new Hono<MvpHonoEnv>()
 // ─── Middleware ────────────────────────────────────────────────────────────────
 
 // CORS — must be first so OPTIONS preflight requests are handled before logging
-const corsOrigins = env.CORS_ORIGINS
-  ? env.CORS_ORIGINS.split(",").map((o) => o.trim())
+const corsOrigins = env.MVP_CORS_ORIGINS
+  ? env.MVP_CORS_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:3002"] // mvp_web dev default
 
-app.use("*", cors({ origin: corsOrigins }))
+app.use(
+  "*",
+  cors({
+    origin: corsOrigins,
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type"],
+  }),
+)
 app.use("*", requestLogger)
 app.onError(errorHandler)
 

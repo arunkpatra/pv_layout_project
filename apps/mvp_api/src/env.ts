@@ -7,7 +7,7 @@ const EnvSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   // Comma-separated list of allowed CORS origins
-  CORS_ORIGINS: z.string().optional(),
+  MVP_CORS_ORIGINS: z.string().optional(),
   // S3 — optional for graceful degradation
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
