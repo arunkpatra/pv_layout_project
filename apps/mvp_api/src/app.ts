@@ -7,6 +7,7 @@ import { errorHandler } from "./middleware/error-handler.js"
 import type { MvpHonoEnv } from "./middleware/error-handler.js"
 import { renderRoot } from "./views/root.html.js"
 import { downloadsRoutes } from "./modules/downloads/downloads.routes.js"
+import { contactRoutes } from "./modules/contact/contact.routes.js"
 
 export const app = new Hono<MvpHonoEnv>()
 
@@ -31,6 +32,7 @@ app.onError(errorHandler)
 // ─── Routes ────────────────────────────────────────────────────────────────────
 
 app.route("/", downloadsRoutes)
+app.route("/", contactRoutes)
 
 app.get("/", async (c) => {
   const status = {

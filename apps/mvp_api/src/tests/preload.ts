@@ -15,6 +15,12 @@ const noopPrismaClient = {
     create: () => Promise.resolve(null),
     count: () => Promise.resolve(0),
   },
+  contactSubmission: {
+    findUnique: () => Promise.resolve(null),
+    findMany: () => Promise.resolve([]),
+    create: () => Promise.resolve(null),
+    count: () => Promise.resolve(0),
+  },
   $connect: () => Promise.resolve(),
   $disconnect: () => Promise.resolve(),
   $queryRaw: () => Promise.resolve([{ "?column?": 1 }]),
