@@ -10,11 +10,11 @@
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
-    "db:status": "prisma migrate status",
-    "db:validate": "prisma validate",
+    "mvp-db:generate": "prisma generate",
+    "mvp-db:migrate": "prisma migrate dev",
+    "mvp-db:studio": "prisma studio",
+    "mvp-db:status": "prisma migrate status",
+    "mvp-db:validate": "prisma validate",
     "test": "bun test"
   },
   "dependencies": {

@@ -14,7 +14,12 @@
     "db:studio": "turbo db:studio",
     "db:status": "turbo db:status",
     "db:validate": "turbo db:validate",
-    "db:seed": "turbo db:seed"
+    "db:seed": "turbo db:seed",
+    "mvp-db:generate": "turbo mvp-db:generate",
+    "mvp-db:migrate": "turbo mvp-db:migrate",
+    "mvp-db:studio": "turbo mvp-db:studio",
+    "mvp-db:status": "turbo mvp-db:status",
+    "mvp-db:validate": "turbo mvp-db:validate"
   },
   "devDependencies": {
     "@renewable-energy/eslint-config": "workspace:*",

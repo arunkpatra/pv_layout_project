@@ -131,15 +131,41 @@
       "outputs": []
     },
     "@renewable-energy/mvp-db#typecheck": {
-      "dependsOn": ["db:generate"],
+      "dependsOn": ["mvp-db:generate"],
       "outputs": []
     },
     "@renewable-energy/mvp-db#build": {
-      "dependsOn": ["db:generate"],
+      "dependsOn": ["mvp-db:generate"],
       "outputs": ["dist/**", "tsconfig.tsbuildinfo"],
       "env": [
-        "MVP_DATABASE_URL"
+        "MVP_DATABASE_URL",
+        "MVP_S3_DOWNLOADS_BUCKET",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION"
       ]
+    },
+    "mvp-db:generate": {
+      "inputs": ["prisma/**/*.prisma", "prisma.config.ts"],
+      "outputs": ["node_modules/.prisma/**"],
+      "cache": false
+    },
+    "mvp-db:validate": {
+      "inputs": ["prisma/**/*.prisma", "prisma.config.ts"],
+      "outputs": []
+    },
+    "mvp-db:status": {
+      "dependsOn": ["mvp-db:generate"],
+      "cache": false
+    },
+    "mvp-db:migrate": {
+      "dependsOn": ["mvp-db:generate"],
+      "cache": false
+    },
+    "mvp-db:studio": {
+      "dependsOn": ["mvp-db:generate"],
+      "persistent": true,
+      "cache": false
     }
   }
 }
