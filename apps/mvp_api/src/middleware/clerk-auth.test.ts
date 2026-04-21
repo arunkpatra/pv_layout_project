@@ -1,19 +1,20 @@
 import { describe, expect, it, mock, beforeEach } from "bun:test"
 import { Hono } from "hono"
+import {
+  errorHandler,
+  type MvpHonoEnv,
+} from "./error-handler.js"
 
 // Mock @clerk/backend BEFORE importing the middleware
 const mockVerifyToken = mock(async (_token: string) => ({ sub: "user_abc" }))
 mock.module("@clerk/backend", () => ({
-  createClerkClient: () => ({
-    verifyToken: mockVerifyToken,
-  }),
+  verifyToken: mockVerifyToken,
 }))
 
 const { clerkAuth } = await import("./clerk-auth.js")
-const { errorHandler } = await import("./error-handler.js")
 
 function makeApp() {
-  const app = new Hono()
+  const app = new Hono<MvpHonoEnv>()
   app.use("/protected", clerkAuth)
   app.get("/protected", (c) => c.json({ ok: true }))
   app.onError(errorHandler)

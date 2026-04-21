@@ -14,7 +14,7 @@ const EnvSchema = z.object({
   AWS_REGION: z.string().optional(),
   MVP_S3_DOWNLOADS_BUCKET: z.string().optional(),
   // Clerk — used to verify dashboard JWT tokens
-  MVP_CLERK_SECRET_KEY: z.string().optional(),
+  CLERK_SECRET_KEY: z.string().optional(),
 })
 
 const parsed = EnvSchema.safeParse(process.env)

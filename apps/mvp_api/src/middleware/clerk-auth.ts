@@ -1,11 +1,7 @@
-import { createClerkClient } from "@clerk/backend"
+import { verifyToken } from "@clerk/backend"
 import type { MiddlewareHandler } from "hono"
 import { env } from "../env.js"
 import { AppError } from "../lib/errors.js"
-
-const clerk = createClerkClient({
-  secretKey: env.MVP_CLERK_SECRET_KEY ?? "",
-})
 
 export const clerkAuth: MiddlewareHandler = async (c, next) => {
   const authHeader = c.req.header("Authorization")
@@ -18,7 +14,7 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
   }
 
   try {
-    await clerk.verifyToken(token)
+    await verifyToken(token, { secretKey: env.CLERK_SECRET_KEY ?? "" })
   } catch {
     throw new AppError("UNAUTHORIZED", "Invalid or expired token", 401)
   }

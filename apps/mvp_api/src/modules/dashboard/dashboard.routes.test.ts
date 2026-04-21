@@ -1,6 +1,9 @@
 import { describe, expect, it, mock, beforeEach } from "bun:test"
 import { Hono } from "hono"
-import { errorHandler } from "../../middleware/error-handler.js"
+import {
+  errorHandler,
+  type MvpHonoEnv,
+} from "../../middleware/error-handler.js"
 
 // Mock Clerk auth to pass by default
 mock.module("../../middleware/clerk-auth.js", () => ({
@@ -19,7 +22,7 @@ mock.module("../../lib/s3.js", () => ({
 const { dashboardRoutes } = await import("./dashboard.routes.js")
 
 function makeApp() {
-  const app = new Hono()
+  const app = new Hono<MvpHonoEnv>()
   app.route("/", dashboardRoutes)
   app.onError(errorHandler)
   return app
@@ -87,7 +90,7 @@ describe("GET /dashboard/download/:product", () => {
   })
 
   it("returns 500 when S3 is not configured (url is null)", async () => {
-    mockGetPresignedDownloadUrl.mockImplementation(async () => null)
+    mockGetPresignedDownloadUrl.mockImplementation(async () => null as unknown as string)
     const app = makeApp()
     const res = await app.request("/dashboard/download/pv-layout-basic", {
       method: "GET",
