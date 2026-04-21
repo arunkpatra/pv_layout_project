@@ -47,11 +47,11 @@ export function FeaturesOverview() {
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Three Tools for Every Stage of Solar Development
+            Solutions for Every Stage of Solar Development
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            From quick capacity estimates to detailed bankable layouts
-            with energy yield analysis.
+            From quick capacity estimates to detailed layouts with energy yield
+            analysis.
           </p>
         </div>
 
@@ -76,11 +76,7 @@ export function FeaturesOverview() {
                     </li>
                   ))}
                 </ul>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="mt-6 w-full"
-                >
+                <Button asChild variant="outline" className="mt-6 w-full">
                   <Link href="/products">Learn More</Link>
                 </Button>
               </CardContent>

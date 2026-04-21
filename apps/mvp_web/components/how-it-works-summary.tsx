@@ -32,7 +32,7 @@ export function HowItWorksSummary() {
             How It Works
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            From boundary to bankable layout — in minutes.
+            From Boundary to Layout to Yield — in minutes.
           </p>
         </div>
 
