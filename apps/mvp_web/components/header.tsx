@@ -57,7 +57,7 @@ export function Header() {
         <div className="hidden md:block">
           <Button
             asChild
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
+            className="bg-accent text-accent-foreground [a]:hover:bg-accent/80"
           >
             <Link href="/products">Download Now</Link>
           </Button>
@@ -102,7 +102,7 @@ export function Header() {
             <div className="mt-6">
               <Button
                 asChild
-                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                className="w-full bg-accent text-accent-foreground [a]:hover:bg-accent/80"
               >
                 <Link href="/products" onClick={() => setOpen(false)}>
                   Download Now
