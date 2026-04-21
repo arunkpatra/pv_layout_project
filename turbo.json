@@ -129,6 +129,17 @@
     "@renewable-energy/web#typecheck": {
       "dependsOn": ["^build"],
       "outputs": []
+    },
+    "@renewable-energy/mvp-db#typecheck": {
+      "dependsOn": ["db:generate"],
+      "outputs": []
+    },
+    "@renewable-energy/mvp-db#build": {
+      "dependsOn": ["db:generate"],
+      "outputs": ["dist/**", "tsconfig.tsbuildinfo"],
+      "env": [
+        "MVP_DATABASE_URL"
+      ]
     }
   }
 }
