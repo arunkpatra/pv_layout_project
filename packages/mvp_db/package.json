@@ -3,12 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/src/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/src/index.js"
   },
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsc --build && cp -r src/generated dist/src/",
     "typecheck": "tsc --noEmit",
     "mvp-db:generate": "prisma generate",
     "mvp-db:migrate": "prisma migrate dev",
