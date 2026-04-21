@@ -147,6 +147,10 @@
         "AWS_REGION"
       ]
     },
+    "@renewable-energy/mvp-api#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "@renewable-energy/mvp-api#build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"],
