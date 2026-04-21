@@ -46,7 +46,7 @@ A spike is complete only when **all** of the following are true:
 | # | Spike | Scope | Status | Completed |
 |---|---|---|---|---|
 | 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | in-progress | — |
-| 2 | MVP API scaffold + download registration | New `apps/mvp_api` Hono server, Prisma models, download-register endpoint, wire Products modal | planned | — |
+| 2 | MVP DB + MVP API scaffold + download registration | New `packages/mvp_db`, `apps/mvp_api`, docker-compose, download-register endpoint | planned | — |
 | 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | planned | — |
 | 4 | Legal pages (full content) | T&C (IT Act), Privacy (DPDP Act), cookie consent banner | planned | — |
 | 5 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | planned | — |
@@ -65,7 +65,8 @@ apps/mvp_web/         → Next.js 16 App Router — public marketing site (solar
 apps/mvp_api/         → Hono API on Bun — MVP backend (api.solarlayout.in)
 apps/mvp_dashboard/   → Next.js 16 App Router — user dashboard (dashboard.solarlayout.in) [Spike 8]
 packages/ui/          → Shared shadcn/ui components (reused with solar palette overrides)
-packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-3, 8-9)
+packages/mvp_db/      → Prisma schema + client for MVP domain (separate DB from cloud platform)
+packages/db/          → Prisma schema + client for cloud platform (unchanged, not used by MVP)
 ```
 
 **Key boundaries:**
@@ -75,9 +76,11 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
   - API key auth: entitlement validation, usage reporting (called by desktop Python apps)
   - Clerk auth: dashboard API routes (Spike 8)
 - `apps/mvp_dashboard` — Clerk-authenticated, where users view license keys and entitlements
+- `packages/mvp_db` — separate Prisma schema and Postgres DB from `packages/db`. Independent migrations, no coupling between MVP and cloud platform
 - Desktop Python apps store license key (API key) via `keyring` (OS-native credential store)
 - `apps/mvp_api` is separate from `apps/api` — different auth models, different domain concerns
 - Same S3 bucket, `downloads/` key prefix for exe files
+- `docker-compose.yml` gets a second Postgres service (`mvp_db`, port 5433)
 
 ---
 
@@ -116,16 +119,22 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
 
 ---
 
-## Spike 2: MVP API Scaffold + Download Registration
+## Spike 2: MVP DB + MVP API Scaffold + Download Registration
 
 **Status:** planned
 
 **Scope:**
+- New Prisma package: `packages/mvp_db`
+  - Own Prisma schema, own DB connection (`MVP_DATABASE_URL`)
+  - Same patterns as `packages/db` (semantic IDs, appPrisma/adminPrisma exports, bun:test)
+  - `docker-compose.yml` updated: new `mvp_db` Postgres service on port 5433
+  - `turbo.json` updated: `@renewable-energy/mvp-db` tasks mirroring `@renewable-energy/db`
 - New Hono API server: `apps/mvp_api` (same tech stack as `apps/api` — Hono v4, Bun, Prisma, Zod)
   - package.json, tsconfig, env, middleware, error handler, response helpers
   - Modelled on `apps/api` patterns but independent codebase
+  - Imports `@renewable-energy/mvp-db` (NOT `@renewable-energy/db`)
   - Vercel deployment entry point
-- New Prisma model: `DownloadRegistration` (name, email, mobile, product, ipAddress, timestamp)
+- New Prisma model in `packages/mvp_db`: `DownloadRegistration` (name, email, mobile, product, ipAddress, timestamp)
 - DB migration
 - Unauthenticated route: `POST /download-register`
   - Validates input (Zod)
@@ -138,9 +147,11 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
 
 **Acceptance Criteria:**
 - [ ] Gates pass
+- [ ] `docker compose up -d` starts both `db` (5432) and `mvp_db` (5433)
+- [ ] `packages/mvp_db` builds and generates Prisma client
 - [ ] `apps/mvp_api` builds and starts on its own port (e.g. 3003)
 - [ ] POST to `/download-register` with valid data returns presigned URL
-- [ ] Registration saved to DB (verify in Prisma Studio)
+- [ ] Registration saved to MVP DB (verify in Prisma Studio)
 - [ ] Products page modal submits and triggers file download
 - [ ] Invalid input returns appropriate error
 - [ ] Duplicate email handled gracefully
@@ -152,7 +163,7 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
 **Status:** planned
 
 **Scope:**
-- New Prisma model: `ContactSubmission` (name, email, subject, message, ipAddress, timestamp)
+- New Prisma model in `packages/mvp_db`: `ContactSubmission` (name, email, subject, message, ipAddress, timestamp)
 - DB migration
 - New unauthenticated route in `apps/mvp_api`: `POST /contact`
   - Validates input (Zod)
@@ -273,7 +284,7 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
   - Clerk authentication (user signup/login)
   - Solar brand palette (shared with `mvp_web`)
   - Reuses `packages/ui` components
-- New Prisma models:
+- New Prisma models in `packages/mvp_db`:
   - `LicenseKey` (key, userId, email, product, createdAt, revokedAt)
   - `Entitlement` (userId, product, totalCalculations, usedCalculations, purchasedAt)
 - Dashboard pages:
@@ -307,7 +318,7 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
     - Decrements remaining calculations
     - Returns updated balance
   - `GET /usage/history` — returns usage history for this key's user
-- New Prisma model: `UsageRecord` (userId, product, licenseKeyId, metadata, timestamp)
+- New Prisma model in `packages/mvp_db`: `UsageRecord` (userId, product, licenseKeyId, metadata, timestamp)
 
 **Acceptance Criteria:**
 - [ ] Gates pass
@@ -364,3 +375,4 @@ packages/db/          → Prisma schema — new models for MVP domain (Spikes 2-
 | D11 | 2026-04-22 | `apps/mvp_dashboard` as separate Clerk-authenticated app | Users manage license keys and view entitlements at dashboard.solarlayout.in |
 | D12 | 2026-04-22 | Python `keyring` library for license key storage in desktop apps | Uses OS-native credential stores (Windows Credential Locker, macOS Keychain, Linux Secret Service) — secure, cross-platform, no custom encryption |
 | D13 | 2026-04-22 | License key = API key with `sl_live_` prefix | Simple bearer token auth for desktop apps; tied to user identity via dashboard |
+| D14 | 2026-04-22 | New `packages/mvp_db` with separate Postgres DB | MVP and cloud platform have fundamentally different data models (license/entitlement vs project/version/job); shared schema would couple unrelated migrations and risk cross-domain breakage |
