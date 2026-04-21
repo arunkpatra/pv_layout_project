@@ -45,7 +45,7 @@ A spike is complete only when **all** of the following are true:
 
 | # | Spike | Scope | Status | Completed |
 |---|---|---|---|---|
-| 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | in-progress | — |
+| 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | complete | 2026-04-22 |
 | 2 | MVP DB + MVP API scaffold + download registration | New `packages/mvp_db`, `apps/mvp_api`, docker-compose, download-register endpoint | planned | — |
 | 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | planned | — |
 | 4 | Legal pages (full content) | T&C (IT Act), Privacy (DPDP Act), cookie consent banner | planned | — |
@@ -86,7 +86,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 1: Website Scaffold + All 9 Pages
 
-**Status:** in-progress  
+**Status:** complete (2026-04-22)  
 **Implementation Plan:** [docs/superpowers/plans/2026-04-21-mvp-spike1-website-scaffold.md](../superpowers/plans/2026-04-21-mvp-spike1-website-scaffold.md)
 
 **Scope:**
