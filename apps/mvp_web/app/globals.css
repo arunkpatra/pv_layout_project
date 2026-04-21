@@ -1,5 +1,21 @@
 @import "@renewable-energy/ui/globals.css";
 
+button,
+a,
+[data-slot="button"],
+[data-slot="dialog-close"],
+[data-slot="sheet-close"],
+[data-slot="accordion-trigger"],
+[data-slot="checkbox"],
+[role="button"],
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+select,
+summary {
+  cursor: pointer;
+}
+
 :root {
   --background: #F4F6F8;
   --foreground: #1C1C1C;
