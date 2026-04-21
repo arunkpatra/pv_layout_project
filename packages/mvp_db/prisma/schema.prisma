@@ -30,3 +30,39 @@ model ContactSubmission {
 
   @@map("contact_submissions")
 }
+
+model User {
+  id           String        @id @default("")
+  clerkId      String        @unique
+  email        String        @unique
+  name         String?
+  createdAt    DateTime      @default(now())
+  licenseKeys  LicenseKey[]
+  entitlements Entitlement[]
+
+  @@map("users")
+}
+
+model LicenseKey {
+  id        String    @id @default("")
+  key       String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  product   String
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@map("license_keys")
+}
+
+model Entitlement {
+  id                String   @id @default("")
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  product           String
+  totalCalculations Int
+  usedCalculations  Int      @default(0)
+  purchasedAt       DateTime @default(now())
+
+  @@map("entitlements")
+}
