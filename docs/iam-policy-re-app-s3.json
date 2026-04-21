@@ -24,6 +24,30 @@
         "arn:aws:s3:::renewable-energy-staging-artifacts",
         "arn:aws:s3:::renewable-energy-prod-artifacts"
       ]
+    },
+    {
+      "Sid": "MvpDownloadsReadWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::solarlayout-local-downloads/*",
+        "arn:aws:s3:::solarlayout-staging-downloads/*",
+        "arn:aws:s3:::solarlayout-prod-downloads/*"
+      ]
+    },
+    {
+      "Sid": "MvpDownloadsList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": [
+        "arn:aws:s3:::solarlayout-local-downloads",
+        "arn:aws:s3:::solarlayout-staging-downloads",
+        "arn:aws:s3:::solarlayout-prod-downloads"
+      ]
     }
   ]
 }

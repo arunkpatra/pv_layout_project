@@ -13,6 +13,21 @@ Resources are namespaced by environment. Last verified: 2026-04-20.
 | staging | `renewable-energy-staging-artifacts` | Layout artifacts for staging/CI deployments |
 | prod | `renewable-energy-prod-artifacts` | Layout artifacts for production |
 
+### MVP Download Buckets
+
+| Environment | Bucket Name | Purpose |
+|---|---|---|
+| local | `solarlayout-local-downloads` | Desktop exe downloads during local development |
+| staging | `solarlayout-staging-downloads` | Desktop exe downloads for staging (future) |
+| prod | `solarlayout-prod-downloads` | Desktop exe downloads for production (future) |
+
+**Key layout within each MVP download bucket:**
+```
+downloads/pv-layout-basic.exe       ← PV Layout Basic desktop app
+downloads/pv-layout-pro.exe         ← PV Layout Pro desktop app
+downloads/pv-layout-pro-plus.exe    ← PV Layout Pro Plus desktop app
+```
+
 **Configuration applied to all buckets:**
 - Public access fully blocked (BlockPublicAcls, IgnorePublicAcls, BlockPublicPolicy, RestrictPublicBuckets)
 - Region: `ap-south-1`
