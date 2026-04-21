@@ -1,10 +1,10 @@
-import { test, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { test, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("sonner", () => ({
   toast: {
-    info: vi.fn(),
+    success: vi.fn(),
     error: vi.fn(),
   },
 }))
@@ -12,19 +12,30 @@ vi.mock("sonner", () => ({
 import { ContactForm } from "./contact-form"
 import { toast } from "sonner"
 
+const mockFetch = vi.fn()
+vi.stubGlobal("fetch", mockFetch)
+
+afterEach(() => {
+  cleanup()
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
 test("renders all form fields", () => {
   render(<ContactForm />)
   expect(
-    screen.getAllByPlaceholderText("Enter your full name").length
+    screen.getAllByPlaceholderText("Enter your full name").length,
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByPlaceholderText("you@company.com").length
+    screen.getAllByPlaceholderText("you@company.com").length,
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByPlaceholderText("What is this regarding?").length
+    screen.getAllByPlaceholderText("What is this regarding?").length,
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByPlaceholderText("Tell us more...").length
+    screen.getAllByPlaceholderText("Tell us more...").length,
   ).toBeGreaterThanOrEqual(1)
 })
 
@@ -36,25 +47,38 @@ test("renders Send Message button", () => {
   expect(buttons.length).toBeGreaterThanOrEqual(1)
 })
 
-test("shows toast on valid submit", async () => {
+test("shows success toast on valid submit", async () => {
   const user = userEvent.setup()
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        success: true,
+        data: {
+          message:
+            "Thank you for reaching out. We will get back to you within 2 business days.",
+        },
+      }),
+  })
+
   render(<ContactForm />)
 
   await user.type(
     screen.getAllByPlaceholderText("Enter your full name")[0]!,
-    "Test User"
+    "Test User",
   )
   await user.type(
     screen.getAllByPlaceholderText("you@company.com")[0]!,
-    "test@example.com"
+    "test@example.com",
   )
   await user.type(
     screen.getAllByPlaceholderText("What is this regarding?")[0]!,
-    "Support"
+    "Support",
   )
   await user.type(
     screen.getAllByPlaceholderText("Tell us more...")[0]!,
-    "I need help with the software."
+    "I need help with the software.",
   )
 
   const buttons = screen.getAllByRole("button", {
@@ -62,7 +86,184 @@ test("shows toast on valid submit", async () => {
   })
   await user.click(buttons[0]!)
 
-  expect(toast.info).toHaveBeenCalledWith(
-    expect.stringContaining("Message sending coming soon")
+  await waitFor(() => {
+    expect(toast.success).toHaveBeenCalledWith(
+      "Thank you for reaching out. We will get back to you within 2 business days.",
+    )
+  })
+})
+
+test("shows error toast on API failure", async () => {
+  const user = userEvent.setup()
+
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    json: () =>
+      Promise.resolve({
+        success: false,
+        error: { message: "Validation failed" },
+      }),
+  })
+
+  render(<ContactForm />)
+
+  await user.type(
+    screen.getAllByPlaceholderText("Enter your full name")[0]!,
+    "Test User",
   )
+  await user.type(
+    screen.getAllByPlaceholderText("you@company.com")[0]!,
+    "test@example.com",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
+    "Support",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("Tell us more...")[0]!,
+    "I need help.",
+  )
+
+  const buttons = screen.getAllByRole("button", {
+    name: /Send Message/i,
+  })
+  await user.click(buttons[0]!)
+
+  await waitFor(() => {
+    expect(toast.error).toHaveBeenCalledWith("Validation failed")
+  })
+})
+
+test("shows error toast on network failure", async () => {
+  const user = userEvent.setup()
+
+  mockFetch.mockRejectedValueOnce(new Error("Network error"))
+
+  render(<ContactForm />)
+
+  await user.type(
+    screen.getAllByPlaceholderText("Enter your full name")[0]!,
+    "Test User",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("you@company.com")[0]!,
+    "test@example.com",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
+    "Support",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("Tell us more...")[0]!,
+    "I need help.",
+  )
+
+  const buttons = screen.getAllByRole("button", {
+    name: /Send Message/i,
+  })
+  await user.click(buttons[0]!)
+
+  await waitFor(() => {
+    expect(toast.error).toHaveBeenCalledWith(
+      "Failed to send message. Please try again.",
+    )
+  })
+})
+
+test("clears form fields after successful submit", async () => {
+  const user = userEvent.setup()
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        success: true,
+        data: { message: "Thank you." },
+      }),
+  })
+
+  render(<ContactForm />)
+
+  const nameInput = screen.getAllByPlaceholderText(
+    "Enter your full name",
+  )[0]! as HTMLInputElement
+  const emailInput = screen.getAllByPlaceholderText(
+    "you@company.com",
+  )[0]! as HTMLInputElement
+  const subjectInput = screen.getAllByPlaceholderText(
+    "What is this regarding?",
+  )[0]! as HTMLInputElement
+  const messageInput = screen.getAllByPlaceholderText(
+    "Tell us more...",
+  )[0]! as HTMLTextAreaElement
+
+  await user.type(nameInput, "Test User")
+  await user.type(emailInput, "test@example.com")
+  await user.type(subjectInput, "Support")
+  await user.type(messageInput, "I need help.")
+
+  const buttons = screen.getAllByRole("button", {
+    name: /Send Message/i,
+  })
+  await user.click(buttons[0]!)
+
+  await waitFor(() => {
+    expect(nameInput.value).toBe("")
+    expect(emailInput.value).toBe("")
+    expect(subjectInput.value).toBe("")
+    expect(messageInput.value).toBe("")
+  })
+})
+
+test("sends correct payload to API", async () => {
+  const user = userEvent.setup()
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        success: true,
+        data: { message: "Thank you." },
+      }),
+  })
+
+  render(<ContactForm />)
+
+  await user.type(
+    screen.getAllByPlaceholderText("Enter your full name")[0]!,
+    "Test User",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("you@company.com")[0]!,
+    "test@example.com",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
+    "Support",
+  )
+  await user.type(
+    screen.getAllByPlaceholderText("Tell us more...")[0]!,
+    "I need help with the software.",
+  )
+
+  const buttons = screen.getAllByRole("button", {
+    name: /Send Message/i,
+  })
+  await user.click(buttons[0]!)
+
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/contact"),
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Test User",
+          email: "test@example.com",
+          subject: "Support",
+          message: "I need help with the software.",
+        }),
+      }),
+    )
+  })
 })
