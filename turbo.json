@@ -25,7 +25,8 @@
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_REGION",
-        "S3_ARTIFACTS_BUCKET"
+        "S3_ARTIFACTS_BUCKET",
+        "NEXT_PUBLIC_MVP_API_URL"
       ]
     },
     "lint": {
