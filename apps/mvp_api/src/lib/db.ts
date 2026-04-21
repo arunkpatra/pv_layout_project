@@ -1,3 +1,1 @@
-import { prisma } from "@renewable-energy/mvp-db"
-
-export const db = prisma
+export { prisma as db } from "@renewable-energy/mvp-db"

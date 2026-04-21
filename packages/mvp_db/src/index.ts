@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient } from "./generated/prisma/index.js"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { semanticIdExtension, strictIdExtension } from "./extensions/index.js"
 
@@ -37,4 +37,4 @@ export const adminPrisma = rawClient.$extends(semanticIdExtension)
  */
 export const prisma = appPrisma
 
-export type { Prisma } from "@prisma/client"
+export type { Prisma } from "./generated/prisma/index.js"

@@ -15,6 +15,9 @@ import { Label } from "@renewable-energy/ui/components/label"
 import { Checkbox } from "@renewable-energy/ui/components/checkbox"
 import Link from "next/link"
 
+const API_URL =
+  process.env.NEXT_PUBLIC_MVP_API_URL ?? "http://localhost:3003"
+
 interface DownloadModalProps {
   productName: string
   children: React.ReactNode
@@ -29,8 +32,9 @@ export function DownloadModal({
   const [email, setEmail] = useState("")
   const [mobile, setMobile] = useState("")
   const [agreed, setAgreed] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     if (!fullName.trim() || !email.trim()) {
@@ -45,14 +49,41 @@ export function DownloadModal({
       return
     }
 
-    toast.info(
-      `Download for ${productName} coming soon. We have noted your interest.`
-    )
-    setOpen(false)
-    setFullName("")
-    setEmail("")
-    setMobile("")
-    setAgreed(false)
+    setSubmitting(true)
+    try {
+      const res = await fetch(`${API_URL}/download-register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fullName.trim(),
+          email: email.trim(),
+          mobile: mobile.trim() || undefined,
+          product: productName,
+        }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok || !json.success) {
+        const message =
+          json.error?.message ?? "Download failed. Please try again."
+        toast.error(message)
+        return
+      }
+
+      const { downloadUrl } = json.data as { downloadUrl: string }
+      window.location.href = downloadUrl
+      toast.info("Download started")
+      setOpen(false)
+      setFullName("")
+      setEmail("")
+      setMobile("")
+      setAgreed(false)
+    } catch {
+      toast.error("Download failed. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -137,9 +168,10 @@ export function DownloadModal({
 
           <Button
             type="submit"
+            disabled={submitting}
             className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
           >
-            Submit &amp; Download
+            {submitting ? "Submitting\u2026" : "Submit & Download"}
           </Button>
         </form>
       </DialogContent>
