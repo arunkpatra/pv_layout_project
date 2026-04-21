@@ -42,12 +42,11 @@ test("renders Governing Law section with Indian jurisdiction", () => {
   ).toBeGreaterThanOrEqual(1)
 })
 
-test("renders preliminary notice", () => {
+test("does not render preliminary notice banner", () => {
   render(<TermsPage />)
   expect(
-    screen.getAllByText(/preliminary and subject to legal review/i)
-      .length
-  ).toBeGreaterThanOrEqual(1)
+    screen.queryByText(/preliminary and subject to legal review/i)
+  ).not.toBeInTheDocument()
 })
 
 test("renders all key sections", () => {

@@ -45,14 +45,17 @@ test("renders prices", () => {
   expect(screen.getAllByText("$14.99").length).toBeGreaterThanOrEqual(1)
 })
 
-test("renders disabled Buy Now buttons", () => {
+test("renders disabled Buy Now buttons without tooltip", () => {
   render(<PricingPage />)
   const buyButtons = screen.getAllByRole("button", { name: /Buy Now/i })
   expect(buyButtons.length).toBeGreaterThanOrEqual(3)
   const disabledButtons = buyButtons.filter(
-    (btn) => btn.hasAttribute("disabled") || btn.getAttribute("aria-disabled") === "true"
+    (btn) =>
+      btn.hasAttribute("disabled") ||
+      btn.getAttribute("aria-disabled") === "true"
   )
   expect(disabledButtons.length).toBeGreaterThanOrEqual(3)
+  expect(screen.queryByText(/Payment coming soon/i)).not.toBeInTheDocument()
 })
 
 test("renders feature comparison table", () => {
@@ -70,6 +73,7 @@ test("renders top-up note", () => {
   expect(
     screen.getAllByText(/Need more calculations/i).length
   ).toBeGreaterThanOrEqual(1)
+  expect(screen.queryByText(/Phase 2/i)).not.toBeInTheDocument()
 })
 
 test("renders sub-heading text", () => {

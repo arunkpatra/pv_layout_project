@@ -34,12 +34,11 @@ test("renders Grievance Officer section", () => {
   ).toBeGreaterThanOrEqual(1)
 })
 
-test("renders preliminary notice", () => {
+test("does not render preliminary notice banner", () => {
   render(<PrivacyPage />)
   expect(
-    screen.getAllByText(/preliminary and subject to legal review/i)
-      .length
-  ).toBeGreaterThanOrEqual(1)
+    screen.queryByText(/preliminary and subject to legal review/i)
+  ).not.toBeInTheDocument()
 })
 
 test("renders all key sections", () => {
