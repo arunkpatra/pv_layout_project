@@ -293,6 +293,8 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
   - Entitlements: view purchased plans, remaining calculations per product
 - License key generation: cryptographically random, prefixed (e.g. `sl_live_...`)
 - API routes in `apps/mvp_api` for dashboard CRUD (Clerk-authenticated)
+- Consider creating `packages/mvp_shared` — shared TypeScript types between `mvp_api` and `mvp_dashboard` (LicenseKey, Entitlement, User types). Evaluate at spike start — YAGNI until cross-app type dependency is confirmed.
+- Consider creating `packages/mvp_api-client` — type-safe HTTP client for `mvp_dashboard` → `mvp_api`. Evaluate at spike start — may not be needed if dashboard uses server-side API calls directly.
 
 **Acceptance Criteria:**
 - [ ] Gates pass
