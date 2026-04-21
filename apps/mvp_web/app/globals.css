@@ -1,0 +1,23 @@
+@import "@renewable-energy/ui/globals.css";
+
+:root {
+  --background: #F4F6F8;
+  --foreground: #1C1C1C;
+  --card: #FFFFFF;
+  --card-foreground: #1C1C1C;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1C1C;
+  --primary: #1A3A5C;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F4F6F8;
+  --secondary-foreground: #1A3A5C;
+  --muted: #E5E7EB;
+  --muted-foreground: #6B7280;
+  --accent: #F5A623;
+  --accent-foreground: #1C1C1C;
+  --destructive: #DC2626;
+  --border: #D1D5DB;
+  --input: #D1D5DB;
+  --ring: #1A3A5C;
+  --radius: 0.625rem;
+}
