@@ -1,4 +1,4 @@
-import { Mail, MapPin, Linkedin, Youtube } from "lucide-react"
+import { Mail, MapPin, LinkedinIcon, YoutubeIcon } from "lucide-react"
 
 const contactDetails = [
   {
@@ -17,12 +17,12 @@ const contactDetails = [
 
 const socialLinks = [
   {
-    icon: Linkedin,
+    icon: LinkedinIcon,
     label: "LinkedIn",
     href: "https://linkedin.com",
   },
   {
-    icon: Youtube,
+    icon: YoutubeIcon,
     label: "YouTube",
     href: "https://youtube.com",
   },
