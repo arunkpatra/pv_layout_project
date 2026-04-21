@@ -47,7 +47,7 @@ A spike is complete only when **all** of the following are true:
 |---|---|---|---|---|
 | 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | complete | 2026-04-22 |
 | 2 | MVP DB + MVP API scaffold + download registration | New `packages/mvp_db`, `apps/mvp_api`, docker-compose, download-register endpoint | complete | 2026-04-22 |
-| 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | planned | — |
+| 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | complete | 2026-04-22 |
 | 4 | Legal pages (full content) | T&C (IT Act), Privacy (DPDP Act), cookie consent banner | planned | — |
 | 5 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | planned | — |
 | 6 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | planned | — |
