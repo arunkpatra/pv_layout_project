@@ -48,13 +48,14 @@ A spike is complete only when **all** of the following are true:
 | 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | complete | 2026-04-22 |
 | 2 | MVP DB + MVP API scaffold + download registration | New `packages/mvp_db`, `apps/mvp_api`, docker-compose, download-register endpoint | complete | 2026-04-22 |
 | 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | complete | 2026-04-22 |
-| 4 | Legal pages (full content) | T&C (IT Act), Privacy (DPDP Act), cookie consent banner | planned | — |
-| 5 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | planned | — |
-| 6 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | planned | — |
-| 7 | Domain + production deployment | Vercel projects for mvp_web + mvp_api, solarlayout.in, api.solarlayout.in | planned | — |
-| 8 | Dashboard app + license key generation | `apps/mvp_dashboard` (Clerk auth), license key CRUD, display entitlements | planned | — |
-| 9 | Entitlement validation + usage reporting API | API key auth middleware, entitlement check endpoint, usage recording | planned | — |
-| 10 | Python app integration guide | `keyring` storage, API call pattern, usage reporting, reference implementation | planned | — |
+| 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | planned | — |
+| 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | planned | — |
+| 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | planned | — |
+| 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
+| 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
+| 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
+| 10 | Legal pages full review | Full DPDP Act / IT Act legal review | post-launch | — |
+| ~~7~~ | ~~Domain + production deployment~~ | ~~solarlayout.in + api.solarlayout.in~~ | complete | 2026-04-22 |
 
 ---
 
@@ -180,133 +181,77 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ---
 
-## Spike 4: Legal Pages (Full Content)
+## Spike 4: Cleanup + Dashboard App
 
 **Status:** planned
 
 **Scope:**
-- Full Terms & Conditions page — IT Act 2000, Consumer Protection Act 2019 compliant
-  - Covers: software use, IP, liability, refund, jurisdiction (Bangalore), prohibited uses
-- Full Privacy Policy page — DPDP Act 2023 compliant
-  - Covers: data collected, purpose, storage, retention, user rights, third-party sharing, cookies, grievance officer
-- Cookie consent banner on first visit
-  - Must gate analytics tracking (wired in Spike 6)
-  - Stores consent preference in localStorage or cookie
 
-**Acceptance Criteria:**
-- [ ] Gates pass
-- [ ] Terms page has substantive legal content with Indian law references
-- [ ] Privacy page has DPDP Act compliant content with grievance officer details
-- [ ] Cookie consent banner appears on first visit
-- [ ] Banner does not reappear after consent given
-- [ ] Banner reappears if consent cookie is cleared
+**Part A — Website cleanup (mvp_web):**
+- Remove "preliminary and subject to legal review" banners from Terms and Privacy pages
+- Remove all Phase 2 / "coming soon" / "Payment coming soon" references across all pages
+- Remove disabled Buy Now button tooltips on Pricing page (replace with active buttons linking to dashboard signup)
+- Clean up any placeholder text that references future phases
 
----
-
-## Spike 5: SEO
-
-**Status:** planned
-
-**Scope:**
-- Unique `<title>` and `<meta description>` for every page (Next.js metadata API)
-- Open Graph and Twitter Card meta tags for social sharing
-- JSON-LD structured data: Organization schema, SoftwareApplication schema
-- `sitemap.xml` auto-generated (next-sitemap or Next.js built-in)
-- `robots.txt` configured
-- Semantic HTML audit (H1/H2/H3 hierarchy on all pages)
-- Image alt tags on all images
-
-**Acceptance Criteria:**
-- [ ] Gates pass
-- [ ] Each page has unique title and meta description (verify with View Source)
-- [ ] Social sharing preview works (Open Graph tags present)
-- [ ] `/sitemap.xml` returns valid sitemap with all pages
-- [ ] `/robots.txt` returns valid robots file
-- [ ] JSON-LD structured data in page source
-- [ ] H1 → H2 → H3 hierarchy correct on all pages
-
----
-
-## Spike 6: GA4 + Consent Mode v2
-
-**Status:** planned
-
-**Scope:**
-- Google Analytics 4 integration with measurement ID
-- Consent mode v2 — GA4 only fires after user accepts cookie consent (from Spike 4)
-- Event tracking:
-  - Page views
-  - Download button clicks (per product)
-  - Email capture form submissions (per product)
-  - Contact form submissions
-  - Pricing page views
-  - CTA button clicks
-
-**Acceptance Criteria:**
-- [ ] Gates pass
-- [ ] GA4 does NOT fire before cookie consent
-- [ ] GA4 fires after cookie consent accepted
-- [ ] Page view events tracked in GA4 dashboard
-- [ ] Download click events tracked
-- [ ] Form submission events tracked
-
----
-
-## Spike 7: Domain + Production Deployment
-
-**Status:** planned
-
-**Scope:**
-- New Vercel project for `apps/mvp_web` → `solarlayout.in`
-- New Vercel project for `apps/mvp_api` → `api.solarlayout.in`
-- SSL certificates (automatic via Vercel)
-- Environment variables configured (DB, S3, CORS)
-- Production build and deployment for both
-- All pages + API endpoints verified in production
-
-**Acceptance Criteria:**
-- [ ] `solarlayout.in` resolves to the MVP website
-- [ ] `api.solarlayout.in` resolves to the MVP API
-- [ ] HTTPS working on both domains
-- [ ] All 9 pages load correctly in production
-- [ ] Download registration works end-to-end in production
-- [ ] Contact form works end-to-end in production
-- [ ] Core Web Vitals within acceptable range
-
----
-
-## Spike 8: Dashboard App + License Key Generation
-
-**Status:** planned
-
-**Scope:**
+**Part B — Dashboard app (mvp_dashboard):**
 - New Next.js 16 app: `apps/mvp_dashboard` — deployed to `dashboard.solarlayout.in`
   - Clerk authentication (user signup/login)
-  - Solar brand palette (shared with `mvp_web`)
+  - Solar brand palette with dark/light theme support
   - Reuses `packages/ui` components
+  - Left sidebar navigation: Plan, Usage, License
+  - UI patterns borrowed from `apps/web` authenticated shell
 - New Prisma models in `packages/mvp_db`:
-  - `LicenseKey` (key, userId, email, product, createdAt, revokedAt)
+  - `User` (clerkId, email, name, createdAt)
+  - `LicenseKey` (key, userId, product, createdAt, revokedAt)
   - `Entitlement` (userId, product, totalCalculations, usedCalculations, purchasedAt)
 - Dashboard pages:
-  - Home: overview of license keys and remaining entitlements
-  - License Keys: generate, view, revoke API keys
-  - Entitlements: view purchased plans, remaining calculations per product
-- License key generation: cryptographically random, prefixed (e.g. `sl_live_...`)
+  - Plan: current plan overview, remaining calculations
+  - License: view/generate/revoke license keys, copy-to-clipboard
+  - Usage: usage history
+- License key generation: cryptographically random, prefixed (`sl_live_...`)
 - API routes in `apps/mvp_api` for dashboard CRUD (Clerk-authenticated)
-- Consider creating `packages/mvp_shared` — shared TypeScript types between `mvp_api` and `mvp_dashboard` (LicenseKey, Entitlement, User types). Evaluate at spike start — YAGNI until cross-app type dependency is confirmed.
-- Consider creating `packages/mvp_api-client` — type-safe HTTP client for `mvp_dashboard` → `mvp_api`. Evaluate at spike start — may not be needed if dashboard uses server-side API calls directly.
+- Evaluate `packages/mvp_shared` and `packages/mvp_api-client` at spike start
 
 **Acceptance Criteria:**
 - [ ] Gates pass
+- [ ] No Phase 2 / "coming soon" references remain on `solarlayout.in`
+- [ ] Legal page banners removed
 - [ ] User can sign up / sign in at `dashboard.solarlayout.in`
+- [ ] Sidebar navigation works (Plan, Usage, License)
 - [ ] User can generate a license key
 - [ ] User can view their license key(s)
 - [ ] User can see their entitlement balances
-- [ ] License key is displayed once at creation (copy-to-clipboard)
+- [ ] License key displayed once at creation (copy-to-clipboard)
 
 ---
 
-## Spike 9: Entitlement Validation + Usage Reporting API
+## Spike 5: Stripe Integration
+
+**Status:** planned
+
+**Scope:**
+- Stripe Checkout integration for one-time purchases
+- Three products mapped to Stripe prices:
+  - PV Layout Basic — $1.99 (5 calculations)
+  - PV Layout Pro — $4.99 (10 calculations)
+  - PV Layout Pro Plus — $14.99 (50 calculations)
+- Purchase flow: Dashboard "Buy" button → Stripe Checkout → webhook → provision entitlement
+- Stripe webhook handler in `apps/mvp_api`: `checkout.session.completed` → create/update Entitlement
+- Dashboard shows purchase history and receipt links
+- Reference: user has working Stripe integration in another production app (to be shared at spike start)
+
+**Acceptance Criteria:**
+- [ ] Gates pass
+- [ ] User can purchase a plan from the dashboard
+- [ ] Stripe Checkout redirects back to dashboard on success
+- [ ] Entitlement provisioned automatically after payment
+- [ ] Webhook handles duplicate events idempotently
+- [ ] Purchase visible in dashboard with receipt link
+- [ ] Pricing page "Buy Now" buttons link to dashboard purchase flow
+
+---
+
+## Spike 6: Entitlement API + License Key Generation
 
 **Status:** planned
 
@@ -332,31 +277,68 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ---
 
-## Spike 10: Python App Integration Guide + Reference Implementation
+## Spike 7: Python App Integration
 
 **Status:** planned
 
 **Scope:**
-- Python reference module (`solarlayout_client/`) demonstrating:
+- Integrate auth/license key into `/Users/arunkpatra/codebase/PVlayout_Advance` as reference implementation:
   - License key storage via `keyring` (cross-platform: Windows Credential Locker, macOS Keychain, Linux Secret Service)
   - First-run prompt: ask user for license key → store in keyring
   - Subsequent runs: retrieve silently from keyring
   - API client: check entitlements before generation, report usage after successful generation
   - Error handling: expired key, exhausted entitlements, network failure
-- Integration guide document for Prasanta's Python apps:
+- Extract PRD + Claude Code prompt for Prasanta from the working implementation:
+  - What to change in each Python app
   - `pip install keyring` + usage pattern
-  - API endpoint reference
-  - Example code for each API call
-  - Platform-specific notes (Windows UAC, macOS Keychain access prompt, Linux Secret Service setup)
-- Modify one of Prasanta's apps as reference (or provide a standalone demo script)
+  - API endpoint reference with example calls
+  - Platform-specific notes (Windows UAC, macOS Keychain, Linux Secret Service)
 
 **Acceptance Criteria:**
-- [ ] Reference module stores/retrieves license key on all 3 platforms
-- [ ] `keyring.get_password("solarlayout", "license_key")` returns stored key
+- [ ] PVlayout_Advance prompts for license key on first run
+- [ ] Key stored in OS credential store via keyring
 - [ ] Entitlement check works before generation
-- [ ] Usage reporting works after generation
-- [ ] Integration guide document reviewed by Prasanta
-- [ ] At least one Python app demonstrates the full flow end-to-end
+- [ ] Usage reporting works after successful generation
+- [ ] PRD document written for Prasanta
+- [ ] Claude Code prompt tested and produces working integration
+- [ ] End-to-end flow: dashboard signup → purchase → get key → paste in Python app → generate → usage recorded
+
+---
+
+## Spike 8: SEO (post-launch)
+
+**Status:** post-launch
+
+**Scope:**
+- Unique `<title>` and `<meta description>` for every page
+- Open Graph and Twitter Card meta tags
+- JSON-LD structured data (Organization, SoftwareApplication)
+- `sitemap.xml` auto-generated
+- `robots.txt`
+- Semantic HTML audit
+
+---
+
+## Spike 9: GA4 + Consent Mode v2 (post-launch)
+
+**Status:** post-launch
+
+**Scope:**
+- Google Analytics 4 integration
+- Consent mode v2 — GA4 only fires after cookie consent
+- Event tracking: page views, downloads, form submissions, CTA clicks
+- Cookie consent banner
+
+---
+
+## Spike 10: Legal Pages Full Review (post-launch)
+
+**Status:** post-launch
+
+**Scope:**
+- Full Terms & Conditions — IT Act 2000, Consumer Protection Act 2019 compliant
+- Full Privacy Policy — DPDP Act 2023 compliant with grievance officer
+- Professional legal review
 
 ---
 
@@ -378,3 +360,8 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 | D12 | 2026-04-22 | Python `keyring` library for license key storage in desktop apps | Uses OS-native credential stores (Windows Credential Locker, macOS Keychain, Linux Secret Service) — secure, cross-platform, no custom encryption |
 | D13 | 2026-04-22 | License key = API key with `sl_live_` prefix | Simple bearer token auth for desktop apps; tied to user identity via dashboard |
 | D14 | 2026-04-22 | New `packages/mvp_db` with separate Postgres DB | MVP and cloud platform have fundamentally different data models (license/entitlement vs project/version/job); shared schema would couple unrelated migrations and risk cross-domain breakage |
+| D15 | 2026-04-22 | Spike plan re-prioritized for weekend launch | Dashboard + Stripe + Entitlement API + Python integration are launch-critical; SEO, GA4, legal review are post-launch |
+| D16 | 2026-04-22 | Domain + deployment (old Spike 7) already complete | solarlayout.in and api.solarlayout.in live, SSL active, prod DB and S3 provisioned |
+| D17 | 2026-04-22 | Website cleanup folded into Dashboard spike | Remove Phase 2 refs, "coming soon" placeholders, legal banners — small scope, natural to do alongside dashboard work |
+| D18 | 2026-04-22 | Python integration: build reference impl first, then extract PRD for Prasanta | Working code is better than a spec written in isolation; PRD + Claude Code prompt derived from what actually works |
+| D19 | 2026-04-22 | Stripe integration as separate spike from Dashboard | Payment flow is complex enough to warrant its own spike; dashboard can exist without Stripe initially (manual entitlement provisioning as fallback) |
