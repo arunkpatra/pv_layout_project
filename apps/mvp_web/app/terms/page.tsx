@@ -82,8 +82,7 @@ export default function TermsPage() {
           SolarLayout is a digital software product. Due to the nature of
           digital goods, refunds are limited. If the software fails to function
           as described and the issue cannot be resolved within 15 business days,
-          you may request a refund within 30 days of purchase. Free-tier and
-          trial usage is not eligible for refunds.
+          you may request a refund within 30 days of purchase.
         </p>
 
         <h2 className="mt-10 text-2xl font-semibold tracking-tight text-foreground">

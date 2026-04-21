@@ -28,9 +28,9 @@ test("renders SolarLayout logo text", () => {
   expect(screen.getByText("SolarLayout")).toBeInTheDocument()
 })
 
-test("renders Download Free Trial CTA", () => {
+test("renders Get Started CTA", () => {
   render(<Header />)
-  const ctas = screen.getAllByText("Download Free Trial")
+  const ctas = screen.getAllByText("Get Started")
   expect(ctas.length).toBeGreaterThanOrEqual(1)
 })
 

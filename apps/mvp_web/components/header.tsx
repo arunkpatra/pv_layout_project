@@ -32,9 +32,7 @@ export function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <Sun className="h-7 w-7 text-accent" />
-          <span className="text-xl font-bold text-primary">
-            SolarLayout
-          </span>
+          <span className="text-xl font-bold text-primary">SolarLayout</span>
         </Link>
 
         {/* Desktop nav */}
@@ -61,7 +59,7 @@ export function Header() {
             asChild
             className="bg-accent text-accent-foreground hover:bg-accent/90"
           >
-            <Link href="/products">Download Free Trial</Link>
+            <Link href="/products">Download Now</Link>
           </Button>
         </div>
 
@@ -78,7 +76,7 @@ export function Header() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-72">
-            <div className="flex items-center gap-2 pb-6 pt-2">
+            <div className="flex items-center gap-2 pt-2 pb-6">
               <Sun className="h-6 w-6 text-accent" />
               <span className="text-lg font-bold text-primary">
                 SolarLayout
@@ -107,7 +105,7 @@ export function Header() {
                 className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
               >
                 <Link href="/products" onClick={() => setOpen(false)}>
-                  Download Free Trial
+                  Download Now
                 </Link>
               </Button>
             </div>
