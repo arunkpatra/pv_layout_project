@@ -18,3 +18,15 @@ model DownloadRegistration {
 
   @@map("download_registrations")
 }
+
+model ContactSubmission {
+  id        String   @id @default("")
+  name      String
+  email     String
+  subject   String
+  message   String
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  @@map("contact_submissions")
+}
