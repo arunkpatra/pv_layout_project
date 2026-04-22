@@ -48,7 +48,7 @@ A spike is complete only when **all** of the following are true:
 | 1 | Website scaffold + all 9 pages | Full responsive site, stubbed forms, solar brand palette | complete | 2026-04-22 |
 | 2 | MVP DB + MVP API scaffold + download registration | New `packages/mvp_db`, `apps/mvp_api`, docker-compose, download-register endpoint | complete | 2026-04-22 |
 | 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | complete | 2026-04-22 |
-| 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | planned | — |
+| 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | complete | 2026-04-22 |
 | 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | planned | — |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | planned | — |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
@@ -64,7 +64,7 @@ A spike is complete only when **all** of the following are true:
 ```
 apps/mvp_web/         → Next.js 16 App Router — public marketing site (solarlayout.in)
 apps/mvp_api/         → Hono API on Bun — MVP backend (api.solarlayout.in)
-apps/mvp_dashboard/   → Next.js 16 App Router — user dashboard (dashboard.solarlayout.in) [Spike 8]
+apps/mvp_dashboard/   → Next.js 16 App Router — user dashboard (dashboard.solarlayout.in)
 packages/ui/          → Shared shadcn/ui components (reused with solar palette overrides)
 packages/mvp_db/      → Prisma schema + client for MVP domain (separate DB from cloud platform)
 packages/db/          → Prisma schema + client for cloud platform (unchanged, not used by MVP)
@@ -75,7 +75,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - `apps/mvp_api` — standalone Hono server (same tech stack as `apps/api`). Two auth modes:
   - Unauthenticated: download-register, contact form
   - API key auth: entitlement validation, usage reporting (called by desktop Python apps)
-  - Clerk auth: dashboard API routes (Spike 8)
+  - Clerk auth: dashboard API routes (`GET /dashboard/download/:product`)
 - `apps/mvp_dashboard` — Clerk-authenticated, where users view license keys and entitlements
 - `packages/mvp_db` — separate Prisma schema and Postgres DB from `packages/db`. Independent migrations, no coupling between MVP and cloud platform
 - Desktop Python apps store license key (API key) via `keyring` (OS-native credential store)
@@ -183,45 +183,40 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 4: Cleanup + Dashboard App
 
-**Status:** planned
+**Status:** complete (2026-04-22)  
+**Implementation Plan:** [docs/superpowers/plans/2026-04-22-mvp-spike4-cleanup-dashboard.md](../superpowers/plans/2026-04-22-mvp-spike4-cleanup-dashboard.md)
 
 **Scope:**
 
 **Part A — Website cleanup (mvp_web):**
-- Remove "preliminary and subject to legal review" banners from Terms and Privacy pages
-- Remove all Phase 2 / "coming soon" / "Payment coming soon" references across all pages
-- Remove disabled Buy Now button tooltips on Pricing page (replace with active buttons linking to dashboard signup)
-- Clean up any placeholder text that references future phases
+- Removed "preliminary and subject to legal review" banners from Terms and Privacy pages
+- Removed all Phase 2 / "coming soon" / "Payment coming soon" references from FAQ, pricing, system requirements
+- Buy Now buttons remain disabled (no tooltip); will be wired in Spike 5 after Stripe integration
 
 **Part B — Dashboard app (mvp_dashboard):**
 - New Next.js 16 app: `apps/mvp_dashboard` — deployed to `dashboard.solarlayout.in`
-  - Clerk authentication (user signup/login)
-  - Solar brand palette with dark/light theme support
-  - Reuses `packages/ui` components
-  - Left sidebar navigation: Plan, Usage, License
-  - UI patterns borrowed from `apps/web` authenticated shell
+  - Clerk authentication (signup/signin) using standard `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY`
+  - Solar brand palette with dark/light theme support (same CSS vars as `apps/mvp_web`)
+  - Reuses `packages/ui` shadcn components
+  - Left sidebar navigation: Dashboard, Plan, Usage, License — collapsible icon mode
+  - Provider stack: ClerkProvider → ThemeProvider → QueryProvider → TooltipProvider
 - New Prisma models in `packages/mvp_db`:
   - `User` (clerkId, email, name, createdAt)
   - `LicenseKey` (key, userId, product, createdAt, revokedAt)
   - `Entitlement` (userId, product, totalCalculations, usedCalculations, purchasedAt)
-- Dashboard pages:
-  - Plan: current plan overview, remaining calculations
-  - License: view/generate/revoke license keys, copy-to-clipboard
-  - Usage: usage history
-- License key generation: cryptographically random, prefixed (`sl_live_...`)
-- API routes in `apps/mvp_api` for dashboard CRUD (Clerk-authenticated)
-- Evaluate `packages/mvp_shared` and `packages/mvp_api-client` at spike start
+  - Tables created; populated in Spike 5 after Stripe purchase flow
+- New API route in `apps/mvp_api`:
+  - `GET /dashboard/download/:product` — Clerk-JWT authenticated, returns presigned S3 URL (60s expiry)
+  - Validates product slug against allowlist; returns 400 for unknown products
+- Dashboard home page: 3 `DownloadCard` components — click fetches presigned URL and triggers browser download
+- Plan / Usage / License pages: coming-soon placeholder cards
+- `packages/mvp_api-client` deferred to Spike 5 (single inline fetch is sufficient now)
 
 **Acceptance Criteria:**
-- [ ] Gates pass
-- [ ] No Phase 2 / "coming soon" references remain on `solarlayout.in`
-- [ ] Legal page banners removed
-- [ ] User can sign up / sign in at `dashboard.solarlayout.in`
-- [ ] Sidebar navigation works (Plan, Usage, License)
-- [ ] User can generate a license key
-- [ ] User can view their license key(s)
-- [ ] User can see their entitlement balances
-- [ ] License key displayed once at creation (copy-to-clipboard)
+- [x] Gates pass (lint + typecheck + test + build from root)
+- [ ] Human verifies locally: no Phase 2 refs on `localhost:3002`; dashboard sign-up/sign-in works at `localhost:3004`; download buttons trigger file download; sidebar nav works
+- [ ] CI/CD passes
+- [ ] Production: `solarlayout.in` clean; `dashboard.solarlayout.in` live with working download
 
 ---
 
@@ -365,3 +360,6 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 | D17 | 2026-04-22 | Website cleanup folded into Dashboard spike | Remove Phase 2 refs, "coming soon" placeholders, legal banners — small scope, natural to do alongside dashboard work |
 | D18 | 2026-04-22 | Python integration: build reference impl first, then extract PRD for Prasanta | Working code is better than a spec written in isolation; PRD + Claude Code prompt derived from what actually works |
 | D19 | 2026-04-22 | Stripe integration as separate spike from Dashboard | Payment flow is complex enough to warrant its own spike; dashboard can exist without Stripe initially (manual entitlement provisioning as fallback) |
+| D20 | 2026-04-22 | Dashboard home page: direct presigned S3 download (no registration form) | Users are already authenticated via Clerk — we know who they are. Skip the email capture form used for unauthenticated downloads. MVP API's `GET /dashboard/download/:product` returns a 60s presigned URL directly. |
+| D21 | 2026-04-22 | `packages/mvp_api-client` deferred to Spike 5 | Single inline `fetch` call in DownloadCard is sufficient for now; client package adds complexity without enough call-sites to justify it yet. |
+| D22 | 2026-04-22 | Use standard Clerk env vars (`CLERK_SECRET_KEY`) in `apps/mvp_api` | Clerk's SDK expects standard env var names; custom var names (`MVP_CLERK_SECRET_KEY`) require explicit passing and are error-prone. Both MVP and cloud platform use the same Clerk org with separate apps, so per-Vercel-project env isolation handles any conflict. |

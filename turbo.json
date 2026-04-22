@@ -163,7 +163,22 @@
         "PORT",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
-        "AWS_REGION"
+        "AWS_REGION",
+        "CLERK_SECRET_KEY"
+      ]
+    },
+    "@renewable-energy/mvp-dashboard#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@renewable-energy/mvp-dashboard#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "CLERK_SECRET_KEY",
+        "NEXT_PUBLIC_MVP_API_URL",
+        "NODE_ENV"
       ]
     },
     "mvp-db:generate": {
