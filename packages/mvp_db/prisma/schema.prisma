@@ -69,6 +69,7 @@ model Product {
   stripePriceId String           @unique
   displayOrder  Int              @default(0)
   active        Boolean          @default(true)
+  isFree        Boolean          @default(false)
   features      ProductFeature[]
   entitlements  Entitlement[]
   usageRecords  UsageRecord[]
