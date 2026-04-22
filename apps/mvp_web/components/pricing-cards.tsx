@@ -185,24 +185,33 @@ export function PricingCards() {
           <TableBody>
             <TableRow>
               <TableCell className="font-medium">Price</TableCell>
-              <TableCell className="text-center text-green-700 font-semibold">Free</TableCell>
-              <TableCell className="text-center">$1.99</TableCell>
-              <TableCell className="text-center">$4.99</TableCell>
-              <TableCell className="text-center">$14.99</TableCell>
+              {tiers.map((tier) => (
+                <TableCell
+                  key={tier.slug}
+                  className={`text-center${tier.isFree ? " text-green-700 font-semibold" : ""}`}
+                >
+                  {tier.price}
+                </TableCell>
+              ))}
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Purchase Model</TableCell>
-              <TableCell className="text-center text-muted-foreground text-sm">On signup</TableCell>
-              <TableCell className="text-center">One-time</TableCell>
-              <TableCell className="text-center">One-time</TableCell>
-              <TableCell className="text-center">One-time</TableCell>
+              {tiers.map((tier) => (
+                <TableCell
+                  key={tier.slug}
+                  className={`text-center${tier.isFree ? " text-muted-foreground text-sm" : ""}`}
+                >
+                  {tier.purchaseModel}
+                </TableCell>
+              ))}
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Calculations Included</TableCell>
-              <TableCell className="text-center">5 Layout</TableCell>
-              <TableCell className="text-center">5 Layout</TableCell>
-              <TableCell className="text-center">10 Layout</TableCell>
-              <TableCell className="text-center">50 Layout + Yield</TableCell>
+              {tiers.map((tier) => (
+                <TableCell key={tier.slug} className="text-center">
+                  {tier.calculations}
+                </TableCell>
+              ))}
             </TableRow>
             {features.map((row) => (
               <TableRow key={row.feature}>
