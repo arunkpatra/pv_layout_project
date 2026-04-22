@@ -69,6 +69,19 @@ describe("licenseKeyAuth middleware", () => {
       headers: { Authorization: "sl_live_testkey" },
     })
     expect(res.status).toBe(401)
+    const body = (await res.json()) as { success: boolean }
+    expect(body.success).toBe(false)
+  })
+
+  it("returns 401 when token does not have sl_live_ prefix", async () => {
+    const app = makeApp()
+    const res = await app.request("/protected", {
+      method: "GET",
+      headers: { Authorization: "Bearer some_random_token" },
+    })
+    expect(res.status).toBe(401)
+    const body = (await res.json()) as { success: boolean }
+    expect(body.success).toBe(false)
   })
 
   it("returns 401 when key is not found", async () => {

@@ -8,7 +8,7 @@ export const licenseKeyAuth: MiddlewareHandler = async (c, next) => {
     ? authHeader.slice(7)
     : undefined
 
-  if (!token) {
+  if (!token || !token.startsWith("sl_live_")) {
     throw new AppError("UNAUTHORIZED", "Authentication required", 401)
   }
 
