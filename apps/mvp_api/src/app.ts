@@ -24,7 +24,7 @@ app.use(
   cors({
     origin: corsOrigins,
     allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", "Authorization"],
   }),
 )
 app.use("*", requestLogger)
