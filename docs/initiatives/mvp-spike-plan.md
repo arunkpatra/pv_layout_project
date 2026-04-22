@@ -54,6 +54,7 @@ A spike is complete only when **all** of the following are true:
 | 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | complete | 2026-04-22 |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
+| 7.1 | Free tier quota enforcement | `_can_generate()` checks free-tier quota from server; anonymous usage reporting; blocks after free quota exhausted | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
 | 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
 | 10 | Legal pages full review | Full DPDP Act / IT Act legal review | post-launch | — |
@@ -314,29 +315,55 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 7: Python App Integration
 
+**Status:** planned  
+**Design Spec:** [docs/superpowers/specs/2026-04-22-spike7-python-app-integration-design.md](../superpowers/specs/2026-04-22-spike7-python-app-integration-design.md)
+
+**Scope:**
+- Integrate auth/license key into `PVlayout_Advance` (`add-auth` branch) as reference implementation:
+  - `auth/` module: `license_client.py`, `key_store.py`, `workers.py` (QThread-based)
+  - `gui/license_key_dialog.py`: masked key entry, "Buy a license" link
+  - Three touch points in `main_window.py`: startup entitlement check, `_can_generate()` guard, post-generate usage report
+  - Freemium-forward: no blocking on startup; `_can_generate()` returns `True` unconditionally (Spike 7.1 adds quota enforcement)
+  - Dismissable banner for no-key state; soft banner for quota exhausted
+  - Non-fatal error handling: all API errors logged, never block the UI
+  - `keyring` for OS-native credential storage (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- Deliverables in `PVlayout_Advance`:
+  - `docs/PRD-license-key-integration.md` — full PRD for Prasanta
+  - `docs/CLAUDE_CODE_PROMPT.md` — standalone Claude Code implementation prompt
+  - Full test coverage of `auth/` module with mocked HTTP and keyring
+
+**Acceptance Criteria:**
+- [ ] `flake8 . && python -m pytest` passes in PVlayout_Advance on `add-auth` branch
+- [ ] First-run: no key → banner shown, dialog opens, key saved, entitlements fetched silently
+- [ ] Startup with key: status bar shows remaining count, no blocking spinner
+- [ ] Generate: `_can_generate()` returns True, layout runs, usage reported after done, status bar updates
+- [ ] Quota exhausted: 402 response → soft banner, app still usable
+- [ ] Network offline at startup: warning in status bar only, UI fully usable
+- [ ] PRD and Claude Code prompt committed to `add-auth`
+- [ ] End-to-end flow: dashboard signup → purchase → copy key → enter in app → generate → usage recorded in prod
+
+---
+
+## Spike 7.1: Free Tier Quota Enforcement
+
 **Status:** planned
 
 **Scope:**
-- Integrate auth/license key into `/Users/arunkpatra/codebase/PVlayout_Advance` as reference implementation:
-  - License key storage via `keyring` (cross-platform: Windows Credential Locker, macOS Keychain, Linux Secret Service)
-  - First-run prompt: ask user for license key → store in keyring
-  - Subsequent runs: retrieve silently from keyring
-  - API client: check entitlements before generation, report usage after successful generation
-  - Error handling: expired key, exhausted entitlements, network failure
-- Extract PRD + Claude Code prompt for Prasanta from the working implementation:
-  - What to change in each Python app
-  - `pip install keyring` + usage pattern
-  - API endpoint reference with example calls
-  - Platform-specific notes (Windows UAC, macOS Keychain, Linux Secret Service)
+- Extend Spike 7's `_can_generate()` to enforce free-tier quota for users without a license key:
+  - New API response field: `freeGenerationsRemaining` on `GET /entitlements` (anonymous token or session-based)
+  - `_can_generate()` checks `_free_quota_remaining > 0` when no key stored
+  - After free quota exhausted: show purchase prompt modal (hard block for anonymous users only)
+  - `UsageReportWorker` fires even without a key (anonymous quota decrement)
+  - Each product tier (Basic, Pro, Pro+) gets a configured free generation count
+- No structural changes to `auth/` module or the three touch points — this is additive only
+
+**Why:** Blocking before any generation kills conversion. Users must see the product working before they buy. Free quota lets them try once (or a few times) before the paywall.
 
 **Acceptance Criteria:**
-- [ ] PVlayout_Advance prompts for license key on first run
-- [ ] Key stored in OS credential store via keyring
-- [ ] Entitlement check works before generation
-- [ ] Usage reporting works after successful generation
-- [ ] PRD document written for Prasanta
-- [ ] Claude Code prompt tested and produces working integration
-- [ ] End-to-end flow: dashboard signup → purchase → get key → paste in Python app → generate → usage recorded
+- [ ] New/anonymous user gets N free generations (N configured per product in DB)
+- [ ] After N generations without a key, `_can_generate()` returns False; purchase prompt shown
+- [ ] Licensed user is never affected by this check
+- [ ] API: anonymous quota decrement is idempotent on retry
 
 ---
 
