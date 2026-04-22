@@ -347,26 +347,42 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ---
 
-## Spike 7.1: Free Tier Quota Enforcement
+## Spike 7.1: Free Plan Auto-Provisioning + Quota Enforcement
 
-**Status:** planned
+**Status:** planned  
+**Implementation Plan:** [docs/superpowers/plans/2026-04-22-spike7.1-free-plan.md](../superpowers/plans/2026-04-22-spike7.1-free-plan.md)
 
 **Scope:**
-- Extend Spike 7's `_can_generate()` to enforce free-tier quota for users without a license key:
-  - New API response field: `freeGenerationsRemaining` on `GET /entitlements` (anonymous token or session-based)
-  - `_can_generate()` checks `_free_quota_remaining > 0` when no key stored
-  - After free quota exhausted: show purchase prompt modal (hard block for anonymous users only)
-  - `UsageReportWorker` fires even without a key (anonymous quota decrement)
-  - Each product tier (Basic, Pro, Pro+) gets a configured free generation count
-- No structural changes to `auth/` module or the three touch points — this is additive only
 
-**Why:** Blocking before any generation kills conversion. Users must see the product working before they buy. Free quota lets them try once (or a few times) before the paywall.
+**DB (`packages/mvp_db`):**
+- New `isFree Boolean @default(false)` field on `Product` model — migration required (DB wipe permitted, no backward compat)
+- New seed entry: `pv-layout-free` — 5 calculations, all Pro Plus features, `priceAmount: 0`, `stripePriceId: "price_free_tier"` (sentinel, never called against Stripe), `isFree: true`
+
+**API (`apps/mvp_api`):**
+- `clerkAuth` middleware: after creating a new User, auto-provision Free plan — create `Entitlement` (5 calc) + `LicenseKey` (`sl_live_...`) in a single transaction. Non-fatal: provisioning failure logs and continues, never breaks auth.
+- `GET /products`: add `isFree: false` filter — Free product never appears in purchasable product list
+- `POST /billing/checkout`: reject `isFree: true` products — 422 Validation Error
+
+**Web (`apps/mvp_web`):**
+- Pricing page (`pricing-cards.tsx`): add Free tier column — "Free / On signup / 5 Layout / all Pro Plus features", "Get Started Free" button links to `/sign-up`
+- Dashboard Plan page: "Free" badge on `pv-layout-free` entitlement card; license key helper text updated to "Enter this key in your SolarLayout desktop application to activate your plan"
+
+**Python app (`PVlayout_Advance`):**
+- `_can_generate()`: checks `self._entitlements.get("data", {}).get("remainingCalculations", 0) > 0`; fails open (returns True) if entitlements not yet loaded
+- `_on_generate()`: when `_can_generate()` returns False, shows `QMessageBox.information` pointing to `solarlayout.in/dashboard/plan`; no generate runs
+
+**Design decision:** No anonymous tracking, no install IDs. Every user must sign up to get a license key. The Free plan key IS the key they enter in the desktop app — it works identically to a paid key. Conversion path: sign up → dashboard shows Free plan key → copy into app → generate 5 times → quota prompt → upgrade.
 
 **Acceptance Criteria:**
-- [ ] New/anonymous user gets N free generations (N configured per product in DB)
-- [ ] After N generations without a key, `_can_generate()` returns False; purchase prompt shown
-- [ ] Licensed user is never affected by this check
-- [ ] API: anonymous quota decrement is idempotent on retry
+- [ ] Gates pass (`bun run lint && bun run typecheck && bun run test && bun run build` from repo root)
+- [ ] Python gates pass (`flake8` + `pytest`) in PVlayout_Advance
+- [ ] New user signs up → dashboard Plan page shows "PV Layout Free — 5 remaining" + license key
+- [ ] Free product does NOT appear in Plan page purchase grid
+- [ ] Free product slug in `POST /billing/checkout` returns 422
+- [ ] User copies Free plan key → enters in desktop app → status bar shows "5 calculation(s) remaining"
+- [ ] After 5 generates → `_can_generate()` returns False → purchase prompt shown → Generate blocked
+- [ ] Pricing page shows Free tier column with "Get Started Free" button
+- [ ] Human sign-off
 
 ---
 
