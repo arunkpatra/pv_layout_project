@@ -16,6 +16,8 @@ All work is in `/Users/arunkpatra/codebase/PVlayout_Advance` on the `add-auth` b
 
 The app entry point is `main.py` → `gui/main_window.py` (`MainWindow`). The `LayoutWorker` and `GHIFetchWorker` QThread pattern already exists in `main_window.py` (lines 73–119) — follow exactly the same pattern for new workers.
 
+**Platform notes:** Windows is the primary release platform. Prasanta builds the `.exe` on his Windows machine and uploads to S3. macOS builds (via `PVlayout_Advance.spec`) are for Arun's local testing only. The production API endpoint (`https://api.solarlayout.in`) is hardcoded — no env switching.
+
 The pre-commit gate is:
 ```bash
 cd /Users/arunkpatra/codebase/PVlayout_Advance
@@ -43,8 +45,12 @@ cd /Users/arunkpatra/codebase/PVlayout_Advance
 - `docs/CLAUDE_CODE_PROMPT.md` — standalone implementation prompt for Prasanta
 
 **Modified files:**
-- `requirements.txt` — add `keyring>=24.0.0` and `pytest>=7.0` and `flake8>=6.0`
+- `requirements.txt` — add `keyring>=24.0.0`, `pytest>=7.0`, `flake8>=6.0`
 - `gui/main_window.py` — 3 touch points: `__init__` startup, `_can_generate()`, `_on_layout_done()` usage report
+- `PVlayout_Advance.spec` — add `keyring` macOS hidden imports (already done in spec file)
+
+**New files (build):**
+- `PVlayout_Advance_windows.spec` — single-`.exe` PyInstaller spec for Prasanta's Windows builds
 
 ---
 
@@ -87,6 +93,8 @@ pyproj>=3.5
 simplekml>=1.3
 requests>=2.28
 keyring>=24.0.0
+
+# Dev tools — not bundled by PyInstaller
 pytest>=7.0
 flake8>=6.0
 ```
@@ -1292,10 +1300,14 @@ User clicks Generate
 
 ## 9. `requirements.txt` Changes
 
-Add `keyring>=24.0.0`. The `requests` library is already present.
+Add `keyring>=24.0.0`. The `requests` library is already present. `pytest` and `flake8` are dev-only and will not be bundled by PyInstaller.
 
 ```
 keyring>=24.0.0
+
+# Dev tools — not bundled by PyInstaller
+pytest>=7.0
+flake8>=6.0
 ```
 
 `keyring` uses the native OS secret store:
@@ -1307,7 +1319,42 @@ No plaintext credentials ever touch the filesystem.
 
 ---
 
-## 10. Spike 7.1 Extension Points
+## 10. Build & Release (Windows-first)
+
+**Windows is the primary release platform.** Prasanta builds the `.exe` on his Windows machine and uploads to S3. macOS builds are for Arun's local testing only.
+
+**Production API endpoint is hardcoded** in `auth/license_client.py`:
+```python
+BASE_URL = "https://api.solarlayout.in"
+```
+There is no dev/staging endpoint for desktop apps — the exe always calls production.
+
+### PyInstaller + keyring on Windows
+
+`keyring` uses OS-specific backends that PyInstaller cannot auto-discover. The Windows spec (`PVlayout_Advance_windows.spec`) includes:
+```python
+'keyring.backends.Windows',
+'keyring.core',
+# plus:
+hidden += collect_submodules('keyring')
+```
+
+Without these, the exe will fail silently when trying to store or retrieve the license key.
+
+### Prasanta's build workflow (Windows)
+
+```bat
+REM From project root, in a virtualenv
+pip install -r requirements.txt
+pyinstaller --noconfirm --clean PVlayout_Advance_windows.spec
+REM Output: dist\PVlayout_Advance.exe
+```
+
+Then upload `dist\PVlayout_Advance.exe` to S3. Always use a new `--name` if the previous exe is still running — PyInstaller cannot overwrite a locked file.
+
+---
+
+## 11. Spike 7.1 Extension Points
 
 The following change in Spike 7.1 is **additive only** — no existing code needs restructuring:
 
@@ -1323,7 +1370,7 @@ The `auth/` module, `LicenseKeyDialog`, and the three touch points are unchanged
 
 ---
 
-## 11. Definition of Done
+## 12. Definition of Done
 
 1. `flake8 auth/ gui/license_key_dialog.py tests/ --max-line-length=100` — no output
 2. `pytest tests/ -v` — all pass
@@ -1332,7 +1379,8 @@ The `auth/` module, `LicenseKeyDialog`, and the three touch points are unchanged
 5. Normal startup: status bar shows remaining count
 6. Generate: layout completes, usage reported, count decrements in status bar
 7. Quota exhausted: red banner shown, Generate still works
-8. Both `docs/PRD-license-key-integration.md` and `docs/CLAUDE_CODE_PROMPT.md` committed
+8. `PVlayout_Advance_windows.spec` committed
+9. Both `docs/PRD-license-key-integration.md` and `docs/CLAUDE_CODE_PROMPT.md` committed
 ```
 
 - [ ] **Step 2: Run flake8 on auth and tests (final gate check)**
@@ -1534,6 +1582,30 @@ The method signature and name must match exactly so Spike 7.1 can extend it.
 
 ---
 
+## Platform & Build Notes
+
+**Windows is the primary release platform.** The production API endpoint
+(`https://api.solarlayout.in`) is hardcoded — there is no dev endpoint for desktop apps.
+
+**PyInstaller on Windows requires explicit keyring hidden imports:**
+```python
+'keyring.backends.Windows',
+'keyring.core',
+hidden += collect_submodules('keyring')
+```
+Without these, the `.exe` silently fails to store or retrieve the license key.
+Use `PVlayout_Advance_windows.spec` (in this repo) for Windows builds.
+
+**Prasanta's build command (Windows):**
+```bat
+.venv\Scripts\activate
+pip install -r requirements.txt
+pyinstaller --noconfirm --clean PVlayout_Advance_windows.spec
+REM Output: dist\PVlayout_Advance.exe
+```
+
+---
+
 ## Definition of Done
 
 1. `flake8` passes with no output
@@ -1543,6 +1615,7 @@ The method signature and name must match exactly so Spike 7.1 can extend it.
 5. Normal startup: status bar shows remaining count
 6. Generate completes: usage reported, count decrements
 7. Network offline: app still fully usable
+8. `PVlayout_Advance_windows.spec` committed
 ````
 
 - [ ] **Step 2: Commit**
@@ -1555,7 +1628,134 @@ git commit -m "docs: add Claude Code implementation prompt for Spike 7 (Prasanta
 
 ---
 
-## Task 9: Final gate check and push
+## Task 9: Create `PVlayout_Advance_windows.spec`
+
+The Windows spec produces a single `.exe` (onefile) for Prasanta's release builds. The macOS spec already has `keyring` hidden imports added. This task creates the Windows equivalent.
+
+**Files:**
+- Create: `PVlayout_Advance_windows.spec`
+
+- [ ] **Step 1: Create `PVlayout_Advance_windows.spec`**
+
+```python
+# -*- mode: python ; coding: utf-8 -*-
+#
+# PyInstaller spec file for PVlayout_Advance — Windows (single .exe)
+#
+# Usage (on Windows, run from project root):
+#   .venv\Scripts\activate
+#   pyinstaller --noconfirm --clean PVlayout_Advance_windows.spec
+#
+# Output: dist\PVlayout_Advance.exe  (single file, no directory)
+#
+# IMPORTANT: Always use a new --name (e.g. _v2) if the previous exe is still
+# running — PyInstaller cannot overwrite a locked file on Windows.
+
+from PyInstaller.utils.hooks import collect_data_files, collect_all, collect_submodules
+
+block_cipher = None
+
+# ── Data files ────────────────────────────────────────────────────────────────
+pyproj_datas, pyproj_binaries, pyproj_hiddenimports = collect_all('pyproj')
+ezdxf_datas, ezdxf_binaries, ezdxf_hiddenimports = collect_all('ezdxf')
+qt_datas, qt_binaries, qt_hiddenimports = collect_all('PyQt5')
+mpl_datas = collect_data_files('matplotlib')
+
+# ── Hidden imports ────────────────────────────────────────────────────────────
+hidden = [
+    # matplotlib Qt backend
+    'matplotlib.backends.backend_qtagg',
+    'matplotlib.backends.backend_pdf',
+    # scipy K-means (used by string_inverter_manager)
+    'scipy.spatial',
+    'scipy.spatial.distance',
+    'scipy._lib.array_api_compat.numpy.fft',
+    # simplekml
+    'simplekml',
+    # shapely
+    'shapely',
+    'shapely.geometry',
+    # pyproj
+    'pyproj',
+    'pyproj.datadir',
+    # requests (used by energy_calculator and license_client)
+    'requests',
+    'charset_normalizer',
+    # keyring — Windows Credential Manager backend (not auto-discovered by PyInstaller)
+    'keyring.backends.Windows',
+    'keyring.core',
+]
+hidden += pyproj_hiddenimports
+hidden += ezdxf_hiddenimports
+hidden += qt_hiddenimports
+hidden += collect_submodules('scipy')
+hidden += collect_submodules('keyring')
+
+# ── Analysis ──────────────────────────────────────────────────────────────────
+a = Analysis(
+    ['main.py'],
+    pathex=['.'],
+    binaries=pyproj_binaries + ezdxf_binaries + qt_binaries,
+    datas=pyproj_datas + ezdxf_datas + qt_datas + mpl_datas,
+    hiddenimports=hidden,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['PySide6', 'PySide2', 'tkinter', 'wx'],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+# ── Single-file EXE (onefile) ─────────────────────────────────────────────────
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='PVlayout_Advance',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,          # no terminal window
+    disable_windowed_traceback=False,
+    target_arch=None,       # None = native Windows arch (x86_64)
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=None,              # set to 'assets/icon.ico' when available
+)
+```
+
+- [ ] **Step 2: Run flake8 on the spec file (Python syntax check)**
+
+```bash
+cd /Users/arunkpatra/codebase/PVlayout_Advance
+.venv/bin/python -m flake8 PVlayout_Advance_windows.spec --max-line-length=100
+```
+
+Expected: no output (spec files are valid Python)
+
+- [ ] **Step 3: Commit**
+
+Note: `*.spec` files were previously gitignored. The `.gitignore` was already updated in this spike to track spec files. If you get an "ignored file" error, run `git add -f` instead.
+
+```bash
+cd /Users/arunkpatra/codebase/PVlayout_Advance
+git add .gitignore PVlayout_Advance_windows.spec PVlayout_Advance.spec
+git commit -m "build: add Windows PyInstaller spec; add keyring hidden imports to macOS spec"
+```
+
+---
+
+## Task 10: Final gate check and push
 
 - [ ] **Step 1: Run the full gate**
 
@@ -1580,10 +1780,11 @@ Expected: App opens. Yellow banner visible (if no key stored). No crash.
 
 ```bash
 cd /Users/arunkpatra/codebase/PVlayout_Advance
-git log --oneline -10
+git log --oneline -12
 ```
 
 Expected commits visible:
+- `build: add Windows PyInstaller spec; add keyring hidden imports to macOS spec`
 - `docs: add Claude Code implementation prompt for Spike 7 (Prasanta)`
 - `docs: add PRD for license key integration (Spike 7)`
 - `feat(gui): wire license key auth into MainWindow — banner, entitlements, usage reporting`
@@ -1613,9 +1814,10 @@ Before declaring Spike 7 done, verify each item manually:
 - [ ] App starts: no crash, yellow banner if no key stored
 - [ ] Enter key dialog: opens, validates `sl_live_` prefix, rejects invalid format
 - [ ] After saving valid key: banner dismissed, status bar shows remaining count
-- [ ] Generate layout: completes normally, usage reported, count decrements
+- [ ] Generate layout: completes normally, usage reported, count decrements in status bar
 - [ ] Quota exhausted (402 from usage report): red banner, app still usable
 - [ ] Kill network (airplane mode), restart app: no crash, soft warning in status bar
 - [ ] 401 from entitlements: key cleared from keyring, re-enter banner shown
+- [ ] `PVlayout_Advance_windows.spec` present and committed
 - [ ] `docs/PRD-license-key-integration.md` present and readable
 - [ ] `docs/CLAUDE_CODE_PROMPT.md` present and readable

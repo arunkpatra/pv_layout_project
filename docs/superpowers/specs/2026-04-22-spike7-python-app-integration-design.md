@@ -241,9 +241,62 @@ Feature key for a Generate click: `"plant_layout"` (one report per Generate, reg
 
 ```
 keyring>=24.0.0
+pytest>=7.0       # dev only — not bundled by PyInstaller
+flake8>=6.0       # dev only — not bundled by PyInstaller
 ```
 
 `requests` is already present. `keyring` uses the OS credential store (macOS Keychain, Windows Credential Manager, Linux Secret Service / KWallet).
+
+---
+
+## Build & Release Platform Notes
+
+**Windows is the primary release platform.** Prasanta builds the Windows `.exe` on his machine and uploads it to S3. macOS builds are for Arun's local testing only. Production endpoints are hardcoded — there is no dev/staging endpoint for desktop apps.
+
+### PyInstaller + keyring
+
+`keyring` uses OS-specific backends that PyInstaller cannot auto-discover. Both specs must explicitly include them as hidden imports:
+
+**macOS** (`PVlayout_Advance.spec`):
+```python
+# Add to hidden imports list:
+'keyring.backends.macOS',
+'keyring.core',
+# Plus:
+hidden += collect_submodules('keyring')
+```
+
+**Windows** (`PVlayout_Advance_windows.spec` — new file for Prasanta):
+```python
+# Add to hidden imports list:
+'keyring.backends.Windows',
+'keyring.core',
+# Plus:
+hidden += collect_submodules('keyring')
+```
+
+The Windows spec uses `--onefile` style (single `.exe`, no directory) to match Prasanta's existing build workflow. The macOS spec keeps the existing `.app` bundle structure.
+
+### Build commands
+
+**macOS (Arun, local testing):**
+```bash
+source .venv/bin/activate
+pyinstaller --noconfirm --clean PVlayout_Advance.spec
+# Output: dist/PVlayout_Advance.app
+```
+
+**Windows (Prasanta, release builds):**
+```bat
+.venv\Scripts\activate
+pyinstaller --noconfirm --clean PVlayout_Advance_windows.spec
+# Output: dist/PVlayout_Advance.exe  (single file)
+```
+
+Prasanta must install dependencies on Windows before building:
+```bat
+pip install -r requirements.txt
+```
 
 ---
 
