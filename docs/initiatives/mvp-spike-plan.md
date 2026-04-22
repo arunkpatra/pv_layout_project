@@ -53,7 +53,7 @@ A spike is complete only when **all** of the following are true:
 | 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | complete | 2026-04-22 |
 | 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | complete | 2026-04-22 |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
-| 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
+| 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | complete | 2026-04-22 |
 | 7.1 | Free tier quota enforcement | `_can_generate()` checks free-tier quota from server; anonymous usage reporting; blocks after free quota exhausted | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
 | 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
@@ -315,7 +315,8 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 7: Python App Integration
 
-**Status:** planned  
+**Status:** complete  
+**Completed:** 2026-04-22  
 **Design Spec:** [docs/superpowers/specs/2026-04-22-spike7-python-app-integration-design.md](../superpowers/specs/2026-04-22-spike7-python-app-integration-design.md)
 
 **Scope:**
