@@ -1,12 +1,14 @@
 import { Geist } from "next/font/google"
 import type { Metadata } from "next"
+import { ClerkProvider } from "@clerk/nextjs"
 
 import "@renewable-energy/ui/globals.css"
 import "./globals.css"
 
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { MvpToaster } from "@/components/mvp-toaster"
+import { ThemeProvider } from "@/components/theme-provider"
+import { QueryProvider } from "@/components/query-provider"
+import { TooltipProvider } from "@renewable-energy/ui/components/tooltip"
+import { Toaster } from "@renewable-energy/ui/components/sonner"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -28,13 +30,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${fontSans.variable} font-sans antialiased`}>
-      <body className="flex min-h-screen flex-col bg-background text-foreground">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <MvpToaster />
-      </body>
-    </html>
+    <ClerkProvider afterSignOutUrl="/">
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={`${fontSans.variable} font-sans antialiased`}
+      >
+        <body>
+          <ThemeProvider>
+            <QueryProvider>
+              <TooltipProvider>
+                {children}
+                <Toaster />
+              </TooltipProvider>
+            </QueryProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }
