@@ -54,7 +54,7 @@ A spike is complete only when **all** of the following are true:
 | 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | complete | 2026-04-22 |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | complete | 2026-04-22 |
-| 7.1 | Free Plan Auto-Provisioning + Quota Enforcement | DB isFree field + pv-layout-free seed; clerkAuth auto-provisions Entitlement + LicenseKey on signup; GET /products excludes free; checkout guard; pricing page Free column; Plan page Free badge; Python _can_generate() quota check | implementation complete | 2026-04-22 |
+| 7.1 | Free Plan Auto-Provisioning + Quota Enforcement | DB isFree field + pv-layout-free seed; clerkAuth auto-provisions Entitlement + LicenseKey on signup; GET /products excludes free; checkout guard; pricing page Free column; Plan page Free badge; Python re-fetches entitlements on every generate click; quota dialog when exhausted | complete | 2026-04-22 |
 | 7.2 | Python GUI — account & license info modal | Toolbar button (user icon) opens modal: name, email, all plans, entitled features, remaining calculations, Change Key | planned | — |
 | 7.3 | mvp_web usability improvements | UI/UX polish on the web dashboard — scope TBD at brainstorm time | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
@@ -126,7 +126,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 2: MVP DB + MVP API Scaffold + Download Registration
 
-**Status:** planned
+**Status:** complete (2026-04-22)
 
 **Scope:**
 - New Prisma package: `packages/mvp_db`
@@ -165,7 +165,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 3: Contact Form API
 
-**Status:** planned
+**Status:** complete (2026-04-22)
 
 **Scope:**
 - New Prisma model in `packages/mvp_db`: `ContactSubmission` (name, email, subject, message, ipAddress, timestamp)
@@ -291,7 +291,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 6: Entitlement API + License Key Generation
 
-**Status:** planned
+**Status:** complete (2026-04-22)
 
 **Scope:**
 - API key auth middleware in `apps/mvp_api` — validates `Authorization: Bearer sl_live_...` header
@@ -349,7 +349,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 7.1: Free Plan Auto-Provisioning + Quota Enforcement
 
-**Status:** implementation complete — awaiting human sign-off  
+**Status:** complete  
 **Completed:** 2026-04-22  
 **Implementation Plan:** [docs/superpowers/plans/2026-04-22-spike7.1-free-plan.md](../superpowers/plans/2026-04-22-spike7.1-free-plan.md)
 
@@ -369,8 +369,11 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - Dashboard Plan page: "Free" badge on `pv-layout-free` entitlement card; license key helper text updated to "Enter this key in your SolarLayout desktop application to activate your plan"
 
 **Python app (`PVlayout_Advance`):**
-- `_can_generate()`: checks `self._entitlements.get("data", {}).get("remainingCalculations", 0) > 0`; fails open (returns True) if entitlements not yet loaded
-- `_on_generate()`: when `_can_generate()` returns False, shows `QMessageBox.information` pointing to `solarlayout.in/dashboard/plan`; no generate runs
+- `_on_generate()` re-fetches entitlements from the API before every layout click (no local cache check). Rationale: license key is multi-machine, API call is cheap (~200 ms).
+- `_run_layout()` extracted from `_on_generate()` — called by `_on_entitlements_result` only after quota confirmed > 0.
+- `_on_entitlements_result`: `remainingCalculations == 0` → `QMessageBox.information` pointing to `solarlayout.in/dashboard/plan`; no layout runs.
+- `_on_entitlements_error`: on 401 clears key; on network/5xx fails open and calls `_run_layout()`.
+- No `_can_generate()` method — quota enforcement lives entirely in `_on_entitlements_result`.
 
 **Design decision:** No anonymous tracking, no install IDs. Every user must sign up to get a license key. The Free plan key IS the key they enter in the desktop app — it works identically to a paid key. Conversion path: sign up → dashboard shows Free plan key → copy into app → generate 5 times → quota prompt → upgrade.
 
@@ -381,7 +384,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - [ ] Free product does NOT appear in Plan page purchase grid
 - [ ] Free product slug in `POST /billing/checkout` returns 422
 - [ ] User copies Free plan key → enters in desktop app → status bar shows "5 calculation(s) remaining"
-- [ ] After 5 generates → `_can_generate()` returns False → purchase prompt shown → Generate blocked
+- [x] After 5 generates → quota dialog shown → layout does not run
 - [ ] Pricing page shows Free tier column with "Get Started Free" button
 - [ ] Human sign-off
 
