@@ -57,12 +57,12 @@ export function Header() {
         {/* Desktop CTA + Auth */}
         <div className="hidden items-center gap-2 md:flex">
           <SignedOut>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline">
               <Link href="/sign-in">Sign In</Link>
             </Button>
           </SignedOut>
           <SignedIn>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline">
               <Link href="/dashboard">Dashboard</Link>
             </Button>
           </SignedIn>
