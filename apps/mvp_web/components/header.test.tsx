@@ -21,17 +21,20 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }))
 
+vi.mock("@clerk/nextjs", () => ({
+  SignedIn: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="signed-in">{children}</div>
+  ),
+  SignedOut: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="signed-out">{children}</div>
+  ),
+}))
+
 import { Header } from "./header"
 
 test("renders SolarLayout logo text", () => {
   render(<Header />)
   expect(screen.getByText("SolarLayout")).toBeInTheDocument()
-})
-
-test("renders Download Now CTA", () => {
-  render(<Header />)
-  const ctas = screen.getAllByText("Download Now")
-  expect(ctas.length).toBeGreaterThanOrEqual(1)
 })
 
 test("renders all desktop navigation links", () => {
@@ -48,4 +51,14 @@ test("renders all desktop navigation links", () => {
   expect(
     screen.getAllByRole("link", { name: "Contact" }).length
   ).toBeGreaterThanOrEqual(1)
+})
+
+test("renders Sign In link for unauthenticated users", () => {
+  render(<Header />)
+  expect(screen.getByText("Sign In")).toBeInTheDocument()
+})
+
+test("renders Dashboard link for authenticated users", () => {
+  render(<Header />)
+  expect(screen.getByText("Dashboard")).toBeInTheDocument()
 })

@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Sun, Menu } from "lucide-react"
+import { SignedIn, SignedOut } from "@clerk/nextjs"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
   Sheet,
@@ -53,8 +54,18 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Desktop CTA */}
-        <div className="hidden md:block">
+        {/* Desktop CTA + Auth */}
+        <div className="hidden items-center gap-2 md:flex">
+          <SignedOut>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/sign-in">Sign In</Link>
+            </Button>
+          </SignedOut>
+          <SignedIn>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
+          </SignedIn>
           <Button
             asChild
             className="bg-accent text-accent-foreground [a]:hover:bg-accent/80"
@@ -99,7 +110,21 @@ export function Header() {
                 </Link>
               ))}
             </nav>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-col gap-2">
+              <SignedOut>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/sign-in" onClick={() => setOpen(false)}>
+                    Sign In
+                  </Link>
+                </Button>
+              </SignedOut>
+              <SignedIn>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/dashboard" onClick={() => setOpen(false)}>
+                    Dashboard
+                  </Link>
+                </Button>
+              </SignedIn>
               <Button
                 asChild
                 className="w-full bg-accent text-accent-foreground [a]:hover:bg-accent/80"
