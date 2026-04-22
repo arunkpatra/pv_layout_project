@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { Suspense, useEffect, useState, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { Check, Loader2, Copy, CheckCheck } from "lucide-react"
@@ -36,6 +36,20 @@ interface EntitlementItem {
 }
 
 export default function PlanPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <PlanPageInner />
+    </Suspense>
+  )
+}
+
+function PlanPageInner() {
   const { getToken } = useAuth()
   const searchParams = useSearchParams()
   const router = useRouter()
