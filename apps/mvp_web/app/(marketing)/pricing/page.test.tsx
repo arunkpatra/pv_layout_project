@@ -45,17 +45,14 @@ test("renders prices", () => {
   expect(screen.getAllByText("$14.99").length).toBeGreaterThanOrEqual(1)
 })
 
-test("renders disabled Buy Now buttons without tooltip", () => {
+test("renders Buy Now buttons as links to dashboard plan page", () => {
   render(<PricingPage />)
-  const buyButtons = screen.getAllByRole("button", { name: /Buy Now/i })
-  expect(buyButtons.length).toBeGreaterThanOrEqual(3)
-  const disabledButtons = buyButtons.filter(
-    (btn) =>
-      btn.hasAttribute("disabled") ||
-      btn.getAttribute("aria-disabled") === "true"
+  const buyLinks = screen.getAllByRole("link", { name: /Buy Now/i })
+  expect(buyLinks.length).toBeGreaterThanOrEqual(3)
+  expect(buyLinks[0]).toHaveAttribute(
+    "href",
+    "/dashboard/plan?product=pv-layout-basic"
   )
-  expect(disabledButtons.length).toBeGreaterThanOrEqual(3)
-  expect(screen.queryByText(/Payment coming soon/i)).not.toBeInTheDocument()
 })
 
 test("renders feature comparison table", () => {

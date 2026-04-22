@@ -1,4 +1,5 @@
 import { Check, X } from "lucide-react"
+import Link from "next/link"
 import {
   Card,
   CardHeader,
@@ -20,6 +21,7 @@ interface PricingTier {
   price: string
   purchaseModel: string
   calculations: string
+  slug: string
   highlighted?: boolean
 }
 
@@ -29,12 +31,14 @@ const tiers: PricingTier[] = [
     price: "$1.99",
     purchaseModel: "One-time",
     calculations: "5 Layout",
+    slug: "pv-layout-basic",
   },
   {
     name: "PV Layout Pro",
     price: "$4.99",
     purchaseModel: "One-time",
     calculations: "10 Layout",
+    slug: "pv-layout-pro",
     highlighted: true,
   },
   {
@@ -42,6 +46,7 @@ const tiers: PricingTier[] = [
     price: "$14.99",
     purchaseModel: "One-time",
     calculations: "50 Layout + Yield",
+    slug: "pv-layout-pro-plus",
   },
 ]
 
@@ -127,12 +132,10 @@ export function PricingCards() {
               </p>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col justify-end">
-              <Button
-                variant="outline"
-                className="w-full cursor-not-allowed opacity-60"
-                disabled
-              >
-                Buy Now
+              <Button asChild variant="outline" className="w-full">
+                <Link href={`/dashboard/plan?product=${tier.slug}`}>
+                  Buy Now
+                </Link>
               </Button>
             </CardContent>
           </Card>
