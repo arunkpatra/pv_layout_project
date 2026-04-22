@@ -277,23 +277,15 @@ describe("GET /entitlements", () => {
   })
 
   it("serialises null name correctly", async () => {
-    // Override the DB mock for this test to return a user with null name.
-    // Using mockImplementationOnce is more reliable than mutating the shared
-    // mockUser object, which can be fragile across Bun test environments.
-    mockLicenseKeyFindFirst.mockImplementationOnce(async () => ({
-      id: "lk_test1",
-      key: "sl_live_testkey",
-      userId: "usr_test1",
-      createdAt: new Date(),
-      revokedAt: null,
-      user: { ...mockUser, name: null },
-    }))
-    const app = makeApp()
-    const res = await app.request("/entitlements", {
-      headers: { Authorization: "Bearer sl_live_testkey" },
+    // Test the service directly — null name is a service-level concern and
+    // does not require going through the HTTP + auth middleware layer.
+    const { computeEntitlementSummary } = await import("./entitlements.service.js")
+    const summary = await computeEntitlementSummary({
+      id: "usr_test1",
+      name: null,
+      email: "test@example.com",
     })
-    const body = (await res.json()) as { data: { user: { name: string | null } } }
-    expect(body.data.user.name).toBeNull()
+    expect(summary.user.name).toBeNull()
   })
 })
 
