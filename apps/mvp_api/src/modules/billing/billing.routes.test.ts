@@ -10,9 +10,21 @@ mock.module("../../middleware/clerk-auth.js", () => ({
   clerkAuth: async (_c: unknown, next: () => Promise<void>) => next(),
 }))
 
-// Mock verifyToken
+// Mock @clerk/backend
 mock.module("@clerk/backend", () => ({
   verifyToken: async () => ({ sub: "clerk_user_123" }),
+  createClerkClient: () => ({
+    users: {
+      getUser: async () => ({
+        emailAddresses: [
+          { id: "ea_1", emailAddress: "test@example.com" },
+        ],
+        primaryEmailAddressId: "ea_1",
+        firstName: "Test",
+        lastName: "User",
+      }),
+    },
+  }),
 }))
 
 // Mock Stripe

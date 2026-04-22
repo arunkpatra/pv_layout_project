@@ -39,8 +39,27 @@ async function resolveUser(clerkId: string) {
   let user = await db.user.findFirst({ where: { clerkId } })
 
   if (!user) {
+    // Fetch real email from Clerk (dynamic import to avoid module resolution issues in test)
+    const { createClerkClient } = await import("@clerk/backend")
+    const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY ?? "" })
+    const clerkUser = await clerk.users.getUser(clerkId)
+    const email =
+      clerkUser.emailAddresses.find(
+        (e) => e.id === clerkUser.primaryEmailAddressId,
+      )?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress
+
+    if (!email) {
+      throw new AppError("BAD_REQUEST", "Clerk user has no email address", 400)
+    }
+
     user = await db.user.create({
-      data: { clerkId, email: clerkId },
+      data: {
+        clerkId,
+        email,
+        name: [clerkUser.firstName, clerkUser.lastName]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      },
     })
   }
 
