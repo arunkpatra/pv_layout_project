@@ -57,6 +57,7 @@ A spike is complete only when **all** of the following are true:
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
 | 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
 | 10 | Legal pages full review | Full DPDP Act / IT Act legal review | post-launch | — |
+| 11 | Admin UI | Usage records, user list, entitlement overview, license key revocation | planned | — |
 | ~~7~~ | ~~Domain + production deployment~~ | ~~solarlayout.in + api.solarlayout.in~~ | complete | 2026-04-22 |
 
 ---
@@ -373,6 +374,16 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - Full Terms & Conditions — IT Act 2000, Consumer Protection Act 2019 compliant
 - Full Privacy Policy — DPDP Act 2023 compliant with grievance officer
 - Professional legal review
+
+---
+
+## Spike 11: Admin UI
+
+**Status:** planned
+
+**Scope:** To be defined during Spike 11 brainstorming session.
+
+Likely scope: usage records table, user list, entitlement overview per user, license key revocation.
 
 ---
 
