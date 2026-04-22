@@ -23,7 +23,7 @@ mock.module("@clerk/backend", () => ({
   }),
 }))
 
-// Mock DB — user found by default
+// DB mocks
 const mockUserFindFirst = mock(async () => ({
   id: "usr_test1",
   clerkId: "user_abc",
@@ -32,18 +32,40 @@ const mockUserFindFirst = mock(async () => ({
   stripeCustomerId: null,
 }))
 const mockUserUpsert = mock(async () => ({
-  id: "usr_test1",
+  id: "usr_new",
   clerkId: "user_abc",
   email: "test@example.com",
   name: "Test User",
   stripeCustomerId: null,
 }))
+const mockProductFindFirst = mock(async () => ({
+  id: "prod_free",
+  slug: "pv-layout-free",
+  name: "PV Layout Free",
+  calculations: 5,
+  isFree: true,
+  active: true,
+}))
+const mockEntitlementCreate = mock(async () => ({ id: "ent_free" }))
+const mockLicenseKeyCreate = mock(async () => ({ id: "lk_free" }))
+const mockTx = {
+  entitlement: { create: mockEntitlementCreate },
+  licenseKey: { create: mockLicenseKeyCreate },
+}
+const mockTransaction = mock(async (fn: (tx: typeof mockTx) => Promise<void>) =>
+  fn(mockTx),
+)
+
 mock.module("../lib/db.js", () => ({
   db: {
     user: {
       findFirst: mockUserFindFirst,
       upsert: mockUserUpsert,
     },
+    product: {
+      findFirst: mockProductFindFirst,
+    },
+    $transaction: mockTransaction,
   },
 }))
 
@@ -72,6 +94,31 @@ describe("clerkAuth middleware", () => {
       name: "Test User",
       stripeCustomerId: null,
     }))
+    mockUserUpsert.mockReset()
+    mockUserUpsert.mockImplementation(async () => ({
+      id: "usr_new",
+      clerkId: "user_abc",
+      email: "test@example.com",
+      name: "Test User",
+      stripeCustomerId: null,
+    }))
+    mockProductFindFirst.mockReset()
+    mockProductFindFirst.mockImplementation(async () => ({
+      id: "prod_free",
+      slug: "pv-layout-free",
+      name: "PV Layout Free",
+      calculations: 5,
+      isFree: true,
+      active: true,
+    }))
+    mockEntitlementCreate.mockReset()
+    mockEntitlementCreate.mockImplementation(async () => ({ id: "ent_free" }))
+    mockLicenseKeyCreate.mockReset()
+    mockLicenseKeyCreate.mockImplementation(async () => ({ id: "lk_free" }))
+    mockTransaction.mockReset()
+    mockTransaction.mockImplementation(
+      async (fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx),
+    )
   })
 
   it("returns 401 when Authorization header is missing", async () => {
@@ -106,15 +153,18 @@ describe("clerkAuth middleware", () => {
     expect(body.userId).toBe("usr_test1")
   })
 
-  it("creates user via Clerk API when not found in DB", async () => {
+  it("does NOT provision Free plan when user already exists in DB", async () => {
+    // User found — provisioning path is skipped
+    const app = makeApp()
+    await app.request("/protected", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(mockTransaction).not.toHaveBeenCalled()
+  })
+
+  it("creates user and provisions Free plan when user not found in DB", async () => {
     mockUserFindFirst.mockImplementation(async () => null as never)
-    mockUserUpsert.mockImplementation(async () => ({
-      id: "usr_new",
-      clerkId: "user_abc",
-      email: "test@example.com",
-      name: "Test User",
-      stripeCustomerId: null,
-    }))
     const app = makeApp()
     const res = await app.request("/protected", {
       method: "GET",
@@ -124,5 +174,30 @@ describe("clerkAuth middleware", () => {
     const body = (await res.json()) as { ok: boolean; userId: string }
     expect(body.userId).toBe("usr_new")
     expect(mockUserUpsert).toHaveBeenCalled()
+    expect(mockProductFindFirst).toHaveBeenCalledWith({
+      where: { isFree: true },
+    })
+    expect(mockTransaction).toHaveBeenCalled()
+    expect(mockEntitlementCreate).toHaveBeenCalledWith({
+      data: {
+        userId: "usr_new",
+        productId: "prod_free",
+        totalCalculations: 5,
+      },
+    })
+    expect(mockLicenseKeyCreate).toHaveBeenCalled()
+  })
+
+  it("skips provisioning gracefully when Free product not found in DB", async () => {
+    mockUserFindFirst.mockImplementation(async () => null as never)
+    mockProductFindFirst.mockImplementation(async () => null as never)
+    const app = makeApp()
+    const res = await app.request("/protected", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    // Auth still succeeds — provisioning failure is non-fatal
+    expect(res.status).toBe(200)
+    expect(mockTransaction).not.toHaveBeenCalled()
   })
 })

@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from "hono"
 import { env } from "../env.js"
 import { AppError } from "../lib/errors.js"
 import { db } from "../lib/db.js"
+import crypto from "node:crypto"
 
 export const clerkAuth: MiddlewareHandler = async (c, next) => {
   const authHeader = c.req.header("Authorization")
@@ -62,6 +63,34 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
             .join(" ") || null,
       },
     })
+
+    // Auto-provision Free plan for new users
+    try {
+      const freeProduct = await db.product.findFirst({ where: { isFree: true } })
+      if (freeProduct) {
+        const licenseKey = `sl_live_${crypto.randomBytes(24).toString("base64url")}`
+        await db.$transaction(async (tx) => {
+          await tx.entitlement.create({
+            data: {
+              userId: user!.id,
+              productId: freeProduct.id,
+              totalCalculations: freeProduct.calculations,
+            },
+          })
+          await tx.licenseKey.create({
+            data: {
+              userId: user!.id,
+              key: licenseKey,
+            },
+          })
+        })
+      } else {
+        console.warn("[auth] Free product not found — skipping Free plan provisioning")
+      }
+    } catch (err) {
+      // Non-fatal: log and continue — auth must not fail due to provisioning error
+      console.warn("[auth] Free plan provisioning failed:", err)
+    }
   }
 
   c.set("user", user)
