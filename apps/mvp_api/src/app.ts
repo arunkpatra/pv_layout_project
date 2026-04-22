@@ -9,6 +9,7 @@ import { renderRoot } from "./views/root.html.js"
 import { downloadsRoutes } from "./modules/downloads/downloads.routes.js"
 import { contactRoutes } from "./modules/contact/contact.routes.js"
 import { dashboardRoutes } from "./modules/dashboard/dashboard.routes.js"
+import { productsRoutes } from "./modules/products/products.routes.js"
 
 export const app = new Hono<MvpHonoEnv>()
 
@@ -35,6 +36,7 @@ app.onError(errorHandler)
 app.route("/", downloadsRoutes)
 app.route("/", contactRoutes)
 app.route("/", dashboardRoutes)
+app.route("/", productsRoutes)
 
 app.get("/", async (c) => {
   const status = {
