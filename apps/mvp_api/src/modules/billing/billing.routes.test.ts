@@ -5,26 +5,18 @@ import {
   type MvpHonoEnv,
 } from "../../middleware/error-handler.js"
 
-// Mock Clerk auth to pass
+// Mock Clerk auth — sets user on context (matches real middleware behavior)
 mock.module("../../middleware/clerk-auth.js", () => ({
-  clerkAuth: async (_c: unknown, next: () => Promise<void>) => next(),
-}))
-
-// Mock @clerk/backend
-mock.module("@clerk/backend", () => ({
-  verifyToken: async () => ({ sub: "clerk_user_123" }),
-  createClerkClient: () => ({
-    users: {
-      getUser: async () => ({
-        emailAddresses: [
-          { id: "ea_1", emailAddress: "test@example.com" },
-        ],
-        primaryEmailAddressId: "ea_1",
-        firstName: "Test",
-        lastName: "User",
-      }),
-    },
-  }),
+  clerkAuth: async (c: { set: (key: string, value: unknown) => void }, next: () => Promise<void>) => {
+    c.set("user", {
+      id: "usr_test1",
+      clerkId: "clerk_user_123",
+      email: "test@example.com",
+      name: "Test User",
+      stripeCustomerId: "cus_existing",
+    })
+    return next()
+  },
 }))
 
 // Mock Stripe
@@ -283,8 +275,9 @@ describe("GET /billing/entitlements", () => {
     expect(body.data.licenseKey).toBeNull()
   })
 
-  it("returns empty when user not found", async () => {
-    mockUserFindFirst.mockImplementation(async () => null as never)
+  it("returns empty when user has no entitlements", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [] as never)
+    mockLicenseKeyFindFirst.mockImplementation(async () => null as never)
     const app = makeApp()
     const res = await app.request("/billing/entitlements", {
       method: "GET",

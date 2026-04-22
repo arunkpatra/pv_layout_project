@@ -4,11 +4,10 @@ import { clerkAuth } from "../../middleware/clerk-auth.js"
 import { db } from "../../lib/db.js"
 import { getStripeClient } from "../../lib/stripe.js"
 import { ok } from "../../lib/response.js"
-import { AppError, ValidationError } from "../../lib/errors.js"
+import { ValidationError } from "../../lib/errors.js"
 import { provisionEntitlement } from "./provision.js"
 import { env } from "../../env.js"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
-import { verifyToken } from "@clerk/backend"
 
 export const billingRoutes = new Hono<MvpHonoEnv>()
 
@@ -22,61 +21,27 @@ const VerifyBodySchema = z.object({
   sessionId: z.string().min(1),
 })
 
-async function getClerkUserId(
-  authHeader: string | undefined,
-): Promise<string> {
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : undefined
-  if (!token) throw new AppError("UNAUTHORIZED", "Missing token", 401)
-  const payload = await verifyToken(token, {
-    secretKey: env.CLERK_SECRET_KEY ?? "",
+/** Ensure user has a Stripe customer ID. Creates one if missing. */
+async function ensureStripeCustomer(user: {
+  id: string
+  email: string
+  name: string | null
+  clerkId: string
+  stripeCustomerId: string | null
+}) {
+  if (user.stripeCustomerId) return user
+
+  const stripe = getStripeClient()
+  const customer = await stripe.customers.create({
+    email: user.email,
+    name: user.name ?? undefined,
+    metadata: { userId: user.id, clerkId: user.clerkId },
   })
-  return payload.sub
-}
 
-async function resolveUser(clerkId: string) {
-  let user = await db.user.findFirst({ where: { clerkId } })
-
-  if (!user) {
-    // Fetch real email from Clerk (dynamic import to avoid module resolution issues in test)
-    const { createClerkClient } = await import("@clerk/backend")
-    const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY ?? "" })
-    const clerkUser = await clerk.users.getUser(clerkId)
-    const email =
-      clerkUser.emailAddresses.find(
-        (e) => e.id === clerkUser.primaryEmailAddressId,
-      )?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress
-
-    if (!email) {
-      throw new AppError("BAD_REQUEST", "Clerk user has no email address", 400)
-    }
-
-    user = await db.user.create({
-      data: {
-        clerkId,
-        email,
-        name: [clerkUser.firstName, clerkUser.lastName]
-          .filter(Boolean)
-          .join(" ") || undefined,
-      },
-    })
-  }
-
-  if (!user.stripeCustomerId) {
-    const stripe = getStripeClient()
-    const customer = await stripe.customers.create({
-      email: user.email,
-      name: user.name ?? undefined,
-      metadata: { userId: user.id, clerkId: user.clerkId },
-    })
-    user = await db.user.update({
-      where: { id: user.id },
-      data: { stripeCustomerId: customer.id },
-    })
-  }
-
-  return user
+  return db.user.update({
+    where: { id: user.id },
+    data: { stripeCustomerId: customer.id },
+  })
 }
 
 // POST /billing/checkout
@@ -96,8 +61,8 @@ billingRoutes.post("/billing/checkout", async (c) => {
     })
   }
 
-  const clerkId = await getClerkUserId(c.req.header("Authorization"))
-  const user = await resolveUser(clerkId)
+  // User is guaranteed to exist — created by clerkAuth middleware
+  const user = await ensureStripeCustomer(c.get("user"))
 
   const stripe = getStripeClient()
   const baseUrl =
@@ -136,7 +101,7 @@ billingRoutes.post("/billing/verify-session", async (c) => {
   })
 
   if (!session) {
-    throw new AppError("NOT_FOUND", "Checkout session not found", 404)
+    throw new ValidationError({ sessionId: ["Checkout session not found"] })
   }
 
   if (session.processedAt) {
@@ -162,12 +127,7 @@ billingRoutes.post("/billing/verify-session", async (c) => {
 
 // GET /billing/entitlements
 billingRoutes.get("/billing/entitlements", async (c) => {
-  const clerkId = await getClerkUserId(c.req.header("Authorization"))
-  const user = await db.user.findFirst({ where: { clerkId } })
-
-  if (!user) {
-    return c.json(ok({ entitlements: [], licenseKey: null }))
-  }
+  const user = c.get("user")
 
   const entitlements = await db.entitlement.findMany({
     where: { userId: user.id },

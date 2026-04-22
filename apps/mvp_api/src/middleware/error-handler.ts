@@ -3,7 +3,11 @@ import type { ContentfulStatusCode } from "hono/utils/http-status"
 import { AppError } from "../lib/errors.js"
 import { err } from "../lib/response.js"
 
-export type MvpHonoEnv = { Variables: Record<string, never> }
+export type MvpHonoEnv = {
+  Variables: {
+    user: { id: string; clerkId: string; email: string; name: string | null; stripeCustomerId: string | null }
+  }
+}
 
 export const errorHandler: ErrorHandler<MvpHonoEnv> = (error, c) => {
   if (error instanceof AppError) {

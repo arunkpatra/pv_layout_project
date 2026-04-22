@@ -5,9 +5,28 @@ import {
   type MvpHonoEnv,
 } from "../../middleware/error-handler.js"
 
-// Mock Clerk auth to pass by default
+// Mock Clerk auth — sets user on context
 mock.module("../../middleware/clerk-auth.js", () => ({
-  clerkAuth: async (_c: unknown, next: () => Promise<void>) => next(),
+  clerkAuth: async (c: { set: (key: string, value: unknown) => void }, next: () => Promise<void>) => {
+    c.set("user", {
+      id: "usr_test1",
+      clerkId: "clerk_user_123",
+      email: "test@example.com",
+      name: "Test User",
+      stripeCustomerId: null,
+    })
+    return next()
+  },
+}))
+
+// Mock db (needed to prevent clerk-auth from crashing on module load in parallel test runs)
+mock.module("../../lib/db.js", () => ({
+  db: {
+    user: {
+      findFirst: async () => null,
+      upsert: async () => ({}),
+    },
+  },
 }))
 
 // Mock S3 presigned URL helper

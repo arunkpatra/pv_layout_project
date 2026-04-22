@@ -9,6 +9,42 @@ import {
 const mockVerifyToken = mock(async (_token: string) => ({ sub: "user_abc" }))
 mock.module("@clerk/backend", () => ({
   verifyToken: mockVerifyToken,
+  createClerkClient: () => ({
+    users: {
+      getUser: async () => ({
+        emailAddresses: [
+          { id: "ea_1", emailAddress: "test@example.com" },
+        ],
+        primaryEmailAddressId: "ea_1",
+        firstName: "Test",
+        lastName: "User",
+      }),
+    },
+  }),
+}))
+
+// Mock DB — user found by default
+const mockUserFindFirst = mock(async () => ({
+  id: "usr_test1",
+  clerkId: "user_abc",
+  email: "test@example.com",
+  name: "Test User",
+  stripeCustomerId: null,
+}))
+const mockUserUpsert = mock(async () => ({
+  id: "usr_test1",
+  clerkId: "user_abc",
+  email: "test@example.com",
+  name: "Test User",
+  stripeCustomerId: null,
+}))
+mock.module("../lib/db.js", () => ({
+  db: {
+    user: {
+      findFirst: mockUserFindFirst,
+      upsert: mockUserUpsert,
+    },
+  },
 }))
 
 const { clerkAuth } = await import("./clerk-auth.js")
@@ -16,7 +52,10 @@ const { clerkAuth } = await import("./clerk-auth.js")
 function makeApp() {
   const app = new Hono<MvpHonoEnv>()
   app.use("/protected", clerkAuth)
-  app.get("/protected", (c) => c.json({ ok: true }))
+  app.get("/protected", (c) => {
+    const user = c.get("user")
+    return c.json({ ok: true, userId: user.id })
+  })
   app.onError(errorHandler)
   return app
 }
@@ -25,6 +64,14 @@ describe("clerkAuth middleware", () => {
   beforeEach(() => {
     mockVerifyToken.mockReset()
     mockVerifyToken.mockImplementation(async () => ({ sub: "user_abc" }))
+    mockUserFindFirst.mockReset()
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_test1",
+      clerkId: "user_abc",
+      email: "test@example.com",
+      name: "Test User",
+      stripeCustomerId: null,
+    }))
   })
 
   it("returns 401 when Authorization header is missing", async () => {
@@ -47,14 +94,35 @@ describe("clerkAuth middleware", () => {
     expect(res.status).toBe(401)
   })
 
-  it("passes through when token is valid", async () => {
+  it("passes through and sets user on context when token is valid", async () => {
     const app = makeApp()
     const res = await app.request("/protected", {
       method: "GET",
       headers: { Authorization: "Bearer valid-token" },
     })
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { ok: boolean }
+    const body = (await res.json()) as { ok: boolean; userId: string }
     expect(body.ok).toBe(true)
+    expect(body.userId).toBe("usr_test1")
+  })
+
+  it("creates user via Clerk API when not found in DB", async () => {
+    mockUserFindFirst.mockImplementation(async () => null)
+    mockUserUpsert.mockImplementation(async () => ({
+      id: "usr_new",
+      clerkId: "user_abc",
+      email: "test@example.com",
+      name: "Test User",
+      stripeCustomerId: null,
+    }))
+    const app = makeApp()
+    const res = await app.request("/protected", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { ok: boolean; userId: string }
+    expect(body.userId).toBe("usr_new")
+    expect(mockUserUpsert).toHaveBeenCalled()
   })
 })
