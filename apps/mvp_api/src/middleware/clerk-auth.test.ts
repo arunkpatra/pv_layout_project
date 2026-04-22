@@ -107,7 +107,7 @@ describe("clerkAuth middleware", () => {
   })
 
   it("creates user via Clerk API when not found in DB", async () => {
-    mockUserFindFirst.mockImplementation(async () => null)
+    mockUserFindFirst.mockImplementation(async () => null as never)
     mockUserUpsert.mockImplementation(async () => ({
       id: "usr_new",
       clerkId: "user_abc",
