@@ -1,6 +1,5 @@
 import { db } from "../../lib/db.js"
 import { AppError } from "../../lib/errors.js"
-import { computeEntitlementSummary } from "../entitlements/entitlements.service.js"
 
 export async function reportUsage(
   userId: string,
@@ -48,7 +47,7 @@ export async function reportUsage(
   await db.$transaction(async (tx) => {
     const rowsUpdated = await (
       tx as unknown as {
-        $executeRaw: (...args: unknown[]) => Promise<number>
+        $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<number>
       }
     ).$executeRaw`
       UPDATE entitlements
@@ -75,7 +74,10 @@ export async function reportUsage(
     })
   })
 
-  // 4. Return updated total remaining across all entitlements
-  const { remainingCalculations } = await computeEntitlementSummary(userId)
+  // 4. Compute remaining from already-loaded entitlements, subtracting the one just consumed.
+  // Avoids a second DB round-trip that could race with concurrent decrements.
+  const totalCalculations = entitlements.reduce((sum, e) => sum + e.totalCalculations, 0)
+  const usedCalculations = entitlements.reduce((sum, e) => sum + e.usedCalculations, 0)
+  const remainingCalculations = Math.max(0, totalCalculations - usedCalculations - 1)
   return { recorded: true, remainingCalculations }
 }
