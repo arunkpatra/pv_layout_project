@@ -12,7 +12,7 @@ entitlementsRoutes.use("/usage/history", licenseKeyAuth)
 
 entitlementsRoutes.get("/entitlements", async (c) => {
   const user = c.get("user")
-  const summary = await computeEntitlementSummary(user.id)
+  const summary = await computeEntitlementSummary(user)
   return c.json(ok(summary))
 })
 

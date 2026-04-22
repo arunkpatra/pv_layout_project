@@ -116,6 +116,14 @@ describe("GET /entitlements", () => {
     const body = (await res.json()) as {
       success: boolean
       data: {
+        user: { name: string | null; email: string }
+        plans: {
+          planName: string
+          features: string[]
+          totalCalculations: number
+          usedCalculations: number
+          remainingCalculations: number
+        }[]
         licensed: boolean
         availableFeatures: string[]
         totalCalculations: number
@@ -124,12 +132,23 @@ describe("GET /entitlements", () => {
       }
     }
     expect(body.success).toBe(true)
+    // existing assertions — must still pass
     expect(body.data.licensed).toBe(true)
     expect(body.data.availableFeatures).toContain("plant_layout")
     expect(body.data.availableFeatures).toContain("cable_routing")
     expect(body.data.totalCalculations).toBe(10)
     expect(body.data.usedCalculations).toBe(3)
     expect(body.data.remainingCalculations).toBe(7)
+    // new assertions
+    expect(body.data.user.name).toBe("Test User")
+    expect(body.data.user.email).toBe("test@example.com")
+    expect(body.data.plans).toHaveLength(1)
+    expect(body.data.plans[0]!.planName).toBe("PV Layout Pro")
+    expect(body.data.plans[0]!.features).toContain("Plant Layout")
+    expect(body.data.plans[0]!.features).toContain("Cable Routing")
+    expect(body.data.plans[0]!.totalCalculations).toBe(10)
+    expect(body.data.plans[0]!.usedCalculations).toBe(3)
+    expect(body.data.plans[0]!.remainingCalculations).toBe(7)
   })
 
   it("returns licensed false when all calculations exhausted", async () => {
@@ -171,6 +190,37 @@ describe("GET /entitlements", () => {
       data: { licensed: boolean }
     }
     expect(body.data.licensed).toBe(false)
+  })
+
+  it("returns plan details correctly for a Basic plan", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_test1",
+        userId: "usr_test1",
+        productId: "prod_basic",
+        totalCalculations: 5,
+        usedCalculations: 2,
+        purchasedAt: new Date(),
+        product: {
+          name: "PV Layout Basic",
+          displayOrder: 1,
+          features: [{ featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" }],
+        },
+      },
+    ])
+    const app = makeApp()
+    const res = await app.request("/entitlements", {
+      headers: { Authorization: "Bearer sl_live_testkey" },
+    })
+    const body = (await res.json()) as {
+      success: boolean
+      data: {
+        plans: { planName: string; features: string[]; remainingCalculations: number }[]
+      }
+    }
+    expect(body.data.plans[0]!.planName).toBe("PV Layout Basic")
+    expect(body.data.plans[0]!.features).toContain("Plant Layout (MMS, Inverter, LA)")
+    expect(body.data.plans[0]!.remainingCalculations).toBe(3)
   })
 
   it("computes feature union and sums counts across multiple entitlements", async () => {
