@@ -6,7 +6,7 @@ const mockUser = {
   id: "usr_test1",
   clerkId: "clerk_abc",
   email: "test@example.com",
-  name: "Test User",
+  name: "Test User" as string | null,
   stripeCustomerId: null,
 }
 
@@ -173,10 +173,15 @@ describe("GET /entitlements", () => {
     })
     const body = (await res.json()) as {
       success: boolean
-      data: { licensed: boolean; availableFeatures: string[] }
+      data: {
+        licensed: boolean
+        availableFeatures: string[]
+        plans: { remainingCalculations: number }[]
+      }
     }
     expect(body.data.licensed).toBe(false)
     expect(body.data.availableFeatures).toHaveLength(0)
+    expect(body.data.plans[0]!.remainingCalculations).toBe(0)
   })
 
   it("returns licensed false when no entitlements", async () => {
@@ -269,6 +274,24 @@ describe("GET /entitlements", () => {
     expect(body.data.availableFeatures.filter((f) => f === "plant_layout")).toHaveLength(1)
     expect(body.data.totalCalculations).toBe(13)
     expect(body.data.remainingCalculations).toBe(10)
+  })
+
+  it("serialises null name correctly", async () => {
+    // Temporarily set name to null on the shared mock object; the licenseKeyAuth
+    // module mock closes over mockUser by reference, so this propagates.
+    const savedName = mockUser.name
+    mockUser.name = null
+
+    try {
+      const app = makeApp()
+      const res = await app.request("/entitlements", {
+        headers: { Authorization: "Bearer sl_live_testkey" },
+      })
+      const body = (await res.json()) as { data: { user: { name: null } } }
+      expect(body.data.user.name).toBeNull()
+    } finally {
+      mockUser.name = savedName
+    }
   })
 })
 

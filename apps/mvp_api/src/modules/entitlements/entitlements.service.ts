@@ -2,6 +2,7 @@ import { db } from "../../lib/db.js"
 
 export interface PlanSummary {
   planName: string
+  /** Human-readable labels from ProductFeature.label — for display only */
   features: string[]
   totalCalculations: number
   usedCalculations: number
@@ -12,6 +13,7 @@ export interface EntitlementSummary {
   user: { name: string | null; email: string }
   plans: PlanSummary[]
   licensed: boolean
+  /** Feature keys (e.g. "plant_layout") — used for runtime feature gating */
   availableFeatures: string[]
   totalCalculations: number
   usedCalculations: number
