@@ -266,7 +266,17 @@ describe("GET /entitlements", () => {
     })
     const body = (await res.json()) as {
       success: boolean
-      data: { availableFeatures: string[]; totalCalculations: number; remainingCalculations: number }
+      data: {
+        availableFeatures: string[]
+        totalCalculations: number
+        remainingCalculations: number
+        plans: {
+          planName: string
+          totalCalculations: number
+          usedCalculations: number
+          remainingCalculations: number
+        }[]
+      }
     }
     expect(body.data.availableFeatures).toContain("plant_layout")
     expect(body.data.availableFeatures).toContain("cable_routing")
@@ -274,6 +284,15 @@ describe("GET /entitlements", () => {
     expect(body.data.availableFeatures.filter((f) => f === "plant_layout")).toHaveLength(1)
     expect(body.data.totalCalculations).toBe(13)
     expect(body.data.remainingCalculations).toBe(10)
+    expect(body.data.plans).toHaveLength(2)
+    expect(body.data.plans[0]!.planName).toBe("PV Layout Basic")
+    expect(body.data.plans[0]!.totalCalculations).toBe(3)
+    expect(body.data.plans[0]!.usedCalculations).toBe(1)
+    expect(body.data.plans[0]!.remainingCalculations).toBe(2)
+    expect(body.data.plans[1]!.planName).toBe("PV Layout Pro")
+    expect(body.data.plans[1]!.totalCalculations).toBe(10)
+    expect(body.data.plans[1]!.usedCalculations).toBe(2)
+    expect(body.data.plans[1]!.remainingCalculations).toBe(8)
   })
 
   it("serialises null name correctly", async () => {
