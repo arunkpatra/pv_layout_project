@@ -7,9 +7,27 @@ const STRIPE_PRICE_IDS = {
     process.env.STRIPE_PRICE_PRO ?? "price_placeholder_pro",
   "pv-layout-pro-plus":
     process.env.STRIPE_PRICE_PRO_PLUS ?? "price_placeholder_pro_plus",
+  "pv-layout-free": "price_free_tier",   // sentinel — never used in Stripe
 }
 
 const products = [
+  {
+    slug: "pv-layout-free",
+    name: "PV Layout Free",
+    description: "5 free layout calculations on signup — all Pro Plus features included",
+    priceAmount: 0,
+    calculations: 5,
+    displayOrder: 0,
+    isFree: true,
+    features: [
+      { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
+      { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
+      { featureKey: "cable_routing", label: "AC & DC Cable Routing" },
+      { featureKey: "cable_measurements", label: "Cable Quantity Measurements" },
+      { featureKey: "energy_yield", label: "Energy Yield Analysis" },
+      { featureKey: "generation_estimates", label: "Plant Generation Estimates" },
+    ],
+  },
   {
     slug: "pv-layout-basic",
     name: "PV Layout Basic",
@@ -17,6 +35,7 @@ const products = [
     priceAmount: 199,
     calculations: 5,
     displayOrder: 1,
+    isFree: false,
     features: [
       { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
       { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
@@ -29,6 +48,7 @@ const products = [
     priceAmount: 499,
     calculations: 10,
     displayOrder: 2,
+    isFree: false,
     features: [
       { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
       { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
@@ -43,6 +63,7 @@ const products = [
     priceAmount: 1499,
     calculations: 50,
     displayOrder: 3,
+    isFree: false,
     features: [
       { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
       { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
@@ -70,6 +91,7 @@ async function seed() {
         calculations: product.calculations,
         stripePriceId: stripePriceId,
         displayOrder: product.displayOrder,
+        isFree: product.isFree,
         active: true,
       },
       create: {
@@ -80,11 +102,11 @@ async function seed() {
         calculations: product.calculations,
         stripePriceId: stripePriceId,
         displayOrder: product.displayOrder,
+        isFree: product.isFree,
         active: true,
       },
     })
 
-    // Delete existing features and recreate
     await adminPrisma.productFeature.deleteMany({
       where: { productId: upserted.id },
     })
