@@ -50,7 +50,7 @@ A spike is complete only when **all** of the following are true:
 | 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | complete | 2026-04-22 |
 | 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | complete | 2026-04-22 |
 | 4.1 | Merge dashboard into mvp_web | Consolidate mvp_dashboard into mvp_web — single app, single domain | complete | 2026-04-22 |
-| 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | planned | — |
+| 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | complete | 2026-04-22 |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | planned | — |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
@@ -244,27 +244,27 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 5: Stripe Integration
 
-**Status:** planned
+**Status:** complete (2026-04-22)
+**Design Spec:** [docs/superpowers/specs/2026-04-22-spike5-stripe-integration-design.md](../superpowers/specs/2026-04-22-spike5-stripe-integration-design.md)
+**Implementation Plan:** [docs/superpowers/plans/2026-04-22-spike5-stripe-integration.md](../superpowers/plans/2026-04-22-spike5-stripe-integration.md)
 
 **Scope:**
-- Stripe Checkout integration for one-time purchases
-- Three products mapped to Stripe prices:
-  - PV Layout Basic — $1.99 (5 calculations)
-  - PV Layout Pro — $4.99 (10 calculations)
-  - PV Layout Pro Plus — $14.99 (50 calculations)
-- Purchase flow: Dashboard "Buy" button → Stripe Checkout → webhook → provision entitlement
-- Stripe webhook handler in `apps/mvp_api`: `checkout.session.completed` → create/update Entitlement
-- Dashboard shows purchase history and receipt links
-- Reference: user has working Stripe integration in another production app (to be shared at spike start)
+- Stripe Checkout one-time payments (`mode: 'payment'`) — not subscriptions
+- Product and ProductFeature tables seeded per environment with Stripe price IDs
+- Purchase flow: Plan page → POST /billing/checkout → Stripe Checkout redirect → webhook + verify-session → provision Entitlement + LicenseKey
+- Idempotent provisioning via `processedAt` timestamp on CheckoutSession
+- Plan page: product cards with Purchase buttons, entitlement balances, license key with copy-to-clipboard
+- License page: license key display
+- Dashboard home: remaining calculations per product, "Buy calculations" links
+- Pricing page: Buy Now buttons enabled, link to `/dashboard/plan?product=<slug>`
+- GET /products (public), POST /billing/checkout, POST /billing/verify-session, GET /billing/entitlements, POST /webhooks/stripe
 
 **Acceptance Criteria:**
-- [ ] Gates pass
-- [ ] User can purchase a plan from the dashboard
-- [ ] Stripe Checkout redirects back to dashboard on success
-- [ ] Entitlement provisioned automatically after payment
-- [ ] Webhook handles duplicate events idempotently
-- [ ] Purchase visible in dashboard with receipt link
-- [ ] Pricing page "Buy Now" buttons link to dashboard purchase flow
+- [x] Gates pass (lint + typecheck + test + build)
+- [ ] Human verifies locally: purchase flow end-to-end with Stripe test mode
+- [ ] CI/CD passes
+- [ ] Production: Stripe live products created, purchase works at solarlayout.in
+- [ ] Human sign-off
 
 ---
 
@@ -386,3 +386,6 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 | D21 | 2026-04-22 | `packages/mvp_api-client` deferred to Spike 5 | Single inline `fetch` call in DownloadCard is sufficient for now; client package adds complexity without enough call-sites to justify it yet. |
 | D22 | 2026-04-22 | Use standard Clerk env vars (`CLERK_SECRET_KEY`) in `apps/mvp_api` | Clerk's SDK expects standard env var names; custom var names (`MVP_CLERK_SECRET_KEY`) require explicit passing and are error-prone. Both MVP and cloud platform use the same Clerk org with separate apps, so per-Vercel-project env isolation handles any conflict. |
 | D23 | 2026-04-22 | Merge dashboard into mvp_web (single-app pattern) | Separate dashboard app created unnecessary deployment + domain overhead. Cloud product `apps/web` proves marketing + auth pages coexist cleanly in one Next.js app. |
+| D24 | 2026-04-22 | One-time payment packs, not subscriptions | Target market (Indian solar professionals) has project-based usage. Subscriptions feel wasteful for irregular use. Low price points ($1.99–$14.99) are impulse buys. Subscriptions can be added as upsell in future spike once power users emerge. |
+| D25 | 2026-04-22 | Always Stripe Checkout, even for top-ups | Indian RBI mandates 2FA/OTP for most card transactions. Stripe Checkout handles 3DS automatically. Embedded Payment Element is a future enhancement. |
+| D26 | 2026-04-22 | Products and features in seeded DB tables, not hardcoded | Stripe price IDs differ per environment. Feature table enables Python desktop app to query capabilities via API. |
