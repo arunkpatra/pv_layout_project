@@ -55,7 +55,7 @@ A spike is complete only when **all** of the following are true:
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | complete | 2026-04-22 |
 | 7.1 | Free Plan Auto-Provisioning + Quota Enforcement | DB isFree field + pv-layout-free seed; clerkAuth auto-provisions Entitlement + LicenseKey on signup; GET /products excludes free; checkout guard; pricing page Free column; Plan page Free badge; Python re-fetches entitlements on every generate click; quota dialog when exhausted | complete | 2026-04-22 |
-| 7.2 | Python GUI — account & license info modal | Toolbar button (user icon) opens modal: name, email, all plans, entitled features, remaining calculations, Change Key | planned | — |
+| 7.2 | Python GUI — account & license info modal | Toolbar button (user icon) opens modal: name, email, all plans, entitled features, remaining calculations, Change Key | complete | 2026-04-22 |
 | 7.3 | mvp_web usability improvements | UI/UX polish on the web dashboard — scope TBD at brainstorm time | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
 | 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
@@ -392,7 +392,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 7.2: Python GUI — Account & License Info Modal
 
-**Status:** planned
+**Status:** complete (2026-04-22)
 
 **Scope:**
 
@@ -431,13 +431,13 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - PRD (`docs/PRD-license-key-integration.md`) and Claude Code prompt (`docs/CLAUDE_CODE_PROMPT.md`) updated for Prasanta
 
 **Acceptance Criteria:**
-- [ ] Gates pass (`flake8` + `pytest`) in PVlayout_Advance
-- [ ] Toolbar button appears when key is stored; hidden when no key
-- [ ] Dialog opens and shows correct name, email, plan(s), features, remaining count
-- [ ] "Change Key" opens `LicenseKeyDialog`; successful validation replaces key; dialog refreshes
-- [ ] "Change Key" with invalid key: banner shows error, old key remains active
-- [ ] API `GET /entitlements` returns user + plan fields; existing status bar still updates correctly
-- [ ] PRD and Claude Code prompt updated and committed
+- [x] Gates pass (`flake8` + `pytest`) in PVlayout_Advance
+- [x] Toolbar button appears when key is stored; hidden when no key
+- [x] Dialog opens and shows correct name, email, plan(s), features, remaining count
+- [x] "Change Key" opens `LicenseKeyDialog`; successful validation replaces key; dialog refreshes
+- [x] "Change Key" with invalid key: banner shows error, old key remains active
+- [x] API `GET /entitlements` returns user + plan fields; existing status bar still updates correctly
+- [x] PRD and Claude Code prompt updated and committed
 
 ---
 
