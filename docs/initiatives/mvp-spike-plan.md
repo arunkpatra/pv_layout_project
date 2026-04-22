@@ -54,7 +54,7 @@ A spike is complete only when **all** of the following are true:
 | 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | complete | 2026-04-22 |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | complete | 2026-04-22 |
-| 7.1 | Free tier quota enforcement | `_can_generate()` checks free-tier quota from server; anonymous usage reporting; blocks after free quota exhausted | planned | — |
+| 7.1 | Free Plan Auto-Provisioning + Quota Enforcement | DB isFree field + pv-layout-free seed; clerkAuth auto-provisions Entitlement + LicenseKey on signup; GET /products excludes free; checkout guard; pricing page Free column; Plan page Free badge; Python _can_generate() quota check | implementation complete | 2026-04-22 |
 | 7.2 | Python GUI — account & license info modal | Toolbar button (user icon) opens modal: name, email, all plans, entitled features, remaining calculations, Change Key | planned | — |
 | 7.3 | mvp_web usability improvements | UI/UX polish on the web dashboard — scope TBD at brainstorm time | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
@@ -349,7 +349,8 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 7.1: Free Plan Auto-Provisioning + Quota Enforcement
 
-**Status:** planned  
+**Status:** implementation complete — awaiting human sign-off  
+**Completed:** 2026-04-22  
 **Implementation Plan:** [docs/superpowers/plans/2026-04-22-spike7.1-free-plan.md](../superpowers/plans/2026-04-22-spike7.1-free-plan.md)
 
 **Scope:**
