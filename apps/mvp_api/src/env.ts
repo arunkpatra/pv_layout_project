@@ -15,6 +15,9 @@ const EnvSchema = z.object({
   MVP_S3_DOWNLOADS_BUCKET: z.string().optional(),
   // Clerk — used to verify dashboard JWT tokens
   CLERK_SECRET_KEY: z.string().optional(),
+  // Stripe
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 })
 
 const parsed = EnvSchema.safeParse(process.env)
