@@ -41,17 +41,19 @@ model User {
   licenseKeys      LicenseKey[]
   entitlements     Entitlement[]
   checkoutSessions CheckoutSession[]
+  usageRecords     UsageRecord[]
 
   @@map("users")
 }
 
 model LicenseKey {
-  id        String    @id @default("")
-  key       String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  createdAt DateTime  @default(now())
-  revokedAt DateTime?
+  id           String        @id @default("")
+  key          String        @unique
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  createdAt    DateTime      @default(now())
+  revokedAt    DateTime?
+  usageRecords UsageRecord[]
 
   @@map("license_keys")
 }
@@ -69,6 +71,7 @@ model Product {
   active        Boolean          @default(true)
   features      ProductFeature[]
   entitlements  Entitlement[]
+  usageRecords  UsageRecord[]
   createdAt     DateTime         @default(now())
 
   @@map("products")
@@ -110,4 +113,19 @@ model CheckoutSession {
   createdAt                DateTime  @default(now())
 
   @@map("checkout_sessions")
+}
+
+model UsageRecord {
+  id           String     @id @default("")
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  licenseKeyId String
+  licenseKey   LicenseKey @relation(fields: [licenseKeyId], references: [id])
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+  featureKey   String
+  metadata     Json?
+  createdAt    DateTime   @default(now())
+
+  @@map("usage_records")
 }
