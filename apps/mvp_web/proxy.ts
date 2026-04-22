@@ -12,11 +12,14 @@ export const proxy = clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
 
-  // Protect dashboard routes for unauthenticated users
-  if (isProtectedRoute(req)) {
-    await auth.protect({
-      unauthenticatedUrl: new URL("/sign-in", req.url).toString(),
-    })
+  // Protect dashboard routes — redirect to sign-in with original URL preserved
+  if (isProtectedRoute(req) && !userId) {
+    const signInUrl = new URL("/sign-in", req.url)
+    signInUrl.searchParams.set(
+      "redirect_url",
+      req.nextUrl.pathname + req.nextUrl.search,
+    )
+    return NextResponse.redirect(signInUrl)
   }
 })
 
