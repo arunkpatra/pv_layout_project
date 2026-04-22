@@ -51,7 +51,7 @@ A spike is complete only when **all** of the following are true:
 | 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | complete | 2026-04-22 |
 | 4.1 | Merge dashboard into mvp_web | Consolidate mvp_dashboard into mvp_web — single app, single domain | complete | 2026-04-22 |
 | 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | complete | 2026-04-22 |
-| 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | planned | — |
+| 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | complete | 2026-04-22 |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | planned | — |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
@@ -271,7 +271,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ## Spike 5.1: Clerk Sign-In Preserve Original URL
 
-**Status:** planned
+**Status:** complete (2026-04-22)
 
 **Scope:**
 - After sign-in, Clerk should redirect to the page the user was originally trying to reach (e.g. `/dashboard/plan?product=pv-layout-pro`) instead of always redirecting to `/dashboard`
@@ -279,9 +279,9 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - Small scope — configuration fix, no new features
 
 **Acceptance Criteria:**
-- [ ] Gates pass
-- [ ] User visits `/dashboard/plan?product=pv-layout-pro` while signed out → Clerk sign-in → redirected back to `/dashboard/plan?product=pv-layout-pro`
-- [ ] Normal sign-in (no original URL) → redirected to `/dashboard`
+- [x] Gates pass
+- [x] User visits `/dashboard/plan?product=pv-layout-pro` while signed out → Clerk sign-in → redirected back to `/dashboard/plan?product=pv-layout-pro`
+- [x] Normal sign-in (no original URL) → redirected to `/dashboard`
 
 ---
 
@@ -406,3 +406,4 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 | D24 | 2026-04-22 | One-time payment packs, not subscriptions | Target market (Indian solar professionals) has project-based usage. Subscriptions feel wasteful for irregular use. Low price points ($1.99–$14.99) are impulse buys. Subscriptions can be added as upsell in future spike once power users emerge. |
 | D25 | 2026-04-22 | Always Stripe Checkout, even for top-ups | Indian RBI mandates 2FA/OTP for most card transactions. Stripe Checkout handles 3DS automatically. Embedded Payment Element is a future enhancement. |
 | D26 | 2026-04-22 | Products and features in seeded DB tables, not hardcoded | Stripe price IDs differ per environment. Feature table enables Python desktop app to query capabilities via API. |
+| D27 | 2026-04-22 | Manual redirect_url param in middleware instead of auth.protect() unauthenticatedUrl | auth.protect() does not append redirect_url automatically; explicit param in proxy.ts + fallbackRedirectUrl on SignIn/SignUp components is the correct pattern. |
