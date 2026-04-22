@@ -52,7 +52,7 @@ A spike is complete only when **all** of the following are true:
 | 4.1 | Merge dashboard into mvp_web | Consolidate mvp_dashboard into mvp_web — single app, single domain | complete | 2026-04-22 |
 | 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | complete | 2026-04-22 |
 | 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | complete | 2026-04-22 |
-| 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | in-progress | — |
+| 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
 | 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
