@@ -72,6 +72,7 @@ const mockProductFindUnique = mock(async () => ({
   stripePriceId: "price_test_basic",
   calculations: 5,
   active: true,
+  isFree: false,
 }))
 const mockCheckoutSessionCreate = mock(async () => ({ id: "csdb_test1" }))
 const mockCheckoutSessionFindUnique = mock(async () => ({
@@ -139,6 +140,7 @@ describe("POST /billing/checkout", () => {
       stripePriceId: "price_test_basic",
       calculations: 5,
       active: true,
+      isFree: false,
     }))
     mockCheckoutCreate.mockImplementation(async () => ({
       id: "cs_test_123",
@@ -175,6 +177,27 @@ describe("POST /billing/checkout", () => {
         Authorization: "Bearer valid-token",
       },
       body: JSON.stringify({ product: "nonexistent" }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 400 when product is free (isFree: true)", async () => {
+    mockProductFindUnique.mockImplementation(async () => ({
+      id: "prod_free",
+      slug: "pv-layout-free",
+      stripePriceId: "price_free_tier",
+      calculations: 5,
+      active: true,
+      isFree: true,
+    }))
+    const app = makeApp()
+    const res = await app.request("/billing/checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ product: "pv-layout-free" }),
     })
     expect(res.status).toBe(400)
   })

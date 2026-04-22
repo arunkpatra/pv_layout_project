@@ -13,6 +13,7 @@ const mockFindMany = mock(async () => [
     priceAmount: 199,
     priceCurrency: "usd",
     calculations: 5,
+    isFree: false,
     features: [
       { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
     ],
@@ -47,6 +48,7 @@ describe("GET /products", () => {
         priceAmount: 199,
         priceCurrency: "usd",
         calculations: 5,
+        isFree: false,
         features: [
           {
             featureKey: "plant_layout",
@@ -83,5 +85,15 @@ describe("GET /products", () => {
       data: { products: Record<string, unknown>[] }
     }
     expect(body.data.products[0]).not.toHaveProperty("stripePriceId")
+  })
+
+  it("passes isFree: false filter to findMany", async () => {
+    const app = makeApp()
+    await app.request("/products", { method: "GET" })
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isFree: false }),
+      }),
+    )
   })
 })

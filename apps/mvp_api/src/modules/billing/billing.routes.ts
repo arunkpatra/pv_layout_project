@@ -55,7 +55,7 @@ billingRoutes.post("/billing/checkout", async (c) => {
     where: { slug: body.data.product },
   })
 
-  if (!product || !product.active) {
+  if (!product || !product.active || product.isFree) {
     throw new ValidationError({
       product: ["Invalid or inactive product"],
     })

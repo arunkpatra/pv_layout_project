@@ -7,7 +7,7 @@ export const productsRoutes = new Hono<MvpHonoEnv>()
 
 productsRoutes.get("/products", async (c) => {
   const products = await db.product.findMany({
-    where: { active: true },
+    where: { active: true, isFree: false },
     orderBy: { displayOrder: "asc" },
     select: {
       slug: true,
