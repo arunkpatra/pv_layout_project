@@ -28,7 +28,7 @@ export async function computeEntitlementSummary(
     (sum, e) => sum + e.usedCalculations,
     0,
   )
-  const remainingCalculations = totalCalculations - usedCalculations
+  const remainingCalculations = Math.max(0, totalCalculations - usedCalculations)
 
   const featureSet = new Set<string>()
   for (const e of entitlements) {

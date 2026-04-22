@@ -56,6 +56,8 @@ const mockUsageRecordFindMany = mock(async () => [
   },
 ])
 
+// licenseKeyAuth runs via the real middleware path even with the module mock,
+// so db.licenseKey.findFirst must be stubbed to avoid runtime errors.
 const mockLicenseKeyFindFirst = mock(async () => ({
   id: "lk_test1",
   key: "sl_live_testkey",
