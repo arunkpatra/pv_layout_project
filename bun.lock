@@ -63,37 +63,6 @@
         "typescript": "^5.9.3",
       },
     },
-    "apps/mvp_dashboard": {
-      "name": "@renewable-energy/mvp-dashboard",
-      "version": "0.0.1",
-      "dependencies": {
-        "@clerk/nextjs": "^6.21.0",
-        "@renewable-energy/ui": "workspace:*",
-        "@tanstack/react-query": "^5.76.1",
-        "lucide-react": "^0.511.0",
-        "next": "16.2.4",
-        "next-themes": "^0.4.6",
-        "react": "^19.2.4",
-        "react-dom": "^19.2.4",
-        "sonner": "^2.0.0",
-      },
-      "devDependencies": {
-        "@renewable-energy/eslint-config": "workspace:^",
-        "@renewable-energy/typescript-config": "workspace:*",
-        "@tailwindcss/postcss": "^4.1.18",
-        "@testing-library/jest-dom": "^6.9.1",
-        "@testing-library/react": "^16.3.2",
-        "@testing-library/user-event": "^14.6.1",
-        "@types/node": "^25.1.0",
-        "@types/react": "^19.2.10",
-        "@types/react-dom": "^19.2.3",
-        "@vitejs/plugin-react": "^6.0.1",
-        "eslint": "^9.39.2",
-        "jsdom": "^29.0.2",
-        "typescript": "^5.9.3",
-        "vitest": "^4.1.4",
-      },
-    },
     "apps/mvp_web": {
       "name": "@renewable-energy/mvp-web",
       "version": "0.0.1",
@@ -879,8 +848,6 @@
     "@renewable-energy/eslint-config": ["@renewable-energy/eslint-config@workspace:packages/eslint-config"],
 
     "@renewable-energy/mvp-api": ["@renewable-energy/mvp-api@workspace:apps/mvp_api"],
-
-    "@renewable-energy/mvp-dashboard": ["@renewable-energy/mvp-dashboard@workspace:apps/mvp_dashboard"],
 
     "@renewable-energy/mvp-db": ["@renewable-energy/mvp-db@workspace:packages/mvp_db"],
 
