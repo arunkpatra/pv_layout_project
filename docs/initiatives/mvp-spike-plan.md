@@ -49,6 +49,7 @@ A spike is complete only when **all** of the following are true:
 | 2 | MVP DB + MVP API scaffold + download registration | New `packages/mvp_db`, `apps/mvp_api`, docker-compose, download-register endpoint | complete | 2026-04-22 |
 | 3 | Contact form API | ContactSubmission model, endpoint, wire Contact form | complete | 2026-04-22 |
 | 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | complete | 2026-04-22 |
+| 4.1 | Merge dashboard into mvp_web | Consolidate mvp_dashboard into mvp_web — single app, single domain | complete | 2026-04-22 |
 | 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | planned | — |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | planned | — |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
@@ -62,21 +63,19 @@ A spike is complete only when **all** of the following are true:
 ## Architecture
 
 ```
-apps/mvp_web/         → Next.js 16 App Router — public marketing site (solarlayout.in)
+apps/mvp_web/         → Next.js 16 App Router — marketing site + dashboard (solarlayout.in)
 apps/mvp_api/         → Hono API on Bun — MVP backend (api.solarlayout.in)
-apps/mvp_dashboard/   → Next.js 16 App Router — user dashboard (dashboard.solarlayout.in)
 packages/ui/          → Shared shadcn/ui components (reused with solar palette overrides)
 packages/mvp_db/      → Prisma schema + client for MVP domain (separate DB from cloud platform)
 packages/db/          → Prisma schema + client for cloud platform (unchanged, not used by MVP)
 ```
 
 **Key boundaries:**
-- `apps/mvp_web` — public, NO auth, NO Clerk. Calls `apps/mvp_api` for download registration + contact
+- `apps/mvp_web` — marketing pages (public, no auth) + dashboard at `/dashboard` (Clerk-authenticated). Clerk middleware protects `/dashboard(.*)` routes. Header shows Sign In / Dashboard buttons using `<SignedIn>` / `<SignedOut>`
 - `apps/mvp_api` — standalone Hono server (same tech stack as `apps/api`). Two auth modes:
   - Unauthenticated: download-register, contact form
   - API key auth: entitlement validation, usage reporting (called by desktop Python apps)
-  - Clerk auth: dashboard API routes (`GET /dashboard/download/:product`)
-- `apps/mvp_dashboard` — Clerk-authenticated, where users view license keys and entitlements
+  - Clerk auth: dashboard API routes (`GET /dashboard/download/:product`) — called from `apps/mvp_web/dashboard`
 - `packages/mvp_db` — separate Prisma schema and Postgres DB from `packages/db`. Independent migrations, no coupling between MVP and cloud platform
 - Desktop Python apps store license key (API key) via `keyring` (OS-native credential store)
 - `apps/mvp_api` is separate from `apps/api` — different auth models, different domain concerns
@@ -194,7 +193,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - Buy Now buttons remain disabled (no tooltip); will be wired in Spike 5 after Stripe integration
 
 **Part B — Dashboard app (mvp_dashboard):**
-- New Next.js 16 app: `apps/mvp_dashboard` — deployed to `dashboard.solarlayout.in`
+- New Next.js 16 app: `apps/mvp_dashboard` — ~~deployed to `dashboard.solarlayout.in`~~ (superseded by Spike 4.1: merged into `apps/mvp_web` at `solarlayout.in/dashboard`)
   - Clerk authentication (signup/signin) using standard `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY`
   - Solar brand palette with dark/light theme support (same CSS vars as `apps/mvp_web`)
   - Reuses `packages/ui` shadcn components
@@ -216,7 +215,30 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - [x] Gates pass (lint + typecheck + test + build from root)
 - [ ] Human verifies locally: no Phase 2 refs on `localhost:3002`; dashboard sign-up/sign-in works at `localhost:3004`; download buttons trigger file download; sidebar nav works
 - [ ] CI/CD passes
-- [ ] Production: `solarlayout.in` clean; `dashboard.solarlayout.in` live with working download
+- [ ] Production: `solarlayout.in` clean; dashboard at `solarlayout.in/dashboard` live with working download (superseded by Spike 4.1 — dashboard merged into mvp_web)
+
+---
+
+## Spike 4.1: Merge Dashboard into mvp_web
+
+**Status:** complete (2026-04-22)
+**Design Spec:** [docs/superpowers/specs/2026-04-22-spike4.1-merge-dashboard-into-mvp-web-design.md](../superpowers/specs/2026-04-22-spike4.1-merge-dashboard-into-mvp-web-design.md)
+**Implementation Plan:** [docs/superpowers/plans/2026-04-22-spike4.1-merge-dashboard-into-mvp-web.md](../superpowers/plans/2026-04-22-spike4.1-merge-dashboard-into-mvp-web.md)
+
+**Scope:**
+- Merged `apps/mvp_dashboard` into `apps/mvp_web` — single Next.js app, single domain (`solarlayout.in`)
+- Marketing pages in `(marketing)` route group, dashboard in `(main)` route group
+- Clerk middleware protects `/dashboard(.*)` routes
+- Header shows Sign In / Dashboard auth buttons using `<SignedIn>` / `<SignedOut>`
+- Dark mode palette + sidebar CSS variables added to `globals.css`
+- `apps/mvp_dashboard` deleted, turbo.json cleaned up
+
+**Acceptance Criteria:**
+- [x] Gates pass (lint + typecheck + test + build from root)
+- [ ] Human verifies locally: marketing pages at localhost:3002, dashboard at localhost:3002/dashboard
+- [ ] CI/CD passes
+- [ ] Production: solarlayout.in serves both marketing and dashboard
+- [ ] Human sign-off
 
 ---
 
@@ -351,7 +373,7 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 | D8 | 2026-04-21 | Legal templates generated by developer, lawyer-reviewed before launch | Faster delivery; legal review happens in parallel |
 | D9 | 2026-04-21 | SSG for all pages in Spike 1 | Best Core Web Vitals and SEO; no dynamic data needed yet |
 | D10 | 2026-04-22 | New standalone `apps/mvp_api` instead of adding routes to `apps/api` | Different auth models (unauthenticated + API key + Clerk), different domain (license/entitlement vs layout engine), independent deployment at api.solarlayout.in |
-| D11 | 2026-04-22 | `apps/mvp_dashboard` as separate Clerk-authenticated app | Users manage license keys and view entitlements at dashboard.solarlayout.in |
+| D11 | 2026-04-22 | ~~`apps/mvp_dashboard` as separate Clerk-authenticated app~~ → superseded by D23 | ~~Users manage license keys and view entitlements at dashboard.solarlayout.in~~ → dashboard merged into `apps/mvp_web` at `solarlayout.in/dashboard` (see D23) |
 | D12 | 2026-04-22 | Python `keyring` library for license key storage in desktop apps | Uses OS-native credential stores (Windows Credential Locker, macOS Keychain, Linux Secret Service) — secure, cross-platform, no custom encryption |
 | D13 | 2026-04-22 | License key = API key with `sl_live_` prefix | Simple bearer token auth for desktop apps; tied to user identity via dashboard |
 | D14 | 2026-04-22 | New `packages/mvp_db` with separate Postgres DB | MVP and cloud platform have fundamentally different data models (license/entitlement vs project/version/job); shared schema would couple unrelated migrations and risk cross-domain breakage |
@@ -363,3 +385,4 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 | D20 | 2026-04-22 | Dashboard home page: direct presigned S3 download (no registration form) | Users are already authenticated via Clerk — we know who they are. Skip the email capture form used for unauthenticated downloads. MVP API's `GET /dashboard/download/:product` returns a 60s presigned URL directly. |
 | D21 | 2026-04-22 | `packages/mvp_api-client` deferred to Spike 5 | Single inline `fetch` call in DownloadCard is sufficient for now; client package adds complexity without enough call-sites to justify it yet. |
 | D22 | 2026-04-22 | Use standard Clerk env vars (`CLERK_SECRET_KEY`) in `apps/mvp_api` | Clerk's SDK expects standard env var names; custom var names (`MVP_CLERK_SECRET_KEY`) require explicit passing and are error-prone. Both MVP and cloud platform use the same Clerk org with separate apps, so per-Vercel-project env isolation handles any conflict. |
+| D23 | 2026-04-22 | Merge dashboard into mvp_web (single-app pattern) | Separate dashboard app created unnecessary deployment + domain overhead. Cloud product `apps/web` proves marketing + auth pages coexist cleanly in one Next.js app. |
