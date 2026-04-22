@@ -6,6 +6,7 @@ import { err } from "../lib/response.js"
 export type MvpHonoEnv = {
   Variables: {
     user: { id: string; clerkId: string; email: string; name: string | null; stripeCustomerId: string | null }
+    licenseKey?: { id: string; key: string; userId: string; createdAt: Date; revokedAt: Date | null }
   }
 }
 
