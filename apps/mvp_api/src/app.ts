@@ -13,6 +13,7 @@ import { productsRoutes } from "./modules/products/products.routes.js"
 import { billingRoutes } from "./modules/billing/billing.routes.js"
 import { stripeWebhookRoutes } from "./modules/webhooks/stripe.webhook.routes.js"
 import { entitlementsRoutes } from "./modules/entitlements/entitlements.routes.js"
+import { usageRoutes } from "./modules/usage/usage.routes.js"
 
 export const app = new Hono<MvpHonoEnv>()
 
@@ -43,6 +44,7 @@ app.route("/", productsRoutes)
 app.route("/", billingRoutes)
 app.route("/", stripeWebhookRoutes)
 app.route("/", entitlementsRoutes)
+app.route("/", usageRoutes)
 
 app.get("/", async (c) => {
   const status = {
