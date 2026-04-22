@@ -8,4 +8,10 @@
 export const ID_PREFIXES: Record<string, string> = {
   DownloadRegistration: "drg",
   ContactSubmission: "csb",
+  User: "usr",
+  LicenseKey: "lk",
+  Product: "prod",
+  ProductFeature: "pf",
+  Entitlement: "ent",
+  CheckoutSession: "cs",
 }

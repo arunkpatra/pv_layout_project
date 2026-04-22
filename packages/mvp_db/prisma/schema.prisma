@@ -32,13 +32,15 @@ model ContactSubmission {
 }
 
 model User {
-  id           String        @id @default("")
-  clerkId      String        @unique
-  email        String        @unique
-  name         String?
-  createdAt    DateTime      @default(now())
-  licenseKeys  LicenseKey[]
-  entitlements Entitlement[]
+  id               String            @id @default("")
+  clerkId          String            @unique
+  email            String            @unique
+  name             String?
+  stripeCustomerId String?           @unique
+  createdAt        DateTime          @default(now())
+  licenseKeys      LicenseKey[]
+  entitlements     Entitlement[]
+  checkoutSessions CheckoutSession[]
 
   @@map("users")
 }
@@ -48,21 +50,64 @@ model LicenseKey {
   key       String    @unique
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  product   String
   createdAt DateTime  @default(now())
   revokedAt DateTime?
 
   @@map("license_keys")
 }
 
+model Product {
+  id            String           @id @default("")
+  slug          String           @unique
+  name          String
+  description   String
+  priceAmount   Int
+  priceCurrency String           @default("usd")
+  calculations  Int
+  stripePriceId String           @unique
+  displayOrder  Int              @default(0)
+  active        Boolean          @default(true)
+  features      ProductFeature[]
+  entitlements  Entitlement[]
+  createdAt     DateTime         @default(now())
+
+  @@map("products")
+}
+
+model ProductFeature {
+  id         String  @id @default("")
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  featureKey String
+  label      String
+
+  @@unique([productId, featureKey])
+  @@map("product_features")
+}
+
 model Entitlement {
   id                String   @id @default("")
   userId            String
   user              User     @relation(fields: [userId], references: [id])
-  product           String
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id])
   totalCalculations Int
   usedCalculations  Int      @default(0)
   purchasedAt       DateTime @default(now())
 
   @@map("entitlements")
+}
+
+model CheckoutSession {
+  id                       String    @id @default("")
+  userId                   String
+  user                     User      @relation(fields: [userId], references: [id])
+  productSlug              String
+  stripeCheckoutSessionId  String    @unique
+  stripeCheckoutSessionUrl String
+  status                   String?
+  processedAt              DateTime?
+  createdAt                DateTime  @default(now())
+
+  @@map("checkout_sessions")
 }
