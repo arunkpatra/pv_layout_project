@@ -242,7 +242,14 @@ function PlanPageInner() {
             {entitlements.map((ent, i) => (
               <Card key={i}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{ent.productName}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base">{ent.productName}</CardTitle>
+                    {ent.product === "pv-layout-free" && (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                        Free
+                      </span>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-foreground">
@@ -286,7 +293,7 @@ function PlanPageInner() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Use this key in your SolarLayout desktop application.
+            Enter this key in your SolarLayout desktop application to activate your plan.
           </p>
         </div>
       )}
