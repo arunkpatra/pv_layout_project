@@ -51,6 +51,7 @@ A spike is complete only when **all** of the following are true:
 | 4 | Cleanup + Dashboard app | Remove Phase 2 refs/banners from mvp_web; scaffold `apps/mvp_dashboard` with Clerk, sidebar nav, solar palette dark/light | complete | 2026-04-22 |
 | 4.1 | Merge dashboard into mvp_web | Consolidate mvp_dashboard into mvp_web — single app, single domain | complete | 2026-04-22 |
 | 5 | Stripe integration | Purchase flow, entitlement provisioning on payment success | complete | 2026-04-22 |
+| 5.1 | Clerk sign-in preserve original URL | After sign-in, redirect to the page user was trying to reach instead of always /dashboard | planned | — |
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | planned | — |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
@@ -265,6 +266,22 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 - [ ] CI/CD passes
 - [ ] Production: Stripe live products created, purchase works at solarlayout.in
 - [ ] Human sign-off
+
+---
+
+## Spike 5.1: Clerk Sign-In Preserve Original URL
+
+**Status:** planned
+
+**Scope:**
+- After sign-in, Clerk should redirect to the page the user was originally trying to reach (e.g. `/dashboard/plan?product=pv-layout-pro`) instead of always redirecting to `/dashboard`
+- Affects: `apps/mvp_web/proxy.ts`, sign-in/sign-up page `forceRedirectUrl`, and Clerk env vars
+- Small scope — configuration fix, no new features
+
+**Acceptance Criteria:**
+- [ ] Gates pass
+- [ ] User visits `/dashboard/plan?product=pv-layout-pro` while signed out → Clerk sign-in → redirected back to `/dashboard/plan?product=pv-layout-pro`
+- [ ] Normal sign-in (no original URL) → redirected to `/dashboard`
 
 ---
 
