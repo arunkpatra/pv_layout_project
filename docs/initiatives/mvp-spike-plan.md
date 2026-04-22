@@ -55,6 +55,8 @@ A spike is complete only when **all** of the following are true:
 | 6 | Entitlement API + license key generation | API key auth middleware, license key CRUD, entitlement check, usage reporting endpoints | complete | 2026-04-22 |
 | 7 | Python app integration | Integrate auth/license key into PVlayout_Advance, write PRD + Claude Code prompt for Prasanta | complete | 2026-04-22 |
 | 7.1 | Free tier quota enforcement | `_can_generate()` checks free-tier quota from server; anonymous usage reporting; blocks after free quota exhausted | planned | — |
+| 7.2 | Python GUI — account & license info modal | Toolbar button (user icon) opens modal: name, email, all plans, entitled features, remaining calculations, Change Key | planned | — |
+| 7.3 | mvp_web usability improvements | UI/UX polish on the web dashboard — scope TBD at brainstorm time | planned | — |
 | 8 | SEO | Meta tags, Open Graph, JSON-LD, sitemap.xml, robots.txt | post-launch | — |
 | 9 | GA4 + consent mode v2 | Google Analytics 4, consent gating, event tracking | post-launch | — |
 | 10 | Legal pages full review | Full DPDP Act / IT Act legal review | post-launch | — |
@@ -368,6 +370,67 @@ packages/db/          → Prisma schema + client for cloud platform (unchanged, 
 
 ---
 
+## Spike 7.2: Python GUI — Account & License Info Modal
+
+**Status:** planned
+
+**Scope:**
+
+**Python app (`PVlayout_Advance`):**
+- New toolbar button at the right end of the existing main toolbar (the bar containing Home, left arrow, right arrow). Button uses a user/person icon. Only shown when a license key is stored; hidden otherwise.
+- Clicking opens `LicenseInfoDialog` — a new read-only modal dialog showing:
+  - Name and email (from API)
+  - All plans the user has purchased (e.g. Basic, Pro, Pro+)
+  - Features entitled per plan (e.g. Plant Layout, Cable Routing)
+  - Remaining calculations
+  - "Change Key" button — opens the existing `LicenseKeyDialog`; replaces stored key only after new key confirmed valid by API (same validate-then-persist flow as Spike 7)
+- `LicenseInfoDialog` is populated from the last fetched entitlements data (no extra network call on open); data refreshed in background via `EntitlementsWorker` on each startup
+- New file: `gui/license_info_dialog.py`
+
+**API (`apps/mvp_api`):**
+- Extend `GET /entitlements` response to include user profile and plan details:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "user": { "name": "Ravi Kumar", "email": "ravi@example.com" },
+      "plans": [
+        {
+          "planName": "Pro",
+          "features": ["plant_layout", "cable_routing"],
+          "totalCalculations": 10,
+          "usedCalculations": 3,
+          "remainingCalculations": 7
+        }
+      ]
+    }
+  }
+  ```
+- `license_client.py` and `EntitlementsWorker` consume the new response shape; `_entitlements` dict in `main_window.py` stores it for the dialog to read
+- Existing `remainingCalculations` field on the top level retained for backwards compatibility (status bar still works)
+- PRD (`docs/PRD-license-key-integration.md`) and Claude Code prompt (`docs/CLAUDE_CODE_PROMPT.md`) updated for Prasanta
+
+**Acceptance Criteria:**
+- [ ] Gates pass (`flake8` + `pytest`) in PVlayout_Advance
+- [ ] Toolbar button appears when key is stored; hidden when no key
+- [ ] Dialog opens and shows correct name, email, plan(s), features, remaining count
+- [ ] "Change Key" opens `LicenseKeyDialog`; successful validation replaces key; dialog refreshes
+- [ ] "Change Key" with invalid key: banner shows error, old key remains active
+- [ ] API `GET /entitlements` returns user + plan fields; existing status bar still updates correctly
+- [ ] PRD and Claude Code prompt updated and committed
+
+---
+
+## Spike 7.3: mvp_web Usability Improvements
+
+**Status:** planned
+
+**Scope:** To be defined during Spike 7.3 brainstorming session.
+
+Likely scope: UI/UX polish on the web dashboard — layout, copy, information hierarchy, mobile responsiveness gaps, and any friction points identified during real usage.
+
+---
+
 ## Spike 8: SEO (post-launch)
 
 **Status:** post-launch
@@ -446,3 +509,6 @@ Likely scope: usage records table, user list, entitlement overview per user, lic
 | D25 | 2026-04-22 | Always Stripe Checkout, even for top-ups | Indian RBI mandates 2FA/OTP for most card transactions. Stripe Checkout handles 3DS automatically. Embedded Payment Element is a future enhancement. |
 | D26 | 2026-04-22 | Products and features in seeded DB tables, not hardcoded | Stripe price IDs differ per environment. Feature table enables Python desktop app to query capabilities via API. |
 | D27 | 2026-04-22 | Manual redirect_url param in middleware instead of auth.protect() unauthenticatedUrl | auth.protect() does not append redirect_url automatically; explicit param in proxy.ts + fallbackRedirectUrl on SignIn/SignUp components is the correct pattern. |
+| D28 | 2026-04-22 | Spike 7.2 account info sourced from extended GET /entitlements (not a new endpoint) | Modal is populated from data already fetched at startup; no extra network call on dialog open. Simpler worker model — one worker, one signal, one dict. |
+| D29 | 2026-04-22 | Spike 7.2 toolbar button hidden when no key stored | No point opening an account info dialog when there is no account linked. Keeps UI uncluttered for first-run users who haven't entered a key. |
+| D30 | 2026-04-22 | Spike 7.2 Change Key reuses existing LicenseKeyDialog + validate-then-persist flow | Consistency with Spike 7 — same UX, same safety guarantee. New key only replaces stored key after API confirms it valid. |
