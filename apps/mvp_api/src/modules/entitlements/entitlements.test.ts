@@ -2,6 +2,8 @@ import { describe, expect, it, mock, beforeEach } from "bun:test"
 import { Hono } from "hono"
 import { errorHandler, type MvpHonoEnv } from "../../middleware/error-handler.js"
 
+// The real licenseKeyAuth middleware runs in these tests — no module mock.
+// All DB calls are intercepted here so no real database is used.
 const mockUser = {
   id: "usr_test1",
   clerkId: "clerk_abc",
@@ -10,23 +12,13 @@ const mockUser = {
   stripeCustomerId: null,
 }
 
-const mockLicenseKey = {
+const mockLicenseKeyFindFirst = mock(async () => ({
   id: "lk_test1",
   key: "sl_live_testkey",
   userId: "usr_test1",
   createdAt: new Date(),
   revokedAt: null,
-}
-
-mock.module("../../middleware/license-key-auth.js", () => ({
-  licenseKeyAuth: async (
-    c: { set: (k: string, v: unknown) => void },
-    next: () => Promise<void>,
-  ) => {
-    c.set("user", mockUser)
-    c.set("licenseKey", mockLicenseKey)
-    return next()
-  },
+  user: mockUser,
 }))
 
 const mockEntitlementFindMany = mock(async () => [
@@ -55,17 +47,6 @@ const mockUsageRecordFindMany = mock(async () => [
     product: { name: "PV Layout Pro" },
   },
 ])
-
-// licenseKeyAuth runs via the real middleware path even with the module mock,
-// so db.licenseKey.findFirst must be stubbed to avoid runtime errors.
-const mockLicenseKeyFindFirst = mock(async () => ({
-  id: "lk_test1",
-  key: "sl_live_testkey",
-  userId: "usr_test1",
-  createdAt: new Date(),
-  revokedAt: null,
-  user: mockUser,
-}))
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -296,21 +277,23 @@ describe("GET /entitlements", () => {
   })
 
   it("serialises null name correctly", async () => {
-    // Temporarily set name to null on the shared mock object; the licenseKeyAuth
-    // module mock closes over mockUser by reference, so this propagates.
-    const savedName = mockUser.name
-    mockUser.name = null
-
-    try {
-      const app = makeApp()
-      const res = await app.request("/entitlements", {
-        headers: { Authorization: "Bearer sl_live_testkey" },
-      })
-      const body = (await res.json()) as { data: { user: { name: null } } }
-      expect(body.data.user.name).toBeNull()
-    } finally {
-      mockUser.name = savedName
-    }
+    // Override the DB mock for this test to return a user with null name.
+    // Using mockImplementationOnce is more reliable than mutating the shared
+    // mockUser object, which can be fragile across Bun test environments.
+    mockLicenseKeyFindFirst.mockImplementationOnce(async () => ({
+      id: "lk_test1",
+      key: "sl_live_testkey",
+      userId: "usr_test1",
+      createdAt: new Date(),
+      revokedAt: null,
+      user: { ...mockUser, name: null },
+    }))
+    const app = makeApp()
+    const res = await app.request("/entitlements", {
+      headers: { Authorization: "Bearer sl_live_testkey" },
+    })
+    const body = (await res.json()) as { data: { user: { name: string | null } } }
+    expect(body.data.user.name).toBeNull()
   })
 })
 
