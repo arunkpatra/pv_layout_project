@@ -18,13 +18,13 @@ stripeWebhookRoutes.post("/webhooks/stripe", async (c) => {
 
   let event
   try {
-    event = stripe.webhooks.constructEvent(
+    event = await stripe.webhooks.constructEventAsync(
       rawBody,
       sig,
       env.STRIPE_WEBHOOK_SECRET ?? "",
     )
   } catch (err) {
-    console.error("Stripe webhook signature verification failed:", err)
+    console.error("Stripe webhook signature verification failed:", String(err))
     return c.json({ error: "Invalid signature" }, 400)
   }
 

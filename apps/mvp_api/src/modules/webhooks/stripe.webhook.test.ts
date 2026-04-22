@@ -23,7 +23,7 @@ const mockConstructEvent = mock(
 )
 mock.module("../../lib/stripe.js", () => ({
   getStripeClient: () => ({
-    webhooks: { constructEvent: mockConstructEvent },
+    webhooks: { constructEventAsync: mockConstructEvent },
   }),
 }))
 
