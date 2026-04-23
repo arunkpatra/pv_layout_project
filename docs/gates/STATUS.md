@@ -4,17 +4,17 @@
 
 ## Current state
 
-**Active spike:** S1 — Vendor Python core from PVlayout_Advance
+**Active spike:** S2 — FastAPI sidecar: health, schemas, auth
 **Status:** awaiting human gate verification
-**Gate memo:** [`s01.md`](./s01.md)
+**Gate memo:** [`s02.md`](./s02.md)
 
 ## Progress
 
 | Spike | Title | Status | Gate memo |
 |---|---|---|---|
 | S0    | Repo & tooling bootstrap                       | 🟢 passed | [s00.md](./s00.md) |
-| S1    | Vendor Python core from PVlayout_Advance       | 🟡 awaiting gate | [s01.md](./s01.md) |
-| S2    | FastAPI sidecar — health, schemas, auth        | ⚪ pending | — |
+| S1    | Vendor Python core from PVlayout_Advance       | 🟢 passed | [s01.md](./s01.md) |
+| S2    | FastAPI sidecar — health, schemas, auth        | 🟡 awaiting gate | [s02.md](./s02.md) |
 | S3    | Sidecar: parse + layout + golden-file tests    | ⚪ pending | — |
 | S4    | Sidecar: PyInstaller single-binary build       | ⚪ pending | — |
 | S5    | Tauri 2 shell + sidecar lifecycle              | ⚪ pending | — |
