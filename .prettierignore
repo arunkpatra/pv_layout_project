@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.turbo
+.next
+target
+.venv
+__pycache__
+*.lock
+bun.lockb
+reference_screenshots_for_UX_dsktop

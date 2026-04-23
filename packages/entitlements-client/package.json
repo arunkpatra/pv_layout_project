@@ -1,0 +1,13 @@
+{
+  "name": "@solarlayout/entitlements-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hand-written TypeScript client for api.solarlayout.in — GET /entitlements, POST /usage/report (stub, filled in S7)",
+  "scripts": {
+    "build": "echo \"[S0 stub] @solarlayout/entitlements-client build\"",
+    "lint": "echo \"[S0 stub] @solarlayout/entitlements-client lint\"",
+    "typecheck": "echo \"[S0 stub] @solarlayout/entitlements-client typecheck\"",
+    "test": "echo \"[S0 stub] @solarlayout/entitlements-client test\""
+  }
+}

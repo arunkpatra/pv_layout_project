@@ -1,0 +1,13 @@
+{
+  "name": "@solarlayout/sidecar-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed TypeScript client generated from the Python sidecar's FastAPI OpenAPI schema (stub, filled in S3/S5)",
+  "scripts": {
+    "build": "echo \"[S0 stub] @solarlayout/sidecar-client build\"",
+    "lint": "echo \"[S0 stub] @solarlayout/sidecar-client lint\"",
+    "typecheck": "echo \"[S0 stub] @solarlayout/sidecar-client typecheck\"",
+    "test": "echo \"[S0 stub] @solarlayout/sidecar-client test\""
+  }
+}

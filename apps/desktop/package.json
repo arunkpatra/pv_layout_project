@@ -1,0 +1,14 @@
+{
+  "name": "@solarlayout/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SolarLayout desktop app — Tauri 2 shell + React 19 frontend (stub, filled in S5/S6)",
+  "scripts": {
+    "build": "echo \"[S0 stub] @solarlayout/desktop build (Tauri build lands in S5)\"",
+    "lint": "echo \"[S0 stub] @solarlayout/desktop lint\"",
+    "typecheck": "echo \"[S0 stub] @solarlayout/desktop typecheck\"",
+    "test": "echo \"[S0 stub] @solarlayout/desktop test\"",
+    "dev": "echo \"[S0 stub] @solarlayout/desktop dev (Tauri dev lands in S5)\""
+  }
+}

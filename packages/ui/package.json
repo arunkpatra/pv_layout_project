@@ -1,0 +1,13 @@
+{
+  "name": "@solarlayout/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared UI component library — shadcn primitives + SolarLayout design system (stub, filled in S6)",
+  "scripts": {
+    "build": "echo \"[S0 stub] @solarlayout/ui build\"",
+    "lint": "echo \"[S0 stub] @solarlayout/ui lint\"",
+    "typecheck": "echo \"[S0 stub] @solarlayout/ui typecheck\"",
+    "test": "echo \"[S0 stub] @solarlayout/ui test\""
+  }
+}
