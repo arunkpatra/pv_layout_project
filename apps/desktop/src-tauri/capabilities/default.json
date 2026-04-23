@@ -20,6 +20,17 @@
         { "url": "http://localhost:*/*" },
         { "url": "https://api.solarlayout.in/*" }
       ]
+    },
+    "dialog:default",
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$RESOURCE/**" }
+      ]
     }
   ]
 }

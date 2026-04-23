@@ -114,13 +114,20 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 /// Attach the menu event handler. Forwards all custom item IDs to the
-/// frontend as `menu:<id>` events; the React shell listens and dispatches.
+/// frontend as `menu:<category>/<name>` events; the React shell listens
+/// and dispatches.
+///
+/// NOTE: Tauri 2's event-name validator bans `.` (only alphanumerics,
+/// `-`, `/`, `:`, `_` are allowed). The menu item IDs themselves use
+/// dotted namespaces (`file.open_kmz`) for readability; we translate
+/// to `/` at the emit boundary so the event name passes validation.
 pub fn wire_events<R: Runtime>(app: &AppHandle<R>) {
     let handle = app.clone();
     app.on_menu_event(move |_window, event| {
         let id = event.id().0.as_str().to_string();
         if id.starts_with("file.") || id.starts_with("view.") || id.starts_with("help.") {
-            let _ = handle.emit(&format!("menu:{id}"), ());
+            let name = format!("menu:{}", id.replace('.', "/"));
+            let _ = handle.emit(&name, ());
         }
     });
 }

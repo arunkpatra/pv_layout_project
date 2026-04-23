@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S8 — KMZ load + MapLibre canvas (not started)
-**Status:** pending
-**Previous gate:** S7 passed 2026-04-24 — [`s07.md`](./s07.md)
+**Active spike:** S9 — Input panel + Generate Layout
+**Status:** ⚪ pending start
+**Previous gate:** S8 passed 2026-04-24 — [`s08.md`](./s08.md)
 
 ## Progress
 
@@ -21,7 +21,7 @@
 | S5.5  | Design Foundations (tokens + light mocks)      | 🟢 passed | [s05_5.md](./s05_5.md) |
 | S6    | Design system implementation (light polished)  | 🟢 passed | [s06.md](./s06.md) |
 | S7    | License key + entitlements + feature gating    | 🟢 passed | [s07.md](./s07.md) |
-| S8    | KMZ load + MapLibre canvas                     | ⚪ pending | — |
+| S8    | KMZ load + MapLibre canvas                     | 🟢 passed | [s08.md](./s08.md) |
 | S9    | Input panel + Generate Layout                  | ⚪ pending | — |
 | S10   | Inverters, cables, LAs                         | ⚪ pending | — |
 | S11   | ICR drag + obstruction drawing                 | ⚪ pending | — |

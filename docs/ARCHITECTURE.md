@@ -316,10 +316,12 @@ Resolved:
 Resolved in S7:
 - **Offline entitlement behaviour** — no grace window. Online required on every launch for entitlement verification. See [ADR 0001](./adr/0001-online-required-entitlements.md).
 
+Resolved in S8:
+- **MapLibre basemap strategy** — no basemap. Canvas-first surface with our KMZ overlay on top. See [ADR 0002](./adr/0002-no-basemap.md).
+
 Deferred to relevant spikes:
 - **Telemetry granularity** (which events fire `/usage/report`, opt-in vs. opt-out) — decided in S12.
 - **Crash reporting** (Sentry for both Rust shell and Python sidecar? free tier?) — decided in S14.
-- **MapLibre basemap strategy** (online free tiles vs. offline vector pack bundled with the app) — decided in S8.
 - **Subscription model redesign** (Free / Basic / Pro / Pro+, single active subscription, upgrade/downgrade) — deliberated in S13.7.
 
 ---

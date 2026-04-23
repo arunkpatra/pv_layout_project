@@ -1,0 +1,87 @@
+{
+  "version": 8,
+  "name": "SolarLayout Light",
+  "metadata": {
+    "solarlayout:theme": "light",
+    "solarlayout:purpose": "Overlay-only style. No basemap tiles (see ADR 0002). Colours mirror the canvas-vis tokens in packages/ui/src/tokens.css (:root)."
+  },
+  "sources": {
+    "kmz-boundaries": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-obstacles": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-line-obstructions": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    }
+  },
+  "layers": [
+    {
+      "id": "canvas-background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f7f6f3"
+      }
+    },
+    {
+      "id": "boundary-fill",
+      "type": "fill",
+      "source": "kmz-boundaries",
+      "paint": {
+        "fill-color": "rgba(26, 26, 25, 0.02)"
+      }
+    },
+    {
+      "id": "boundary-outline",
+      "type": "line",
+      "source": "kmz-boundaries",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(26, 26, 25, 0.55)",
+        "line-width": 1.5
+      }
+    },
+    {
+      "id": "obstacle-fill",
+      "type": "fill",
+      "source": "kmz-obstacles",
+      "paint": {
+        "fill-color": "rgba(26, 26, 25, 0.12)"
+      }
+    },
+    {
+      "id": "obstacle-outline",
+      "type": "line",
+      "source": "kmz-obstacles",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(26, 26, 25, 0.32)",
+        "line-width": 1
+      }
+    },
+    {
+      "id": "line-obstruction",
+      "type": "line",
+      "source": "kmz-line-obstructions",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(180, 44, 44, 0.45)",
+        "line-width": 2,
+        "line-dasharray": [2, 1.5]
+      }
+    }
+  ]
+}

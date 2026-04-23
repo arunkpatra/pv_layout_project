@@ -1,0 +1,87 @@
+{
+  "version": 8,
+  "name": "SolarLayout Dark (preview)",
+  "metadata": {
+    "solarlayout:theme": "dark",
+    "solarlayout:purpose": "Overlay-only style. No basemap tiles (see ADR 0002). Draft colours from packages/ui/src/tokens.css ([data-theme=\"dark\"]); polish deferred to S13.5."
+  },
+  "sources": {
+    "kmz-boundaries": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-obstacles": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-line-obstructions": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    }
+  },
+  "layers": [
+    {
+      "id": "canvas-background",
+      "type": "background",
+      "paint": {
+        "background-color": "#17171a"
+      }
+    },
+    {
+      "id": "boundary-fill",
+      "type": "fill",
+      "source": "kmz-boundaries",
+      "paint": {
+        "fill-color": "rgba(236, 236, 234, 0.02)"
+      }
+    },
+    {
+      "id": "boundary-outline",
+      "type": "line",
+      "source": "kmz-boundaries",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(236, 236, 234, 0.55)",
+        "line-width": 1.5
+      }
+    },
+    {
+      "id": "obstacle-fill",
+      "type": "fill",
+      "source": "kmz-obstacles",
+      "paint": {
+        "fill-color": "rgba(236, 236, 234, 0.10)"
+      }
+    },
+    {
+      "id": "obstacle-outline",
+      "type": "line",
+      "source": "kmz-obstacles",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(236, 236, 234, 0.32)",
+        "line-width": 1
+      }
+    },
+    {
+      "id": "line-obstruction",
+      "type": "line",
+      "source": "kmz-line-obstructions",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(255, 120, 120, 0.55)",
+        "line-width": 2,
+        "line-dasharray": [2, 1.5]
+      }
+    }
+  ]
+}

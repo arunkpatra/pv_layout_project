@@ -1,32 +1,57 @@
 /**
  * SolarLayout sidecar client.
  *
- * Minimal S5 surface: just what the shell needs to confirm the sidecar is
- * alive after startup. Route-specific methods (/parse-kmz, /layout,
- * /refresh-inverters) arrive when the React app starts using them (S8+).
- *
  * All requests:
  *   * target http://<host>:<port>
  *   * carry an `Authorization: Bearer <token>` header
  *   * throw SidecarError on any non-2xx response
+ *
+ * Types mirror the pydantic schemas in
+ * `python/pvlayout_engine/pvlayout_engine/schemas.py`. Any drift here
+ * surfaces as a TS error at the call site (no runtime Zod validation —
+ * the sidecar is trusted, loopback-only, token-gated).
  */
+
+// ─────────────────────────────────────────────────────────────────────
+// Types — mirror pvlayout_engine.schemas
+// ─────────────────────────────────────────────────────────────────────
+
+export type Wgs84Point = [number, number] // (lon, lat)
+
+export interface ParsedBoundary {
+  name: string
+  coords: Wgs84Point[]
+  obstacles: Wgs84Point[][]
+  line_obstructions: Wgs84Point[][]
+}
+
+export interface ParsedKMZ {
+  boundaries: ParsedBoundary[]
+  centroid_lat: number
+  centroid_lon: number
+}
+
+export interface HealthResponse {
+  status: string
+  version: string
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Client
+// ─────────────────────────────────────────────────────────────────────
 
 export interface SidecarClientOptions {
   host: string
   port: number
   token: string
-  /** Override fetch implementation for tests. */
+  /** Override fetch implementation for tests / Tauri plugin-http. */
   fetchImpl?: typeof fetch
 }
 
 export interface SidecarClient {
   readonly baseUrl: string
   health(): Promise<HealthResponse>
-}
-
-export interface HealthResponse {
-  status: string
-  version: string
+  parseKmz(file: Blob | File, filename?: string): Promise<ParsedKMZ>
 }
 
 export class SidecarError extends Error {
@@ -55,21 +80,49 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
       try {
         body = await response.json()
       } catch {
-        // swallow — body may be empty
+        // body may be empty — swallow
       }
-      throw new SidecarError(
-        response.status,
-        `Sidecar ${path} returned ${response.status}`,
-        body
-      )
+      const message = extractError(body) ?? `Sidecar ${path} returned ${response.status}`
+      throw new SidecarError(response.status, message, body)
     }
     return (await response.json()) as T
   }
 
   return {
     baseUrl,
+
     health(): Promise<HealthResponse> {
       return request<HealthResponse>("/health")
     },
+
+    async parseKmz(file: Blob | File, filename?: string): Promise<ParsedKMZ> {
+      const fd = new FormData()
+      // FastAPI's `UploadFile` binds to the `file` multipart field name.
+      // A filename is required so the server can check the .kmz/.kml
+      // extension — fall back to a generic name if the caller omitted it.
+      const resolvedName =
+        filename ?? (file instanceof File ? file.name : "upload.kmz")
+      fd.append("file", file, resolvedName)
+      return request<ParsedKMZ>("/parse-kmz", {
+        method: "POST",
+        body: fd,
+      })
+    },
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Pull a human-readable error message out of FastAPI's default error
+ * body (`{ "detail": "..." }`) or our custom shape (`{ error, detail? }`).
+ */
+function extractError(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null
+  const b = body as Record<string, unknown>
+  if (typeof b.detail === "string") return b.detail
+  if (typeof b.error === "string") return b.error
+  return null
 }

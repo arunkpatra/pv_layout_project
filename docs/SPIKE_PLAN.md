@@ -333,7 +333,7 @@ S15   Release pipeline + download delivery          [release]
 - Tauri command: `open_kmz()` → native file dialog, returns path.
 - React file-open flow: read file bytes → `POST /parse-kmz` → GeoJSON response.
 - `MapCanvas.tsx` — MapLibre GL map instance.
-- **Basemap decision resolved here.** Evaluate: online free tile providers (MapTiler, Stadia, Protomaps) vs. offline vector pack bundled with the app. Decision criteria: data freshness, redistribution license, offline-readiness, cost at scale. Record decision in an ADR under `docs/adr/`.
+- **Basemap decision resolved here.** [ADR 0002](./adr/0002-no-basemap.md) — accepted 2026-04-24. No basemap tiles. MapLibre renders our KMZ overlay on a solid `--surface-canvas` background; a scale bar and the existing hairline dot grid provide the only ambient reference. Adding a tile-based basemap later is an additive change that doesn't touch the overlay styles.
 - **Custom MapLibre vector styles** authored per the canvas visual language defined in S5.5:
   - `pv-light.json` — polished to bar; matches the S5.5 canvas mocks for typography, feature colors, atmosphere.
   - `pv-dark.json` — draft; tokens applied, polish deferred to S13.5. Must be readable and not visually broken, but not expected to match the light style's craft level.

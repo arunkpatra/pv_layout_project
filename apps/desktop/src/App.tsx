@@ -1,8 +1,19 @@
-import { useCallback, useEffect, useState, type JSX } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type JSX,
+} from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
+import { listen } from "@tauri-apps/api/event"
 import { useQueryClient } from "@tanstack/react-query"
-import { createSidecarClient } from "@solarlayout/sidecar-client"
+import {
+  createSidecarClient,
+  type ParsedKMZ,
+  type SidecarClient,
+} from "@solarlayout/sidecar-client"
 import type { Entitlements } from "@solarlayout/entitlements-client"
 import {
   AppShell,
@@ -35,6 +46,8 @@ import {
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
+import { openAndParseKmz } from "./project/kmzLoader"
+import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
 
 /**
  * App shell orchestrator.
@@ -82,6 +95,16 @@ export function App(): JSX.Element {
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
   const activeKey = pendingKey ?? savedKey
+
+  // Project state — the currently loaded KMZ. Arrives in S8; replaced on
+  // each new open. A future spike may promote this to Zustand when the
+  // project grows to hold layout results, selection, history, etc.
+  const [project, setProject] = useState<{
+    kmz: ParsedKMZ
+    fileName: string
+  } | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
+  const [opening, setOpening] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -209,6 +232,31 @@ export function App(): JSX.Element {
       : null
   useSyncEntitlementsToSidecar(entQuery.data, sidecarEndpoint)
 
+  // ── Sidecar client — memoised against the config so downstream calls
+  //    (parse-kmz, layout, usage/report) reuse a single instance.
+  const sidecarClient = useMemo<SidecarClient | null>(() => {
+    if (sidecarPhase.kind !== "healthy") return null
+    if (sidecarPhase.port === 0) return null // preview mode — no real sidecar
+    return createSidecarClient({
+      host: sidecarPhase.host,
+      port: sidecarPhase.port,
+      token: sidecarPhase.token,
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    })
+  }, [sidecarPhase])
+
+  // ── GeoJSON derived from the current project, memoised against the
+  //    identity of the ParsedKMZ so MapCanvas doesn't re-hydrate
+  //    sources on every App render.
+  const projectGeoJson = useMemo(
+    () => (project ? kmzToGeoJson(project.kmz) : null),
+    [project]
+  )
+  const projectCounts = useMemo(
+    () => (project ? countKmzFeatures(project.kmz) : null),
+    [project]
+  )
+
   // ── Actions ──────────────────────────────────────────────────────────────
   const handleSubmitKey = useCallback((key: string) => {
     setValidationError(null)
@@ -235,20 +283,63 @@ export function App(): JSX.Element {
     void entQuery.refetch()
   }, [entQuery])
 
+  // ── KMZ load flow ────────────────────────────────────────────────────────
+  const handleOpenKmz = useCallback(async () => {
+    if (!sidecarClient || opening) return
+    setOpening(true)
+    setOpenError(null)
+    try {
+      const result = await openAndParseKmz(sidecarClient)
+      if (!result) return // user cancelled the native dialog
+      setProject({ kmz: result.parsed, fileName: result.fileName })
+      setPaletteOpen(false)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      console.error("KMZ load failed:", err)
+      setOpenError(detail)
+    } finally {
+      setOpening(false)
+    }
+  }, [sidecarClient, opening])
+
+  // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
+  // (the `.` in the Rust menu-item id is translated to `/` at emit time
+  // because Tauri 2's event-name validator rejects dots). The command
+  // palette + empty-state button call handleOpenKmz directly.
+  useEffect(() => {
+    if (!inTauri()) return
+    let unlisten: (() => void) | undefined
+    void listen("menu:file/open_kmz", () => {
+      void handleOpenKmz()
+    }).then((fn) => {
+      unlisten = fn
+    })
+    return () => {
+      unlisten?.()
+    }
+  }, [handleOpenKmz])
+
   const openPalette = useCallback(() => setPaletteOpen(true), [])
 
-  // ── ⌘K / Ctrl-K global ───────────────────────────────────────────────────
+  // ── Global keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      const meta = e.metaKey || e.ctrlKey
+      if (meta && e.key.toLowerCase() === "k") {
         e.preventDefault()
         setPaletteOpen((o) => !o)
+        return
+      }
+      if (meta && e.key.toLowerCase() === "o") {
+        e.preventDefault()
+        void handleOpenKmz()
+        return
       }
       if (e.key === "Escape") setPaletteOpen(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [])
+  }, [handleOpenKmz])
 
   // ── Render decisions ─────────────────────────────────────────────────────
 
@@ -347,7 +438,7 @@ export function App(): JSX.Element {
         inspectorOpen={inspectorOpen}
         topBar={
           <TopBar
-            projectName={undefined}
+            projectName={project?.fileName}
             chip={<Chip tone="accent">{planName}</Chip>}
             onCommandPaletteClick={openPalette}
             onToggleToolRail={() => setToolRailOpen((v) => !v)}
@@ -361,17 +452,39 @@ export function App(): JSX.Element {
         }
         toolRail={<ToolRail activeTool={activeTool} onSelect={setActiveTool} />}
         canvas={
-          <MapCanvas>
+          <MapCanvas
+            boundariesGeoJson={projectGeoJson?.boundaries}
+            obstaclesGeoJson={projectGeoJson?.obstacles}
+            lineObstructionsGeoJson={projectGeoJson?.lineObstructions}
+          >
             <CommandBarHint onClick={openPalette} />
-            <EmptyStateCard />
+            {!project && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="pointer-events-auto">
+                  <EmptyStateCard onOpen={() => void handleOpenKmz()} />
+                </div>
+              </div>
+            )}
+            {opening && <OpeningOverlay />}
+            {openError && (
+              <OpenErrorOverlay
+                detail={openError}
+                onDismiss={() => setOpenError(null)}
+                onRetry={() => void handleOpenKmz()}
+              />
+            )}
           </MapCanvas>
         }
-        inspector={<InspectorSkeleton />}
+        inspector={<InspectorSkeleton projectLoaded={!!project} />}
         statusBar={
           <StatusBar
             sidecarHealthy
             sidecarLabel={`Sidecar healthy · engine ${sidecarPhase.version}`}
-            leftMeta="No project loaded"
+            leftMeta={
+              projectCounts
+                ? `${plural(projectCounts.boundaries, "boundary", "boundaries")} · ${plural(projectCounts.obstacles, "obstacle", "obstacles")}`
+                : "No project loaded"
+            }
             units={units}
             onUnitsChange={setUnits}
             zoomPercent={100}
@@ -382,7 +495,11 @@ export function App(): JSX.Element {
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen}>
         <CommandGroup heading="File" className="px-[4px] py-[4px]">
-          <PaletteItem label="Open KMZ…" shortcut="⌘O" />
+          <PaletteItem
+            label="Open KMZ…"
+            shortcut="⌘O"
+            onSelect={() => void handleOpenKmz()}
+          />
           <PaletteItem label="Save project" shortcut="⌘S" />
           <PaletteItem label="Export…" shortcut="⌘E" />
         </CommandGroup>
@@ -462,12 +579,14 @@ function PaletteItem({
   )
 }
 
-function InspectorSkeleton() {
+function InspectorSkeleton({ projectLoaded }: { projectLoaded: boolean }) {
   return (
     <InspectorRoot>
       <InspectorSection title="Layout summary">
         <p className="text-[12px] text-[var(--text-muted)] leading-normal">
-          Load a KMZ to generate a layout and see metrics here.
+          {projectLoaded
+            ? "Configure parameters and click Generate to place tables, ICRs, and cables."
+            : "Load a KMZ to generate a layout and see metrics here."}
         </p>
       </InspectorSection>
       <InspectorSection title="Area">
@@ -484,6 +603,51 @@ function InspectorSkeleton() {
         </p>
       </InspectorSection>
     </InspectorRoot>
+  )
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+function OpeningOverlay() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto px-[16px] py-[10px] rounded-[var(--radius-md)] bg-[var(--surface-panel)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)] text-[13px] text-[var(--text-secondary)]">
+        Parsing KMZ…
+      </div>
+    </div>
+  )
+}
+
+function OpenErrorOverlay({
+  detail,
+  onDismiss,
+  onRetry,
+}: {
+  detail: string
+  onDismiss: () => void
+  onRetry: () => void
+}) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto max-w-[460px] bg-[var(--surface-panel)] border border-[var(--error-muted)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] p-[20px] flex flex-col gap-[10px]">
+        <h2 className="text-[14px] font-semibold text-[var(--error-default)]">
+          Couldn't open KMZ
+        </h2>
+        <p className="text-[12px] text-[var(--text-secondary)] leading-normal break-words">
+          {detail}
+        </p>
+        <div className="flex items-center justify-end gap-[8px]">
+          <Button type="button" variant="ghost" size="md" onClick={onDismiss}>
+            Dismiss
+          </Button>
+          <Button type="button" variant="primary" size="md" onClick={onRetry}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 
