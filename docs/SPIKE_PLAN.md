@@ -85,14 +85,14 @@ S15   Release pipeline + download delivery          [release]
 **Out of scope:** FastAPI, HTTP, any GUI concerns.
 
 **Deliverables:**
-- `uv run python -c "from pvlayout_core.layout_engine import run_layout_multi"` succeeds.
+- `uv run python -c "from pvlayout_core.core.layout_engine import run_layout_multi"` succeeds.
 - `uv run pytest` passes the smoke test.
-- No PyQt5 in `uv tree`.
+- No PyQt5 or PySide in `uv tree`.
 
 **Human Gate:**
-1. Run `uv run pytest tests/smoke/test_imports.py` — all pass.
-2. Confirm `uv tree | grep -i pyqt` returns nothing.
-3. Confirm `ls python/pvlayout_engine/pvlayout_core/core/` lists all 17 original core modules.
+1. Run `uv run pytest tests/smoke/` — all pass.
+2. Confirm `uv tree | grep -iE 'pyqt|pyside'` returns nothing.
+3. Confirm `ls python/pvlayout_engine/pvlayout_core/core/` lists the 16 vendored modules plus `__init__.py`.
 
 ---
 

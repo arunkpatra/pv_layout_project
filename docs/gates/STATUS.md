@@ -4,16 +4,16 @@
 
 ## Current state
 
-**Active spike:** S0 — Repo & tooling bootstrap
+**Active spike:** S1 — Vendor Python core from PVlayout_Advance
 **Status:** awaiting human gate verification
-**Gate memo:** [`s00.md`](./s00.md)
+**Gate memo:** [`s01.md`](./s01.md)
 
 ## Progress
 
 | Spike | Title | Status | Gate memo |
 |---|---|---|---|
-| S0    | Repo & tooling bootstrap                       | 🟡 awaiting gate | [s00.md](./s00.md) |
-| S1    | Vendor Python core from PVlayout_Advance       | ⚪ pending | — |
+| S0    | Repo & tooling bootstrap                       | 🟢 passed | [s00.md](./s00.md) |
+| S1    | Vendor Python core from PVlayout_Advance       | 🟡 awaiting gate | [s01.md](./s01.md) |
 | S2    | FastAPI sidecar — health, schemas, auth        | ⚪ pending | — |
 | S3    | Sidecar: parse + layout + golden-file tests    | ⚪ pending | — |
 | S4    | Sidecar: PyInstaller single-binary build       | ⚪ pending | — |
