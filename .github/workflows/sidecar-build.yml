@@ -1,0 +1,96 @@
+name: sidecar-build
+
+# Build the pvlayout-engine single-binary sidecar on every supported
+# OS/arch. S4 delivers this workflow as scaffolding — it activates the
+# first time the repo is pushed to GitHub. Until then, the spec and the
+# smoke_binary.sh script are verified locally on the host OS.
+#
+# Security posture: every interpolated expression in `run:` is a trusted
+# matrix/workflow/ref value — there is no user-controlled input (PR body,
+# issue title, commit message, etc.) injected anywhere.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "python/pvlayout_engine/**"
+      - ".github/workflows/sidecar-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "python/pvlayout_engine/**"
+      - ".github/workflows/sidecar-build.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            platform: macos-arm64
+            ext: ""
+          - runner: macos-13
+            platform: macos-x64
+            ext: ""
+          - runner: ubuntu-22.04
+            platform: linux-x64
+            ext: ""
+          - runner: windows-2022
+            platform: windows-x64
+            ext: ".exe"
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: python/pvlayout_engine
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install deps (runtime + dev)
+        run: uv sync --extra dev
+
+      - name: Run tests before bundling
+        # Catch regressions early — no point spending 30s bundling if the
+        # tests are red. Golden-file tests run against /layout via
+        # TestClient and are separately covered in workspace gates; here
+        # we only want the quick smoke + schema + auth checks.
+        run: uv run pytest tests/smoke tests/integration -q
+
+      - name: Build binary (PyInstaller)
+        run: uv run pyinstaller pvlayout-engine.spec --noconfirm --clean
+
+      - name: Smoke-test bundled binary
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: ./scripts/smoke_binary.sh
+
+      - name: Rename artifact for upload
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          mv "dist/pvlayout-engine${EXT}" "dist/pvlayout-engine-${PLATFORM}${EXT}"
+          ls -lh dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pvlayout-engine-${{ matrix.platform }}
+          path: python/pvlayout_engine/dist/pvlayout-engine-${{ matrix.platform }}${{ matrix.ext }}
+          retention-days: 14
+          if-no-files-found: error
