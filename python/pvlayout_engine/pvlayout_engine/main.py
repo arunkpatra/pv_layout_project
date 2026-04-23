@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import socket
 import sys
 import threading
 import time
@@ -34,13 +35,52 @@ log = logging.getLogger("pvlayout_engine")
 def _announce_ready(config) -> None:  # noqa: ANN001 — frozen dataclass
     """Write the startup JSON to stdout and flush.
 
-    The parent process captures our stdout to discover how to connect.
-    We prefix with ``READY `` so multi-line logging output can be filtered
-    out by a simple ``startswith`` check on the parent side.
+    IMPORTANT: must fire only *after* uvicorn has bound the TCP socket.
+    The parent (Tauri) uses this as the "go ahead and connect" signal;
+    publishing it before the socket is listening causes a race where the
+    client's first request hits connection-refused. We attach this to a
+    FastAPI lifespan in ``main()`` so it runs after bind + before serve.
+
+    We prefix with ``READY `` so multi-line logging can be filtered out by
+    a simple ``startswith`` check on the parent side.
     """
     payload = {"ready": True, **config.startup_json()}
     sys.stdout.write(f"READY {json.dumps(payload)}\n")
     sys.stdout.flush()
+
+
+def _announce_when_listening(
+    config,  # noqa: ANN001
+    poll_interval_s: float = 0.05,
+    timeout_s: float = 10.0,
+) -> None:
+    """Wait until uvicorn actually accepts TCP connections, then emit READY.
+
+    uvicorn runs lifespan startup *before* binding the socket, so any
+    startup-event hook announces too early. A TCP connect attempt is the
+    ground-truth signal that the server is reachable. If the timeout
+    passes without a successful connect we announce anyway — the parent
+    will see its next fetch fail, which is a better failure mode than
+    hanging forever.
+    """
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(
+                (config.host, config.port), timeout=poll_interval_s
+            ):
+                _announce_ready(config)
+                return
+        except (OSError, ConnectionRefusedError, TimeoutError):
+            time.sleep(poll_interval_s)
+    # Timed out. Announce anyway so the parent stops waiting; subsequent
+    # requests will surface the real problem.
+    log.warning(
+        "uvicorn did not start accepting connections within %.1fs; "
+        "announcing READY anyway",
+        timeout_s,
+    )
+    _announce_ready(config)
 
 
 def _watch_parent_exit(poll_interval_s: float = 1.0) -> None:
@@ -101,12 +141,16 @@ def main() -> int:
     config = resolve_config()
     app = build_app(config)
 
+    # Poll TCP connect in a background thread; emit READY only once uvicorn
+    # is actually accepting connections. Uvicorn runs lifespan startup
+    # *before* it binds the socket, so a FastAPI startup event would still
+    # announce too early; polling the real socket is the reliable signal.
+    threading.Thread(
+        target=_announce_when_listening, args=(config,), daemon=True
+    ).start()
+
     # Start parent-death watchdog. Daemon thread so it doesn't block exit.
     threading.Thread(target=_watch_parent_exit, daemon=True).start()
-
-    # Announce BEFORE uvicorn starts logging. The parent process doesn't
-    # wait for an HTTP probe — it parses this one line and moves on.
-    _announce_ready(config)
 
     # uvicorn.run blocks until the server is stopped.
     uvicorn.run(

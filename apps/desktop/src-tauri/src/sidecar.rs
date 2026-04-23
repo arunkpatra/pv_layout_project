@@ -197,7 +197,10 @@ pub async fn spawn(app: &AppHandle) {
                 }
                 CommandEvent::Stderr(line) => {
                     let line = String::from_utf8_lossy(&line).into_owned();
-                    log::debug!("sidecar stderr: {}", line.trim_end());
+                    // S5 diagnostic: pass-through at info! so /health
+                    // request logs are visible during the gate. Can drop
+                    // to debug! once we're confident the path works.
+                    log::info!("sidecar: {}", line.trim_end());
                 }
                 CommandEvent::Terminated(payload) => {
                     log::warn!(

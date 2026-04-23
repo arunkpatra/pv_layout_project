@@ -1,5 +1,6 @@
 import { useEffect, useState, type JSX } from "react"
 import { invoke } from "@tauri-apps/api/core"
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
 import { createSidecarClient } from "@solarlayout/sidecar-client"
 
 /**
@@ -44,6 +45,11 @@ export function App(): JSX.Element {
           host: cfg.host,
           port: cfg.port,
           token: cfg.token,
+          // Route through Tauri's HTTP plugin (Rust-backed) rather than
+          // WKWebView's native fetch. Avoids the cross-origin / ATS
+          // restrictions that block `tauri://` → `http://127.0.0.1` in
+          // release builds.
+          fetchImpl: tauriFetch as typeof fetch,
         })
         const health = await client.health()
         if (cancelled) return
@@ -55,7 +61,16 @@ export function App(): JSX.Element {
         })
       } catch (err) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : String(err)
+        // Surface both message and stringified error for diagnostic clarity
+        // — browser-thrown fetch failures often have empty `.message`.
+        const parts: string[] = []
+        if (err instanceof Error) {
+          parts.push(err.name, err.message, err.stack ?? "")
+        } else {
+          parts.push(String(err))
+        }
+        const message = parts.filter(Boolean).join(" | ")
+        console.error("Sidecar boot failed:", err)
         setPhase({ kind: "error", detail: message })
       }
     })()

@@ -42,14 +42,16 @@ async fn get_sidecar_config(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
         .manage(SidecarState::default())
         .invoke_handler(tauri::generate_handler![get_sidecar_config])
         .setup(|app| {
-            env_logger::builder()
-                .filter_level(log::LevelFilter::Info)
-                .format_timestamp_secs()
-                .try_init()
-                .ok();
+            env_logger::Builder::from_env(
+                env_logger::Env::default().default_filter_or("info"),
+            )
+            .format_timestamp_secs()
+            .try_init()
+            .ok();
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
