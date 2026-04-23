@@ -461,7 +461,7 @@ def calculate_energy(
         gti_hourly = _ensure_gti(params)
         if gti_hourly:
             # Aggregate hourly GTI → monthly kWh/m²
-            from core.pvgis_file_parser import _monthly_sum as _ms
+            from pvlayout_core.core.pvgis_file_parser import _monthly_sum as _ms
             monthly_params_gti = _ms(params.hourly_timestamps, gti_hourly)
             if params.hourly_ghi_wm2:
                 monthly_params_ghi = _ms(params.hourly_timestamps,
@@ -506,7 +506,7 @@ def calculate_energy(
         #   Priority 2 — sinusoidal seasonal model (fallback)
         if (len(params.hourly_temp_c) >= 365
                 and len(params.hourly_timestamps) == len(params.hourly_temp_c)):
-            from core.pvgis_file_parser import _monthly_avg as _mavg
+            from pvlayout_core.core.pvgis_file_parser import _monthly_avg as _mavg
             t_amb_monthly = _mavg(params.hourly_timestamps, params.hourly_temp_c)
         else:
             t_amb_monthly = _seasonal_temperatures(
@@ -648,7 +648,7 @@ def _ensure_gti(params: EnergyParameters) -> List[float]:
     if not params.hourly_ghi_wm2:
         return []
 
-    from core.solar_transposition import ghi_to_gti
+    from pvlayout_core.core.solar_transposition import ghi_to_gti
     gti_arr = ghi_to_gti(
         params.hourly_ghi_wm2,
         params.hourly_timestamps,

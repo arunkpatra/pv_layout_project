@@ -224,7 +224,7 @@ def _build_summary_figure(
     )
 
     # ---- Title bar --------------------------------------------------------
-    from core.edition import edition_name as _ed_name
+    from pvlayout_core.core.edition import edition_name as _ed_name
     _title_bar(
         fig.add_subplot(gs[0]),
         f"PV Plant Layout [{_ed_name(edition)}] — Summary Report    |    "
@@ -499,7 +499,7 @@ def _build_pr_and_inputs(gs_sub, fig, energy_params: EnergyParameters,
       Right — Performance Ratio breakdown table
     Both get in-axes titles via _section_title().
     """
-    from core.energy_calculator import calculate_pr
+    from pvlayout_core.core.energy_calculator import calculate_pr
     pr_val = calculate_pr(energy_params)
 
     src_map = {
@@ -727,7 +727,7 @@ def _build_per_plant_table(ax, results, energy_params: EnergyParameters) -> None
 
 def _build_25yr_table(ax, results, energy_params: EnergyParameters) -> None:
     """Draw the 25-year generation forecast table into *ax*."""
-    from core.energy_calculator import _z_score as _zscore
+    from pvlayout_core.core.energy_calculator import _z_score as _zscore
 
     ax.axis("off")
     _section_title(

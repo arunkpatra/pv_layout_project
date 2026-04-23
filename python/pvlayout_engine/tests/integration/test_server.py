@@ -1,37 +1,28 @@
 """
-S2 integration tests for the sidecar HTTP surface.
+Integration tests for the sidecar HTTP surface.
 
 Uses FastAPI's TestClient (httpx) to exercise the app without a live
 uvicorn, so the tests are deterministic, fast, and don't bind real ports.
 
-Covered:
+Covered (as of S3):
   * /health requires a bearer token (401 without, 200 with).
-  * /openapi.json exposes every schema in SCHEMAS_FOR_INSPECTION.
-  * /_schemas/echo/<name> endpoints validate and echo each schema.
+  * /docs and /openapi.json stay public.
+  * OpenAPI registers every schema referenced by any route and every route.
   * The token comparison is constant-time-safe against near-matches.
+
+S3 route behaviour (/parse-kmz, /layout, /refresh-inverters) is covered by
+``tests/golden/`` against real KMZ inputs.
 """
 from __future__ import annotations
-
-import json
 
 import pytest
 from fastapi.testclient import TestClient
 
 from pvlayout_engine.config import SidecarConfig
-from pvlayout_engine.schemas import SCHEMAS_FOR_INSPECTION
 from pvlayout_engine.server import build_app
 
 
-TEST_TOKEN = "s2-integration-test-token-abcdefghijk"
-
-
-def _constructs_with_no_args(cls: type) -> bool:
-    """True if the schema has all-default fields and needs no args."""
-    try:
-        cls()
-    except Exception:  # noqa: BLE001
-        return False
-    return True
+TEST_TOKEN = "integration-test-token-abcdefghijklmnop"
 
 
 @pytest.fixture(scope="module")
@@ -104,66 +95,63 @@ def test_docs_is_public(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_openapi_contains_every_registered_schema(client: TestClient) -> None:
+def test_openapi_contains_real_route_schemas(client: TestClient) -> None:
+    """S3: every schema reachable from /parse-kmz, /layout, /refresh-inverters
+    must appear in OpenAPI. Ancillary schemas not referenced by any live
+    route (e.g. EnergyParameters) are no longer surfaced — intentional."""
     response = client.get("/openapi.json")
     schemas = response.json().get("components", {}).get("schemas", {})
-    missing = [
-        cls.__name__
-        for cls in SCHEMAS_FOR_INSPECTION.values()
-        if cls.__name__ not in schemas
-    ]
+    required = {
+        # Request/response envelopes
+        "LayoutRequest",
+        "LayoutResponse",
+        "RefreshInvertersRequest",
+        "ParsedKMZ",
+        "BoundaryInfo",
+        # Parameters + nested
+        "LayoutParameters",
+        "ModuleSpec",
+        "TableConfig",
+        "DesignType",
+        "Orientation",
+        "DesignMode",
+        # Result + nested
+        "LayoutResult",
+        "PlacedTable",
+        "PlacedICR",
+        "PlacedRoad",
+        "PlacedStringInverter",
+        "CableRun",
+        "PlacedLA",
+        "EnergyResult",
+        # Meta
+        "HealthResponse",
+    }
+    missing = sorted(required - set(schemas))
     assert not missing, f"Schemas missing from OpenAPI: {missing}"
 
 
-def test_openapi_registers_health_and_echo_routes(client: TestClient) -> None:
+def test_openapi_registers_real_routes(client: TestClient) -> None:
     response = client.get("/openapi.json")
     paths = response.json().get("paths", {})
+    # All four routes exposed as of S3:
     assert "/health" in paths
-    for name in SCHEMAS_FOR_INSPECTION:
-        assert f"/_schemas/echo/{name}" in paths, f"missing echo route for {name}"
+    assert "/parse-kmz" in paths
+    assert "/layout" in paths
+    assert "/refresh-inverters" in paths
 
 
-# ---------------------------------------------------------------------------
-# Schema echoes — each endpoint accepts and returns a valid payload.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "name,cls",
-    [
-        (n, c)
-        for n, c in SCHEMAS_FOR_INSPECTION.items()
-        # The positional-coordinate schemas require fields; they're exercised
-        # separately in test_schemas.py round-tripping. We only echo-test the
-        # ones that construct with zero args.
-        if _constructs_with_no_args(c)
-    ],
-)
-def test_schema_echo_round_trips(client: TestClient, name: str, cls: type) -> None:
-    payload = json.loads(cls().model_dump_json())
-    response = client.post(
-        f"/_schemas/echo/{name}", headers=auth_headers(), json=payload
-    )
-    assert response.status_code == 200, response.text
-    # Server-side re-serialization must match the canonical form.
-    assert response.json() == payload
-
-
-def test_schema_echo_rejects_extra_fields(client: TestClient) -> None:
-    """Forbidding extras surfaces typos clearly."""
-    response = client.post(
-        "/_schemas/echo/layout-parameters",
-        headers=auth_headers(),
-        json={"tilt_angle": 22.5, "typo_field": 1},
-    )
-    assert response.status_code == 422
-
-
-def test_schema_echo_requires_auth(client: TestClient) -> None:
-    response = client.post(
-        "/_schemas/echo/module-spec",
-        json={"length": 2.38, "width": 1.13, "wattage": 580.0},
-    )
+def test_layout_requires_auth(client: TestClient) -> None:
+    response = client.post("/layout", json={})
     assert response.status_code == 401
+
+
+def test_layout_rejects_empty_boundaries(client: TestClient) -> None:
+    body = {
+        "parsed_kmz": {"boundaries": [], "centroid_lat": 0, "centroid_lon": 0},
+        "params": {},
+    }
+    response = client.post("/layout", headers=auth_headers(), json=body)
+    assert response.status_code == 422
 
 

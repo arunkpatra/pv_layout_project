@@ -94,7 +94,7 @@ def run_layout(
             line_union = unary_union(line_polys_utm)
             usable_poly = usable_poly.difference(line_union)
             # Convert buffered polygons back to WGS84 for visualization
-            from utils.geo_utils import utm_to_wgs84
+            from pvlayout_core.utils.geo_utils import utm_to_wgs84
             for bp in line_polys_utm:
                 try:
                     if bp.geom_type == "Polygon":

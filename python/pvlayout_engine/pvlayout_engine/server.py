@@ -4,12 +4,12 @@ FastAPI application factory for the pvlayout sidecar.
 The app is:
   * bound to loopback (127.0.0.1) by the main entry; see main.py.
   * token-gated on every non-public endpoint via a router-level dependency.
-  * intentionally minimal in S2 — it exposes /health plus one echo endpoint
-    per pydantic schema so the full type surface appears in /docs.
+  * wired to the vendored domain logic in ``pvlayout_core`` via route
+    modules under ``pvlayout_engine.routes``.
 
-S3 replaces the echo endpoints with the real /parse-kmz, /layout,
-/refresh-inverters routes. S2 is about proving the transport, auth, and
-type plumbing are correct before any real compute is wired in.
+S2 introduced dev-only echo routes to expose every schema in /docs.
+S3 replaces them with the real ``/parse-kmz``, ``/layout``, and
+``/refresh-inverters`` endpoints.
 """
 from __future__ import annotations
 
@@ -21,10 +21,8 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request,
 from fastapi.middleware.cors import CORSMiddleware
 
 from pvlayout_engine.config import SidecarConfig
-from pvlayout_engine.schemas import (
-    SCHEMAS_FOR_INSPECTION,
-    HealthResponse,
-)
+from pvlayout_engine.routes.layout import router as layout_router
+from pvlayout_engine.schemas import HealthResponse
 
 log = logging.getLogger("pvlayout_engine")
 
@@ -42,7 +40,7 @@ def build_app(config: SidecarConfig) -> FastAPI:
         ),
         openapi_tags=[
             {"name": "meta", "description": "Health and version checks."},
-            {"name": "schemas", "description": "Type inspection (dev-only; removed in S3)."},
+            {"name": "layout", "description": "Parse KMZ, generate layout, refresh inverters."},
         ],
     )
 
@@ -91,14 +89,9 @@ def build_app(config: SidecarConfig) -> FastAPI:
     def health() -> HealthResponse:
         return HealthResponse(status="ok", version=config.version)
 
-    # --- Dev-only schema echoes ---------------------------------------------
-    # For each registered pydantic schema, register a POST that accepts and
-    # returns it. This surfaces the whole type system in /docs so the human
-    # gate #4 ("all schemas render in Swagger") can be verified visually.
-    # These routes disappear in S3 when real endpoints take over.
-
-    for name, schema_cls in SCHEMAS_FOR_INSPECTION.items():
-        _register_echo_route(authed, name, schema_cls)
+    # --- Layout routes (S3) -------------------------------------------------
+    # /parse-kmz, /layout, /refresh-inverters — all token-gated.
+    authed.include_router(layout_router)
 
     app.include_router(authed)
 
@@ -116,30 +109,3 @@ def build_app(config: SidecarConfig) -> FastAPI:
     return app
 
 
-def _register_echo_route(router: APIRouter, name: str, schema_cls: type) -> None:
-    """Register POST /_schemas/echo/<name> that echoes a payload validated
-    against `schema_cls`. Used in S2 to expose every schema in /docs.
-
-    FastAPI reads parameter annotations via ``typing.get_type_hints()`` which
-    consults ``__annotations__``. A closure-captured ``cls`` annotation gets
-    resolved to the generic type parameter, not the concrete class, so we
-    build a plain handler and inject the annotations explicitly.
-    """
-    path = f"/_schemas/echo/{name}"
-
-    def handler(payload):  # type: ignore[no-untyped-def]
-        return payload
-
-    handler.__annotations__ = {"payload": schema_cls, "return": schema_cls}
-    handler.__name__ = f"echo_{name.replace('-', '_')}"
-    handler.__doc__ = (
-        f"Echo endpoint for the `{schema_cls.__name__}` schema. "
-        "Dev-only; removed in S3."
-    )
-
-    router.post(
-        path,
-        response_model=schema_cls,
-        tags=["schemas"],
-        summary=f"Echo {schema_cls.__name__}",
-    )(handler)

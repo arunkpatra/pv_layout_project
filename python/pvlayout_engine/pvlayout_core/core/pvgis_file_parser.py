@@ -39,7 +39,7 @@ Supported timestamp formats
 
 Usage
 -----
-    from core.pvgis_file_parser import parse_pvgis_file
+    from pvlayout_core.core.pvgis_file_parser import parse_pvgis_file
     data = parse_pvgis_file("hourly_ghi.csv")
     # data.ghi_wm2  — list of hourly GHI values (W/m²)
     # data.gti_wm2  — same if GTI column present, else empty

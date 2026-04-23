@@ -277,6 +277,67 @@ class LayoutResult(_Model):
 
 
 # ---------------------------------------------------------------------------
+# Parsed KMZ wire format (output of /parse-kmz; input to /layout)
+# ---------------------------------------------------------------------------
+
+# A WGS84 coordinate pair (lon, lat) in degrees.
+Wgs84Point = tuple[float, float]
+
+
+class BoundaryInfo(_Model):
+    """One plant boundary polygon with its associated inner obstacles
+    and line obstructions (TL corridors, canals, roads).
+
+    Coordinates are WGS84 (lon, lat) in degrees — same convention the
+    domain engine uses internally.
+    """
+
+    name: str
+    coords: list[Wgs84Point]
+    obstacles: list[list[Wgs84Point]] = Field(default_factory=list)
+    line_obstructions: list[list[Wgs84Point]] = Field(default_factory=list)
+
+
+class ParsedKMZ(_Model):
+    """Output of /parse-kmz; input to /layout."""
+
+    boundaries: list[BoundaryInfo] = Field(default_factory=list)
+    centroid_lat: float = 0.0
+    centroid_lon: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Request / response envelopes for the real routes (S3)
+# ---------------------------------------------------------------------------
+
+
+class LayoutRequest(_Model):
+    """POST /layout body."""
+
+    parsed_kmz: ParsedKMZ
+    params: LayoutParameters
+
+
+class LayoutResponse(_Model):
+    """POST /layout response — one result per boundary in the KMZ."""
+
+    results: list[LayoutResult]
+
+
+class RefreshInvertersRequest(_Model):
+    """POST /refresh-inverters body.
+
+    The client sends back the previous ``result`` (possibly with updated
+    ICR positions) plus the current ``params``; the sidecar rebuilds
+    ``usable_polygon`` from the result's persisted fields and reruns
+    lightning-arrester + string-inverter placement.
+    """
+
+    result: LayoutResult
+    params: LayoutParameters
+
+
+# ---------------------------------------------------------------------------
 # Health + error payloads (sidecar-specific, no domain twin).
 # ---------------------------------------------------------------------------
 
@@ -294,6 +355,7 @@ class ErrorResponse(_Model):
 # ---------------------------------------------------------------------------
 # Registry — list of schemas surfaced via /_schemas/echo/* dev endpoints so
 # they appear in OpenAPI / Swagger UI.
+# Dev-only; the echo routes are removed in S3 (after real routes take over).
 # ---------------------------------------------------------------------------
 
 SCHEMAS_FOR_INSPECTION: dict[str, type[_Model]] = {
@@ -310,3 +372,4 @@ SCHEMAS_FOR_INSPECTION: dict[str, type[_Model]] = {
     "energy-result": EnergyResult,
     "layout-result": LayoutResult,
 }
+
