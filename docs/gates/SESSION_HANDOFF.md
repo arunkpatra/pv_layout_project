@@ -1,3 +1,5 @@
+> **Historical — S5.5 shipped at `v0.0.6-s05_5`. Kept for context, not current state.**
+
 # Session Handoff — S5.5 mid-spike
 
 **Written:** 2026-04-23
