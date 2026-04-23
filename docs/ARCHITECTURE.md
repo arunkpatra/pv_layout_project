@@ -38,9 +38,9 @@ Deliver a single native desktop application — Windows, macOS, Linux — that:
 │  │  React 19 + TypeScript                                                │   │
 │  │  • shadcn/ui + Tailwind v4 + Nova theme (shared with mvp_web)         │   │
 │  │  • MapLibre GL + deck.gl overlays (interactive layout canvas)         │   │
-│  │  • TanStack Query (entitlements cache + sidecar RPC cache)            │   │
-│  │  • Zustand (project state)                                            │   │
-│  │  • react-hook-form + Zod (input panel)                                │   │
+│  │  • TanStack Query — server cache (entitlements, sidecar RPC)          │   │
+│  │  • Zustand — cross-component client state (sliced; see ADR-0003)      │   │
+│  │  • react-hook-form + Zod (input panel — RHF lifecycle, Zustand persist)│  │
 │  │  • Typed sidecar client generated from FastAPI OpenAPI schema         │   │
 │  └─────────────────────────────┬─────────────────────────────────────────┘   │
 │                                │  loopback HTTP (127.0.0.1:<random>)          │
@@ -65,9 +65,13 @@ Deliver a single native desktop application — Windows, macOS, Linux — that:
 └────────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────── solarlayout.in (Vercel — apps/mvp_web) ───────────────────────┐
-│  Marketing, pricing, Stripe checkout, user dashboard, license downloads       │
+│  Marketing, pricing, Stripe checkout, user dashboard, license downloads,      │
+│  artifact listing (S3-backed via mvp_api — KMZ/PDF/DXF the user opted to      │
+│  upload from the desktop). No render compute — see ADR-0004.                  │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Cloud is passive — desktop is the engineering tool.** All layout, ICR placement, energy yield, KMZ/DXF/PDF rendering happens in the local sidecar. The cloud handles auth, payments, entitlements, opt-in artifact storage, and dashboard listing — nothing more. See [ADR-0004](./adr/0004-cloud-as-passive-storage.md).
 
 ---
 
@@ -233,6 +237,23 @@ One build. All features shipped. Runtime gating by entitlements.
 1. User clicks Upgrade → Tauri opens browser at `solarlayout.in/pricing?user=<email>`.
 2. Stripe → `mvp_api` → license email.
 3. User pastes key → keyring + entitlements refresh → features unlock.
+
+---
+
+## 6.5. State architecture
+
+State in the desktop app lives in exactly one of five places, by category. This is enforced via [ADR-0003](./adr/0003-state-architecture.md); summarized here.
+
+| State category | Mechanism | Examples |
+|---|---|---|
+| **Server cache** | TanStack Query | `useEntitlementsQuery`, `useLayoutMutation`, `useUsageReportMutation` |
+| **Cross-component client state** | Zustand (sliced by domain) | `useProjectStore`, `useLayoutParamsStore`, `useLayoutResultStore`, `useSelectionStore` |
+| **Ephemeral UI state** (single component, no siblings care) | `useState` | `paletteOpen`, dialog flags, hover state |
+| **Imperative handles & RAF guards** | `useRef` | MapLibre `mapRef`, `propsRef`, `lastBoundariesKey` |
+| **Persistent preferences** | `localStorage` (typed wrapper) or Zustand `persist` | `theme`, `unitsPreference`, `recentProjects` |
+| **OS-secret persistence** | Tauri `keyring` plugin | `licenseKey` |
+
+Slices live at `apps/desktop/src/state/<slice>.ts`. TanStack Query keys come from `apps/desktop/src/state/queryKeys.ts`. Context is reserved for *configuration* injection (ThemeProvider, EntitlementsProvider) — never for writable state. Full convention details in ADR-0003.
 
 ---
 

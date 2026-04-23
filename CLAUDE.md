@@ -21,12 +21,30 @@ A ground-up rewrite of the **SolarLayout** desktop product — a native desktop 
 2. **[docs/SPIKE_PLAN.md](./docs/SPIKE_PLAN.md)** — the 17-spike project plan. We execute these sequentially with human gates between each.
 
 ### Working agreements
-- **Spike-based development.** Work proceeds in 17 named spikes (S0 → S15, with S5.5 and S13.5 inserted). Each spike has an explicit **Human Gate** defined in `SPIKE_PLAN.md`. Nothing else gets built until the current spike's gate passes.
+- **Spike-based development.** Work proceeds in named spikes (S0 → S15, with intervening sub-spikes inserted as needs surface — currently S5.5, S8.7, S8.8, S10.5, S13.5, S13.6, S13.7, S15.5). Each spike has an explicit **Human Gate** defined in `SPIKE_PLAN.md`. Nothing else gets built until the current spike's gate passes.
 - **I pause at every gate.** When a spike's deliverables are ready, I stop and tell the human exactly what to run to verify. I do not start the next spike until the human signs off.
 - **No new features during migration.** If a request comes in that isn't "reach parity with PVlayout_Advance," it goes in a backlog. Keep scope honest.
 - **Functional parity is the contract.** Any feature that behaves one way in `PVlayout_Advance` must behave identically here unless we've explicitly decided otherwise. Golden-file tests in S3 catch silent drift.
 - **Design bar is explicit and non-negotiable** — see §12 of `ARCHITECTURE.md` and the S5.5 deliverables. "It works" is not done. "It matches the quality bar" is done.
 - **Each spike ends with a demo commit.** `git log` should read like a project plan: `s03: golden-file tests for layout`, `s09: input panel + generate layout`, etc.
+
+### Local execution, global awareness
+
+> *"Look at the road you are on, but know where the road leads to."*
+
+Each spike has a tight scope and a physical gate. Within those, execute end-to-end without leaking. **Look at the road.**
+
+But every architectural decision — every data shape, dependency, abstraction, naming choice, file structure — implicitly binds the future. **Know where the road leads.**
+
+Operationally:
+
+1. **Before locking any architectural decision** (anything that becomes an ADR or shows up in a gate memo as a "Decision"), re-read the SPIKE_PLAN entries for S+1 through S+5. Ask: does this choice serve or constrain those spikes?
+2. **When a current-spike decision affects a future spike**, flag it explicitly — in the ADR's "Consequences" section ("S11 will need X because we chose Y here"), or in the gate memo. Never silently bind a future spike to today's expedience.
+3. **Refactor in-spike when a known future need conflicts with current shape.** If S9 needs a Zustand store and S11 will need geometric editing on the same data, design the store now so editing fits — even if S9 uses 20% of it.
+4. **Reverse: don't over-architect for hypothetical futures.** Only design for *known* upcoming spikes (SPIKE_PLAN is the source of truth), not imagined ones. YAGNI still applies.
+5. **Pause and surface** if an in-progress decision would force throw-away work in any future spike. Better to redesign the current spike than to ship debt that compounds across the next five.
+
+This applies to: scoping decisions, dependency choices, data schemas, file structure, naming, abstractions, what to test, what to defer. It does NOT apply to product features — those are governed by the SPIKE_PLAN scope rules and the "no scope creep" agreement above.
 
 ### What I never do without explicit human ask
 - Skip a Human Gate.
@@ -206,11 +224,16 @@ Status: accepted | superseded | reversed
 <what we accept as a result>
 ```
 
-ADRs expected before we're done (assigned to spikes):
-- S7: online-required entitlement policy (ADR 0001 — accepted 2026-04-24).
-- S8: canvas-first MapLibre, no basemap (ADR 0002 — accepted 2026-04-24).
+ADRs accepted so far:
+- ADR 0001 — online-required entitlement policy (S7, accepted 2026-04-24).
+- ADR 0002 — canvas-first MapLibre, no basemap (S8, accepted 2026-04-24).
+- ADR 0003 — state architecture (S8.8, accepted 2026-04-24).
+- ADR 0004 — cloud is passive storage (S8.8, accepted 2026-04-24).
+
+Future ADRs scheduled:
+- ADR 0005 — drawing/editing pipeline (S10.5, to pick deck.gl/nebula.gl vs Terra Draw vs maplibre-gl-draw before S11).
 - S12: telemetry event granularity + opt-in/opt-out.
-- S13.7: subscription model redesign (ADR 0003) + migration plan (ADR 0004).
+- S13.7: subscription model redesign + migration plan.
 - S14: crash reporting provider.
 
 ---
@@ -220,7 +243,8 @@ ADRs expected before we're done (assigned to spikes):
 - **Prettier:** no semicolons, double quotes, trailing commas (es5), 80-char width — matches `renewable_energy` conventions.
 - **Workspace package scope:** `@solarlayout/*` for all internal packages, all `private: true`.
 - **Zod** for all external input validation (sidecar request bodies, env vars, entitlements response parsing).
-- **Test co-location:** `foo.test.ts` beside `foo.ts`.
+- **State:** lives where ADR-0003 says it lives. TanStack Query for server cache; Zustand (sliced under `apps/desktop/src/state/<slice>.ts`) for cross-component client state; `useState` for ephemeral single-component UI state; `useRef` for imperative handles. Context is for *configuration* injection only, never for writable state. See [ADR-0003](./docs/adr/0003-state-architecture.md) for the full convention.
+- **Test co-location:** `foo.test.ts` beside `foo.ts`. Frontend uses Vitest + RTL + happy-dom (S8.7); sidecar uses pytest (S3).
 - **Python:** `ruff` + `mypy`. Tests in `python/pvlayout_engine/tests/`.
 - **Rust:** `cargo fmt` + `cargo clippy`. Lives in `apps/desktop/src-tauri/`.
 - **Commit style:** `s<NN>: <summary>` for spike-closing commits; `wip: <summary>` for intra-spike commits.
@@ -245,7 +269,8 @@ Explicitly: **do not design from memory, do not assume PVlayout_Advance behavior
 
 At the start of every new session on this repo, before taking any action:
 1. Read this CLAUDE.md end to end.
-2. Read `docs/ARCHITECTURE.md` §1–3, §12.
-3. Read `docs/SPIKE_PLAN.md` — at minimum, the Spike Map, the current spike's entry, and the Cross-cutting Principles.
+2. Read `docs/ARCHITECTURE.md` §1–3, §6.5, §12.
+3. Read `docs/SPIKE_PLAN.md` — at minimum, the Spike Map, the current spike's entry, the entries for S+1 through S+5 (per the "Local execution, global awareness" principle in §2), and the Cross-cutting Principles.
 4. Read `docs/gates/STATUS.md` to know which spike is active and whether the last gate passed.
-5. If asked to do work: confirm it matches the current spike's In-Scope section. If it doesn't, surface the mismatch to the human before proceeding.
+5. Skim `docs/adr/README.md` for the index of accepted ADRs; read any ADR relevant to the current spike.
+6. If asked to do work: confirm it matches the current spike's In-Scope section. If it doesn't, surface the mismatch to the human before proceeding.

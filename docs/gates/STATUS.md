@@ -4,9 +4,10 @@
 
 ## Current state
 
-**Active spike:** S9 — Input panel + Generate Layout
+**Active spike:** S8.7 — Frontend test harness + CI
 **Status:** ⚪ pending start
 **Previous gate:** S8 passed 2026-04-24 — [`s08.md`](./s08.md)
+**Note:** S8.7 + S8.8 inserted 2026-04-24 as foundation spikes ahead of S9 (per cross-session strategic review). See [`docs/SPIKE_PLAN.md`](../SPIKE_PLAN.md) for rationale.
 
 ## Progress
 
@@ -22,8 +23,11 @@
 | S6    | Design system implementation (light polished)  | 🟢 passed | [s06.md](./s06.md) |
 | S7    | License key + entitlements + feature gating    | 🟢 passed | [s07.md](./s07.md) |
 | S8    | KMZ load + MapLibre canvas                     | 🟢 passed | [s08.md](./s08.md) |
+| S8.7  | Frontend test harness + CI                     | ⚪ pending | [s08_7.md](./s08_7.md) |
+| S8.8  | State architecture cleanup (ADR-0003 + 0004)   | ⚪ pending | [s08_8.md](./s08_8.md) |
 | S9    | Input panel + Generate Layout                  | ⚪ pending | — |
 | S10   | Inverters, cables, LAs                         | ⚪ pending | — |
+| S10.5 | Drawing/editing pipeline ADR                   | ⚪ pending | — |
 | S11   | ICR drag + obstruction drawing                 | ⚪ pending | — |
 | S12   | Exports: KMZ + PDF                             | ⚪ pending | — |
 | S13   | PRO_PLUS: DXF + energy yield + CSV             | ⚪ pending | — |
@@ -31,6 +35,7 @@
 | S13.7 | Subscription model redesign (brainstorm)       | ⚪ pending | — |
 | S14   | Auto-updater + code signing + notarization     | ⚪ pending | — |
 | S15   | Release pipeline + download delivery           | ⚪ pending | — |
+| S15.5 | Sidecar bundle slimming (deferred opt)         | ⚪ pending | — |
 
 **Legend:** ⚪ pending · 🟡 awaiting gate · 🟢 passed · 🔴 failed (in repair)
 

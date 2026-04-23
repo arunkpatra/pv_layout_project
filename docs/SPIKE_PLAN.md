@@ -30,8 +30,11 @@ S5.5  Design Foundations (tokens + light mocks)      [design]
 S6    Design system implementation (light polished)  [frontend]
 S7    License key + entitlements + feature gating    [auth]
 S8    KMZ load + MapLibre canvas (light vector style)[canvas]
+S8.7  Frontend test harness + CI                     [foundation]
+S8.8  State architecture cleanup (ADR-0003 + 0004)   [foundation]
 S9    Input panel + Generate Layout (tables, ICRs)   [core UX]
 S10   Inverters, cables, LAs (PRO, read-only)        [core UX]
+S10.5 Drawing/editing pipeline ADR                   [foundation]
 S11   Interactivity: ICR drag + obstruction drawing  [core UX]
 S12   Exports: KMZ + PDF                             [output]
 S13   PRO_PLUS: DXF + energy yield + CSV             [output]
@@ -39,9 +42,10 @@ S13.5 Dark theme parity                              [design]
 S13.7 Subscription model redesign (brainstorm)       [strategy]
 S14   Auto-updater + code signing + notarization    [release]
 S15   Release pipeline + download delivery          [release]
+S15.5 Sidecar bundle slimming (deferred opt)         [post-launch]
 ```
 
-18 spikes. S0–S4 produce a working sidecar you can `curl`. S5–S7 produce a launchable shell that can authenticate, rendered to the Claude-Desktop-quality bar in light mode. S8–S13 bring the UI to feature parity with PVlayout_Advance. S13.5 brings dark theme to parity. S13.7 decomposes the Edition → Subscription redesign (Free / Basic / Pro / Pro+) into executable sub-spikes before release. S14–S15 make it shippable.
+21 spikes. S0–S4 produce a working sidecar you can `curl`. S5–S7 produce a launchable shell that can authenticate, rendered to the Claude-Desktop-quality bar in light mode. S8.7 + S8.8 invest in foundation (test harness, state architecture) before the core-UX run begins. S9–S13 bring the UI to feature parity with PVlayout_Advance, with S10.5 inserted to pick the drawing/editing library before S11 needs it. S13.5 brings dark theme to parity. S13.7 decomposes the Edition → Subscription redesign before release. S14–S15 make it shippable. S15.5 is a deferred post-launch optimization picked up only on real-user signal.
 
 ---
 
@@ -361,19 +365,105 @@ S15   Release pipeline + download delivery          [release]
 
 ---
 
-## S9 — Input panel + Generate Layout
+## S8.7 — Frontend test harness + CI
 
-**Goal:** User fills in module/table/spacing parameters in the right panel, clicks Generate, sees tables and ICRs on the map with counts in the summary panel.
+**Goal:** Stand up an automated test harness for the frontend (Vitest + RTL + happy-dom) so S9–S15 fixes are caught before the gate, not by you in dev mode. Wire CI to enforce it.
 
 **In scope:**
-- `InputPanel.tsx` — React port of `gui/input_panel.py`. All current fields: module spec, table config (portrait/landscape, rows/cols), spacing (auto from latitude or manual), inverter sizing, road width, setbacks.
-- Validation with Zod; persisted to Zustand store so changing fields doesn't lose state.
-- "Generate" button → `POST /layout` with current params + parsed KMZ data.
-- `SummaryPanel.tsx` — counts: MWp, number of tables, number of ICRs, plant area, used area, packing density.
-- Canvas layers: `tables` (rect polygons), `icrs` (building footprints + labels).
-- Loading state during compute (spinner on Generate button, skeleton on summary).
+- Vitest + `@testing-library/react` + `@testing-library/jest-dom` + `@testing-library/user-event` + `happy-dom` across the workspace.
+- `apps/desktop/src/test-setup.ts` (matchMedia stub, `inTauri()` stub).
+- `apps/desktop/src/test-utils/mockSidecar.ts` — typed mock factory for `SidecarClient`.
+- ~10 proof-of-life tests covering: a few components from `packages/ui`, the `kmzToGeoJson` pure function (the one that almost shipped a bug in S8), the MapCanvas cascade-layer fix as a regression guard, and `App.tsx` mount with mocked sidecar + entitlements.
+- ESLint configs replacing the stub `lint` scripts in `apps/desktop` + `packages/ui`.
+- `.github/workflows/ci.yml`: triggers on push to non-main + PR to main; runs `lint`, `typecheck`, `test`, `build` for the frontend and `pytest` for the sidecar in parallel.
+- Update `CLAUDE.md` §8 to reflect that `bun run test` actually runs tests.
 
-**Out of scope:** inverters, cables, LAs (S10), drag (S11), exports (S12).
+**Out of scope:** visual regression tests (S13.5 territory), end-to-end Tauri tests, sidecar coverage uplift, Storybook/Ladle, pre-commit hooks.
+
+**Deliverables:**
+- `bun run test` runs and passes locally + in CI.
+- Intentionally breaking a test makes CI red.
+- Local test suite finishes in <15s.
+
+**Human Gate:**
+1. `bun run lint && bun run typecheck && bun run test && bun run build` clean from repo root.
+2. Push to a feature branch — both `frontend` and `sidecar` CI jobs go green.
+3. Break one test, confirm CI red, revert.
+4. Mock sidecar shape stays in sync with real `SidecarClient` (TS error surfaces if the real interface drifts).
+
+Memo: [`docs/gates/s08_7.md`](./gates/s08_7.md).
+
+---
+
+## S8.8 — State architecture cleanup
+
+**Goal:** Land [ADR-0003 — State architecture](./adr/0003-state-architecture.md) and [ADR-0004 — Cloud is passive storage](./adr/0004-cloud-as-passive-storage.md). Adopt Zustand as the cross-component client-state layer. Migrate the `project` state out of `useState` into a Zustand slice. Establish empty `layoutParams` + `layoutResult` slices that S9 fills.
+
+**In scope:**
+- New dep: `zustand` (with `subscribeWithSelector` middleware).
+- `apps/desktop/src/state/` directory with `README.md`, `queryKeys.ts`, `project.ts`, `layoutParams.ts` (empty schema), `layoutResult.ts` (empty schema).
+- Migrate `App.tsx`'s `project` state to `useProjectStore`.
+- Tests for each slice (depends on S8.7 harness).
+- ADR-0003 + ADR-0004 marked `accepted`.
+- Update `docs/ARCHITECTURE.md` §3 (frontend stack table) to reference Zustand + ADR-0003.
+- Update `CLAUDE.md` §11 (Coding conventions) to reference `state/` + slice pattern.
+
+**Out of scope:** any S9 feature (no InputPanel, no SummaryPanel, no layout mutation). Other useState that is still ephemeral / single-component (`paletteOpen`, dialog flags, etc.) — stays as is per ADR-0003.
+
+**Deliverables:**
+- Project open/load flow still works after migration (S8 success path holds).
+- DevTools: fewer re-renders on KMZ open (selectors isolate consumers).
+- Both ADRs land as `accepted`.
+
+**Human Gate:**
+1. Static gates green (incl. new state tests).
+2. Open phaseboundary2.kmz — boundary renders, breadcrumb + status update, second KMZ replaces cleanly. (S8 regression check.)
+3. Read-through: ADR-0003, ADR-0004, `state/README.md`, CLAUDE.md §11 updates — all clear and useful as future-reference docs.
+
+Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
+
+---
+
+## S9 — Input panel + Generate Layout
+
+**Goal:** User fills in module / table / spacing / site / inverter sizing parameters in the right panel's **Layout tab**, clicks Generate, sees tables and ICRs on the map with counts in the summary panel. The **Energy yield tab** is visible but locked behind a PRO_PLUS gate (built fully in S13).
+
+**In scope:**
+
+- **Tabbed inspector IA.** Right panel becomes a `Tabs` primitive (Radix). Two tabs:
+  - **Layout** — fully built in S9.
+  - **Energy yield** — visible to all users; renders a `LockedSectionCard` ("Available in PRO_PLUS") for non-entitled users; placeholder body for PRO_PLUS users (full content lands in S13). Locks the IA so S13 doesn't redesign the panel mid-spike — see [ADR-0003](./adr/0003-state-architecture.md) and the "InputPanel split" rationale.
+- **`LayoutPanel.tsx`** — react-hook-form bound to the `layoutParams` Zustand slice (introduced in S8.8). Sections:
+  - Module: length / width / wattage.
+  - Table: orientation (portrait/landscape), modules per row, rows per table, table gap.
+  - Spacing & tilt: tilt override (auto-from-latitude vs manual), row pitch override (auto-from-shading vs manual).
+  - Site: perimeter road width.
+  - Inverter sizing: design mode (string vs central), max strings per inverter (or SMB), max SMB per central (visible in central mode), enable cable calc toggle.
+- **Validation:** Zod schema mirroring the sidecar's `LayoutParameters`. Min/max from PyQt5 reference inventory. Errors render inline.
+- **Generate button.** Wired to a TanStack Query mutation that POSTs `/layout` with the current `parsed_kmz` + `layoutParams`. Disabled when no project loaded or mid-flight.
+- **`SummaryPanel.tsx`** (in the Layout tab, below the Generate button or as a separate inspector section) — counts: MWp, # tables, # ICRs, plant area, used area, packing density. `Skeleton` state during mutation.
+- **Sidecar:** add `placed_tables_wgs84: list[list[Wgs84Point]]` and `placed_icrs_wgs84: list[list[Wgs84Point]]` fields to `LayoutResult`. Populate via existing `utm_to_wgs84` helper in `result_from_core`. Tests for parity with golden fixtures.
+- **`@solarlayout/sidecar-client`:** add `LayoutParameters` / `LayoutResult` / `PlacedTable` / `PlacedICR` / enums + `runLayout(parsedKmz, params)`.
+- **MapCanvas extension:** 2 new sources (`kmz-tables`, `kmz-icrs`) + 4 new layers in both `pv-light.json` and `pv-dark.json` (tables-fill, tables-outline, icrs-fill, icrs-outline). New props `tablesGeoJson` / `icrsGeoJson`.
+- **ICR labels:** HTML overlays positioned via `map.project()` on `move`/`zoom` events. Sidesteps the glyph/sprite stack we don't have. Pragmatic for ~1–5 ICRs per plant; deck.gl integration deferred to S10 where it earns its keep on inverters/cables.
+- **Loading state:** spinner inside the Generate button; `Skeleton` rows in the summary panel during mutation.
+
+**Out of scope:** inverters, cables, LAs (S10), drag/edit (S11), exports (S12), all energy yield fields (S13). PVgis / PAN / OND file parsers (deferred — manual entry works).
+
+**Deliverables:**
+- Fill in typical parameters → click Generate → tables appear as a grid inside the boundary, ICRs visible with footprint + label.
+- Layout tab fully functional. Energy tab visible with locked or placeholder state per entitlement.
+- Summary panel counts match PyQt5 output for the same input.
+
+**Human Gate:**
+1. Open a known KMZ; enter the same params as a PyQt5 reference run.
+2. Click Generate — tables render in <2s for a typical plant.
+3. Table count in summary = PyQt5's table count for the same run.
+4. ICR count matches.
+5. MWp matches.
+6. Visual: table grid layout looks identical to PyQt5's matplotlib output.
+7. Switch to Energy tab — PRO_PLUS lock card visible (non-entitled) or placeholder content (entitled). No errors.
+8. Re-open a different KMZ — old layout clears, new project state loads cleanly.
 
 **Deliverables:**
 - Fill in typical parameters, click Generate.
@@ -412,6 +502,30 @@ S15   Release pipeline + download delivery          [release]
 1. Using a PRO license: open a KMZ, generate, see string inverters on the map, toggle AC cables on/off, toggle LAs on/off.
 2. Switch to a Basic license (re-enter a basic key from your dashboard): relaunch, generate, PRO features are locked with upgrade badges.
 3. Counts and lengths match PyQt5 output for the same input.
+
+---
+
+## S10.5 — Drawing/editing pipeline ADR
+
+**Goal:** Pick the drawing/editing library S11 will use. MapLibre is a renderer, not an editor — drawing/dragging needs a separate interaction layer. Avoid hitting that wall on day 1 of S11.
+
+**In scope:**
+- Spike-quality demos (throwaway code, ~half-day total) of the three viable options against our existing MapLibre setup, on a real KMZ:
+  - **deck.gl + nebula.gl `EditableGeoJsonLayer`** (deck.gl will land in S10 anyway for inverters/cables, so adding it here is "free").
+  - **Terra Draw** (newer, MIT, MapLibre-native, declarative modes — strong for drawing new polygons).
+  - **maplibre-gl-draw** (community fork of `mapbox-gl-draw`; ISC-licensed; mature, less elegant API).
+- Evaluate each on: API ergonomics, bundle size impact, license, integration cleanliness with our existing `MapCanvas` composition, suitability for both *editing* (ICR drag) and *drawing* (obstruction polygons).
+- ADR-0005 — drawing/editing pipeline — picks one (or a combination) and locks the choice.
+- All demo code thrown away after the ADR lands. Final implementation is S11.
+
+**Out of scope:** any production code. Any S11 deliverable. Any change to S10 deliverables.
+
+**Deliverables:**
+- ADR-0005 written and accepted.
+- One-paragraph summary of why each option was picked or rejected.
+
+**Human Gate:**
+- Read ADR-0005. Decision is clear, options were honestly compared, future-S11 starts on solid ground.
 
 ---
 
@@ -641,6 +755,25 @@ S15   Release pipeline + download delivery          [release]
 3. Visit `solarlayout.in/download` (logged-in dashboard user) → see v1.0.0 buttons.
 4. Download your OS's installer → install → launch → enter test license → generate a layout → export a KMZ.
 5. The full loop works without manual intervention from here on out. You can ship new versions by tagging.
+
+---
+
+## S15.5 — Sidecar bundle slimming (deferred post-launch optimization)
+
+**Status:** Not scheduled. Picked up only on real-user signal.
+
+**Goal:** Reduce sidecar PyInstaller bundle by ~50MB by removing matplotlib (used only for PDF export today) and porting the PDF exporter to reportlab (or equivalent lightweight Python PDF lib).
+
+**Trigger to schedule:** Real-user feedback (after release) indicating install size or auto-update payload is friction. Without that signal, do not schedule — bundle size is a polish concern given our distribution model (binaries shipped from `solarlayout.in/download`, not Microsoft Store / Mac App Store, so no hard size caps; see [ADR-0004](./adr/0004-cloud-as-passive-storage.md)).
+
+**In scope (when activated):**
+- Replace matplotlib with reportlab in a new `pvlayout_engine/` PDF exporter module (NOT in `pvlayout_core/` — that stays verbatim per CLAUDE.md §2).
+- Golden-file tests for byte-similar output against PVlayout_Advance's matplotlib PDF.
+- Drop matplotlib from `pyproject.toml`; rebuild with PyInstaller; verify bundle size delta.
+
+**Out of scope:** any other size reductions; touching `pvlayout_core`; client-side PDF rendering.
+
+**Gate:** Bundle size reduced by ≥40MB; PDF output indistinguishable from current at the eyeball level + summary-page byte-for-byte where possible.
 
 ---
 
