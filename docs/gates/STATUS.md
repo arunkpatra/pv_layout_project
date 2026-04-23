@@ -1,12 +1,12 @@
 # Spike Status
 
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-24
 
 ## Current state
 
-**Active spike:** S6 — Design system implementation (light polished)
-**Status:** not started
-**Previous gate:** S5.5 passed 2026-04-23 — [`s05_5.md`](./s05_5.md)
+**Active spike:** S7 — License key + entitlements + feature gating (not started)
+**Status:** pending
+**Previous gate:** S6 passed 2026-04-24 — [`s06.md`](./s06.md)
 
 ## Progress
 
@@ -19,7 +19,7 @@
 | S4    | Sidecar: PyInstaller single-binary build       | 🟢 passed | [s04.md](./s04.md) |
 | S5    | Tauri 2 shell + sidecar lifecycle              | 🟢 passed | [s05.md](./s05.md) |
 | S5.5  | Design Foundations (tokens + light mocks)      | 🟢 passed | [s05_5.md](./s05_5.md) |
-| S6    | Design system implementation (light polished)  | ⚪ pending | — |
+| S6    | Design system implementation (light polished)  | 🟢 passed | [s06.md](./s06.md) |
 | S7    | License key + entitlements + feature gating    | ⚪ pending | — |
 | S8    | KMZ load + MapLibre canvas                     | ⚪ pending | — |
 | S9    | Input panel + Generate Layout                  | ⚪ pending | — |

@@ -1,0 +1,163 @@
+/* SolarLayout global stylesheet.
+ *
+ * Order matters:
+ *   1. Tailwind v4 core (base, components, utilities auto-loaded).
+ *   2. Our semantic tokens (both themes).
+ *   3. Our font faces.
+ *   4. Base reset + app-surface styles.
+ *
+ * Consumers (apps/desktop/src/main.tsx) import this ONCE. Every component
+ * that needs tokens references CSS variables; every component that needs
+ * utility classes uses Tailwind.
+ */
+
+@import "tailwindcss";
+
+/* Tell Tailwind v4 where our component TSX lives. Workspace packages are
+ * symlinked by Bun; the default content detection can miss them, producing
+ * a CSS bundle with tokens but no layout utilities. These globs are
+ * relative to this file (packages/ui/src/globals.css).
+ */
+@source "./**/*.{ts,tsx}";
+@source "../../../apps/desktop/src/**/*.{ts,tsx}";
+@source "../../../apps/desktop/index.html";
+
+@import "./tokens.css";
+@import "./fonts.css";
+
+/* Map our CSS variables into Tailwind's theme so Tailwind utilities
+ * (bg-[var(--surface-ground)], text-[var(--text-primary)], etc.) resolve
+ * cleanly. We deliberately do NOT register a palette — we want semantic
+ * tokens, not bg-amber-500.
+ *
+ * The only Tailwind additions are tokens that are referenced by
+ * multiple components and benefit from a short utility class, e.g.:
+ *   rounded-token-md  →  var(--radius-md)
+ *   shadow-token-md   →  var(--shadow-md)
+ */
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Base reset
+ *
+ * Wrapped in `@layer base` so component utilities (which Tailwind emits
+ * into `@layer utilities`) win the cascade. Unlayered rules would beat
+ * every layered utility regardless of specificity — the very bug that
+ * silently swallowed `bg-[var(...)]` / `text-[var(...)]` on buttons.
+ * ───────────────────────────────────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    color-scheme: light dark;
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    line-height: var(--lh-snug);
+    color: var(--text-primary);
+    background: var(--surface-ground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Native selection colored via accent-muted for warmth. */
+  ::selection {
+    background: var(--accent-muted);
+    color: var(--text-primary);
+  }
+
+  /* Keep focus visible — never allow `outline: none` to remove it silently.
+   * Components re-style focus with the --border-focus ring. */
+  :focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+
+  input,
+  textarea,
+  select {
+    background: transparent;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Hairline separators — pick up border-subtle from tokens. */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border-subtle);
+    margin: 0;
+  }
+
+  /* Scrollbar — restraint. Visible, not ornamental. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 10px;
+    border: 2px solid var(--surface-ground);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-strong);
+  }
+}
+
+/* prefers-reduced-motion — disables transitions & transforms globally. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

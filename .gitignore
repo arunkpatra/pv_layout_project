@@ -69,6 +69,7 @@ Thumbs.db
 # Test artifacts
 coverage/
 .nyc_output/
+.playwright-mcp/
 
 # Tauri build artifacts
 apps/desktop/src-tauri/target/

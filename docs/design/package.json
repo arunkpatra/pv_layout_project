@@ -6,6 +6,7 @@
   "description": "Static HTML design mocks for S5.5 — rendered to PNG via headless Chromium",
   "scripts": {
     "render": "node scripts/render-mocks.mjs",
+    "render:app": "node scripts/render-app.mjs",
     "build": "echo '[design-mocks] no build — static HTML'",
     "lint": "echo '[design-mocks] no lint yet'",
     "typecheck": "echo '[design-mocks] no typecheck'",

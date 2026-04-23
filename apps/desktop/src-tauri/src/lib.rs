@@ -4,6 +4,7 @@
 //! command (`get_sidecar_config`) that the React shell polls for the
 //! host/port/token the Python sidecar is listening on.
 
+mod menu;
 mod sidecar;
 
 use sidecar::{ConfigState, SidecarConfig, SidecarState};
@@ -52,6 +53,12 @@ pub fn run() {
             .format_timestamp_secs()
             .try_init()
             .ok();
+
+            // Native menu — S6. Event IDs are forwarded to the frontend
+            // as `menu:<id>` events; progressive wiring lands in S8+.
+            let menu = menu::build(app.handle())?;
+            app.set_menu(menu)?;
+            menu::wire_events(app.handle());
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

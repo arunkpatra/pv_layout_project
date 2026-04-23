@@ -1,0 +1,27 @@
+/* Inter — OFL, subset to Latin + Latin-Ext for desktop locale coverage.
+ *
+ * Three weights only: 400 / 500 / 600. No italic, no 700 — matches the
+ * weight discipline in docs/DESIGN_FOUNDATIONS.md §3.1. Adding an italic
+ * or a 700 should be a deliberate design decision, not an accident.
+ */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/Inter-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/Inter-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/Inter-SemiBold.woff2") format("woff2");
+}
