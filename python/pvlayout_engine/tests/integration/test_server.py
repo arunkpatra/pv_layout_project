@@ -134,11 +134,13 @@ def test_openapi_contains_real_route_schemas(client: TestClient) -> None:
 def test_openapi_registers_real_routes(client: TestClient) -> None:
     response = client.get("/openapi.json")
     paths = response.json().get("paths", {})
-    # All four routes exposed as of S3:
+    # S3 routes + S7 session routes:
     assert "/health" in paths
     assert "/parse-kmz" in paths
     assert "/layout" in paths
     assert "/refresh-inverters" in paths
+    assert "/session" in paths
+    assert "/session/entitlements" in paths
 
 
 def test_layout_requires_auth(client: TestClient) -> None:

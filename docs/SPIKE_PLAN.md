@@ -1,7 +1,7 @@
 # SolarLayout Desktop — Spike Plan
 
 **Status:** Draft for review
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-24
 **Companion doc:** [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ---
@@ -36,11 +36,12 @@ S11   Interactivity: ICR drag + obstruction drawing  [core UX]
 S12   Exports: KMZ + PDF                             [output]
 S13   PRO_PLUS: DXF + energy yield + CSV             [output]
 S13.5 Dark theme parity                              [design]
+S13.7 Subscription model redesign (brainstorm)       [strategy]
 S14   Auto-updater + code signing + notarization    [release]
 S15   Release pipeline + download delivery          [release]
 ```
 
-17 spikes. S0–S4 produce a working sidecar you can `curl`. S5–S7 produce a launchable shell that can authenticate, rendered to the Claude-Desktop-quality bar in light mode. S8–S13 bring the UI to feature parity with PVlayout_Advance. S13.5 brings dark theme to parity. S14–S15 make it shippable.
+18 spikes. S0–S4 produce a working sidecar you can `curl`. S5–S7 produce a launchable shell that can authenticate, rendered to the Claude-Desktop-quality bar in light mode. S8–S13 bring the UI to feature parity with PVlayout_Advance. S13.5 brings dark theme to parity. S13.7 decomposes the Edition → Subscription redesign (Free / Basic / Pro / Pro+) into executable sub-spikes before release. S14–S15 make it shippable.
 
 ---
 
@@ -288,21 +289,24 @@ S15   Release pipeline + download delivery          [release]
 
 ## S7 — License key + entitlements + feature gating
 
-**Goal:** User enters their license key, it's saved in OS keyring, entitlements fetched from `api.solarlayout.in`, feature flags applied to UI.
+**Goal:** User enters their license key, it's saved in OS keyring, entitlements fetched from `api.solarlayout.in`, feature flags applied to UI. Online-required (no offline grace window — [ADR 0001](./adr/0001-online-required-entitlements.md)).
 
 **In scope:**
-- `src-tauri/src/keyring.rs` — wraps the `keyring` crate. Service name `solarlayout-desktop`, user derived from license key hash.
+- `src-tauri/src/keyring.rs` — wraps the `keyring` crate. Service name `solarlayout-desktop`, account `license_key`.
 - Tauri commands: `get_license()`, `save_license(key)`, `clear_license()`.
-- `packages/entitlements-client/` — TS client for `GET /entitlements`, `POST /usage/report` on `api.solarlayout.in`. Mirrors `auth/license_client.py` from PVlayout_Advance.
-- React dialogs ported from PVlayout_Advance:
-  - `LicenseKeyDialog.tsx` — paste key, validate format, save.
-  - `LicenseInfoDialog.tsx` — show edition, expiration, holder, features.
-- `useEntitlements()` hook — TanStack Query: fetch on app start, 24h staleTime, offline-fallback to cached response.
-- `<FeatureGate feature="dxf">...</FeatureGate>` wrapper component — renders children if entitled, upgrade badge if not.
-- Entitlement edition chip in top bar ("Basic" / "Pro" / "Pro Plus").
-- Tauri passes the license key to the sidecar on spawn via env var; sidecar loads the feature flags into session state.
+- `packages/entitlements-client/` — TS client for `GET /entitlements`, `POST /usage/report` on `api.solarlayout.in`. Response shape mirrors the live mvp_api contract (`{ data: { user, plans[], availableFeatures[], remainingCalculations, ... } }`). Zod schemas validate at the boundary.
+- React dialogs:
+  - `LicenseKeyDialog.tsx` — paste key, validate `sl_live_` prefix, link to `solarlayout.in/sign-up` for new users.
+  - `LicenseInfoDialog.tsx` — account name/email, active plans with feature lists and `{used}/{total}` calculation counts, Change Key / Close.
+- `useEntitlements()` hook — TanStack Query: fetches once per session on boot (no offline fallback by policy; network failure surfaces as an error banner the user must resolve by reconnecting).
+- `<FeatureGate feature="dxf">…</FeatureGate>` wrapper — renders children if `availableFeatures` includes the key, upgrade badge otherwise.
+- Top-bar plan chip showing `data.plans[0].planName` verbatim (temporary — terminology will be revisited when the subscription redesign in S13.7 lands).
+- Tauri passes the license key to the sidecar on spawn via env var; sidecar loads `availableFeatures` into session state and enforces per-endpoint (infrastructure laid here; real enforcement endpoints arrive in S12/S13).
 
-**Out of scope:** Stripe flow, license issuance (those live in `mvp_api`).
+**Out of scope:**
+- Stripe flow, license issuance, subscription upgrade/downgrade (live in `mvp_api`; redesign in S13.7).
+- Renaming editions to subscription tiers (deferred to S13.7 and its sub-spikes).
+- Offline grace window (explicitly rejected — see ADR 0001).
 
 **Deliverables:**
 - First launch: license dialog blocks the app until a key is entered.
@@ -312,11 +316,11 @@ S15   Release pipeline + download delivery          [release]
 - "Clear license" menu item: keyring entry removed, relaunch shows dialog again.
 
 **Human Gate:**
-1. Fresh install → license dialog appears.
-2. Paste a valid key (from your test dashboard) → edition chip updates to match.
-3. Close and relaunch → skip dialog, edition chip visible immediately.
-4. Turn off wifi → relaunch → still works (cached entitlements).
-5. Turn off wifi + wait past grace window → graceful "license needs verification" banner.
+1. Fresh install → license dialog appears (blocking — no anonymous path).
+2. Paste a valid key from your signup-provisioned dashboard → plan chip updates to match `data.plans[0].planName`.
+3. Close and relaunch with internet → skip dialog, plan chip visible immediately.
+4. Turn off wifi → relaunch → app shows a "no internet — license check required" error surface. No offline fallback (by policy — see [ADR 0001](./adr/0001-online-required-entitlements.md)).
+5. Reconnect → relaunch works.
 6. Clear license from menu → relaunch → dialog returns.
 
 ---
@@ -537,6 +541,53 @@ S15   Release pipeline + download delivery          [release]
 3. MapLibre canvas in dark looks intentional — not inverted, not washed out. Labels readable. Selection state obvious. Obstruction fills distinguishable from boundary.
 4. Sighted check by a second person (anyone): "does this feel like the same premium app in both themes?" returns yes.
 5. Theme switcher no longer says "preview."
+
+---
+
+## S13.7 — Subscription model redesign (brainstorm)
+
+**Goal:** Decide the path from the current Edition-based stacking-entitlements model (Basic / Pro / Pro Plus — historical artifact from PVlayout_Advance) to a subscription-based model (Free / Basic / Pro / Pro+ — single active subscription per user, upgrade/downgrade supported). Output: a written decision doc and a set of executable sub-spikes.
+
+**This spike is deliberative. No desktop code. No mvp_api code. Only thinking, scoping, and planning.**
+
+**Input context (as of S13.7 start — all captured already in S0–S13.5):**
+- Live mvp_api response shape for `/entitlements`, `/usage/report`, `/health`.
+- Live mvp_db schema (`User`, `Product`, `ProductFeature`, `Entitlement`, `LicenseKey`, `CheckoutSession`, `UsageRecord`).
+- Live Stripe wiring: `checkout.session.completed` only; no subscription lifecycle webhooks.
+- Live Clerk integration: signup → auto-provision Free product entitlement + license key.
+- Complete list of `availableFeatures` keys the desktop consumes across S7, S10, S11, S12, S13.
+- Complete list of PVlayout_Advance Edition-gated behaviors (`core/edition.py` semantics preserved verbatim in `pvlayout_core` but consumed via feature keys rather than Edition enum at the app boundary).
+
+**In scope:**
+1. **Tier design.** What features, what quotas, what price points for Free / Basic / Pro / Pro+. Anchor against competitive landscape and cost-to-serve. Output: a tier matrix.
+2. **Subscription lifecycle design.** Upgrade, downgrade, cancel, reactivate, payment-failed states. Proration rules. Grace-before-downgrade vs. immediate-downgrade. Plan-change effective-date semantics. Output: a state diagram.
+3. **Data model delta.** `Subscription` table shape, relationship to `Entitlement` (replace / augment / coexist), `SubscriptionEvent` audit log, migration strategy for existing stacking-entitlement users. Output: a proposed Prisma schema diff.
+4. **API contract delta.** New/updated endpoints (`GET /billing/subscription`, `POST /billing/upgrade`, `POST /billing/downgrade`, `POST /billing/cancel`, modified `/entitlements` response), Stripe webhook expansion (`customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`). Output: a proposed OpenAPI delta.
+5. **Desktop client delta.** `@solarlayout/entitlements-client` schema update, `useEntitlements` shape change, top-bar chip copy (planName now is tier name — one of four), FeatureGate behavior unchanged. Output: a proposed TS client diff.
+6. **mvp_web dashboard delta.** "Current plan" + "Manage subscription" surface. Upgrade/downgrade modal. Payment-failed dunning UI. Output: rough wireframes or a written surface list.
+7. **Migration strategy.** How do existing stacking-entitlement users land in the new subscription model on cutover day? Grandfathering rules. Communication.
+8. **Cutover ordering.** Does the new API ship before, after, or alongside desktop v1? If alongside: how do we coordinate releases? Output: a cutover runbook.
+9. **Sub-spike enumeration.** What sub-spikes come out of this, in what order, with what gates. Output: draft spike-plan entries for each.
+
+**Out of scope:**
+- Writing any of the sub-spike code.
+- Stripe product catalog changes (these ride in the sub-spikes).
+- Any desktop code or test change.
+- Brand / identity decisions (S13.6).
+
+**Deliverables:**
+- `docs/adr/0002-subscription-model.md` — the decision doc recording the final design across all 9 in-scope items.
+- `docs/SPIKE_PLAN.md` amended — new sub-spikes (S13.7a, S13.7b, …) inserted between S13.7 and S14, each with real Goal/In-scope/Out-of-scope/Deliverables/Gate sections.
+- `docs/adr/0003-subscription-migration.md` — cutover and grandfathering plan.
+
+**Human Gate:**
+1. Read `docs/adr/0002-subscription-model.md` end to end. Every design decision is explicit, justified, and has a "consequence" line.
+2. Sub-spike list in the updated `SPIKE_PLAN.md` covers every delta in the ADR. No hand-waving; each sub-spike has a real gate.
+3. Stripe product catalog + Clerk signup flow + mvp_web dashboard changes all mapped to specific sub-spikes. Nothing orphaned.
+4. Cutover runbook addresses: grandfathering, communication, rollback plan, data migration script. Your judgment: would you trust this plan with real users on the other side?
+5. Sign-off on this spike is sign-off on the subscription architecture. The sub-spikes execute against this contract.
+
+**Note:** This spike explicitly decouples deliberation from execution. The spike closes when the plan is good, not when any code ships. Sub-spikes carry the execution.
 
 ---
 

@@ -207,9 +207,10 @@ Status: accepted | superseded | reversed
 ```
 
 ADRs expected before we're done (assigned to spikes):
-- S7: offline entitlement grace window.
+- S7: online-required entitlement policy (ADR 0001 — accepted 2026-04-24).
 - S8: basemap strategy (online free tiles vs. offline vector pack).
 - S12: telemetry event granularity + opt-in/opt-out.
+- S13.7: subscription model redesign (ADR 0002) + migration plan (ADR 0003).
 - S14: crash reporting provider.
 
 ---

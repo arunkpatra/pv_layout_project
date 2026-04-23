@@ -3,11 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Hand-written TypeScript client for api.solarlayout.in — GET /entitlements, POST /usage/report (stub, filled in S7)",
+  "description": "Typed TypeScript client for api.solarlayout.in — GET /entitlements, POST /usage/report",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
   "scripts": {
-    "build": "echo \"[S0 stub] @solarlayout/entitlements-client build\"",
-    "lint": "echo \"[S0 stub] @solarlayout/entitlements-client lint\"",
-    "typecheck": "echo \"[S0 stub] @solarlayout/entitlements-client typecheck\"",
-    "test": "echo \"[S0 stub] @solarlayout/entitlements-client test\""
+    "build": "echo '[entitlements-client] source-only; consumers transpile'",
+    "lint": "echo '[entitlements-client] lint wired with app ESLint later'",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "typescript": "^5.7.3"
   }
 }

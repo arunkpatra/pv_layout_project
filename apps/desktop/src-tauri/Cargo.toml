@@ -26,6 +26,10 @@ tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread", "proce
 log = "0.4"
 env_logger = "0.11"
 rand = "0.8"
+# S7: OS credential store for the license key. apple-native / linux-native /
+# windows-native features select the platform-native backend; no third-party
+# DBus or Wincred shims pulled in.
+keyring = { version = "3", features = ["apple-native", "linux-native", "windows-native"] }
 
 [profile.release]
 panic = "abort"

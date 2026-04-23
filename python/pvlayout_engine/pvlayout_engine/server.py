@@ -22,7 +22,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pvlayout_engine.config import SidecarConfig
 from pvlayout_engine.routes.layout import router as layout_router
+from pvlayout_engine.routes.session import router as session_router
 from pvlayout_engine.schemas import HealthResponse
+from pvlayout_engine.session import SessionState
 
 log = logging.getLogger("pvlayout_engine")
 
@@ -40,9 +42,14 @@ def build_app(config: SidecarConfig) -> FastAPI:
         ),
         openapi_tags=[
             {"name": "meta", "description": "Health and version checks."},
+            {"name": "session", "description": "Per-session entitlements pushed by the shell."},
             {"name": "layout", "description": "Parse KMZ, generate layout, refresh inverters."},
         ],
     )
+
+    # Per-session state — entitlements set pushed by the shell; feature-gate
+    # dependencies read from here. See pvlayout_engine.session.
+    app.state.session = SessionState()
 
     # Loopback by construction; CORS kept permissive for the WebView origin
     # Tauri picks (tauri:// on Windows/Linux, null on macOS). Token auth is
@@ -88,6 +95,11 @@ def build_app(config: SidecarConfig) -> FastAPI:
     )
     def health() -> HealthResponse:
         return HealthResponse(status="ok", version=config.version)
+
+    # --- Session routes (S7) ------------------------------------------------
+    # /session, /session/entitlements — token-gated but not feature-gated
+    # (the whole point of /session is establishing that state).
+    authed.include_router(session_router)
 
     # --- Layout routes (S3) -------------------------------------------------
     # /parse-kmz, /layout, /refresh-inverters — all token-gated.

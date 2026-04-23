@@ -4,6 +4,7 @@
 //! command (`get_sidecar_config`) that the React shell polls for the
 //! host/port/token the Python sidecar is listening on.
 
+mod keyring;
 mod menu;
 mod sidecar;
 
@@ -45,7 +46,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .manage(SidecarState::default())
-        .invoke_handler(tauri::generate_handler![get_sidecar_config])
+        .invoke_handler(tauri::generate_handler![
+            get_sidecar_config,
+            keyring::get_license,
+            keyring::save_license,
+            keyring::clear_license,
+        ])
         .setup(|app| {
             env_logger::Builder::from_env(
                 env_logger::Env::default().default_filter_or("info"),

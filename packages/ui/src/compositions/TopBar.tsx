@@ -23,6 +23,7 @@ export interface TopBarProps {
   userEmail?: string
   onToggleToolRail?: () => void
   onToggleInspector?: () => void
+  onViewLicense?: () => void
   onClearLicense?: () => void
   onSettings?: () => void
 }
@@ -60,6 +61,7 @@ export function TopBar({
   userEmail,
   onToggleToolRail,
   onToggleInspector,
+  onViewLicense,
   onClearLicense,
   onSettings,
 }: TopBarProps) {
@@ -166,7 +168,7 @@ export function TopBar({
             Settings
             <DropdownMenuShortcut>⌘,</DropdownMenuShortcut>
           </DropdownMenuItem>
-          <DropdownMenuItem>View license</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onViewLicense}>View license</DropdownMenuItem>
           <DropdownMenuItem onSelect={onClearLicense}>Clear license</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem>About SolarLayout</DropdownMenuItem>

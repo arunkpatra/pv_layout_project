@@ -10,10 +10,15 @@
     "shell:allow-spawn",
     "shell:allow-kill",
     {
+      "identifier": "shell:allow-open",
+      "allow": [{ "url": "https://**" }]
+    },
+    {
       "identifier": "http:default",
       "allow": [
         { "url": "http://127.0.0.1:*/*" },
-        { "url": "http://localhost:*/*" }
+        { "url": "http://localhost:*/*" },
+        { "url": "https://api.solarlayout.in/*" }
       ]
     }
   ]

@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S7 — License key + entitlements + feature gating (not started)
+**Active spike:** S8 — KMZ load + MapLibre canvas (not started)
 **Status:** pending
-**Previous gate:** S6 passed 2026-04-24 — [`s06.md`](./s06.md)
+**Previous gate:** S7 passed 2026-04-24 — [`s07.md`](./s07.md)
 
 ## Progress
 
@@ -20,7 +20,7 @@
 | S5    | Tauri 2 shell + sidecar lifecycle              | 🟢 passed | [s05.md](./s05.md) |
 | S5.5  | Design Foundations (tokens + light mocks)      | 🟢 passed | [s05_5.md](./s05_5.md) |
 | S6    | Design system implementation (light polished)  | 🟢 passed | [s06.md](./s06.md) |
-| S7    | License key + entitlements + feature gating    | ⚪ pending | — |
+| S7    | License key + entitlements + feature gating    | 🟢 passed | [s07.md](./s07.md) |
 | S8    | KMZ load + MapLibre canvas                     | ⚪ pending | — |
 | S9    | Input panel + Generate Layout                  | ⚪ pending | — |
 | S10   | Inverters, cables, LAs                         | ⚪ pending | — |
@@ -28,6 +28,7 @@
 | S12   | Exports: KMZ + PDF                             | ⚪ pending | — |
 | S13   | PRO_PLUS: DXF + energy yield + CSV             | ⚪ pending | — |
 | S13.5 | Dark theme parity                              | ⚪ pending | — |
+| S13.7 | Subscription model redesign (brainstorm)       | ⚪ pending | — |
 | S14   | Auto-updater + code signing + notarization     | ⚪ pending | — |
 | S15   | Release pipeline + download delivery           | ⚪ pending | — |
 

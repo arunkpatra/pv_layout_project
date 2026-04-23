@@ -17,8 +17,10 @@
     "test": "echo '[S5 stub] @solarlayout/desktop test (Vitest added in S6)'"
   },
   "dependencies": {
+    "@solarlayout/entitlements-client": "workspace:*",
     "@solarlayout/sidecar-client": "workspace:*",
     "@solarlayout/ui": "workspace:*",
+    "@tanstack/react-query": "^5.62.11",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-http": "^2.2.0",
     "@tauri-apps/plugin-shell": "^2.2.0",

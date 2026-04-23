@@ -1,7 +1,7 @@
 # SolarLayout Desktop — Platform Architecture
 
 **Status:** Draft for review
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-24
 **Owning repo:** `/Users/arunkpatra/codebase/pv_layout_project`
 **Related repos (read-only reference):**
 - `PVlayout_Advance` — the current PyQt5 desktop app, source of truth for all domain logic
@@ -135,36 +135,46 @@ pv_layout_project/
 
 One build. All features shipped. Runtime gating by entitlements.
 
-**Feature definition** — `pvlayout_core/edition.py` stays verbatim. It defines which features belong to which tier, e.g. `has_dxf`, `has_energy`, `has_cables`. The file is the canonical truth for what a feature flag means, shared by the sidecar and (by mirror) the React app.
+**Feature definition** — `pvlayout_core/edition.py` is preserved verbatim (part of the vendored core — never modified). At the app boundary, however, we consume feature keys directly (`"plant_layout"`, `"cables"`, `"icr_drag"`, `"dxf"`, `"energy"`, …) rather than the `Edition` enum. This decouples the desktop from the Edition abstraction, which will be retired when the subscription redesign (S13.7) ships Free/Basic/Pro/Pro+ tiers.
 
 **Entitlements flow:**
 1. App launch → Tauri reads license key from OS keyring → React calls `GET api.solarlayout.in/entitlements` with `Authorization: Bearer <key>`.
-2. Response example:
+2. Response shape (live mvp_api contract as of 2026-04):
    ```json
    {
-     "edition": "pro",
-     "features": {
-       "cables": true,
-       "obstructions": true,
-       "icr_drag": true,
-       "dxf": false,
-       "energy": false,
-       "ac_dc_ratio": false
-     },
-     "license": { "expires_at": "2027-01-01T00:00:00Z", "holder": "Acme Solar" }
+     "success": true,
+     "data": {
+       "user":   { "name": "Acme Solar", "email": "ops@acme.example" },
+       "plans":  [
+         {
+           "planName": "Pro",
+           "features": ["Cable routing", "DXF export"],
+           "totalCalculations": 500,
+           "usedCalculations": 12,
+           "remainingCalculations": 488
+         }
+       ],
+       "licensed": true,
+       "availableFeatures": ["plant_layout", "cables", "icr_drag", "dxf"],
+       "totalCalculations": 500,
+       "usedCalculations": 12,
+       "remainingCalculations": 488
+     }
    }
    ```
-3. React caches in TanStack Query (24h TTL + offline grace window).
+   `availableFeatures[]` is the enforcement truth. `plans[]` drives the top-bar chip and the license-info dialog.
+3. React holds entitlements in TanStack Query for the session (no persistent offline cache — [ADR 0001](./adr/0001-online-required-entitlements.md)).
 4. UI reads `useEntitlements()`; locked features render with an upgrade badge + disabled controls.
 
 **Defense in depth:**
-- The sidecar also enforces. `POST /export/dxf` returns `403 feature_not_entitled` if the entitlements token in the session is missing that flag. A tampered React bundle cannot coax a DXF out of the sidecar.
-- Entitlements are passed to the sidecar at session start (Tauri holds the license, forwards to sidecar on spawn).
+- The sidecar also enforces. `POST /export/dxf` returns `403 feature_not_entitled` if the license key's `availableFeatures` set (loaded at sidecar boot) doesn't include the required key. A tampered React bundle cannot coax a DXF out of the sidecar.
+- Entitlements are loaded by the sidecar at session start — Tauri forwards the license key via env var, the sidecar calls `/entitlements` itself on boot.
 
 **Upgrade flow:**
 - User clicks "Upgrade" in desktop → Tauri opens browser to `solarlayout.in/pricing`.
-- Stripe checkout on `mvp_web` → `mvp_api` issues license → email delivers key.
-- User pastes key in License dialog → entitlements refresh → features unlock immediately, no reinstall.
+- Stripe checkout on `mvp_web` → `mvp_api` provisions entitlement + license key (key is reused across purchases for a given user).
+- User's existing key already works; entitlements refresh on next launch, features unlock immediately.
+- New-user flow: signup at `solarlayout.in/sign-up` (Clerk) auto-provisions a Free-tier entitlement and license key on first authenticated request. No purchase required to start.
 
 ---
 
@@ -292,7 +302,7 @@ Tauri embeds the sidecar binary via `tauri.conf.json > bundle > externalBin`.
 - Multi-user collaboration, project sync, cloud save. File-based workflow only.
 - Mobile apps. Desktop only.
 - Web-based version of the editor. Marketing + dashboard on the web; editing on desktop.
-- Offline license activation. First run requires internet; subsequent launches use cached entitlements with a grace window.
+- Offline license activation. Online required on every launch — no offline grace window. See [ADR 0001](./adr/0001-online-required-entitlements.md).
 
 ---
 
@@ -303,11 +313,14 @@ Resolved:
 - **User environment.** Standard office setting assumed — no sunlight-readability or high-contrast adaptations needed in v1.
 - **Theme priority.** **Light first** in S5.5/S6, to Claude-Desktop quality bar. Dark theme ships as "preview" between S6 and S13.5, then brought to parity in S13.5.
 
+Resolved in S7:
+- **Offline entitlement behaviour** — no grace window. Online required on every launch for entitlement verification. See [ADR 0001](./adr/0001-online-required-entitlements.md).
+
 Deferred to relevant spikes:
-- **Offline grace window** (7 / 14 / 30 days) — decided in S7.
 - **Telemetry granularity** (which events fire `/usage/report`, opt-in vs. opt-out) — decided in S12.
 - **Crash reporting** (Sentry for both Rust shell and Python sidecar? free tier?) — decided in S14.
 - **MapLibre basemap strategy** (online free tiles vs. offline vector pack bundled with the app) — decided in S8.
+- **Subscription model redesign** (Free / Basic / Pro / Pro+, single active subscription, upgrade/downgrade) — deliberated in S13.7.
 
 ---
 

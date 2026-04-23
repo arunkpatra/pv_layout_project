@@ -7,10 +7,19 @@ import { durations, easings } from "../lib/motion"
  *
  * Matches docs/design/light/splash.html. Progress rail is indeterminate
  * (animated slide) until the parent transitions to the healthy state.
+ *
+ * `data-tauri-drag-region` on the root — the Splash shows while the
+ * TopBar isn't yet mounted (S7 first-launch dialog, sidecar boot).
+ * Without it the user has no draggable surface at all. Interactive
+ * descendants (buttons / inputs in any child dialog) are excluded by
+ * Tauri's native handler.
  */
 export function Splash({ statusText = "Starting engine…" }: { statusText?: string }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[var(--surface-ground)]">
+    <div
+      data-tauri-drag-region
+      className="absolute inset-0 flex items-center justify-center bg-[var(--surface-ground)]"
+    >
       <div className="flex flex-col items-center gap-[14px]">
         <div className="flex items-center gap-[12px] text-[28px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
           <span className="w-[28px] h-[28px] flex items-center justify-center text-[var(--accent-default)]">

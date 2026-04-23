@@ -353,6 +353,37 @@ class ErrorResponse(_Model):
 
 
 # ---------------------------------------------------------------------------
+# Session / entitlements (S7)
+#
+# The shell pushes the user's current entitlements to the sidecar after
+# fetching them from api.solarlayout.in. See pvlayout_engine.session for
+# the rationale (push vs. fetch) and the feature-gate dependency.
+# ---------------------------------------------------------------------------
+
+
+class SessionEntitlementsRequest(_Model):
+    """POST /session/entitlements body.
+
+    ``available_features`` is the enforcement truth — a flat list of
+    feature-key strings mirroring the ``availableFeatures`` field of the
+    mvp_api /entitlements response. ``plan_name`` is informational only;
+    it's shown in diagnostics and /session responses but the sidecar
+    never enforces based on it.
+    """
+
+    available_features: list[str] = Field(default_factory=list)
+    plan_name: str | None = None
+
+
+class SessionInfoResponse(_Model):
+    """GET /session response — the current per-session entitlements."""
+
+    initialized: bool
+    available_features: list[str] = Field(default_factory=list)
+    plan_name: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Registry — list of schemas surfaced via /_schemas/echo/* dev endpoints so
 # they appear in OpenAPI / Swagger UI.
 # Dev-only; the echo routes are removed in S3 (after real routes take over).
