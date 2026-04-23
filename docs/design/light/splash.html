@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SolarLayout — Splash</title>
+    <link rel="stylesheet" href="../assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="../tokens/tokens.css" />
+    <link rel="stylesheet" href="../tokens/base.css" />
+    <style>
+      /* Splash-specific — minimal, center-weighted */
+      .splash-body {
+        flex: 1;
+        display: grid;
+        place-items: center;
+        background: var(--surface-ground);
+      }
+      .splash-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-5);
+        transform: translateY(-24px);
+      }
+      .splash-wordmark {
+        font-size: var(--fs-2xl);
+        font-weight: var(--fw-semibold);
+        letter-spacing: var(--letter-tighter);
+        color: var(--text-primary);
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .splash-wordmark-glyph {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        color: var(--accent-default);
+        flex-shrink: 0;
+      }
+      .splash-wordmark-glyph svg {
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .splash-tagline {
+        font-size: var(--fs-sm);
+        color: var(--text-muted);
+        letter-spacing: 0;
+      }
+      .splash-status {
+        margin-top: var(--space-6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-3);
+      }
+      .splash-progress {
+        width: 200px;
+        height: 2px;
+        background: var(--border-subtle);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+      .splash-progress::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 72%;
+        background: var(--accent-default);
+        border-radius: 2px;
+      }
+      .splash-status-text {
+        font-size: var(--fs-xs);
+        color: var(--text-muted);
+        letter-spacing: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-canvas">
+      <div class="window">
+        <div class="window-titlebar">
+          <div class="traffic">
+            <span class="red"></span>
+            <span class="yellow"></span>
+            <span class="green"></span>
+          </div>
+          <span class="titlebar-label">SolarLayout</span>
+        </div>
+        <div class="splash-body">
+          <div class="splash-content">
+            <div class="splash-wordmark">
+              <span class="splash-wordmark-glyph">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              </span>
+              SolarLayout
+            </div>
+            <div class="splash-tagline">Solar PV plant layout design</div>
+            <div class="splash-status">
+              <div class="splash-progress"></div>
+              <div class="splash-status-text">Starting engine…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

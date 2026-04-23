@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SolarLayout — Startup</title>
+    <link rel="stylesheet" href="../assets/fonts/fonts.css" />
+    <link rel="stylesheet" href="../tokens/tokens.css" />
+    <link rel="stylesheet" href="../tokens/base.css" />
+    <style>
+      .startup-body {
+        flex: 1;
+        display: grid;
+        place-items: center;
+        background: var(--surface-ground);
+        padding: var(--space-12) var(--space-8);
+      }
+      .startup-content {
+        width: 100%;
+        max-width: 640px;
+      }
+      .startup-header {
+        text-align: center;
+        margin-bottom: var(--space-8);
+      }
+      .startup-glyph-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: var(--accent-muted);
+        color: var(--accent-default);
+        margin-bottom: var(--space-4);
+      }
+      .startup-title {
+        font-size: var(--fs-xl);
+        font-weight: var(--fw-semibold);
+        letter-spacing: var(--letter-tighter);
+        color: var(--text-primary);
+        margin: 0 0 var(--space-2) 0;
+      }
+      .startup-subtitle {
+        font-size: var(--fs-md);
+        color: var(--text-secondary);
+        margin: 0;
+        line-height: var(--lh-snug);
+      }
+      .mode-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-3);
+        margin-bottom: var(--space-6);
+      }
+      .mode-card {
+        background: var(--surface-panel);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        padding: var(--space-5);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color var(--duration-fast) var(--easing-standard),
+                    box-shadow var(--duration-fast) var(--easing-standard);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        position: relative;
+      }
+      .mode-card:hover { border-color: var(--border-default); }
+      .mode-card.is-selected {
+        border-color: var(--accent-default);
+        box-shadow: 0 0 0 3px var(--accent-muted);
+      }
+      .mode-card-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--surface-muted);
+        color: var(--text-secondary);
+        display: grid;
+        place-items: center;
+      }
+      .mode-card.is-selected .mode-card-icon {
+        background: var(--accent-muted);
+        color: var(--accent-default);
+      }
+      .mode-card-title {
+        font-size: var(--fs-md);
+        font-weight: var(--fw-semibold);
+        color: var(--text-primary);
+        letter-spacing: var(--letter-tight);
+      }
+      .mode-card-body {
+        font-size: var(--fs-sm);
+        color: var(--text-secondary);
+        line-height: var(--lh-snug);
+        margin: 0;
+      }
+      .mode-card-check {
+        position: absolute;
+        top: var(--space-3);
+        right: var(--space-3);
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1.5px solid var(--border-default);
+        background: var(--surface-panel);
+      }
+      .mode-card.is-selected .mode-card-check {
+        border-color: var(--accent-default);
+        background: var(--accent-default);
+        display: grid;
+        place-items: center;
+      }
+      .mode-card.is-selected .mode-card-check::after {
+        content: "";
+        width: 6px; height: 6px;
+        background: var(--surface-panel);
+        border-radius: 50%;
+      }
+      .startup-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .startup-actions-help {
+        font-size: var(--fs-sm);
+        color: var(--text-secondary);
+        cursor: pointer;
+      }
+      .startup-actions-help:hover { color: var(--text-primary); }
+      .startup-actions-help .icon { margin-right: 4px; vertical-align: -3px; }
+    </style>
+  </head>
+  <body>
+    <div class="mock-canvas">
+      <div class="window">
+        <div class="window-titlebar">
+          <div class="traffic">
+            <span class="red"></span>
+            <span class="yellow"></span>
+            <span class="green"></span>
+          </div>
+          <span class="titlebar-label">SolarLayout</span>
+        </div>
+
+        <div class="startup-body">
+          <div class="startup-content">
+            <div class="startup-header">
+              <div class="startup-glyph-wrap">
+                <svg class="icon icon-20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              </div>
+              <h1 class="startup-title">Choose your design approach</h1>
+              <p class="startup-subtitle">
+                Pick the inverter topology that matches the plant you're designing. You can change this later in project settings.
+              </p>
+            </div>
+
+            <div class="mode-cards">
+              <button class="mode-card is-selected">
+                <span class="mode-card-check"></span>
+                <span class="mode-card-icon">
+                  <svg class="icon icon-20" viewBox="0 0 24 24"><rect x="3" y="7" width="5" height="10" rx="1" /><rect x="10" y="7" width="5" height="10" rx="1" /><rect x="17" y="7" width="4" height="10" rx="1" /><path d="M5.5 3v4M12.5 3v4M19 3v4" /></svg>
+                </span>
+                <div>
+                  <div class="mode-card-title">String inverter</div>
+                </div>
+                <p class="mode-card-body">
+                  Distributed inverters sized per table cluster. Simpler wiring; common for plants under 30 MWp.
+                </p>
+              </button>
+
+              <button class="mode-card">
+                <span class="mode-card-check"></span>
+                <span class="mode-card-icon">
+                  <svg class="icon icon-20" viewBox="0 0 24 24"><rect x="8" y="4" width="8" height="16" rx="1.5" /><path d="M4 8h4M4 12h4M4 16h4M16 8h4M16 12h4M16 16h4" /></svg>
+                </span>
+                <div>
+                  <div class="mode-card-title">Central inverter</div>
+                </div>
+                <p class="mode-card-body">
+                  One or more large inverters fed through SMBs. Preferred for utility-scale plants above 30 MWp.
+                </p>
+              </button>
+            </div>
+
+            <div class="startup-actions">
+              <span class="startup-actions-help">
+                <svg class="icon icon-16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" /></svg>
+                What's the difference?
+              </span>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-subtle btn-lg">Open existing</button>
+                <button class="btn btn-primary btn-lg">Continue</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

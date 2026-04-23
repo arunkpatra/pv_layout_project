@@ -1,0 +1,226 @@
+/* SolarLayout design tokens — canonical source.
+ *
+ * Every mock in docs/design/ consumes these variables. S6 copies the
+ * same token names into `packages/ui`, so "design drift" is surfaced
+ * as a diff in this one file, not scattered across components.
+ *
+ * Semantic naming: names describe ROLE, not APPEARANCE. Hue or lightness
+ * can change (Branding spike, dark mode) without any consumer changing.
+ */
+
+:root {
+  /* --------------------------------------------------------------------
+     Ground & elevations (light theme)
+     Hierarchy is carried by luminance shifts on a warm off-white base,
+     not by shadows or heavy borders. Each successive surface is 1–3%
+     darker than the one beneath it — enough to read, quiet enough to
+     stay out of the way.
+     -------------------------------------------------------------------- */
+  --surface-canvas:        #f7f6f3;   /* the map / workspace ground */
+  --surface-ground:        #faf9f7;   /* app chrome ground (sidebars) */
+  --surface-panel:         #ffffff;   /* inspector/dialog surfaces */
+  --surface-popover:       #ffffff;   /* menus, command palette, tooltips */
+  --surface-muted:         #f1efeb;   /* selected rows, subtle chips */
+
+  /* --------------------------------------------------------------------
+     Text
+     Black-on-off-white; hierarchy by weight and opacity, not hue.
+     -------------------------------------------------------------------- */
+  --text-primary:          #1a1a19;
+  --text-secondary:        #60605d;
+  --text-muted:            #94938f;
+  --text-placeholder:      #b1b0ab;
+  --text-on-accent:        #ffffff;
+  --text-link:             #1a1a19;
+
+  /* --------------------------------------------------------------------
+     Borders & separators
+     Hairlines only. All borders inherit from the text color at low
+     alpha so they tint warm with the rest of the palette.
+     -------------------------------------------------------------------- */
+  --border-subtle:         rgba(26, 26, 25, 0.08);
+  --border-default:        rgba(26, 26, 25, 0.12);
+  --border-strong:         rgba(26, 26, 25, 0.20);
+  --border-focus:          rgba(211, 110, 49, 0.55);
+
+  /* --------------------------------------------------------------------
+     Accent (placeholder — real value arrives in the Branding spike)
+     Warm amber, used sparingly. Never for ambient decoration.
+     -------------------------------------------------------------------- */
+  --accent-default:        #d36e31;
+  --accent-hover:           #b85b22;
+  --accent-muted:          rgba(211, 110, 49, 0.12);
+  --accent-ink:            #6e3a1a;     /* text on accent-muted chip */
+
+  /* --------------------------------------------------------------------
+     Signal colors
+     Success/warning/error reserved for meaningful states only.
+     -------------------------------------------------------------------- */
+  --success-default:       #2f7a44;
+  --success-muted:         rgba(47, 122, 68, 0.12);
+  --warning-default:       #b37a00;
+  --warning-muted:         rgba(179, 122, 0, 0.12);
+  --error-default:         #b42c2c;
+  --error-muted:           rgba(180, 44, 44, 0.12);
+
+  /* --------------------------------------------------------------------
+     Data-vis palette (the layout canvas)
+     Each domain object gets its own role-token. Values stay under the
+     "restraint" rule — no rainbow. Orange/amber reserved for accent.
+     -------------------------------------------------------------------- */
+  --canvas-boundary-stroke:    rgba(26, 26, 25, 0.55);
+  --canvas-boundary-fill:      rgba(26, 26, 25, 0.02);
+  --canvas-obstacle-fill:      rgba(26, 26, 25, 0.12);
+  --canvas-obstacle-stroke:    rgba(26, 26, 25, 0.32);
+  --canvas-tl-stroke:          rgba(180, 44, 44, 0.45);   /* TL corridor */
+  --canvas-table-fill:         #3f5d7a;                    /* muted slate-blue */
+  --canvas-table-stroke:       rgba(26, 26, 25, 0.22);
+  --canvas-table-fill-selected:#d36e31;
+  --canvas-icr-fill:           #1a1a19;                    /* ICR building */
+  --canvas-icr-stroke:         #1a1a19;
+  --canvas-inverter-fill:      #2f7a44;                    /* string inverter marker */
+  --canvas-cable-dc:           rgba(63, 93, 122, 0.65);
+  --canvas-cable-ac:           rgba(180, 44, 44, 0.55);
+  --canvas-la-fill:            rgba(211, 110, 49, 0.85);
+  --canvas-la-radius:          rgba(211, 110, 49, 0.08);
+  --canvas-grid-dot:           rgba(26, 26, 25, 0.07);     /* subtle dot grid */
+
+  /* --------------------------------------------------------------------
+     Typography
+     Inter for everything until the Branding spike reconsiders. Weights
+     (400/500/600) chosen to minimize the bundle. No italic, no 700.
+     -------------------------------------------------------------------- */
+  --font-sans:             "Inter", -apple-system, BlinkMacSystemFont,
+                           "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:             ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-xs:                 11px;   /* status bar meta, keyboard hints */
+  --fs-sm:                 12px;   /* secondary labels, tooltips */
+  --fs-base:               13px;   /* default body copy */
+  --fs-md:                 14px;   /* primary controls, inputs */
+  --fs-lg:                 16px;   /* section headers */
+  --fs-xl:                 20px;   /* dialog titles */
+  --fs-2xl:                28px;   /* splash wordmark */
+
+  --fw-regular:            400;
+  --fw-medium:             500;
+  --fw-semibold:           600;
+
+  --lh-tight:              1.25;
+  --lh-snug:               1.4;
+  --lh-normal:             1.5;
+
+  --letter-tight:          -0.01em;
+  --letter-tighter:        -0.02em;
+
+  /* --------------------------------------------------------------------
+     Spacing — 4px grid
+     -------------------------------------------------------------------- */
+  --space-0:               0;
+  --space-1:               4px;
+  --space-2:               8px;
+  --space-3:               12px;
+  --space-4:               16px;
+  --space-5:               20px;
+  --space-6:               24px;
+  --space-8:               32px;
+  --space-10:              40px;
+  --space-12:              48px;
+  --space-16:              64px;
+  --space-20:              80px;
+
+  /* --------------------------------------------------------------------
+     Sizing
+     Component heights follow a tight density appropriate for desktop.
+     -------------------------------------------------------------------- */
+  --size-control-sm:       24px;   /* compact chips, segment tabs */
+  --size-control-md:       28px;   /* default button, input */
+  --size-control-lg:       36px;   /* primary action button */
+  --size-rail:             52px;   /* left tool rail width */
+  --size-topbar:           44px;
+  --size-statusbar:        28px;
+  --size-inspector:        320px;
+
+  /* --------------------------------------------------------------------
+     Radius
+     -------------------------------------------------------------------- */
+  --radius-sm:             4px;
+  --radius-md:             6px;
+  --radius-lg:             10px;
+  --radius-xl:             14px;
+  --radius-2xl:            20px;
+
+  /* --------------------------------------------------------------------
+     Shadow / elevation
+     Reserved for *floating* surfaces only — popovers, menus, toasts.
+     Never on ambient cards. Depth in the app proper comes from luminance.
+     -------------------------------------------------------------------- */
+  --shadow-xs:             0 1px 2px rgba(26, 26, 25, 0.04);
+  --shadow-sm:             0 2px 4px rgba(26, 26, 25, 0.06),
+                           0 0 0 1px rgba(26, 26, 25, 0.04);
+  --shadow-md:             0 6px 16px rgba(26, 26, 25, 0.10),
+                           0 0 0 1px rgba(26, 26, 25, 0.06);
+  --shadow-lg:             0 12px 32px rgba(26, 26, 25, 0.14),
+                           0 0 0 1px rgba(26, 26, 25, 0.08);
+
+  /* --------------------------------------------------------------------
+     Motion
+     Everything uses the same two durations and the same easing. The
+     point is consistency; variation adds perceived heaviness.
+     -------------------------------------------------------------------- */
+  --duration-fast:         120ms;
+  --duration-base:         180ms;
+  --duration-slow:         260ms;
+
+  --easing-standard:       cubic-bezier(0.2, 0, 0, 1);
+  --easing-emphasized:     cubic-bezier(0.3, 0, 0, 1);
+  --easing-exit:           cubic-bezier(0.4, 0, 1, 1);
+}
+
+
+/* Dark theme — first draft. S13.5 polishes. */
+[data-theme="dark"] {
+  --surface-canvas:        #17171a;
+  --surface-ground:        #1a1a1c;
+  --surface-panel:         #1f1f22;
+  --surface-popover:       #23232a;
+  --surface-muted:         #2a2a30;
+
+  --text-primary:          #ececea;
+  --text-secondary:        #a6a6a2;
+  --text-muted:            #70706c;
+  --text-placeholder:      #575753;
+  --text-on-accent:        #1a1a19;
+
+  --border-subtle:         rgba(236, 236, 234, 0.08);
+  --border-default:        rgba(236, 236, 234, 0.12);
+  --border-strong:         rgba(236, 236, 234, 0.22);
+
+  --accent-default:        #e0864a;
+  --accent-hover:          #ed9358;
+  --accent-muted:          rgba(224, 134, 74, 0.18);
+
+  --canvas-boundary-stroke:    rgba(236, 236, 234, 0.55);
+  --canvas-boundary-fill:      rgba(236, 236, 234, 0.02);
+  --canvas-obstacle-fill:      rgba(236, 236, 234, 0.10);
+  --canvas-obstacle-stroke:    rgba(236, 236, 234, 0.32);
+  --canvas-tl-stroke:          rgba(255, 120, 120, 0.55);
+  --canvas-table-fill:         #6a89ab;
+  --canvas-table-stroke:       rgba(236, 236, 234, 0.25);
+  --canvas-icr-fill:           #ececea;
+  --canvas-icr-stroke:         #ececea;
+  --canvas-inverter-fill:      #5fb27a;
+  --canvas-cable-dc:           rgba(106, 137, 171, 0.75);
+  --canvas-cable-ac:           rgba(255, 120, 120, 0.55);
+  --canvas-la-fill:            rgba(224, 134, 74, 0.75);
+  --canvas-la-radius:          rgba(224, 134, 74, 0.10);
+  --canvas-grid-dot:           rgba(236, 236, 234, 0.08);
+
+  --shadow-xs:             0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm:             0 2px 4px rgba(0, 0, 0, 0.35),
+                           0 0 0 1px rgba(236, 236, 234, 0.04);
+  --shadow-md:             0 6px 16px rgba(0, 0, 0, 0.45),
+                           0 0 0 1px rgba(236, 236, 234, 0.06);
+  --shadow-lg:             0 12px 32px rgba(0, 0, 0, 0.55),
+                           0 0 0 1px rgba(236, 236, 234, 0.08);
+}

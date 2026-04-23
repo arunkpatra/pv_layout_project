@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S5 — Tauri 2 shell + sidecar lifecycle
-**Status:** awaiting human gate verification
-**Gate memo:** [`s05.md`](./s05.md)
+**Active spike:** S6 — Design system implementation (light polished)
+**Status:** not started
+**Previous gate:** S5.5 passed 2026-04-23 — [`s05_5.md`](./s05_5.md)
 
 ## Progress
 
@@ -17,8 +17,8 @@
 | S2    | FastAPI sidecar — health, schemas, auth        | 🟢 passed | [s02.md](./s02.md) |
 | S3    | Sidecar: parse + layout + golden-file tests    | 🟢 passed | [s03.md](./s03.md) |
 | S4    | Sidecar: PyInstaller single-binary build       | 🟢 passed | [s04.md](./s04.md) |
-| S5    | Tauri 2 shell + sidecar lifecycle              | 🟡 awaiting gate | [s05.md](./s05.md) |
-| S5.5  | Design Foundations (tokens + light mocks)      | ⚪ pending | — |
+| S5    | Tauri 2 shell + sidecar lifecycle              | 🟢 passed | [s05.md](./s05.md) |
+| S5.5  | Design Foundations (tokens + light mocks)      | 🟢 passed | [s05_5.md](./s05_5.md) |
 | S6    | Design system implementation (light polished)  | ⚪ pending | — |
 | S7    | License key + entitlements + feature gating    | ⚪ pending | — |
 | S8    | KMZ load + MapLibre canvas                     | ⚪ pending | — |

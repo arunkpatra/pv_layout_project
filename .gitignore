@@ -63,6 +63,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Claude Code — personal overrides only (project settings.json would be committed)
+.claude/settings.local.json
+
 # Test artifacts
 coverage/
 .nyc_output/

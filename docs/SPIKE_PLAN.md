@@ -218,12 +218,13 @@ S15   Release pipeline + download delivery          [release]
   - **Canvas visual language** — table fill, stroke, hover, selection, obstruction fills, ICR footprints, cable strokes, LA rects + circles. All defined as vector style specs.
   - **Interaction language** — keyboard shortcuts master list, drag affordances, empty states, loading states, error states.
   - **Accessibility** — contrast targets (WCAG AA), focus visibility, keyboard reachability.
-- **High-fidelity static mocks** (Figma or static HTML) of four surfaces, built for Claude-Desktop-quality in **light mode**:
-  1. Startup dialog.
-  2. Project empty state (canvas, no KMZ loaded).
-  3. Project populated (canvas with tables, ICRs, inverters; inspector with summary).
-  4. Inspector in parameter-editing state (during input, before generate).
-- Dark-mode drafts of the same four surfaces — rough cut, tokens applied, polish deferred to S13.5.
+- **High-fidelity static mocks** (static HTML → PNG via headless Chromium) of five surfaces, built for Claude-Desktop-quality in **light mode**:
+  1. Splash (cold-start during sidecar boot).
+  2. Startup dialog (design mode selection).
+  3. Project empty state (canvas, no KMZ loaded).
+  4. Project populated (canvas with tables, ICRs, inverters; inspector with summary).
+  5. Inspector in parameter-editing state (during input, before generate).
+- Dark-mode drafts of the same five surfaces — rough cut, tokens applied, polish deferred to S13.5.
 
 **Out of scope:**
 - Any code. Not one line of React.
@@ -486,6 +487,24 @@ S15   Release pipeline + download delivery          [release]
 2. Run energy yield with a known PVGIS file; compare P50/P75/P90 with PyQt5 values.
 3. Export 15-min CSV; diff against PyQt5 output → identical.
 4. With non-PRO_PLUS license: these features are locked.
+
+---
+
+## S13.6 — Branding (placeholder; exact number TBD)
+
+**Goal:** Replace the placeholder wordmark/logo/icon/accent from S5.5 with the real brand system. Slot between S13.5 and S14 so signed installers and the auto-update manifest ship with the real assets.
+
+**In scope (will be detailed when the spike activates):**
+- Logo / wordmark / icon set (`icon.icns`, `icon.ico`, favicon, splash mark).
+- Accent and any secondary hues (swapping the `--accent-*` tokens).
+- Optional type-face swap (if a licensed face is procured).
+- App Store / download page assets if applicable.
+
+**Out of scope:** any functional change; any layout change beyond what the new identity requires.
+
+**Gate:** brand assets approved, tokens swapped, side-by-side screenshots against S5.5 placeholders confirm only the identity shifted, not the system.
+
+**Status:** not yet scheduled. Written here as a marker so S5.5 decisions (placeholder identity behind semantic tokens) stay honest.
 
 ---
 
