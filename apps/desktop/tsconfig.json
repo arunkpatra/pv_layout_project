@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "declaration": false,
+    "composite": false,
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*", "vite.config.ts", "scripts/**/*"],
+  "exclude": ["node_modules", "dist", "src-tauri"]
+}

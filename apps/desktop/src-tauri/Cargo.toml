@@ -1,0 +1,37 @@
+[package]
+name = "solarlayout-desktop"
+version = "0.0.0"
+description = "SolarLayout — native desktop shell"
+edition = "2021"
+rust-version = "1.75"
+
+[lib]
+name = "solarlayout_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "solarlayout-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread", "process", "io-util", "time"] }
+log = "0.4"
+env_logger = "0.11"
+rand = "0.8"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[profile.dev]
+incremental = true

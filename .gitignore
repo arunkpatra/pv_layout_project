@@ -35,7 +35,9 @@ env/
 
 # Rust / Tauri
 **/target/
-Cargo.lock
+# Note: Cargo.lock IS committed — this is a binary (desktop app), not a
+# library, so pinning deps across machines is the right call. If we ever
+# add a library crate, ignore Cargo.lock under that subdir specifically.
 
 # Logs
 logs/

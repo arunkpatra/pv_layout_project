@@ -3,12 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "SolarLayout desktop app — Tauri 2 shell + React 19 frontend (stub, filled in S5/S6)",
+  "description": "SolarLayout desktop app — Tauri 2 shell + React 19 frontend",
   "scripts": {
-    "build": "echo \"[S0 stub] @solarlayout/desktop build (Tauri build lands in S5)\"",
-    "lint": "echo \"[S0 stub] @solarlayout/desktop lint\"",
-    "typecheck": "echo \"[S0 stub] @solarlayout/desktop typecheck\"",
-    "test": "echo \"[S0 stub] @solarlayout/desktop test\"",
-    "dev": "echo \"[S0 stub] @solarlayout/desktop dev (Tauri dev lands in S5)\""
+    "dev": "tauri dev",
+    "build": "tsc --noEmit && vite build",
+    "tauri": "tauri",
+    "tauri:build": "bun run bundle:sidecar && tauri build",
+    "vite:dev": "vite",
+    "vite:build": "tsc --noEmit && vite build",
+    "bundle:sidecar": "node scripts/bundle-sidecar.mjs",
+    "lint": "echo '[S5 stub] @solarlayout/desktop lint (real lint in S6)'",
+    "typecheck": "tsc --noEmit",
+    "test": "echo '[S5 stub] @solarlayout/desktop test (Vitest added in S6)'"
+  },
+  "dependencies": {
+    "@solarlayout/sidecar-client": "workspace:*",
+    "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-shell": "^2.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
   }
 }

@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S4 — Sidecar: PyInstaller single-binary build
+**Active spike:** S5 — Tauri 2 shell + sidecar lifecycle
 **Status:** awaiting human gate verification
-**Gate memo:** [`s04.md`](./s04.md)
+**Gate memo:** [`s05.md`](./s05.md)
 
 ## Progress
 
@@ -16,8 +16,8 @@
 | S1    | Vendor Python core from PVlayout_Advance       | 🟢 passed | [s01.md](./s01.md) |
 | S2    | FastAPI sidecar — health, schemas, auth        | 🟢 passed | [s02.md](./s02.md) |
 | S3    | Sidecar: parse + layout + golden-file tests    | 🟢 passed | [s03.md](./s03.md) |
-| S4    | Sidecar: PyInstaller single-binary build       | 🟡 awaiting gate | [s04.md](./s04.md) |
-| S5    | Tauri 2 shell + sidecar lifecycle              | ⚪ pending | — |
+| S4    | Sidecar: PyInstaller single-binary build       | 🟢 passed | [s04.md](./s04.md) |
+| S5    | Tauri 2 shell + sidecar lifecycle              | 🟡 awaiting gate | [s05.md](./s05.md) |
 | S5.5  | Design Foundations (tokens + light mocks)      | ⚪ pending | — |
 | S6    | Design system implementation (light polished)  | ⚪ pending | — |
 | S7    | License key + entitlements + feature gating    | ⚪ pending | — |

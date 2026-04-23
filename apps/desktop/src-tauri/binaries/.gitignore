@@ -1,0 +1,4 @@
+# Bundled sidecar binaries live here at build time — never committed.
+# Populated by `bun run bundle:sidecar` before `tauri build`.
+*
+!.gitignore
