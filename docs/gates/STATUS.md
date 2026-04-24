@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S9 — Input panel + Generate Layout
+**Active spike:** S10 — Inverters, cables, LAs (PRO features, read-only)
 **Status:** ⚪ pending start
-**Previous gate:** S8.8 passed 2026-04-24 — [`s08_8.md`](./s08_8.md)
+**Previous gate:** S9 passed 2026-04-24 — [`s09.md`](./s09.md)
 
 ## Progress
 
@@ -24,7 +24,7 @@
 | S8    | KMZ load + MapLibre canvas                     | 🟢 passed | [s08.md](./s08.md) |
 | S8.7  | Frontend test harness + CI                     | 🟢 passed | [s08_7.md](./s08_7.md) |
 | S8.8  | State architecture cleanup (ADR-0003 + 0004)   | 🟢 passed | [s08_8.md](./s08_8.md) |
-| S9    | Input panel + Generate Layout                  | ⚪ pending | — |
+| S9    | Input panel + Generate Layout                  | 🟢 passed | [s09.md](./s09.md) |
 | S10   | Inverters, cables, LAs                         | ⚪ pending | — |
 | S10.5 | Drawing/editing pipeline ADR                   | ⚪ pending | — |
 | S11   | ICR drag + obstruction drawing                 | ⚪ pending | — |
