@@ -1,0 +1,80 @@
+name: ci
+
+# Frontend + sidecar tests on every push (any branch, including main)
+# and every PR targeting main.
+#
+# Two jobs run in parallel:
+#   - frontend: bun install, lint, typecheck, test, build (turbo-orchestrated).
+#   - sidecar:  uv sync, pytest (lint/typecheck wired in a future spike).
+#
+# The sidecar PyInstaller bundle build lives in sidecar-build.yml, scoped
+# to changes under python/pvlayout_engine/** — that's a separate concern
+# from "did the code typecheck and the tests pass?".
+#
+# Why trigger on push-to-main: this is a solo project. Direct main pushes
+# happen routinely; without main coverage, regressions land silently. The
+# concurrency group below cancels superseded runs so back-to-back commits
+# don't pile up.
+#
+# Security posture: every interpolated `${{ ... }}` here is a trusted
+# matrix/workflow value; no user-controlled input (PR title, issue body,
+# commit message) is injected into any run: step.
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: frontend (lint / typecheck / test / build)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+  sidecar:
+    name: sidecar (pytest)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: python/pvlayout_engine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install Python deps
+        run: uv sync --extra dev
+
+      - name: pytest
+        run: uv run pytest tests/ -q

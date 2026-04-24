@@ -37,7 +37,10 @@ jobs:
           - runner: macos-14
             platform: macos-arm64
             ext: ""
-          - runner: macos-13
+          # macos-15-intel replaces macos-13 (deprecated/retired by GitHub
+          # in 2025; the Intel-arch runner is now an explicit OS-version
+          # variant rather than a separate macOS-13 image).
+          - runner: macos-15-intel
             platform: macos-x64
             ext: ""
           - runner: ubuntu-22.04

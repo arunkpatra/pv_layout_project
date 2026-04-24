@@ -14,9 +14,9 @@
   },
   "scripts": {
     "build": "echo '[sidecar-client] source-only; consumers transpile'",
-    "lint": "echo '[S5 stub] @solarlayout/sidecar-client lint'",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo '[S5 stub] @solarlayout/sidecar-client test'"
+    "test": "echo '[sidecar-client] thin TS client; behavior covered by apps/desktop tests'"
   },
   "devDependencies": {
     "typescript": "^5.7.3"

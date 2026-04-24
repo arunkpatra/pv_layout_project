@@ -159,17 +159,24 @@ These exist elsewhere on disk and are referenced by this project but **never mod
 > These land in S0+ as the repo gets built out. Until S0 is complete, the repo is just docs and references.
 
 ```bash
-# From repo root — after S0
+# From repo root
 bun install
 bun run dev               # all dev servers
 bun run build
-bun run lint
+bun run lint              # eslint via flat config (S8.7)
 bun run typecheck
-bun run test
+bun run test              # vitest + RTL across all workspaces (S8.7)
+bun run format            # prettier --write across the repo
+bun run format:check      # prettier --check (CI)
 
 # Desktop app — from apps/desktop
 bun run tauri dev         # launches Tauri shell with sidecar
 bun run tauri build       # produces installer for host OS/arch
+bun run test:watch        # vitest in watch mode for the desktop workspace
+bun run vite:dev          # vite-only preview (no Tauri); design / headless render mode
+
+# UI package — from packages/ui
+bun run test:watch        # vitest in watch mode for ui
 
 # Python sidecar — from python/pvlayout_engine
 uv sync                   # install deps
@@ -177,8 +184,9 @@ uv run pytest             # run tests (golden-file harness lands in S3)
 uv run python -m pvlayout_engine.main    # dev-mode sidecar
 uv run pyinstaller pvlayout-engine.spec  # build standalone binary (S4+)
 
-# Pre-commit gate (from S0 onward)
+# Pre-commit gate (from S8.7 onward — same gate as CI)
 bun run lint && bun run typecheck && bun run test && bun run build
+cd python/pvlayout_engine && uv run pytest tests/ -q
 ```
 
 ---

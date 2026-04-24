@@ -12,9 +12,10 @@
     "vite:dev": "vite",
     "vite:build": "tsc --noEmit && vite build",
     "bundle:sidecar": "node scripts/bundle-sidecar.mjs",
-    "lint": "echo '[S5 stub] @solarlayout/desktop lint (real lint in S6)'",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo '[S5 stub] @solarlayout/desktop test (Vitest added in S6)'"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@solarlayout/entitlements-client": "workspace:*",
@@ -33,12 +34,17 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.1.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/geojson": "^7946.0.15",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "happy-dom": "^20.9.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.3",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^4.1.5"
   }
 }

@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "echo '[entitlements-client] source-only; consumers transpile'",
-    "lint": "echo '[entitlements-client] lint wired with app ESLint later'",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
