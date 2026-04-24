@@ -17,6 +17,14 @@
     "kmz-line-obstructions": {
       "type": "geojson",
       "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-tables": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-icrs": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
     }
   },
   "layers": [
@@ -81,6 +89,48 @@
         "line-color": "rgba(255, 120, 120, 0.55)",
         "line-width": 2,
         "line-dasharray": [2, 1.5]
+      }
+    },
+    {
+      "id": "tables-fill",
+      "type": "fill",
+      "source": "kmz-tables",
+      "paint": {
+        "fill-color": "rgba(170, 190, 210, 0.22)"
+      }
+    },
+    {
+      "id": "tables-outline",
+      "type": "line",
+      "source": "kmz-tables",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(170, 190, 210, 0.55)",
+        "line-width": 0.5
+      }
+    },
+    {
+      "id": "icrs-fill",
+      "type": "fill",
+      "source": "kmz-icrs",
+      "paint": {
+        "fill-color": "rgba(220, 150, 80, 0.55)"
+      }
+    },
+    {
+      "id": "icrs-outline",
+      "type": "line",
+      "source": "kmz-icrs",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(255, 180, 100, 0.9)",
+        "line-width": 1
       }
     }
   ]

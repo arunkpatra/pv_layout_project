@@ -21,6 +21,9 @@ const defaultParsedKmz: ParsedKMZ = {
   centroid_lon: 0,
 }
 
+/** Default /layout response — empty array. Override in tests that need layout output. */
+const defaultLayoutResults: never[] = []
+
 /**
  * Build a mock SidecarClient. Each method is a `vi.fn()` so individual
  * tests can assert call counts / arguments. Pass `overrides` to swap in
@@ -38,6 +41,7 @@ export function createMockSidecarClient(
     baseUrl: "http://127.0.0.1:0",
     health: vi.fn().mockResolvedValue(defaultHealth),
     parseKmz: vi.fn().mockResolvedValue(defaultParsedKmz),
+    runLayout: vi.fn().mockResolvedValue(defaultLayoutResults),
     ...overrides,
   }
 }

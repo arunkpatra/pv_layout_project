@@ -35,10 +35,23 @@ import { cn } from "../lib/cn"
  * canvas (used by App.tsx for the CommandBarHint and EmptyStateCard).
  */
 
+export interface IcrLabel {
+  /** WGS84 (lon, lat) anchor point — usually the ICR's centroid. */
+  position: [number, number]
+  /** Visible label text (e.g. "ICR-0"). */
+  text: string
+}
+
 export interface MapCanvasProps {
   boundariesGeoJson?: FeatureCollection
   obstaclesGeoJson?: FeatureCollection
   lineObstructionsGeoJson?: FeatureCollection
+  /** Placed-table polygons (added in S9). */
+  tablesGeoJson?: FeatureCollection
+  /** Placed-ICR polygons (added in S9). */
+  icrsGeoJson?: FeatureCollection
+  /** ICR labels — rendered as HTML overlays repositioned on map move. */
+  icrLabels?: IcrLabel[]
   children?: ReactNode
   className?: string
   /** Expose the map instance after the first `load` event. */
@@ -57,6 +70,9 @@ export function MapCanvas({
   boundariesGeoJson,
   obstaclesGeoJson,
   lineObstructionsGeoJson,
+  tablesGeoJson,
+  icrsGeoJson,
+  icrLabels,
   children,
   className,
   onMapReady,
@@ -76,11 +92,15 @@ export function MapCanvas({
     boundariesGeoJson,
     obstaclesGeoJson,
     lineObstructionsGeoJson,
+    tablesGeoJson,
+    icrsGeoJson,
   })
   propsRef.current = {
     boundariesGeoJson,
     obstaclesGeoJson,
     lineObstructionsGeoJson,
+    tablesGeoJson,
+    icrsGeoJson,
   }
 
   const { resolved } = useTheme()
@@ -112,10 +132,8 @@ export function MapCanvas({
     )
 
     map.on("load", () => {
-      const { boundariesGeoJson: b, obstaclesGeoJson: o, lineObstructionsGeoJson: l } =
-        propsRef.current
-      hydrateSources(map, b, o, l)
-      fitToBoundariesIfNew(map, b, lastBoundariesKey)
+      hydrateSources(map, propsRef.current)
+      fitToBoundariesIfNew(map, propsRef.current.boundariesGeoJson, lastBoundariesKey)
       setMapReady(true)
       onMapReady?.(map)
     })
@@ -146,9 +164,7 @@ export function MapCanvas({
     map.setStyle(styleUrl)
     lastAppliedStyleUrl.current = styleUrl
     const onStyle = () => {
-      const { boundariesGeoJson: b, obstaclesGeoJson: o, lineObstructionsGeoJson: l } =
-        propsRef.current
-      hydrateSources(map, b, o, l)
+      hydrateSources(map, propsRef.current)
       // Viewport is preserved — don't re-fit on theme swap.
       map.off("styledata", onStyle)
     }
@@ -160,14 +176,22 @@ export function MapCanvas({
     if (!mapReady) return // load handler will hydrate from propsRef
     const map = mapRef.current
     if (!map) return
-    hydrateSources(
-      map,
+    hydrateSources(map, {
       boundariesGeoJson,
       obstaclesGeoJson,
-      lineObstructionsGeoJson
-    )
+      lineObstructionsGeoJson,
+      tablesGeoJson,
+      icrsGeoJson,
+    })
     fitToBoundariesIfNew(map, boundariesGeoJson, lastBoundariesKey)
-  }, [mapReady, boundariesGeoJson, obstaclesGeoJson, lineObstructionsGeoJson])
+  }, [
+    mapReady,
+    boundariesGeoJson,
+    obstaclesGeoJson,
+    lineObstructionsGeoJson,
+    tablesGeoJson,
+    icrsGeoJson,
+  ])
 
   return (
     <div className={cn("relative w-full h-full overflow-hidden", className)}>
@@ -183,22 +207,91 @@ export function MapCanvas({
        * `w-full h-full` utilities sidesteps the cascade — MapLibre's
        * `position: relative` is fine when the box has an explicit size. */}
       <div ref={containerRef} className="w-full h-full" />
+      <IcrLabelOverlay map={mapRef} mapReady={mapReady} labels={icrLabels} />
       {children}
+    </div>
+  )
+}
+
+/**
+ * IcrLabelOverlay — renders text labels for each ICR as absolutely-
+ * positioned divs anchored to WGS84 lon/lat via `map.project()`. Updated
+ * on every `move` event so labels track during pan/zoom. Pragmatic for
+ * the small N (1-5 ICRs per typical plant); deck.gl TextLayer would be
+ * the right answer if N grew significantly.
+ *
+ * No glyph stack required — sidesteps the MapLibre glyphs/sprite setup
+ * we don't have (and don't want to bundle ~5MB of fonts for).
+ */
+function IcrLabelOverlay({
+  map,
+  mapReady,
+  labels,
+}: {
+  map: MutableRefObject<maplibregl.Map | null>
+  mapReady: boolean
+  labels?: IcrLabel[]
+}) {
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!mapReady || !labels || labels.length === 0) return
+    const m = map.current
+    if (!m) return
+    const onMove = () => setTick((t) => t + 1)
+    m.on("move", onMove)
+    m.on("zoom", onMove)
+    // Initial position now that mapReady is true.
+    setTick((t) => t + 1)
+    return () => {
+      m.off("move", onMove)
+      m.off("zoom", onMove)
+    }
+  }, [map, mapReady, labels])
+
+  if (!mapReady || !labels || labels.length === 0) return null
+  const m = map.current
+  if (!m) return null
+
+  return (
+    <div
+      // tick is in the dependency that re-renders this layer; suppress
+      // the unused-expression lint with a void.
+      data-tick={tick}
+      className="pointer-events-none absolute inset-0"
+    >
+      {labels.map((label, i) => {
+        const point = m.project(label.position)
+        return (
+          <span
+            key={`${label.text}-${i}`}
+            className="absolute -translate-x-1/2 -translate-y-1/2 px-[6px] py-[2px] rounded-[var(--radius-sm)] bg-[var(--surface-panel)] border border-[var(--border-subtle)] shadow-[var(--shadow-xs)] text-[10px] font-medium text-[var(--text-primary)] tabular-nums whitespace-nowrap"
+            style={{ left: point.x, top: point.y }}
+          >
+            {label.text}
+          </span>
+        )
+      })}
     </div>
   )
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-function hydrateSources(
-  map: maplibregl.Map,
-  boundaries?: FeatureCollection,
-  obstacles?: FeatureCollection,
-  lines?: FeatureCollection
-) {
-  setSource(map, "kmz-boundaries", boundaries)
-  setSource(map, "kmz-obstacles", obstacles)
-  setSource(map, "kmz-line-obstructions", lines)
+interface SourceData {
+  boundariesGeoJson?: FeatureCollection
+  obstaclesGeoJson?: FeatureCollection
+  lineObstructionsGeoJson?: FeatureCollection
+  tablesGeoJson?: FeatureCollection
+  icrsGeoJson?: FeatureCollection
+}
+
+function hydrateSources(map: maplibregl.Map, data: SourceData) {
+  setSource(map, "kmz-boundaries", data.boundariesGeoJson)
+  setSource(map, "kmz-obstacles", data.obstaclesGeoJson)
+  setSource(map, "kmz-line-obstructions", data.lineObstructionsGeoJson)
+  setSource(map, "kmz-tables", data.tablesGeoJson)
+  setSource(map, "kmz-icrs", data.icrsGeoJson)
 }
 
 function setSource(

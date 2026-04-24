@@ -118,9 +118,10 @@ export {
   StatGrid,
 } from "./compositions/Inspector"
 export { StatusBar, type StatusBarProps } from "./compositions/StatusBar"
-export { MapCanvas, CommandBarHint } from "./compositions/MapCanvas"
+export { MapCanvas, CommandBarHint, type IcrLabel } from "./compositions/MapCanvas"
 export { Splash } from "./compositions/Splash"
 export { EmptyStateCard } from "./compositions/EmptyState"
+export { LockedSectionCard } from "./compositions/LockedSectionCard"
 export {
   ThemeProvider,
   useTheme,

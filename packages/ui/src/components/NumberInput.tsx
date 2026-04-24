@@ -30,7 +30,11 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
         inputMode="decimal"
         step="any"
         aria-invalid={invalid}
-        className="flex-1 bg-transparent px-[10px] text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-placeholder)] tabular-nums disabled:opacity-40 disabled:cursor-not-allowed appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        /* min-w-0 overrides the flex item default `min-width: auto`, which
+         * would otherwise resolve to the input's intrinsic min-content
+         * width (~200px for `type=number` with implicit `size=20`) and
+         * force the wrapper wider than its parent. */
+        className="flex-1 min-w-0 bg-transparent px-[10px] text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-placeholder)] tabular-nums disabled:opacity-40 disabled:cursor-not-allowed appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         {...props}
       />
       {suffix && (

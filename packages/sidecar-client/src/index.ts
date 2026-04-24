@@ -181,6 +181,14 @@ export interface LayoutResult {
   utm_epsg: number
   boundary_wgs84: UTMPoint[]
   obstacle_polygons_wgs84: UTMPoint[][]
+  /**
+   * WGS84 (lon, lat) corner rings — same length and order as
+   * `placed_tables` / `placed_icrs`. Each ring is closed (first === last)
+   * with 5 points. Pre-projected on the sidecar (S9) so the desktop can
+   * render polygons without client-side projection work.
+   */
+  placed_tables_wgs84: UTMPoint[][]
+  placed_icrs_wgs84: UTMPoint[][]
   placed_string_inverters: PlacedStringInverter[]
   dc_cable_runs: CableRun[]
   ac_cable_runs: CableRun[]
@@ -210,10 +218,27 @@ export interface SidecarClientOptions {
   fetchImpl?: typeof fetch
 }
 
+/** /layout request envelope. */
+export interface LayoutRequest {
+  parsed_kmz: ParsedKMZ
+  params: LayoutParameters
+}
+
+/** /layout response envelope (one LayoutResult per boundary in the input). */
+export interface LayoutResponse {
+  results: LayoutResult[]
+}
+
 export interface SidecarClient {
   readonly baseUrl: string
   health(): Promise<HealthResponse>
   parseKmz(file: Blob | File, filename?: string): Promise<ParsedKMZ>
+  /**
+   * Run the full layout pipeline (table placement → ICR placement →
+   * lightning arresters → string inverters) for every boundary in the
+   * parsed KMZ. Returns one LayoutResult per boundary.
+   */
+  runLayout(parsedKmz: ParsedKMZ, params: LayoutParameters): Promise<LayoutResult[]>
 }
 
 export class SidecarError extends Error {
@@ -255,6 +280,19 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
 
     health(): Promise<HealthResponse> {
       return request<HealthResponse>("/health")
+    },
+
+    async runLayout(
+      parsedKmz: ParsedKMZ,
+      params: LayoutParameters
+    ): Promise<LayoutResult[]> {
+      const body: LayoutRequest = { parsed_kmz: parsedKmz, params }
+      const response = await request<LayoutResponse>("/layout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      return response.results
     },
 
     async parseKmz(file: Blob | File, filename?: string): Promise<ParsedKMZ> {

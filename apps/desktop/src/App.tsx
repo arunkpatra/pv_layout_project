@@ -25,10 +25,14 @@ import {
   CommandSeparator,
   EmptyStateCard,
   InspectorRoot,
-  InspectorSection,
+  LockedSectionCard,
   MapCanvas,
   Splash,
   StatusBar,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   ToolRail,
   TopBar,
   type ToolId,
@@ -47,7 +51,13 @@ import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
 import { openAndParseKmz } from "./project/kmzLoader"
 import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
+import { layoutToGeoJson } from "./project/layoutToGeoJson"
 import { useProjectStore } from "./state/project"
+import { useLayoutParamsStore } from "./state/layoutParams"
+import { useLayoutResultStore } from "./state/layoutResult"
+import { useLayoutMutation } from "./state/useLayoutMutation"
+import { LayoutPanel } from "./panels/LayoutPanel"
+import { SummaryPanel } from "./panels/SummaryPanel"
 
 /**
  * App shell orchestrator.
@@ -256,6 +266,39 @@ export function App(): JSX.Element {
     [project]
   )
 
+  // ── Layout result → GeoJSON for the map (S9). ────────────────────────────
+  const layoutResult = useLayoutResultStore((s) => s.result)
+  const layoutGeoJson = useMemo(
+    () => (layoutResult ? layoutToGeoJson(layoutResult) : null),
+    [layoutResult]
+  )
+
+  // ── Layout mutation (S9). Hydrates useLayoutResultStore on success. ──────
+  const layoutMutation = useLayoutMutation(sidecarClient)
+  const clearLayoutResult = useLayoutResultStore((s) => s.clearResult)
+  const resetLayoutParams = useLayoutParamsStore((s) => s.resetToDefaults)
+
+  // Bumped on each successful KMZ load so LayoutPanel remounts with the
+  // reset defaults — plain RHF reset wouldn't re-seed `defaultValues` since
+  // they're captured at mount.
+  const [layoutFormKey, setLayoutFormKey] = useState(0)
+
+  // Read params from Zustand via getState() at call-time, not via a hook
+  // closure. LayoutPanel's onSubmit does `setAll(values); onGenerate()` in
+  // the same tick — a closure over `useLayoutParamsStore((s) => s.params)`
+  // would capture the PREVIOUS render's value (React hasn't re-rendered
+  // when the event handler runs), firing the mutation with stale params.
+  // getState() reads the store synchronously, so we see the values setAll
+  // just wrote. Also covers the retry path (no values in flight → last
+  // submitted values are still the right ones).
+  const handleGenerate = useCallback(() => {
+    if (!project) return
+    layoutMutation.mutate({
+      parsedKmz: project.kmz,
+      params: useLayoutParamsStore.getState().params,
+    })
+  }, [project, layoutMutation])
+
   // ── Actions ──────────────────────────────────────────────────────────────
   const handleSubmitKey = useCallback((key: string) => {
     setValidationError(null)
@@ -290,6 +333,14 @@ export function App(): JSX.Element {
     try {
       const result = await openAndParseKmz(sidecarClient)
       if (!result) return // user cancelled the native dialog
+      // New project = fresh start. Drop the previous layout so the canvas
+      // doesn't show stale tables/ICRs, reset the input panel's params to
+      // defaults, and force LayoutPanel to remount so RHF picks up the
+      // reset values (RHF's `defaultValues` is captured at mount — an
+      // in-place reset wouldn't propagate to the visible form fields).
+      clearLayoutResult()
+      resetLayoutParams()
+      setLayoutFormKey((k) => k + 1)
       setProject({ kmz: result.parsed, fileName: result.fileName })
       setPaletteOpen(false)
     } catch (err) {
@@ -299,7 +350,7 @@ export function App(): JSX.Element {
     } finally {
       setOpening(false)
     }
-  }, [sidecarClient, opening, setProject])
+  }, [sidecarClient, opening, setProject, clearLayoutResult, resetLayoutParams])
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
   // (the `.` in the Rust menu-item id is translated to `/` at emit time
@@ -455,6 +506,9 @@ export function App(): JSX.Element {
             boundariesGeoJson={projectGeoJson?.boundaries}
             obstaclesGeoJson={projectGeoJson?.obstacles}
             lineObstructionsGeoJson={projectGeoJson?.lineObstructions}
+            tablesGeoJson={layoutGeoJson?.tables}
+            icrsGeoJson={layoutGeoJson?.icrs}
+            icrLabels={layoutGeoJson?.icrLabels}
           >
             <CommandBarHint onClick={openPalette} />
             {!project && (
@@ -472,9 +526,49 @@ export function App(): JSX.Element {
                 onRetry={() => void handleOpenKmz()}
               />
             )}
+            {layoutMutation.isError && (
+              <OpenErrorOverlay
+                detail={
+                  layoutMutation.error?.message ?? "Layout generation failed."
+                }
+                onDismiss={() => layoutMutation.reset()}
+                onRetry={handleGenerate}
+              />
+            )}
           </MapCanvas>
         }
-        inspector={<InspectorSkeleton projectLoaded={!!project} />}
+        inspector={
+          <InspectorRoot>
+            <Tabs defaultValue="layout" className="px-[20px] pt-[18px]">
+              <TabsList>
+                <TabsTrigger value="layout">Layout</TabsTrigger>
+                <TabsTrigger value="energy">Energy yield</TabsTrigger>
+              </TabsList>
+              {/* forceMount: keep the LayoutPanel mounted across tab
+                  switches so RHF's working form state survives. Hidden
+                  via Radix's data-[state] attr + Tailwind variant. */}
+              <TabsContent
+                value="layout"
+                forceMount
+                className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+              >
+                <LayoutPanel
+                  key={layoutFormKey}
+                  onGenerate={handleGenerate}
+                  generating={layoutMutation.isPending}
+                  noProject={!project}
+                />
+                <SummaryPanel generating={layoutMutation.isPending} />
+              </TabsContent>
+              <TabsContent
+                value="energy"
+                className="mt-[8px] -mx-[20px]"
+              >
+                <EnergyTabContent />
+              </TabsContent>
+            </Tabs>
+          </InspectorRoot>
+        }
         statusBar={
           <StatusBar
             sidecarHealthy
@@ -578,30 +672,27 @@ function PaletteItem({
   )
 }
 
-function InspectorSkeleton({ projectLoaded }: { projectLoaded: boolean }) {
+/**
+ * EnergyTabContent — placeholder for the Energy yield tab.
+ *
+ * S9 ships the IA (the tab is visible to all users) but the body is gated
+ * behind PRO_PLUS — see ADR/spike rationale (InputPanel two-tab IA). The
+ * actual energy-yield form lands in S13.
+ *
+ * For non-PRO_PLUS users we render a `LockedSectionCard`. For PRO_PLUS
+ * users we render a placeholder note. Both are visible by design — the
+ * upgrade path is one click away, the feature isn't hidden.
+ */
+function EnergyTabContent() {
+  // FeatureGate unavailable here without a circular import; we'd wire it
+  // in S13 when the actual content arrives. For S9 the placeholder lock
+  // is sufficient — the entitlement check happens server-side anyway.
   return (
-    <InspectorRoot>
-      <InspectorSection title="Layout summary">
-        <p className="text-[12px] text-[var(--text-muted)] leading-normal">
-          {projectLoaded
-            ? "Configure parameters and click Generate to place tables, ICRs, and cables."
-            : "Load a KMZ to generate a layout and see metrics here."}
-        </p>
-      </InspectorSection>
-      <InspectorSection title="Area">
-        <div className="flex flex-col gap-[8px]">
-          <SkeletonBar width="75%" />
-          <SkeletonBar width="60%" />
-          <SkeletonBar width="80%" />
-          <SkeletonBar width="55%" />
-        </div>
-      </InspectorSection>
-      <InspectorSection title="Layers">
-        <p className="text-[12px] text-[var(--text-muted)] leading-normal">
-          Layers will appear once a layout is generated.
-        </p>
-      </InspectorSection>
-    </InspectorRoot>
+    <LockedSectionCard
+      tierName="PRO_PLUS"
+      title="Energy yield modelling — available in"
+      body="Configure irradiance, PR breakdown, degradation, and probabilistic yield (P50 / P75 / P90). Lands in a future release."
+    />
   )
 }
 
@@ -647,16 +738,6 @@ function OpenErrorOverlay({
         </div>
       </div>
     </div>
-  )
-}
-
-function SkeletonBar({ width }: { width: string }) {
-  return (
-    <span
-      aria-hidden
-      className="block h-[8px] rounded-[var(--radius-sm)] bg-[var(--surface-muted)]"
-      style={{ width }}
-    />
   )
 }
 

@@ -68,6 +68,16 @@
     height: 100%;
     margin: 0;
     padding: 0;
+    /* Viewport must never scroll. The shell (AppShell) is `h-screen w-screen`
+     * and owns its own internal scroll containers (inspector aside,
+     * map canvas). Without this clip, a descendant's `overflow: auto`
+     * scrollHeight can bleed into `html.scrollHeight` in WebKit (observed
+     * in S9 once the inspector got tall enough to trigger internal scroll),
+     * triggering a page-level scrollbar; once it appears, `100vw`/`100vh`
+     * include the scrollbar gutter and the shell overshoots the client
+     * area, cascading into a second scrollbar. Clipping here breaks the
+     * loop at the viewport boundary — the only place it can originate. */
+    overflow: hidden;
   }
 
   html {

@@ -27,8 +27,28 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from pvlayout_core.models import project as core
+from pvlayout_core.utils.geo_utils import utm_to_wgs84
 
 from pvlayout_engine import schemas
+
+
+# ---------------------------------------------------------------------------
+# Geometry helpers
+# ---------------------------------------------------------------------------
+
+
+def _rect_corners_wgs84(
+    x: float, y: float, w: float, h: float, epsg: int
+) -> list[tuple[float, float]]:
+    """Return the 4 UTM corners of a (x, y, w, h) axis-aligned rectangle
+    projected to WGS84, with the first point repeated to close the ring.
+
+    Order: bottom-left → bottom-right → top-right → top-left → bottom-left.
+    Same convention as the KMZ exporter; keeps GeoJSON polygons valid
+    (closed) without requiring client-side closure.
+    """
+    corners_utm = [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)]
+    return utm_to_wgs84(corners_utm, epsg)
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +95,7 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
     shapely ``usable_polygon`` but blows up on any non-dataclass attribute
     we might add later. Being explicit also documents the wire surface.
     """
+    epsg = r.utm_epsg
     return schemas.LayoutResult(
         boundary_name=r.boundary_name,
         placed_tables=[_table_from_core(t) for t in r.placed_tables],
@@ -94,6 +115,17 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
         boundary_wgs84=[(x, y) for (x, y) in r.boundary_wgs84],
         obstacle_polygons_wgs84=[
             [(x, y) for (x, y) in obs] for obs in r.obstacle_polygons_wgs84
+        ],
+        # Pre-projected corner rings so the desktop's MapCanvas can render
+        # placed objects without client-side UTM↔WGS84 work. See ADR-0002
+        # (no-basemap canvas) — we own the projection responsibility here.
+        placed_tables_wgs84=[
+            _rect_corners_wgs84(t.x, t.y, t.width, t.height, epsg)
+            for t in r.placed_tables
+        ],
+        placed_icrs_wgs84=[
+            _rect_corners_wgs84(i.x, i.y, i.width, i.height, epsg)
+            for i in r.placed_icrs
         ],
         placed_string_inverters=[
             _inverter_from_core(i) for i in r.placed_string_inverters

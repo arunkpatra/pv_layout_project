@@ -27,6 +27,24 @@ const sampleResult: LayoutResult = {
     [76.5, 14.9],
   ],
   obstacle_polygons_wgs84: [],
+  placed_tables_wgs84: [
+    [
+      [76.4, 14.8],
+      [76.40028, 14.8],
+      [76.40028, 14.80004],
+      [76.4, 14.80004],
+      [76.4, 14.8],
+    ],
+  ],
+  placed_icrs_wgs84: [
+    [
+      [76.41, 14.81],
+      [76.41036, 14.81],
+      [76.41036, 14.81013],
+      [76.41, 14.81013],
+      [76.41, 14.81],
+    ],
+  ],
   placed_string_inverters: [],
   dc_cable_runs: [],
   ac_cable_runs: [],

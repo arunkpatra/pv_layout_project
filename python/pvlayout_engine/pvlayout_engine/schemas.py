@@ -258,6 +258,12 @@ class LayoutResult(_Model):
     utm_epsg: int = 0
     boundary_wgs84: list[UTMPoint] = Field(default_factory=list)
     obstacle_polygons_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
+    # WGS84 (lon, lat) corner rings of placed_tables / placed_icrs — emitted
+    # so the desktop's MapCanvas can render polygons without client-side
+    # UTM↔WGS84 projection. Each ring is a closed 5-tuple [TL, TR, BR, BL, TL].
+    # Same length and order as placed_tables / placed_icrs.
+    placed_tables_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
+    placed_icrs_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     placed_string_inverters: list[PlacedStringInverter] = Field(default_factory=list)
     dc_cable_runs: list[CableRun] = Field(default_factory=list)
     ac_cable_runs: list[CableRun] = Field(default_factory=list)
