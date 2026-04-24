@@ -70,7 +70,13 @@ export function layoutToGeoJson(results: LayoutResult[]): LayoutGeoJson {
         geometry: { type: "Polygon", coordinates: [ring] },
         properties: {
           boundary: r.boundary_name,
+          // Display label from pvlayout_core (1-based: ICR-1, ICR-2…) —
+          // used by the label renderer below.
           index: placed.index,
+          // 0-based array position into LayoutResult.placed_icrs; the
+          // sidecar's /refresh-inverters icr_override.icr_index expects
+          // this, not the display label. Keep the two distinct.
+          array_index: i,
         },
       })
       icrLabels.push({

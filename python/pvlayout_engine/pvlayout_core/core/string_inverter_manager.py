@@ -21,9 +21,12 @@ AC cable routing (Manhattan grid only — H and V segments, no diagonals):
   the same corridor are deduplicated at draw time.
 """
 import math
+import os
+import sys
 from typing import Dict, List, Optional, Tuple
 
 from shapely.geometry import LineString as ShapelyLine, Point as ShapelyPoint, box as shapely_box
+from shapely.prepared import prep as shapely_prep
 
 from pvlayout_core.models.project import (
     LayoutResult, LayoutParameters, PlacedStringInverter,
@@ -32,6 +35,346 @@ from pvlayout_core.models.project import (
 
 INV_EW = 2.0
 INV_NS = 1.0
+
+
+# ---------------------------------------------------------------------------
+# Pattern-stats instrumentation (S11.5 — dormant unless env var set)
+# ---------------------------------------------------------------------------
+# When ``PVLAYOUT_PATTERN_STATS=1`` is set at process start, every successful
+# pattern return in ``_route_ac_cable`` is counted, and every ``_path_ok``
+# candidate check is counted per-cable. ``place_string_inverters`` emits a
+# one-line summary to stderr after the DC and AC cable loops.
+#
+# Overhead when disabled: one ``if`` per ``_path_ok`` call and per pattern
+# return (no global lookups, no dict mutations) — negligible relative to the
+# Shapely intersection work.
+
+_PATTERN_STATS_ENABLED = os.environ.get("PVLAYOUT_PATTERN_STATS") == "1"
+_pattern_counts: Dict[str, int] = {}
+_path_ok_count = 0
+_path_ok_per_cable: List[int] = []
+
+# Module-level transport for the routing quality of the most recent
+# ``_route_ac_cable`` call. Set to one of:
+#   "ok"                 — resolved via patterns A/A2/A3/A4/B/C/D/E/V (or
+#                          the no-polygon shortcut); all segments inside.
+#   "best_effort"        — resolved via Pattern F and all segments inside.
+#   "boundary_violation" — resolved via Pattern F and at least one segment
+#                          leaves the usable polygon, or hit the absolute
+#                          straight-line fallback after F's try failed.
+# Callers read this immediately after each ``_route_ac_cable`` call and
+# copy it onto the produced ``CableRun``. Using a module variable avoids
+# changing the function's return type and keeps the edit scope minimal.
+_last_route_quality: str = "ok"
+
+
+# ---------------------------------------------------------------------------
+# Pattern V — visibility graph + Dijkstra (S11.5, ADR 0007 amendment)
+# ---------------------------------------------------------------------------
+# For plants where Manhattan templates A–E can't find an inside-polygon
+# route (concave / irregular boundaries), we fall to a textbook
+# visibility-graph shortest path BEFORE Pattern F. This guarantees the
+# winning route stays inside the polygon by construction, eliminating
+# the 34–64 m boundary-violating routes that pre-V Pattern F produces
+# on phaseboundary2.
+#
+# The visibility graph is built lazily: on the first Pattern V hit per
+# ``place_string_inverters`` call. All subsequent V hits in the same
+# call reuse the cached graph (N² construction amortised across the
+# ~15 V cables expected). ``_reset_vis_cache`` is called at the top of
+# ``place_string_inverters`` to avoid any stale state from prior calls.
+#
+# Algorithm: Preparata & Shamos 1985; de Berg et al. Computational
+# Geometry ch. 15. Same primitive PVcase / Virto.CAD use under the hood
+# for trench-constrained cable routing, here simplified to the polygon
+# interior (no user-drawn trench graph).
+
+_vis_cache_key: Optional[int] = None        # id(poly) of cached polygon
+_vis_cache_nodes: List[Tuple[float, float]] = []
+_vis_cache_adj: List[List[Tuple[int, float]]] = []
+_vis_cache_prepared = None                   # shapely prepared geometry for fast contains
+
+
+def _reset_vis_cache() -> None:
+    global _vis_cache_key, _vis_cache_nodes, _vis_cache_adj, _vis_cache_prepared
+    _vis_cache_key = None
+    _vis_cache_nodes = []
+    _vis_cache_adj = []
+    _vis_cache_prepared = None
+
+
+def _build_boundary_vis_graph(poly) -> None:
+    """Populate the module-level visibility graph for ``poly``.
+
+    Nodes: polygon exterior vertices + interior-ring (hole) vertices,
+    de-duplicated by rounded coordinates (3 decimal places = 1 mm).
+    Edges: pairs whose straight segment is covered by the polygon
+    (inside or on boundary). Weight = Euclidean length.
+
+    Uses ``shapely.prepared.prep`` — repeat ``covers(line)`` checks are
+    ~5–10× faster than the unprepared equivalent. The prepared geometry
+    is cached and reused for terminal-visibility lookups in
+    ``_visible_neighbors``.
+    """
+    global _vis_cache_key, _vis_cache_nodes, _vis_cache_adj, _vis_cache_prepared
+
+    seen: set = set()
+    nodes: List[Tuple[float, float]] = []
+
+    def _add(x: float, y: float) -> None:
+        k = (round(x, 3), round(y, 3))
+        if k not in seen:
+            seen.add(k)
+            nodes.append((x, y))
+
+    # ``usable_polygon`` may be a ``Polygon`` or a ``MultiPolygon`` —
+    # large plants with perimeter setbacks or deep concavities often
+    # split the usable area into disjoint components. Collect boundary
+    # rings from all components.
+    sub_polys = list(getattr(poly, "geoms", [])) or [poly]
+    for sub in sub_polys:
+        # Exterior ring — drop the duplicated closing vertex
+        for x, y in list(sub.exterior.coords)[:-1]:
+            _add(x, y)
+        # Interior rings (obstacle holes inside this component)
+        for ring in sub.interiors:
+            for x, y in list(ring.coords)[:-1]:
+                _add(x, y)
+
+    prepared = shapely_prep(poly)
+    n = len(nodes)
+    adj: List[List[Tuple[int, float]]] = [[] for _ in range(n)]
+
+    for i in range(n):
+        u = nodes[i]
+        for j in range(i + 1, n):
+            v = nodes[j]
+            seg = ShapelyLine([u, v])
+            # ``covers`` accepts segments that lie on the boundary (like
+            # consecutive exterior vertices) in addition to strictly
+            # interior segments. ``contains`` would reject them. For a
+            # visibility graph we want the inclusive version.
+            if prepared.covers(seg):
+                w = math.hypot(v[0] - u[0], v[1] - u[1])
+                adj[i].append((j, w))
+                adj[j].append((i, w))
+
+    _vis_cache_key = id(poly)
+    _vis_cache_nodes = nodes
+    _vis_cache_adj = adj
+    _vis_cache_prepared = prepared
+
+
+def _ensure_vis_graph(poly) -> None:
+    """Lazy builder — rebuilds only if the cached polygon differs."""
+    if _vis_cache_key != id(poly):
+        _build_boundary_vis_graph(poly)
+
+
+def _dijkstra(
+    adj: List[List[Tuple[int, float]]],
+    start_idx: int,
+    end_idx: int,
+) -> Optional[List[int]]:
+    """Heap-based single-source shortest path (Dijkstra). Returns the
+    list of node indices from ``start_idx`` to ``end_idx``, or ``None``
+    if unreachable. O((V + E) log V).
+    """
+    import heapq
+    n = len(adj)
+    dist = [math.inf] * n
+    prev = [-1] * n
+    dist[start_idx] = 0.0
+    pq: List[Tuple[float, int]] = [(0.0, start_idx)]
+    while pq:
+        d, u = heapq.heappop(pq)
+        if u == end_idx:
+            break
+        if d > dist[u]:
+            continue
+        for v, w in adj[u]:
+            nd = d + w
+            if nd < dist[v]:
+                dist[v] = nd
+                prev[v] = u
+                heapq.heappush(pq, (nd, v))
+    if dist[end_idx] == math.inf:
+        return None
+    path: List[int] = []
+    u = end_idx
+    while u != -1:
+        path.append(u)
+        u = prev[u]
+    path.reverse()
+    return path
+
+
+def _visible_neighbors(
+    point: Tuple[float, float],
+) -> List[Tuple[int, float]]:
+    """Return (cached_node_index, distance) for every cached node
+    visible from ``point`` via the cached prepared polygon. Used to
+    connect per-cable terminals (inverter / ICR) to the cached
+    boundary-only visibility graph.
+    """
+    result: List[Tuple[int, float]] = []
+    if _vis_cache_prepared is None:
+        return result
+    for i, v in enumerate(_vis_cache_nodes):
+        seg = ShapelyLine([point, v])
+        if _vis_cache_prepared.covers(seg):
+            w = math.hypot(v[0] - point[0], v[1] - point[1])
+            result.append((i, w))
+    return result
+
+
+def _build_route_polygon(result):
+    """Construct the polygon used by Pattern V's visibility graph.
+
+    Start from ``result.boundary_wgs84`` (the original plant-fence
+    polygon in WGS84), project to UTM using ``result.utm_epsg``, and
+    subtract hard cable-obstacles (ICR footprints and any obstacle
+    polygons supplied with the boundary). This domain is wider than
+    ``result.usable_polygon`` — it includes the perimeter-road area,
+    which is inside the plant fence and is where physical cables lie.
+
+    On plants where ``usable_polygon`` is a MultiPolygon split by
+    narrow-neck perimeter setbacks, this reconstructed ``route_poly``
+    is usually a single contiguous polygon; Pattern V can then route
+    between components that were previously disjoint in ``usable``.
+
+    Returns ``None`` if inputs are missing or projection fails; callers
+    must fall back to ``usable`` (which means Pattern V behaves as it
+    did pre-ADR-0007-amendment).
+    """
+    try:
+        from shapely.geometry import Polygon as _ShapelyPoly, box as _shapely_box
+        from pvlayout_core.utils.geo_utils import wgs84_to_utm as _to_utm
+
+        if not getattr(result, "boundary_wgs84", None):
+            return None
+        epsg = getattr(result, "utm_epsg", 0)
+        if not epsg:
+            return None
+        coords_utm = _to_utm(list(result.boundary_wgs84), epsg)
+        if len(coords_utm) < 3:
+            return None
+        poly = _ShapelyPoly(coords_utm)
+        if not poly.is_valid:
+            # Attempt to repair self-intersecting rings; buffer(0) is the
+            # standard shapely trick. If it still fails, skip Pattern V.
+            poly = poly.buffer(0)
+            if not poly.is_valid or poly.is_empty:
+                return None
+        # Subtract ICR footprints — cables physically cannot pass through
+        # the ICR building (they terminate inside it, but the building
+        # interior isn't a pass-through route for other cables). ICRs are
+        # small rectangles (40×14 m) and never sit at narrow-neck points,
+        # so subtracting them almost never splits the polygon.
+        for icr in getattr(result, "placed_icrs", []) or []:
+            box = _shapely_box(icr.x, icr.y, icr.x + icr.width, icr.y + icr.height)
+            poly = poly.difference(box)
+            if poly.is_empty:
+                return None
+        # Obstacle polygons (``obstacle_polygons_wgs84``) are NOT subtracted.
+        # They mark regions where TABLES cannot be placed (canals, buildings,
+        # trees). Cables, by contrast, can route around or through these at
+        # ground / trench level — routing AROUND an obstacle is standard EPC
+        # practice. Subtracting them here would falsely split the route
+        # polygon and force cables outside the plant fence (as observed on
+        # phaseboundary2: obstacle[2] splits the boundary into 3 pieces).
+        # The obstacle-avoidance geometry happens at detailed-engineering
+        # stage, not here.
+        if poly.is_empty:
+            return None
+        return poly
+    except Exception:
+        return None
+
+
+def _route_visibility(
+    start: Tuple[float, float],
+    end: Tuple[float, float],
+    poly,
+) -> Optional[List[Tuple[float, float]]]:
+    """Inside-polygon route via visibility graph + Dijkstra.
+
+    Returns a polyline (straight segments between visibility nodes)
+    that stays inside ``poly`` by construction. Returns ``None`` if
+    no path exists (disconnected components in the polygon, or if
+    either terminal sees no boundary vertex — shouldn't happen on a
+    valid plant boundary).
+    """
+    _ensure_vis_graph(poly)
+
+    s = _safe_pt(start, poly)
+    e = _safe_pt(end, poly)
+
+    # Direct visibility short-circuit — most inverter/ICR pairs on
+    # convex sub-regions of the polygon resolve here without running
+    # Dijkstra at all.
+    if _vis_cache_prepared is not None:
+        direct = ShapelyLine([s, e])
+        if _vis_cache_prepared.covers(direct):
+            return [s, e]
+
+    s_nbrs = _visible_neighbors(s)
+    e_nbrs = _visible_neighbors(e)
+    if not s_nbrs or not e_nbrs:
+        return None
+
+    n = len(_vis_cache_nodes)
+    # Extend a copy of the cached adjacency with two new nodes for s and e.
+    # We never mutate the cache itself; each cable gets a fresh extension.
+    adj: List[List[Tuple[int, float]]] = [list(nbrs) for nbrs in _vis_cache_adj]
+    for j, w in s_nbrs:
+        adj[j].append((n, w))
+    adj.append(list(s_nbrs))          # index n = s
+    for j, w in e_nbrs:
+        adj[j].append((n + 1, w))
+    adj.append(list(e_nbrs))          # index n+1 = e
+
+    idx_path = _dijkstra(adj, n, n + 1)
+    if idx_path is None:
+        return None
+
+    pts: List[Tuple[float, float]] = []
+    for idx in idx_path:
+        if idx == n:
+            pts.append(s)
+        elif idx == n + 1:
+            pts.append(e)
+        else:
+            pts.append(_vis_cache_nodes[idx])
+    return pts
+
+
+def _reset_pattern_stats() -> None:
+    global _path_ok_count
+    _pattern_counts.clear()
+    _path_ok_per_cable.clear()
+    _path_ok_count = 0
+
+
+def _record_pattern(name: str) -> None:
+    """Record a pattern hit. No-op unless stats are enabled."""
+    if _PATTERN_STATS_ENABLED:
+        _pattern_counts[name] = _pattern_counts.get(name, 0) + 1
+
+
+def _emit_pattern_stats(label: str, cable_count: int) -> None:
+    """Emit a one-line stats summary to stderr. No-op unless enabled."""
+    if not _PATTERN_STATS_ENABLED:
+        return
+    patterns_str = ", ".join(f"{k}={v}" for k, v in sorted(_pattern_counts.items()))
+    total = sum(_path_ok_per_cable)
+    max_per_cable = max(_path_ok_per_cable) if _path_ok_per_cable else 0
+    sys.stderr.write(
+        f"[PVLAYOUT_PATTERN_STATS] {label}: cables={cable_count} "
+        f"patterns={{{patterns_str}}} "
+        f"path_ok_total={total:,} path_ok_max_per_cable={max_per_cable:,}\n"
+    )
+    sys.stderr.flush()
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +591,9 @@ def _seg_ok(p1: Tuple, p2: Tuple, poly) -> bool:
 
 
 def _path_ok(pts: List[Tuple], poly) -> bool:
+    if _PATTERN_STATS_ENABLED:
+        global _path_ok_count
+        _path_ok_count += 1
     return all(_seg_ok(pts[i], pts[i+1], poly) for i in range(len(pts)-1))
 
 
@@ -292,12 +638,37 @@ def _route_ac_cable(
     gap_ys: List[float],
     col_xs: List[float],
     poly,
+    route_poly=None,
 ) -> List[Tuple[float, float]]:
     """
     Route from start (inverter) to end (ICR centre) using only H/V segments
     that lie strictly inside poly.  Always returns a non-empty route.
+
+    S11.5: search-space caps on patterns A2/A3/A4/B/E (per ADR 0007, ported
+    from the 2026-04-20 review-package validated on a peer plant — see
+    ``docs/superpowers/specs/2026-04-24-s11_5-cable-calc-requirements.md``
+    §1.4). Pattern order, geometry, and A/C/D/F are unchanged.
+
+    S11.5 (ADR 0007 amendment): ``route_poly`` — optional override for
+    Pattern V's visibility graph. Patterns A–F validate against ``poly``
+    (the table-setback usable polygon). Pattern V validates against
+    ``route_poly`` when provided (typically the plant boundary minus
+    hard obstacles — includes perimeter-road area that's outside
+    ``poly`` but inside the plant fence). When ``None``, V falls back
+    to using ``poly``. This matters when ``poly`` is a MultiPolygon
+    with disjoint components — Pattern V on the contiguous
+    ``route_poly`` can bridge the components; V on a disjoint ``poly``
+    cannot find a path.
+
+    Side effect: sets module-level ``_last_route_quality`` to
+    ``"ok" | "best_effort" | "boundary_violation"``. Callers read it
+    immediately after each invocation (see ``place_string_inverters``).
     """
+    global _last_route_quality
+    _last_route_quality = "ok"
+
     if poly is None:
+        _record_pattern("no_poly")
         return [start, end]
 
     s = _safe_pt(start, poly)
@@ -306,57 +677,79 @@ def _route_ac_cable(
     mid_y = (s[1] + e[1]) / 2.0
     mid_x = (s[0] + e[0]) / 2.0
 
+    # S11.5 pruning caps (ADR 0007). Chosen to match the review-package
+    # peer-plant values validated at 0.95 % AC-length delta / bit-identical
+    # counts. Keeping them as named constants makes the intent auditable and
+    # lets remediation §3.2 (iii) bump A4 to 8 × 8 if boundary_violation > 5 %.
+    A2_A3_NEAREST_COLS = 8
+    A4_NEAREST_COLS    = 5
+    B_NEAREST_GAPS     = 8
+    E_SINGLE_WAYPOINTS = 15
+    E_TWO_WAYPOINT_MAX = 10  # skip O(N²) sweep entirely if |wps| > this
+
     # ---- Pattern A: V→H→V via single row gap --------------------------------
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
         path = [s, (s[0], gy), (e[0], gy), e]
         if _path_ok(path, poly):
+            _record_pattern("A")
             return path
 
     # ---- Pattern A2: H→V→H→V -----------------------------------------------
-    # Handles the case where the straight vertical from s to gap_y crosses
-    # outside (inverter near a slanted/irregular boundary).
-    # First step H to a valid column X, then V to the gap, then H to ICR X, then V.
+    # Horizontal escape at the start. Cap to the nearest few column X
+    # positions — the candidate path sits at most a few panel widths from
+    # ``s[0]``, so scanning all 49+ columns was pure waste (ADR 0007).
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        # Try known interior X positions for the intermediate column
-        for tx in sorted(col_xs, key=lambda x: abs(x - s[0])):
+        for tx in sorted(col_xs, key=lambda x: abs(x - s[0]))[:A2_A3_NEAREST_COLS]:
             path = [s, (tx, s[1]), (tx, gy), (e[0], gy), e]
             if _path_ok(path, poly):
+                _record_pattern("A2")
                 return path
-        # Also try mid_x as intermediate
+        # Also try mid_x as intermediate (2 candidates; always kept).
         for tx in [mid_x, e[0]]:
             path = [s, (tx, s[1]), (tx, gy), (e[0], gy), e]
             if _path_ok(path, poly):
+                _record_pattern("A2")
                 return path
 
     # ---- Pattern A3: V→H→V with horizontal escape at end -------------------
-    # Fixes the case where the final vertical to ICR exits the boundary.
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        for tx in sorted(col_xs, key=lambda x: abs(x - e[0])):
+        for tx in sorted(col_xs, key=lambda x: abs(x - e[0]))[:A2_A3_NEAREST_COLS]:
             path = [s, (s[0], gy), (tx, gy), (tx, e[1]), e]
             if _path_ok(path, poly):
+                _record_pattern("A3")
                 return path
 
     # ---- Pattern A4: H→V→H→V→H→V (both ends need horizontal escape) -------
+    # Nested col sweep capped to 5 × 5 nearest. Was 49 × 49 = 2,401 per gap;
+    # now 25. 96× reduction, validated on peer plant at <1 % length delta.
     for gy in sorted(gap_ys, key=lambda y: abs(y - mid_y)):
-        for tx_s in sorted(col_xs, key=lambda x: abs(x - s[0])):
-            for tx_e in sorted(col_xs, key=lambda x: abs(x - e[0])):
+        nearest_tx_s = sorted(col_xs, key=lambda x: abs(x - s[0]))[:A4_NEAREST_COLS]
+        nearest_tx_e = sorted(col_xs, key=lambda x: abs(x - e[0]))[:A4_NEAREST_COLS]
+        for tx_s in nearest_tx_s:
+            for tx_e in nearest_tx_e:
                 path = [s, (tx_s, s[1]), (tx_s, gy), (tx_e, gy), (tx_e, e[1]), e]
                 if _path_ok(path, poly):
+                    _record_pattern("A4")
                     return path
 
     # ---- Pattern B: two gaps V→H→V→H→V ------------------------------------
-    for g1 in sorted(gap_ys, key=lambda y: abs(y - s[1])):
-        for g2 in sorted(gap_ys, key=lambda y: abs(y - e[1])):
+    # Cap main gap sweep to 8 × 8 nearest. 113 × 113 → 64. The inner escape
+    # variant keeps its 3 × 3 cap (already present in the pre-S11.5 code).
+    nearest_g1 = sorted(gap_ys, key=lambda y: abs(y - s[1]))[:B_NEAREST_GAPS]
+    nearest_g2 = sorted(gap_ys, key=lambda y: abs(y - e[1]))[:B_NEAREST_GAPS]
+    for g1 in nearest_g1:
+        for g2 in nearest_g2:
             if abs(g1 - g2) < 0.5:
                 continue
             path = [s, (s[0], g1), (mid_x, g1), (mid_x, g2), (e[0], g2), e]
             if _path_ok(path, poly):
+                _record_pattern("B")
                 return path
-            # With horizontal escape at both ends
             for tx_s in sorted(col_xs, key=lambda x: abs(x - s[0]))[:3]:
                 for tx_e in sorted(col_xs, key=lambda x: abs(x - e[0]))[:3]:
                     path = [s, (tx_s, s[1]), (tx_s, g1), (tx_e, g1), (tx_e, g2), (e[0], g2), e]
                     if _path_ok(path, poly):
+                        _record_pattern("B")
                         return path
 
     # ---- Pattern C: simple L-shapes ----------------------------------------
@@ -365,13 +758,13 @@ def _route_ac_cable(
         [s, (e[0], s[1]), e],
     ]:
         if _path_ok(path, poly):
+            _record_pattern("C")
             return path
 
     # ---- Pattern D: via polygon centroid ------------------------------------
     try:
         cx, cy = poly.centroid.x, poly.centroid.y
         cen = _safe_pt((cx, cy), poly)
-        # Try centroid + each gap
         for gy in sorted(gap_ys, key=lambda y: abs(y - cy)):
             for path in [
                 [s, (s[0], gy), (cx, gy), (cx, e[1]), e],
@@ -381,42 +774,64 @@ def _route_ac_cable(
                 [s, cen, e],
             ]:
                 if _path_ok(path, poly):
+                    _record_pattern("D")
                     return path
     except Exception:
         pass
 
-    # ---- Pattern E: exhaustive 2-waypoint search ---------------------------
+    # ---- Pattern E: waypoint search ---------------------------------------
+    # Single-waypoint capped to the first E_SINGLE_WAYPOINTS candidates.
+    # Two-waypoint sweep (O(N²)) skipped entirely unless |wps| is small
+    # (avoids 10k+ path checks on plants with many gaps × cols).
     try:
         cx, cy = poly.centroid.x, poly.centroid.y
-        # Collect candidate waypoints: centroid, gap midpoints, col positions
         wps = [(cx, cy)]
         for gy in gap_ys:
             for tx in col_xs[::max(1, len(col_xs)//6)]:
                 wps.append((tx, gy))
         wps = [_safe_pt(w, poly) for w in wps]
-        # Single waypoint
-        for w in wps:
+        for w in wps[:E_SINGLE_WAYPOINTS]:
             path = [s, w, e]
             if _path_ok(path, poly):
+                _record_pattern("E1")
                 return path
-        # Two waypoints
-        for w1 in wps:
-            for w2 in wps:
-                if w1 == w2:
-                    continue
-                path = [s, w1, w2, e]
-                if _path_ok(path, poly):
-                    return path
+        if len(wps) <= E_TWO_WAYPOINT_MAX:
+            for w1 in wps:
+                for w2 in wps:
+                    if w1 == w2:
+                        continue
+                    path = [s, w1, w2, e]
+                    if _path_ok(path, poly):
+                        _record_pattern("E2")
+                        return path
+    except Exception:
+        pass
+
+    # ---- Pattern V: visibility-graph shortest path ------------------------
+    # Inside-polygon Dijkstra fallback before Pattern F (ADR 0007 amendment).
+    # For irregular / concave polygons where Manhattan templates A–E fail
+    # to find an inside path, V navigates around concavities via polygon
+    # boundary vertices. By construction the returned polyline lies inside
+    # ``route_poly`` (or ``poly`` when ``route_poly`` is None), so
+    # ``route_quality`` stays ``"ok"``. Deviates from strict Manhattan
+    # (straight segments between graph nodes) — accepted trade-off for
+    # correctness over aesthetics.
+    v_poly = route_poly if route_poly is not None else poly
+    try:
+        v_path = _route_visibility(s, e, v_poly)
+        if v_path is not None and len(v_path) >= 2:
+            _record_pattern("V")
+            return v_path
     except Exception:
         pass
 
     # ---- Pattern F: best-effort (guaranteed connection) --------------------
-    # At this point the polygon is very irregular. Build the best approximate
-    # Manhattan path through the centroid. Segments may touch the boundary
-    # but this is a last resort to ensure every inverter is connected.
+    # Last resort — candidates may cross the boundary. Score by count of
+    # outside-polygon segments. The winning route's ``route_quality`` is
+    # ``"best_effort"`` when score == 0 or ``"boundary_violation"`` when > 0;
+    # the frontend surfaces the latter with a warning affordance.
     try:
         cx, cy = poly.centroid.x, poly.centroid.y
-        # Pick nearest gap to centroid for the horizontal run
         if gap_ys:
             gy = min(gap_ys, key=lambda y: abs(y - cy))
             candidates = [
@@ -431,16 +846,24 @@ def _route_ac_cable(
                 [s, (e[0], s[1]), e],
                 [s, (cx, s[1]), (cx, e[1]), e],
             ]
-        # Return the candidate with fewest segments outside boundary
+
         def _score(path):
-            bad = sum(0 if _seg_ok(path[i], path[i+1], poly) else 1
-                      for i in range(len(path)-1))
-            return bad
+            return sum(0 if _seg_ok(path[i], path[i+1], poly) else 1
+                       for i in range(len(path)-1))
+
         best = min(candidates, key=_score)
+        best_score = _score(best)
+        _last_route_quality = "boundary_violation" if best_score > 0 else "best_effort"
+        _record_pattern("F")
         return best
     except Exception:
         pass
 
+    # Absolute fallthrough — F's try block failed. Treat as boundary
+    # violation because a straight line through the polygon interior on
+    # an irregular shape almost always has at least one outside segment.
+    _last_route_quality = "boundary_violation"
+    _record_pattern("straight")
     return [s, e]
 
 
@@ -477,6 +900,8 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     result.ac_cable_runs                 = []
     result.total_dc_cable_m              = 0.0
     result.total_ac_cable_m              = 0.0
+    result.ac_cable_m_per_inverter       = {}
+    result.ac_cable_m_per_icr            = {}
     result.string_kwp                    = 0.0
     result.inverter_capacity_kwp         = 0.0
     result.num_string_inverters          = 0
@@ -535,6 +960,11 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
         # Counts are already stored above; leave cable arrays empty.
         return
 
+    # S11.5 (Pattern V): clear any stale visibility graph left over from
+    # a prior place_string_inverters call. The graph is rebuilt lazily
+    # on the first Pattern V hit below.
+    _reset_vis_cache()
+
     # ---- Cluster tables → inverter / SMB positions -----------------------
     groups = _kmeans_cluster(tables, num_inverters)
     placed_inverters: List[PlacedStringInverter] = []
@@ -555,13 +985,33 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     col_xs = _get_col_xs(tables)
     usable = result.usable_polygon
 
+    # S11.5 (ADR 0007 amendment): compute a "route polygon" for Pattern V's
+    # visibility graph. ``usable_polygon`` is the table-setback polygon —
+    # it can be a disjoint MultiPolygon on plants where the perimeter road
+    # / ICR setbacks split the plant into narrow-neck regions, in which
+    # case inside-``usable`` routing is impossible between components. The
+    # physical plant boundary (``result.boundary_wgs84`` projected to UTM)
+    # minus hard obstacles (ICR footprints, obstacle polygons) is the
+    # correct domain for cable routing — includes the perimeter road
+    # area, which is inside the plant fence and where cables actually lie.
+    # Patterns A–F continue to use ``usable`` (stays close to row gaps);
+    # only Pattern V uses ``route_poly``.
+    route_poly = _build_route_polygon(result)
+
     tbl_to_inv = {}
     for inv_idx, group in enumerate(groups):
         for t in group:
             tbl_to_inv[id(t)] = placed_inverters[inv_idx]
 
+    # S11.5 (Phase D): allowance constants are now parameterised on
+    # ``LayoutParameters`` with defaults preserving pre-S11.5 numbers.
+    dc_per_string_allowance_m = params.dc_per_string_allowance_m
+    ac_termination_allowance_m = params.ac_termination_allowance_m
+
     dc_cables: List[CableRun] = []
     total_dc = 0.0
+    if _PATTERN_STATS_ENABLED:
+        _reset_pattern_stats()
     for t in tables:
         inv = tbl_to_inv.get(id(t))
         if inv is None:
@@ -570,18 +1020,26 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
         t_cy = t.y + t.height / 2
         i_cx = inv.x + INV_EW / 2
         i_cy = inv.y + INV_NS / 2
-        route     = _route_ac_cable((t_cx, t_cy), (i_cx, i_cy), gap_ys, col_xs, usable)
+        if _PATTERN_STATS_ENABLED:
+            _before = _path_ok_count
+        route     = _route_ac_cable((t_cx, t_cy), (i_cx, i_cy), gap_ys, col_xs, usable, route_poly=route_poly)
+        route_q   = _last_route_quality
+        if _PATTERN_STATS_ENABLED:
+            _path_ok_per_cable.append(_path_ok_count - _before)
         path_len  = _route_length(route)
-        cable_len = (path_len + 10.0) * strings_per_table
+        cable_len = (path_len + dc_per_string_allowance_m) * strings_per_table
         total_dc += cable_len
         dc_cables.append(CableRun(
             start_utm=(t_cx, t_cy), end_utm=(i_cx, i_cy),
             route_utm=route,
             index=len(dc_cables) + 1, cable_type="dc",
             length_m=round(cable_len, 1),
+            route_quality=route_q,
         ))
     result.dc_cable_runs    = dc_cables
     result.total_dc_cable_m = round(total_dc, 1)
+    if _PATTERN_STATS_ENABLED:
+        _emit_pattern_stats("DC", len(dc_cables))
 
     # ---- ICR centres -------------------------------------------------------
     if result.placed_icrs:
@@ -612,21 +1070,42 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
 
     ac_cables: List[CableRun] = []
     total_ac = 0.0
+    # S11.5 (Phase E): per-inverter and per-ICR AC subtotals for EPC BOMs.
+    # Keys: inverter index (1-based PlacedStringInverter.index) / ICR array
+    # position (0-based, matches result.placed_icrs index).
+    ac_m_per_inverter: Dict[int, float] = {}
+    ac_m_per_icr: Dict[int, float] = {}
+    if _PATTERN_STATS_ENABLED:
+        _reset_pattern_stats()
     for icr_idx, inv_group in icr_groups.items():
         icr_pt = icr_centers[icr_idx]
+        icr_subtotal = 0.0
         for inv in inv_group:
             i_cx = inv.x + INV_EW / 2
             i_cy = inv.y + INV_NS / 2
-            route     = _route_ac_cable((i_cx, i_cy), icr_pt, gap_ys, col_xs, usable)
+            if _PATTERN_STATS_ENABLED:
+                _before = _path_ok_count
+            route     = _route_ac_cable((i_cx, i_cy), icr_pt, gap_ys, col_xs, usable, route_poly=route_poly)
+            route_q   = _last_route_quality
+            if _PATTERN_STATS_ENABLED:
+                _path_ok_per_cable.append(_path_ok_count - _before)
             path_len  = _route_length(route)
-            cable_len = (path_len + 4.0) * ac_cable_factor
+            cable_len = (path_len + ac_termination_allowance_m) * ac_cable_factor
             total_ac += cable_len
+            icr_subtotal += cable_len
+            ac_m_per_inverter[inv.index] = round(cable_len, 1)
             ac_cables.append(CableRun(
                 start_utm=(i_cx, i_cy), end_utm=icr_pt,
                 route_utm=route,
                 index=len(ac_cables) + 1, cable_type="ac",
                 length_m=round(cable_len, 1),
+                route_quality=route_q,
             ))
+        ac_m_per_icr[icr_idx] = round(icr_subtotal, 1)
 
     result.ac_cable_runs    = ac_cables
     result.total_ac_cable_m = round(total_ac, 1)
+    result.ac_cable_m_per_inverter = ac_m_per_inverter
+    result.ac_cable_m_per_icr = ac_m_per_icr
+    if _PATTERN_STATS_ENABLED:
+        _emit_pattern_stats("AC", len(ac_cables))

@@ -119,6 +119,8 @@ def params_to_core(p: schemas.LayoutParameters) -> core.LayoutParameters:
         design_mode=core.DesignMode(p.design_mode.value),
         max_smb_per_central_inv=p.max_smb_per_central_inv,
         enable_cable_calc=p.enable_cable_calc,
+        ac_termination_allowance_m=p.ac_termination_allowance_m,
+        dc_per_string_allowance_m=p.dc_per_string_allowance_m,
     )
 
 
@@ -197,6 +199,8 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
         ],
         total_dc_cable_m=r.total_dc_cable_m,
         total_ac_cable_m=r.total_ac_cable_m,
+        ac_cable_m_per_inverter=dict(getattr(r, "ac_cable_m_per_inverter", {}) or {}),
+        ac_cable_m_per_icr=dict(getattr(r, "ac_cable_m_per_icr", {}) or {}),
         string_kwp=r.string_kwp,
         inverter_capacity_kwp=r.inverter_capacity_kwp,
         num_string_inverters=r.num_string_inverters,
@@ -266,6 +270,7 @@ def _cable_from_core(c: core.CableRun) -> schemas.CableRun:
         index=c.index,
         cable_type=c.cable_type,
         length_m=c.length_m,
+        route_quality=getattr(c, "route_quality", "ok"),
     )
 
 
@@ -357,6 +362,7 @@ def result_to_core(r: schemas.LayoutResult) -> core.LayoutResult:
             index=c.index,
             cable_type=c.cable_type,
             length_m=c.length_m,
+            route_quality=getattr(c, "route_quality", "ok"),
         )
         for c in r.dc_cable_runs
     ]
@@ -368,11 +374,16 @@ def result_to_core(r: schemas.LayoutResult) -> core.LayoutResult:
             index=c.index,
             cable_type=c.cable_type,
             length_m=c.length_m,
+            route_quality=getattr(c, "route_quality", "ok"),
         )
         for c in r.ac_cable_runs
     ]
     out.total_dc_cable_m = r.total_dc_cable_m
     out.total_ac_cable_m = r.total_ac_cable_m
+    # S11.5: carry AC subtotals on the reverse path for round-trip consistency.
+    # /refresh-inverters overwrites these when place_string_inverters re-runs.
+    out.ac_cable_m_per_inverter = dict(getattr(r, "ac_cable_m_per_inverter", {}) or {})
+    out.ac_cable_m_per_icr = dict(getattr(r, "ac_cable_m_per_icr", {}) or {})
     out.string_kwp = r.string_kwp
     out.inverter_capacity_kwp = r.inverter_capacity_kwp
     out.num_string_inverters = r.num_string_inverters

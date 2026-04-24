@@ -55,7 +55,7 @@ Full principle, post-mortem of the S7/S10 incident that landed it, authoritative
 ### What I never do without explicit human ask
 - Skip a Human Gate.
 - Start a spike before the previous gate has passed.
-- Rewrite or refactor `pvlayout_core/` modules (the copied PVlayout_Advance domain logic). Those are preserved verbatim.
+- Rewrite or refactor `pvlayout_core/` modules (the copied PVlayout_Advance domain logic). Those are preserved verbatim. **Exception:** scoped, ADR-gated changes are permitted — see [ADR 0007](./docs/adr/0007-pvlayout-core-s11-5-exception.md) for the S11.5 cable-calc exception (two files, additive-only, reversible). Any future need to touch `pvlayout_core/` requires a new ADR of the same shape; do not expand an existing one.
 - Add features not listed in the current spike's In-Scope section.
 - Commit anything the human hasn't asked me to commit.
 - Modify `reference_screenshots_for_UX_dsktop/` — it's a frozen reference.

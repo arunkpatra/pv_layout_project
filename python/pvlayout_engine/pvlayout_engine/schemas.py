@@ -92,6 +92,10 @@ class LayoutParameters(_Model):
     design_mode: DesignMode = DesignMode.STRING_INVERTER
     max_smb_per_central_inv: int = 10
     enable_cable_calc: bool = False
+    # S11.5: additive cable-length allowances. Defaults preserve pre-S11.5
+    # numeric behaviour; EPCs can tune without a code change.
+    ac_termination_allowance_m: float = 4.0
+    dc_per_string_allowance_m: float = 10.0
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +143,9 @@ class CableRun(_Model):
     index: int = 0
     cable_type: str = "dc"
     length_m: float = 0.0
+    # S11.5: routing quality tag. Values: "ok" | "best_effort" |
+    # "boundary_violation". See pvlayout_core.models.project.CableRun.
+    route_quality: str = "ok"
 
 
 class PlacedLA(_Model):
@@ -276,6 +283,12 @@ class LayoutResult(_Model):
     ac_cable_runs_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     total_dc_cable_m: float = 0.0
     total_ac_cable_m: float = 0.0
+    # S11.5: additive per-inverter / per-ICR AC subtotals. Keyed by inverter
+    # index (1-based) / ICR array position (0-based). Empty dicts before
+    # S11.5 runs or when cables are disabled. JSON emits integer keys as
+    # strings — clients convert at the boundary.
+    ac_cable_m_per_inverter: dict[int, float] = Field(default_factory=dict)
+    ac_cable_m_per_icr: dict[int, float] = Field(default_factory=dict)
     string_kwp: float = 0.0
     inverter_capacity_kwp: float = 0.0
     num_string_inverters: int = 0

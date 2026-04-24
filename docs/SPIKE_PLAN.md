@@ -37,6 +37,7 @@ S10   Inverters, cables, LAs (PRO, read-only)        [core UX]
 S10.2 Feature-key alignment with backend seed        [foundation]
 S10.5 Drawing/editing pipeline ADR                   [foundation]
 S11   Interactivity: ICR drag + obstruction drawing  [core UX]
+S11.5 Cable-calc correctness (industry requirements) [core UX]
 S12   Exports: KMZ + PDF                             [output]
 S13   Exports (DXF, CSV) + PRO_PLUS energy yield     [output]
 S13.5 Dark theme parity                              [design]
@@ -619,6 +620,54 @@ Revenue is protected by (a) the feature keys that determine **what gets computed
 4. Draw a polygon. Same behavior.
 5. Draw a line (power line corridor). TL_SETBACK_M buffer respected — a strip of tables clears around the line.
 6. Counts in summary match what PyQt5 produces for identical operations.
+
+---
+
+## S11.5 — Cable-calc correctness (industry requirements)
+
+**Goal:** Fix `place_string_inverters`'s pathological runtime on real plants (measured **460 s** on `phaseboundary2.kmz`, industry-unshippable) and establish that the cable-calc outputs are correct against **solar-industry practice**, not against PVlayout_Advance parity. Sub-spike triggered when S11's physical gate exposed that cables-on runs were taking minutes with no user feedback and that no prior gate had ever verified cable correctness end-to-end.
+
+**Framing:** industry standards are the normative source of truth. IEC 60364-7-712 (DC voltage drop ≤ 3 %), IEC 62548-1:2023 (PV array design), IEC TS 62738 (large PV plants), NREL ATB 2024 (DC:AC ratio), PVcase / HelioScope / Virto.CAD / RatedPower (EPC tool conventions), CEA 2010/2023 (India regulatory). Legacy PVlayout_Advance is explicitly not consulted for "correct" answers.
+
+**In scope:**
+- **Port the search-space pruning** from the 2026-04-20 review-package artifact (validated peer-plant optimisation: 563 s → 16 s, 0.95 % AC length delta, table/inverter/LA counts bit-identical) into `pvlayout_core/core/string_inverter_manager.py`. Caps apply to patterns A2, A3, A4, B main, E; pattern order and pattern geometry preserved.
+- **Dormant instrumentation** in `_route_ac_cable` gated on `PVLAYOUT_PATTERN_STATS=1`. Emits per-pattern and per-cable `_path_ok` counts to stderr for diagnostic runs.
+- **Pattern F route-quality tagging** — every cable that resolves via Pattern F best-effort gets a `CableRun.route_quality` value of `"best_effort"` (route stays inside polygon) or `"boundary_violation"` (some segment crosses outside). Clean routes carry `"ok"`. Frontend renders differently.
+- **Pattern V — visibility-graph shortest-path fallback** (ADR 0007 amendment; added mid-spike when the instrumented baseline revealed Pattern F was producing 15 boundary-violating routes on `phaseboundary2`). Inserted between Pattern E and F. Uses a cached visibility graph on polygon-boundary vertices + Dijkstra via Python stdlib `heapq`. Graph is built against a **route polygon** = plant boundary minus ICR footprints (contiguous; obstacles NOT subtracted since cables can route around them at trench level). Algorithmic basis: textbook computational geometry (Preparata & Shamos 1985). Result: 0 `boundary_violation` cables on `phaseboundary2` (was 15); AC total recomputes from 14,474.8 m to the correct 12,361.0 m.
+- **Optional `LayoutParameters` fields** — `ac_termination_allowance_m` (default 4.0) and `dc_per_string_allowance_m` (default 10.0). Existing numeric behaviour preserved; customer-site tuning becomes parameterised.
+- **Additive `LayoutResult` fields** — `ac_cable_m_per_inverter` and `ac_cable_m_per_icr` (both `Dict[int, float]`, empty-dict default). Surfaces per-ICR BOM subtotals to the API.
+- **Headless timing script** at `python/pvlayout_engine/scripts/debug/time_cable_calc.py`. Benchmark artefact going forward.
+- **Integration test** `test_layout_s11_5_cables.py` — runs `enable_cable_calc=True` on `phaseboundary2.kmz` and asserts: wall-clock ≤ 45 s, DC total ±1 % of 39,536.2 m, AC total ±1 % of 12,361.0 m, 62 inverters + 611 tables + 22 LAs (bit-identical), **zero boundary violations**, all 62 AC cables tagged `route_quality=ok`.
+- **Unit test suite** `test_visibility_graph.py` — 9 tests covering `_build_boundary_vis_graph` on square / L-shape / MultiPolygon, Dijkstra on trivial graphs, and `_route_visibility` happy-path + unreachable cases.
+- **ADR 0007** (amended mid-spike) documenting the scoped §2 exception (two files: `string_inverter_manager.py` + `models/project.py`, additive-only, including Pattern V addition).
+- **Doc patches:** correct `S11_PAUSED_FOR_CABLES.md` §1 "25 s" claim to 460 s; `CLAUDE.md` §2 links ADR 0007; `STATUS.md` flips S11.5 ⚪ → 🟡 → 🟢; gate memo at `docs/gates/s11_5.md`.
+
+**Out of scope:**
+- Cable gauge / cross-section selection — requires ampacity tables + conductor-material handling. → S12 or S13.
+- Voltage-drop computation per cable — requires gauge. → S12 or S13.
+- Per-string DC routing (currently per-table aggregate) — larger data-shape change than S11.5 should carry.
+- BOM spreadsheet export — belongs with export spikes.
+- Cable tray / conduit quantity estimation.
+- Any change to `_kmeans_cluster`, `_assign_to_icrs`, `_find_inverter_position`, `_get_row_gap_ys`, `_get_col_xs`, `_route_length`, `_seg_ok`, `_path_ok` body, `_safe_pt`, `place_lightning_arresters`, `icr_placer`, `road_manager`, `layout_engine`, or any other pvlayout_core module.
+- Any change to existing fields on any dataclass. Rename / retype / delete are all non-goals.
+- Legacy PVlayout_Advance parity at cables-on. Deliberately broken — golden-file convention for cables remains cables-off (unchanged from S3).
+- S11's remaining gate steps (d) through (k). S11 resumes after S11.5.
+
+**Deliverables:**
+- `pvlayout_core/core/string_inverter_manager.py` + `pvlayout_core/models/project.py` patched per ADR 0007 (including the Pattern V amendment).
+- Sidecar wire mirrors (`schemas.py`, `adapters.py`) reflect the three additive model fields.
+- Headless script measures **4.4 s** wall-clock post-port on `phaseboundary2.kmz` (vs 457 s pre-port — **104× faster**; target was ≤ 30 s). Zero boundary-violation cables (vs 15 pre-V).
+- Instrumented baseline + post-port pattern-stats summaries captured in the gate memo (`docs/gates/s11_5.md` §2).
+- All existing tests green; new integration test + 9 new unit tests green. Sidecar pytest: **68 pass, 6 skipped**.
+- ADR 0007 committed (amended mid-spike for Pattern V); `CLAUDE.md` §2 and `docs/adr/README.md` updated.
+
+**Human Gate:**
+1. **Static gates.** `bun run lint && bun run typecheck && bun run test && bun run build` all green. `cd python/pvlayout_engine && uv run pytest -q` green. Expected: **68 pass, 6 skipped** (+10 from S11 pause baseline: 9 new unit tests for Pattern V primitives + 1 integration test on phaseboundary2 cables-on). **108 frontend tests** unchanged. **31 lint warnings** unchanged (all pre-existing `react-refresh`).
+2. **Headless measurement.** `uv run python scripts/debug/time_cable_calc.py` on `phaseboundary2.kmz`: total wall-clock ≤ 30 s (measured 4.4 s; ~104× faster than pre-port 457 s). 62 inverters, 611 DC runs, 62 AC runs. `total_dc_cable_m == 39,536.2 m` (bit-identical to pre-port). `total_ac_cable_m == 12,361.0 m` (14.6 % below the pre-port 14,474.8 m number — correct: pre-port over-counted the outside-polygon portions of 15 boundary-violating cables).
+3. **Pattern-stats census.** Re-run with `PVLAYOUT_PATTERN_STATS=1`. Expected pattern distribution AC: `{A=41, A2=3, A3=3, V=15}`, F=0. DC: `{A=611}`. Zero `boundary_violation` tags across DC and AC.
+4. **UI walkthrough.** Boot desktop app → license → open `phaseboundary2.kmz` → toggle `Calculate cables` ON → click Generate layout. UI returns from "Generating…" to layout view in ≤ 10 s. Cables render as two distinct visual layers (DC and AC). No errors in sidecar stdout.
+5. **Docs patched.** `S11_PAUSED_FOR_CABLES.md` §1 corrected; `docs/adr/0007-pvlayout-core-s11-5-exception.md` committed (with Pattern V amendment); `CLAUDE.md` §2 links ADR 0007; `docs/adr/README.md` lists ADR 0006 and 0007; this spike plan updated; `STATUS.md` reflects gate state; gate memo at `docs/gates/s11_5.md` complete with measurements + Pattern V finding + test-coverage summary.
+6. **Permitted surface.** `git diff` shows only: `string_inverter_manager.py`, `models/project.py`, `schemas.py`, `adapters.py`, new test files (`test_layout_s11_5_cables.py`, `test_visibility_graph.py`), debug script, and docs. No drift into other pvlayout_core modules.
 
 ---
 

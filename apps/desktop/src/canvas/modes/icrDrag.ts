@@ -73,9 +73,13 @@ export function attachIcrDrag(ctx: IcrDragContext): () => void {
     const feat = hits[0]!
     const props = feat.properties ?? {}
     const boundaryName = String(props.boundary ?? "")
-    const icrIndex = Number(props.index ?? -1)
+    // array_index is the 0-based position into LayoutResult.placed_icrs.
+    // Do NOT read props.index here — that's the 1-based display label
+    // ("ICR-1", "ICR-2"…) which mismatches the sidecar's icr_override
+    // contract and produces silent off-by-one moves or 422 out-of-range.
+    const icrIndex = Number(props.array_index ?? -1)
     if (icrIndex < 0) {
-      log.error("icr hit had no valid index", { props })
+      log.error("icr hit had no valid array_index", { props })
       return
     }
     if (feat.geometry.type !== "Polygon") {

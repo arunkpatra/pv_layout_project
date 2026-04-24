@@ -9,10 +9,11 @@ Decisions that materially affect the shape of the system live here as ADRs. Form
 - [ADR 0003](./0003-state-architecture.md) — State architecture: where each kind of state lives (S8.8, accepted 2026-04-24).
 - [ADR 0004](./0004-cloud-as-passive-storage.md) — Cloud is passive storage; desktop is the engineering tool (S8.8, accepted 2026-04-24).
 - [ADR 0005](./0005-feature-key-registry.md) — Feature-key registry and backend contract (S10.2, accepted 2026-04-24).
+- [ADR 0006](./0006-drawing-editing-pipeline.md) — Drawing/editing pipeline for S11 (S10.5, accepted 2026-04-24).
+- [ADR 0007](./0007-pvlayout-core-s11-5-exception.md) — Scoped §2 exception for cable-calc correctness (S11.5, accepted 2026-04-24).
 
 ## Expected ADRs (assigned to spikes)
 
-- **S10.5:** drawing/editing pipeline (ADR 0006 — pick deck.gl/nebula.gl vs Terra Draw vs maplibre-gl-draw before S11).
 - **S12:** telemetry event granularity + opt-in/opt-out.
 - **S13.7:** subscription model redesign + migration plan.
 - **S14:** crash reporting provider.

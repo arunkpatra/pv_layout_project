@@ -76,6 +76,30 @@ describe("layoutToGeoJson", () => {
     expect(ring[0]).toEqual(ring[ring.length - 1])
   })
 
+  it("emits array_index (0-based) distinct from index (display label)", () => {
+    // pvlayout_core assigns placed_icrs[i].index = i + 1 (1-based label
+    // for 'ICR-1', 'ICR-2'…). The sidecar's /refresh-inverters
+    // icr_override.icr_index is 0-based into placed_icrs. The geojson
+    // must expose both so interaction modes can send the right value.
+    const twoIcrs = sample({
+      placed_icrs: [
+        { x: 200, y: 200, width: 40, height: 14, index: 1 },
+        { x: 300, y: 300, width: 40, height: 14, index: 2 },
+      ],
+      placed_icrs_wgs84: [closedRing, closedRing],
+    })
+    const out = layoutToGeoJson([twoIcrs])
+    expect(out.icrs.features).toHaveLength(2)
+    expect(out.icrs.features[0]!.properties).toMatchObject({
+      index: 1,
+      array_index: 0,
+    })
+    expect(out.icrs.features[1]!.properties).toMatchObject({
+      index: 2,
+      array_index: 1,
+    })
+  })
+
   it("emits one ICR label per placed ICR with text 'ICR-{index}'", () => {
     const out = layoutToGeoJson([sample()])
     expect(out.icrLabels).toHaveLength(1)

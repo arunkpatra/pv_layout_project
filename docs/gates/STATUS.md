@@ -4,9 +4,10 @@
 
 ## Current state
 
-**Active spike:** S11 — Interactivity: ICR drag + obstruction drawing
-**Status:** ⚪ pending start
-**Previous gate:** S10.5 passed 2026-04-24 — [`s10_5.md`](./s10_5.md)
+**Active spike:** S12 — Exports: KMZ + PDF (next)
+**Status:** ⚪ pending start.
+**Previous gate:** S11 passed 2026-04-24 (preliminary). Rigorous gate-walkthrough (steps d–k on `docs/gates/s11.md` §4, plus cables-on parity) deferred to a future scoped spike (TBD, user to scope).
+**Also recently passed:** S11.5 passed 2026-04-24 — [`s11_5.md`](./s11_5.md). Spec: [`docs/superpowers/specs/2026-04-24-s11_5-cable-calc-requirements.md`](../superpowers/specs/2026-04-24-s11_5-cable-calc-requirements.md). ADR: [`docs/adr/0007-pvlayout-core-s11-5-exception.md`](../adr/0007-pvlayout-core-s11-5-exception.md).
 
 ## Progress
 
@@ -28,7 +29,8 @@
 | S10   | Inverters, cables, LAs                         | 🟢 passed | [s10.md](./s10.md) |
 | S10.2 | Feature-key alignment with backend seed        | 🟢 passed | [s10_2.md](./s10_2.md) |
 | S10.5 | Drawing/editing pipeline ADR                   | 🟢 passed | [s10_5.md](./s10_5.md) |
-| S11   | ICR drag + obstruction drawing                 | ⚪ pending | — |
+| S11   | ICR drag + obstruction drawing                 | 🟢 passed (preliminary; rigorous deferred) | [S11_PAUSED_FOR_CABLES.md](./S11_PAUSED_FOR_CABLES.md) |
+| S11.5 | Cable calc correctness (industry requirements) | 🟢 passed | [s11_5.md](./s11_5.md) |
 | S12   | Exports: KMZ + PDF                             | ⚪ pending | — |
 | S13   | PRO_PLUS: DXF + energy yield + CSV             | ⚪ pending | — |
 | S13.5 | Dark theme parity                              | ⚪ pending | — |
@@ -38,7 +40,7 @@
 | S15   | Release pipeline + download delivery           | ⚪ pending | — |
 | S15.5 | Sidecar bundle slimming (deferred opt)         | ⚪ pending | — |
 
-**Legend:** ⚪ pending · 🟡 awaiting gate · 🟢 passed · 🔴 failed (in repair)
+**Legend:** ⚪ pending · 🟡 awaiting gate · 🟢 passed · 🔴 failed (in repair) · ⏸ paused
 
 ## How this file is kept current
 

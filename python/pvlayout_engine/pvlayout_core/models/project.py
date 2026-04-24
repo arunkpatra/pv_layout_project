@@ -2,7 +2,7 @@
 Data classes for the PV Layout tool.
 """
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
 
 
@@ -83,6 +83,15 @@ class LayoutParameters:
     # When False, skip cable routing (DC string cables + AC/DC-to-ICR cables).
     # Inverter/SMB counts are still computed; cable length columns show "—".
     enable_cable_calc: bool = False
+    # S11.5: additive cable-length allowances. Defaults preserve pre-S11.5
+    # numeric behaviour (constants 4.0 m and 10.0 m were hard-coded in
+    # string_inverter_manager.place_string_inverters). Exposed for
+    # customer-site tuning without code changes. Typical EPC practice:
+    #   ac_termination_allowance_m: 3–5 m combined inverter + ICR termination.
+    #   dc_per_string_allowance_m:  6–12 m per string (panel jumpers +
+    #                               row-end pigtails + termination slack).
+    ac_termination_allowance_m: float = 4.0
+    dc_per_string_allowance_m: float = 10.0
 
 
 @dataclass
@@ -145,6 +154,14 @@ class CableRun:
     index: int = 0
     cable_type: str = "dc"   # "dc" or "ac"
     length_m: float = 0.0
+    # S11.5: routing quality tag, set by string_inverter_manager.
+    #   "ok"                 — resolved via patterns A/A2/A3/A4/B/C/D/E (all segments inside polygon).
+    #   "best_effort"        — resolved via Pattern F, all segments still inside polygon.
+    #   "boundary_violation" — resolved via Pattern F and at least one segment leaves polygon.
+    # Frontend renders "boundary_violation" cables with a warning affordance
+    # (dashed stroke / warning icon in tooltip). Default "ok" keeps
+    # pre-S11.5 serialisation byte-similar for legacy-produced results.
+    route_quality: str = "ok"
 
 
 # LA: Lightning Arrester
@@ -324,6 +341,12 @@ class LayoutResult:
     ac_cable_runs: List[CableRun] = field(default_factory=list)
     total_dc_cable_m: float = 0.0
     total_ac_cable_m: float = 0.0
+    # S11.5: additive per-inverter / per-ICR AC subtotals. Keys are
+    # inverter index (PlacedStringInverter.index, 1-based) and ICR array
+    # position (0-based, matches placed_icrs index). Empty dicts before
+    # S11.5 runs or when cables are disabled.
+    ac_cable_m_per_inverter: Dict[int, float] = field(default_factory=dict)
+    ac_cable_m_per_icr: Dict[int, float] = field(default_factory=dict)
     string_kwp: float = 0.0
     inverter_capacity_kwp: float = 0.0
     num_string_inverters: int = 0
