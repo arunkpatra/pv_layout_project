@@ -73,14 +73,19 @@ async def parse_kmz(file: UploadFile = FastAPIFile(...)) -> ParsedKMZ:
         )
 
     # core_parse_kmz expects a real path (it opens the zip itself), so we
-    # spill to a temp file. The file is deleted when the context exits.
+    # spill the upload to disk first. NamedTemporaryFile is unsafe on
+    # Windows — it holds an exclusive handle that blocks any re-opening
+    # by path while the context is active, which is exactly what
+    # core_parse_kmz needs to do. TemporaryDirectory + a regular file
+    # inside has ordinary permissions cross-platform; the directory
+    # (and the file it contains) is cleaned up on context exit.
     suffix = ".kmz" if file.filename.lower().endswith(".kmz") else ".kml"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir) / f"upload{suffix}"
         content = await file.read()
-        tmp.write(content)
-        tmp.flush()
+        tmp_path.write_bytes(content)
         try:
-            core_result = core_parse_kmz(tmp.name)
+            core_result = core_parse_kmz(str(tmp_path))
         except Exception as exc:
             log.warning("parse_kmz failed for %s: %s", file.filename, exc)
             raise HTTPException(
