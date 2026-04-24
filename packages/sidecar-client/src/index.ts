@@ -256,6 +256,48 @@ export interface LayoutResponse {
   results: LayoutResult[]
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// S11: per-ICR move overrides and obstruction add/remove
+// ─────────────────────────────────────────────────────────────────────
+
+/** Move the ICR at `icr_index` so its centroid lands at the given
+ * WGS84 point. Sidecar projects to UTM via `result.utm_epsg`. */
+export interface IcrOverrideWgs84 {
+  icr_index: number
+  new_center_wgs84: [number, number]
+}
+
+/** A user-drawn obstruction in WGS84. Projected server-side to UTM
+ * before it's appended to `placed_roads`. */
+export interface RoadInput {
+  road_type: "rectangle" | "polygon" | "line"
+  coords_wgs84: [number, number][]
+}
+
+export interface RefreshInvertersRequest {
+  result: LayoutResult
+  params: LayoutParameters
+  /**
+   * Optional ICR override applied in the same round-trip. The server
+   * projects `new_center_wgs84` via `result.utm_epsg`, moves the ICR's
+   * bottom-left corner so the rectangle's centroid lands at the
+   * requested point, re-runs `recompute_tables`, then LA + string
+   * inverter placement in the legacy order.
+   */
+  icr_override?: IcrOverrideWgs84
+}
+
+export interface AddRoadRequest {
+  result: LayoutResult
+  params: LayoutParameters
+  road: RoadInput
+}
+
+export interface RemoveRoadRequest {
+  result: LayoutResult
+  params: LayoutParameters
+}
+
 export interface SidecarClient {
   readonly baseUrl: string
   health(): Promise<HealthResponse>
@@ -266,6 +308,18 @@ export interface SidecarClient {
    * parsed KMZ. Returns one LayoutResult per boundary.
    */
   runLayout(parsedKmz: ParsedKMZ, params: LayoutParameters): Promise<LayoutResult[]>
+
+  /**
+   * Recompute LA + string-inverter placement for an existing result.
+   * S11: pass `icr_override` to move an ICR in the same round-trip.
+   */
+  refreshInverters(request: RefreshInvertersRequest): Promise<LayoutResult>
+
+  /** S11: append a user-drawn obstruction and recompute. */
+  addRoad(request: AddRoadRequest): Promise<LayoutResult>
+
+  /** S11: pop the most recently added obstruction (LIFO) and recompute. */
+  removeLastRoad(request: RemoveRoadRequest): Promise<LayoutResult>
 }
 
 export class SidecarError extends Error {
@@ -333,6 +387,30 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
       return request<ParsedKMZ>("/parse-kmz", {
         method: "POST",
         body: fd,
+      })
+    },
+
+    refreshInverters(req: RefreshInvertersRequest): Promise<LayoutResult> {
+      return request<LayoutResult>("/refresh-inverters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req),
+      })
+    },
+
+    addRoad(req: AddRoadRequest): Promise<LayoutResult> {
+      return request<LayoutResult>("/add-road", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req),
+      })
+    },
+
+    removeLastRoad(req: RemoveRoadRequest): Promise<LayoutResult> {
+      return request<LayoutResult>("/remove-road", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req),
       })
     },
   }

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type JSX,
 } from "react"
@@ -57,9 +58,17 @@ import { useLayoutParamsStore } from "./state/layoutParams"
 import { useLayoutResultStore } from "./state/layoutResult"
 import { useLayerVisibilityStore } from "./state/layerVisibility"
 import { useLayoutMutation } from "./state/useLayoutMutation"
+import { useEditingStateStore } from "./state/editingState"
+import { useRefreshInvertersMutation } from "./state/useRefreshInvertersMutation"
+import { useAddRoadMutation } from "./state/useAddRoadMutation"
+import { useRemoveLastRoadMutation } from "./state/useRemoveLastRoadMutation"
 import { LayoutPanel } from "./panels/LayoutPanel"
 import { SummaryPanel } from "./panels/SummaryPanel"
 import { VisibilitySection } from "./panels/VisibilitySection"
+import { DrawingToolbar } from "./panels/DrawingToolbar"
+import { InteractionController } from "./canvas/InteractionController"
+import { clearDrawPreview } from "./canvas/preview"
+import type maplibregl from "maplibre-gl"
 
 /**
  * App shell orchestrator.
@@ -282,6 +291,7 @@ export function App(): JSX.Element {
   const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
   const showAcCables = useLayerVisibilityStore((s) => s.showAcCables)
   const showLas = useLayerVisibilityStore((s) => s.showLas)
+  const resetEditingState = useEditingStateStore((s) => s.reset)
 
   // Bumped on each successful KMZ load so LayoutPanel remounts with the
   // reset defaults — plain RHF reset wouldn't re-seed `defaultValues` since
@@ -347,6 +357,7 @@ export function App(): JSX.Element {
       clearLayoutResult()
       resetLayoutParams()
       resetLayerVisibility()
+      resetEditingState()
       setLayoutFormKey((k) => k + 1)
       setProject({ kmz: result.parsed, fileName: result.fileName })
       setPaletteOpen(false)
@@ -364,6 +375,7 @@ export function App(): JSX.Element {
     clearLayoutResult,
     resetLayoutParams,
     resetLayerVisibility,
+    resetEditingState,
   ])
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
@@ -404,6 +416,182 @@ export function App(): JSX.Element {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [handleOpenKmz])
+
+  // ── S11: interactive ICR drag + obstruction drawing ──────────────────────
+  //
+  // Lifecycle:
+  //   mouseup (commit)           → onCommit callback (below)
+  //                                     → setMode('awaiting-ack')
+  //                                     → fire mutation; preview STAYS
+  //                                       visible on the canvas (mode
+  //                                       modules don't clear on commit)
+  //   mutation onSuccess         → setLayoutResult(new) (mutation hook)
+  //                                     → clearDrawPreview(map)
+  //                                     → setMode('idle')
+  //                                     → [add-road only] pushObstruction
+  //   mutation onError           → setMode('idle'), clearDrawPreview(map),
+  //                                no stack mutation (nothing to unwind)
+  //
+  // Single-boundary assumption: S11 Phase 2 operates on boundaryIndex=0.
+  // phaseboundary2.kmz is single-boundary; multi-boundary obstruction
+  // propagation (legacy PVlayout_Advance applied roads to ALL
+  // boundaries) is deferred — documented in S11 gate memo and picked
+  // up in S13.8's parity sweep.
+  const refreshInvertersMutation = useRefreshInvertersMutation(sidecarClient)
+  const addRoadMutation = useAddRoadMutation(sidecarClient)
+  const removeLastRoadMutation = useRemoveLastRoadMutation(sidecarClient)
+
+  const editingSetMode = useEditingStateStore((s) => s.setMode)
+  const editingSetPendingCommit = useEditingStateStore(
+    (s) => s.setPendingCommit
+  )
+  const editingPushObstruction = useEditingStateStore(
+    (s) => s.pushObstruction
+  )
+  const editingPopLastObstruction = useEditingStateStore(
+    (s) => s.popLastObstruction
+  )
+  const editingUndoStackDepth = useEditingStateStore(
+    (s) => s.undoStack.length
+  )
+
+  const interactionMapRef = useRef<maplibregl.Map | null>(null)
+
+  // InteractionController: stable instance across renders. Commit
+  // callbacks close over the mutation hooks + store actions; since
+  // mutation hooks are stable refs themselves, the closure is safe to
+  // hold in a ref-initialised singleton.
+  const interactionControllerRef = useRef<InteractionController | null>(null)
+  if (interactionControllerRef.current === null) {
+    interactionControllerRef.current = new InteractionController({
+      onIcrDragCommit: (commit) => {
+        // Boundary lookup: find the boundary whose name matches. For
+        // S11 Phase 2 with single-boundary phaseboundary2, this is
+        // always index 0.
+        const results = useLayoutResultStore.getState().result
+        if (!results) {
+          console.warn("[s11] onIcrDragCommit: no layout result loaded")
+          return
+        }
+        const boundaryIndex = results.findIndex(
+          (r) => r.boundary_name === commit.boundaryName
+        )
+        if (boundaryIndex < 0) {
+          console.warn("[s11] onIcrDragCommit: boundary not found", commit)
+          return
+        }
+        editingSetPendingCommit({
+          kind: "icr-drag",
+          boundaryName: commit.boundaryName,
+          icrIndex: commit.icrIndex,
+          newCenter: commit.newCenter,
+        })
+        editingSetMode("awaiting-ack")
+        refreshInvertersMutation.mutate(
+          {
+            boundaryIndex,
+            result: results[boundaryIndex]!,
+            params: useLayoutParamsStore.getState().params,
+            icrOverride: {
+              icr_index: commit.icrIndex,
+              new_center_wgs84: [commit.newCenter[0], commit.newCenter[1]],
+            },
+          },
+          {
+            onSettled: () => {
+              const map = interactionMapRef.current
+              if (map) clearDrawPreview(map)
+              editingSetMode("idle")
+            },
+          }
+        )
+      },
+      onRectCommit: (commit) => {
+        // Apply to first boundary (S11 Phase 2). Multi-boundary
+        // broadcast is deferred.
+        const results = useLayoutResultStore.getState().result
+        if (!results || results.length === 0) {
+          console.warn("[s11] onRectCommit: no layout result loaded")
+          return
+        }
+        const boundaryIndex = 0
+        editingSetPendingCommit({
+          kind: "add-road",
+          roadType: "rectangle",
+          coordsWgs84: commit.coordsWgs84,
+        })
+        editingSetMode("awaiting-ack")
+        const coordsTuples: [number, number][] = commit.coordsWgs84.map(
+          (p) => [p[0], p[1]] as [number, number]
+        )
+        addRoadMutation.mutate(
+          {
+            boundaryIndex,
+            result: results[boundaryIndex]!,
+            params: useLayoutParamsStore.getState().params,
+            road: {
+              road_type: "rectangle",
+              coords_wgs84: coordsTuples,
+            },
+          },
+          {
+            onSuccess: () => {
+              editingPushObstruction({
+                roadType: "rectangle",
+                coordsWgs84: commit.coordsWgs84,
+                serverAck: true,
+              })
+            },
+            onSettled: () => {
+              const map = interactionMapRef.current
+              if (map) clearDrawPreview(map)
+              editingSetMode("idle")
+            },
+          }
+        )
+      },
+    })
+  }
+
+  const handleMapReady = useCallback((map: maplibregl.Map) => {
+    interactionMapRef.current = map
+    interactionControllerRef.current?.attach(map, useEditingStateStore)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      interactionControllerRef.current?.detach()
+      interactionMapRef.current = null
+    }
+  }, [])
+
+  const handleUndoLast = useCallback(() => {
+    if (editingUndoStackDepth === 0) return
+    const results = useLayoutResultStore.getState().result
+    if (!results || results.length === 0) return
+    const boundaryIndex = 0
+    editingSetMode("awaiting-ack")
+    removeLastRoadMutation.mutate(
+      {
+        boundaryIndex,
+        result: results[boundaryIndex]!,
+        params: useLayoutParamsStore.getState().params,
+      },
+      {
+        onSuccess: () => {
+          editingPopLastObstruction()
+        },
+        onSettled: () => {
+          editingSetMode("idle")
+        },
+      }
+    )
+  }, [
+    editingUndoStackDepth,
+    editingSetMode,
+    editingPopLastObstruction,
+    removeLastRoadMutation,
+  ])
 
   // ── Render decisions ─────────────────────────────────────────────────────
 
@@ -530,6 +718,7 @@ export function App(): JSX.Element {
             laCirclesGeoJson={layoutGeoJson?.laCircles}
             showAcCables={showAcCables}
             showLas={showLas}
+            onMapReady={handleMapReady}
           >
             <CommandBarHint onClick={openPalette} />
             {!project && (
@@ -580,6 +769,7 @@ export function App(): JSX.Element {
                   noProject={!project}
                 />
                 {layoutResult && <VisibilitySection />}
+                {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
                 <SummaryPanel generating={layoutMutation.isPending} />
               </TabsContent>
               <TabsContent

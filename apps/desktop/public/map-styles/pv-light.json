@@ -45,6 +45,14 @@
     "kmz-la-circles": {
       "type": "geojson",
       "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-draw-preview": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-draw-vertices": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
     }
   },
   "layers": [
@@ -249,6 +257,39 @@
       "paint": {
         "line-color": "rgba(140, 30, 30, 0.95)",
         "line-width": 1
+      }
+    },
+    {
+      "id": "draw-preview-fill",
+      "type": "fill",
+      "source": "kmz-draw-preview",
+      "paint": {
+        "fill-color": "rgba(180, 120, 60, 0.18)"
+      }
+    },
+    {
+      "id": "draw-preview-outline",
+      "type": "line",
+      "source": "kmz-draw-preview",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(140, 90, 40, 0.9)",
+        "line-width": 1.5,
+        "line-dasharray": [2, 2]
+      }
+    },
+    {
+      "id": "draw-vertex-point",
+      "type": "circle",
+      "source": "kmz-draw-vertices",
+      "paint": {
+        "circle-radius": 4,
+        "circle-color": "rgba(140, 90, 40, 1)",
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "rgba(255, 255, 255, 0.9)"
       }
     }
   ]
