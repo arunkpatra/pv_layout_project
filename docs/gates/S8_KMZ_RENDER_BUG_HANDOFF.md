@@ -1,8 +1,8 @@
 # S8 blocker — KMZ parses successfully but MapLibre doesn't render the overlay  *(HISTORICAL — resolved)*
 
 **Written:** 2026-04-24
-**Resolved:** 2026-04-24 — see §10 at bottom.
-**Why this file exists:** S8 was mid-gate with a MapLibre-render blocker — every deliverable passed except the boundary/obstacles/TL lines rendering after a successful parse. Three rounds of speculative fixes had failed to produce a visible overlay. This file briefed the fresh session so it could debug from a clean state without repeating what had been tried. The resolution is appended below (§10); the original triage notes (§§1–9) are preserved verbatim as history for anyone hitting similar Tauri 2 WKWebView + CSS cascade-layer issues later.
+**Resolved:** 2026-04-24 — see §11 at bottom.
+**Why this file exists:** S8 was mid-gate with a MapLibre-render blocker — every deliverable passed except the boundary/obstacles/TL lines rendering after a successful parse. Three rounds of speculative fixes had failed to produce a visible overlay. This file briefed the fresh session so it could debug from a clean state without repeating what had been tried. The resolution is appended below (§11); the original triage notes (§§1–10) are preserved verbatim as history for anyone hitting similar Tauri 2 WKWebView + CSS cascade-layer issues later.
 
 **Read order for the new session:**
 
@@ -257,7 +257,7 @@ If the fix lands AND all other §2–§8 S8 gate steps (in `docs/gates/s08.md`) 
 
 1. Remove/simplify the diagnostic `console.log` probes.
 2. Mark `docs/gates/STATUS.md` S8 row 🟢; update `docs/gates/s08.md` Status → Passed.
-3. (Optional) append a §10 "Resolution" section to this file, mirror of how `S6_DRAG_BUG_HANDOFF.md` was closed.
+3. (Optional) append a §11 "Resolution" section to this file, mirror of how `S6_DRAG_BUG_HANDOFF.md` was closed.
 4. Commit: `s08: KMZ load + MapLibre canvas (light vector style)`.
 5. Tag: `v0.0.9-s8`.
 6. Hand off: "S8 passed, ready for S9."
@@ -279,7 +279,7 @@ If the fix lands AND all other §2–§8 S8 gate steps (in `docs/gates/s08.md`) 
 
 ---
 
-## 10. Resolution (2026-04-24)
+## 11. Resolution (2026-04-24)
 
 S8 passed. Two distinct bugs were found and fixed via diagnostic-driven debugging — none of the eight hypotheses in §4 were the actual root cause; the §4 ranking was based on the wrong mental model.
 

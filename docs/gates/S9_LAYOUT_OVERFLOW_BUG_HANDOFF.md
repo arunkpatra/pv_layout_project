@@ -18,7 +18,7 @@ Three rounds of speculative fixes in S8's bug debugging had wasted time; this ha
 3. `docs/SPIKE_PLAN.md` → S9 entry (In-Scope and Deliverables).
 4. `docs/adr/0003-state-architecture.md`.
 5. `docs/gates/s09.md` — what S9 built, gate steps.
-6. `docs/gates/S8_KMZ_RENDER_BUG_HANDOFF.md` §10 — the resolution / methodology lessons from the previous open-ended layout bug. Especially the "what worked" section.
+6. `docs/gates/S8_KMZ_RENDER_BUG_HANDOFF.md` §11 — the resolution / methodology lessons from the previous open-ended layout bug. Especially the "what worked" section.
 7. **This file.**
 
 ---
@@ -307,7 +307,7 @@ If both bugs fixed AND all S9 gate steps pass:
 
 1. Strip any diagnostic JS pasted into the console (it's not in source).
 2. Mark `docs/gates/STATUS.md` S9 row 🟢; update `docs/gates/s09.md` Status → Passed.
-3. Append §11 "Resolution" to this file (mirror the structure used in `S8_KMZ_RENDER_BUG_HANDOFF.md` §10 — but numbered §11 here to avoid colliding with the pre-existing §10 "User's working style"; S8 has a duplicate §10 which we don't propagate).
+3. Append §11 "Resolution" to this file (mirror the structure used in `S8_KMZ_RENDER_BUG_HANDOFF.md` §11).
 4. Commit the S9 batch: `s09: input panel + generate layout (tabbed inspector + canvas extension)`.
 5. Tag: `v0.0.12-s9`.
 6. Hand off: "S9 passed, ready for S10."
