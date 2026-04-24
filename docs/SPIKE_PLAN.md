@@ -34,18 +34,20 @@ S8.7  Frontend test harness + CI                     [foundation]
 S8.8  State architecture cleanup (ADR-0003 + 0004)   [foundation]
 S9    Input panel + Generate Layout (tables, ICRs)   [core UX]
 S10   Inverters, cables, LAs (PRO, read-only)        [core UX]
+S10.2 Feature-key alignment with backend seed        [foundation]
 S10.5 Drawing/editing pipeline ADR                   [foundation]
 S11   Interactivity: ICR drag + obstruction drawing  [core UX]
 S12   Exports: KMZ + PDF                             [output]
-S13   PRO_PLUS: DXF + energy yield + CSV             [output]
+S13   Exports (DXF, CSV) + PRO_PLUS energy yield     [output]
 S13.5 Dark theme parity                              [design]
 S13.7 Subscription model redesign (brainstorm)       [strategy]
+S13.8 Parity & gates end-to-end verification         [release]
 S14   Auto-updater + code signing + notarization    [release]
 S15   Release pipeline + download delivery          [release]
 S15.5 Sidecar bundle slimming (deferred opt)         [post-launch]
 ```
 
-21 spikes. S0–S4 produce a working sidecar you can `curl`. S5–S7 produce a launchable shell that can authenticate, rendered to the Claude-Desktop-quality bar in light mode. S8.7 + S8.8 invest in foundation (test harness, state architecture) before the core-UX run begins. S9–S13 bring the UI to feature parity with PVlayout_Advance, with S10.5 inserted to pick the drawing/editing library before S11 needs it. S13.5 brings dark theme to parity. S13.7 decomposes the Edition → Subscription redesign before release. S14–S15 make it shippable. S15.5 is a deferred post-launch optimization picked up only on real-user signal.
+23 spikes. S0–S4 produce a working sidecar you can `curl`. S5–S7 produce a launchable shell that can authenticate, rendered to the Claude-Desktop-quality bar in light mode. S8.7 + S8.8 invest in foundation (test harness, state architecture) before the core-UX run begins. S9–S13 bring the UI to feature parity with PVlayout_Advance, with S10.2 inserted to correct S7's fictional feature keys (discovered during S10's gate walkthrough) and S10.5 inserted to pick the drawing/editing library before S11 needs it. S13.5 brings dark theme to parity. S13.7 decomposes the Edition → Subscription redesign. S13.8 runs the full parity + plan-based gate sweep against PVlayout_Advance with real Basic / Pro / Pro Plus licenses (the per-spike gate walkthroughs deliberately cover only what each spike ships — S13.8 is the consolidated pre-release check). S14–S15 make it shippable. S15.5 is a deferred post-launch optimization picked up only on real-user signal.
 
 ---
 
@@ -498,10 +500,65 @@ Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
 - With a Basic license: feature gates visible; toggles disabled.
 - Numbers in summary panel match PyQt5 exactly.
 
-**Human Gate:**
-1. Using a PRO license: open a KMZ, generate, see string inverters on the map, toggle AC cables on/off, toggle LAs on/off.
-2. Switch to a Basic license (re-enter a basic key from your dashboard): relaunch, generate, PRO features are locked with upgrade badges.
-3. Counts and lengths match PyQt5 output for the same input.
+**Human Gate:** combined with S10.2 — see S10.2 Human Gate. S10 cannot pass its physical gate alone because S7's fictional feature keys mis-gate S10's surfaces; S10.2 corrects this and the combined gate validates both.
+
+---
+
+## S10.2 — Feature-key alignment with backend seed
+
+**Goal:** Replace S7's fictional feature-key names with the real keys emitted by `api.solarlayout.in/entitlements`. Introduce a typed registry, a contract test against the `renewable_energy` seed, and correct S10's mis-gated surfaces. Sub-spike triggered during S10's physical gate walkthrough when the LA toggle was shown to be wrongly gated on a fictional `cables` key (LA is part of `plant_layout`, Basic-tier).
+
+**In scope:**
+- Typed `FEATURE_KEYS` registry + `FeatureKey` union in `packages/entitlements-client` mirroring `renewable_energy/packages/mvp_db/prisma/seed-products.ts`.
+- Narrow `FeatureGate` and `useHasFeature` from `string` to `FeatureKey`.
+- Correct S10 call sites: ungate LA toggle; re-gate AC cables on `cable_routing`; re-gate cable-length summary rows on `cable_measurements`; re-gate PRO_PLUS summary rows on `energy_yield`.
+- Replace single `PREVIEW_ENTITLEMENTS` with three tier-accurate variants (Basic / Pro / Pro Plus), each reflecting real seed output.
+- Contract test asserting `ALL_FEATURE_KEYS` ⊆ seed key set.
+- Remove stranded invented keys (`icr_drag`, `dxf`, `obstructions`) from preview; no code consumes them yet.
+- ADR-0005 — feature-key registry and backend contract.
+- Process updates: `CLAUDE.md` §2 (external-contract principle), §7 (named source-of-truth file paths), §13 (session-start checklist); `SPIKE_PLAN.md` cross-cutting criterion for gate-introducing spikes.
+
+**Out of scope:**
+- Sidecar feature-gate enforcement (S12/S13 own the real work; S10.2 audits and flags only if divergence exists).
+- Tier restructure / new product features.
+- New backend seed keys (no `renewable_energy` changes).
+- S11's ICR-drag / obstructions gates (wire with real keys when S11 lands).
+
+**Deliverables:**
+- Registry + contract test green.
+- S10's three mis-gated surfaces corrected.
+- Three-variant preview entitlements.
+- ADR-0005 committed.
+- CLAUDE.md + SPIKE_PLAN.md process patches landed.
+- Combined physical gate with S10 passes — see gate memo for the step-by-step.
+
+**Human Gate (combined with S10):**
+1. **Basic preview**: LA toggle enabled (no Pro chip). AC cables toggle disabled with Pro chip. Summary shows Modules / Inverters / LAs / Inverter capacity; cable-length rows and AC capacity / DC-AC ratio absent.
+2. **Pro preview**: both VisibilitySection toggles enabled. Summary shows cable-length rows. AC capacity / DC-AC ratio rows absent.
+3. **Pro Plus preview**: both toggles enabled. Summary shows AC capacity (MW) and DC-AC ratio.
+4. Counts match PVlayout_Advance on phaseboundary2.kmz (611 tables, 62 inverters, 22 LAs, 19.85 MWp).
+5. Contract test fails if any frontend feature key drifts from seed.
+
+---
+
+## Cross-cutting criterion — feature gates
+
+Any spike that introduces, removes, or modifies a feature gate must:
+1. Use `FEATURE_KEYS.*` constants from `@solarlayout/entitlements-client`. String-literal keys fail lint/typecheck once the narrow type lands in S10.2.
+2. Cross-reference the `renewable_energy` seed before writing new key names. New keys require a seed change first, merged upstream; the frontend tracks.
+3. The contract test in `entitlements-client` runs under CI's `bun run test`. Divergence is a failing build.
+4. **When in doubt, ship ungated.** If a surface "feels like it might be premium" but doesn't match any existing seed key, the default is ungated — don't invent, don't improvise. If it genuinely should be gated, surface to the human, propose a seed change, deploy that first, then wire the gate. Never the other way around.
+
+Applies to S11 (obstruction gate = `OBSTRUCTION_EXCLUSION`; ICR drag ungated), S12 (all exports ungated), S13 (DXF + CSV ungated; energy yield gated on `ENERGY_YIELD`). Authoritative policy: [ADR-0005](./adr/0005-feature-key-registry.md). Background principle: [`docs/principles/external-contracts.md`](./principles/external-contracts.md).
+
+### Product decisions locked in S10.2
+
+- **All export formats (DXF, KMZ, PDF, CSV) — ungated.** Outputs serialize whatever was computed; they don't themselves represent value. A Basic user's DXF is naturally sparser than a Pro Plus user's because the feature keys that drive computation differ; the format is not the revenue lever.
+- **ICR drag — ungated.** Dragging is an interaction on top of layouts a user is already entitled to compute. The recompute that follows a drag is still gated by the user's tier.
+- **Obstruction drawing — gated on existing `OBSTRUCTION_EXCLUSION` (Basic-tier).** No new seed key needed.
+- **Zoom / pan / undo / basic canvas interaction — ungated.** Always available.
+
+Revenue is protected by (a) the feature keys that determine **what gets computed** and (b) the `calculations` quota that determines **how many times**. Not by per-format export gating.
 
 ---
 
@@ -538,7 +595,9 @@ Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
 - MapLibre GL Draw tools: rectangle, polygon, line. Drawing commits a `POST /add-road` with UTM coordinates.
 - "Remove last obstruction" button → `POST /remove-road`.
 - Undo stack (limited, 10 entries) for obstruction adds.
-- Both flows feature-gated on `icr_drag` and `obstructions` entitlements.
+- **Feature gating (resolved in S10.2):**
+  - **ICR drag — ungated.** Drag is an interaction on top of `plant_layout` (Basic-tier); any user entitled to compute a layout can reposition its ICRs. No `FEATURE_KEYS.*` wrap, no `FeatureGate`. The recomputation that follows a drag is still naturally gated by the user's tier (a Basic drag re-runs a Basic-tier layout — no cables appear because `cable_routing` is off).
+  - **Obstruction drawing — gate on `FEATURE_KEYS.OBSTRUCTION_EXCLUSION`.** Existing Basic-tier seed key (labeled "Obstruction Exclusion"). S11 uses the real key directly; no seed change needed.
 
 **Out of scope:** any export changes.
 
@@ -567,6 +626,7 @@ Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
 - PDF export honors the existing visibility rules (AC/DC cables hidden; LA rects/labels force-shown; LA circles hidden).
 - Post-export: `POST api.solarlayout.in/usage/report` with feature name.
 - Toast on success with "Open in Finder/Explorer" action.
+- **Feature gating (resolved in S10.2):** KMZ and PDF exports are **ungated**. Any user with a layout can export it. The exported content is implicitly gated by the feature keys that drove computation — a Basic user's KMZ has MMS + inverters + LAs but no cable layers. No `FeatureGate` on the export buttons; no 403 on the sidecar endpoints.
 
 **Out of scope:** DXF, energy yield (S13).
 
@@ -582,16 +642,20 @@ Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
 
 ---
 
-## S13 — PRO_PLUS: DXF + energy yield + CSV
+## S13 — Exports (DXF, CSV) + PRO_PLUS energy yield
 
-**Goal:** The remaining PRO_PLUS-only exports work and match PyQt5 output.
+**Goal:** DXF export for any user, and the PRO_PLUS energy-yield computation with its CSV artifact. Match PyQt5 output byte-similar where a byte-similar reference exists.
 
 **In scope:**
-- `POST /export/dxf` — calls `dxf_exporter.py`. All layers preserved (tables, ICRs, inverters, cables, LAs, LA circles, obstructions).
+- `POST /export/dxf` — calls `dxf_exporter.py`. All layers preserved (tables, ICRs, inverters, cables, LAs, LA circles, obstructions). **Ungated export** — every tier can produce a DXF; the layer content reflects the tier's computation.
 - `POST /energy-yield` — calls `energy_calculator.py` with PVGIS/TMY/custom weather file; returns 25-year yield summary + 15-min CSV data.
 - UI: Energy Yield panel (new subsection in right panel) — weather file input, output summary: P50/P75/P90, annual yield MWh, specific yield.
-- "Export 15-min CSV" button.
-- All gated on `dxf`, `energy` entitlements.
+- "Export 15-min CSV" button for the energy-yield results.
+- **Feature gating (resolved in S10.2):**
+  - **DXF export — ungated.** Same rationale as S12 KMZ/PDF.
+  - **Energy yield computation — gated on `FEATURE_KEYS.ENERGY_YIELD`.** Existing Pro-Plus-tier seed key.
+  - **Plant generation estimates (if surfaced as a separate computation) — gated on `FEATURE_KEYS.GENERATION_ESTIMATES`.** Existing Pro-Plus-tier seed key.
+  - **15-min CSV export — ungated.** You can export the CSV of whatever yield the user computed; the yield itself is what's gated.
 
 **Out of scope:** auto-update, signing (S14+).
 
@@ -601,10 +665,10 @@ Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
 - 15-min CSV matches PyQt5 byte-for-byte for identical weather input.
 
 **Human Gate:**
-1. With PRO_PLUS license: export DXF, open in LibreCAD or equivalent, all layers present.
-2. Run energy yield with a known PVGIS file; compare P50/P75/P90 with PyQt5 values.
-3. Export 15-min CSV; diff against PyQt5 output → identical.
-4. With non-PRO_PLUS license: these features are locked.
+1. With any licensed key: export DXF, open in LibreCAD or equivalent, all layers present. (Basic's DXF has no cable layers — expected.)
+2. With PRO_PLUS license: run energy yield with a known PVGIS file; compare P50/P75/P90 with PyQt5 values.
+3. With PRO_PLUS license: export 15-min CSV; diff against PyQt5 output → identical.
+4. With non-PRO_PLUS license: the energy-yield panel is disabled / shows upgrade affordance; DXF export and existing S12 exports remain available.
 
 ---
 
@@ -702,6 +766,40 @@ Memo: [`docs/gates/s08_8.md`](./gates/s08_8.md).
 5. Sign-off on this spike is sign-off on the subscription architecture. The sub-spikes execute against this contract.
 
 **Note:** This spike explicitly decouples deliberation from execution. The spike closes when the plan is good, not when any code ships. Sub-spikes carry the execution.
+
+---
+
+## S13.8 — Parity & gates end-to-end verification
+
+**Goal:** A single consolidated pre-release sweep that confirms (a) the desktop app matches PVlayout_Advance output at numeric parity on a canonical input set, and (b) every feature gate behaves correctly on every real plan tier with real licenses. Per-spike gates earlier in the plan validate only what each spike ships; S13.8 is where we walk the full surface with Basic / Pro / Pro Plus licenses and compare byte-level against the reference app. Catches cross-spike drift that individual spike gates can't see.
+
+**Why a dedicated spike?** Running the "open a KMZ, generate, compare every number, toggle every gate, export every format" sweep inside S10, S11, S12, or S13 each bloats those spikes and spreads the parity test across the plan instead of consolidating it at the end. Deferring cross-plan gate testing to a dedicated exercise keeps earlier spikes focused on their own scope and gives the parity sweep a single owner. Per-spike gates still run — S13.8 just replaces the *en-masse* parity / cross-tier portions that were previously spread across them.
+
+**In scope:**
+1. **Parity matrix.** For each canonical KMZ (phaseboundary2 at minimum, plus any other golden fixtures S3 blessed), on each plan tier, verify: table count, ICR count, inverter count, LA count, total MWp, DC/AC cable totals (when applicable), plant AC capacity (when applicable), DC/AC ratio (when applicable), and energy-yield P50/P75/P90 (when applicable) all match PVlayout_Advance within tolerance.
+2. **Gate matrix.** For each UI gate defined in the feature-key registry, verify with a real license key of the appropriate tier: (a) enabled/disabled state matches entitlement, (b) "Pro" / upgrade chip appears only when not entitled, (c) disabled controls are no-ops, (d) gated rows appear/disappear correctly in SummaryPanel, (e) form-level gates (`enable_cable_calc` and any similar additions in S11+) coerce on submit.
+3. **Sidecar enforcement matrix.** If S12/S13 added `require_feature` to any endpoint, verify a not-entitled plan receives 403 `feature_not_entitled` while an entitled plan receives 200. Tested with direct `curl` against the running sidecar, not just the UI layer.
+4. **Export roundtrip.** Every ungated export (KMZ, PDF, DXF, CSV) produced by every tier opens correctly in its native viewer. Per-tier content differences are expected and documented (Basic KMZ has no cable layers, etc.) — that's the point of ungated exports: content scales with compute.
+5. **Parity report doc.** `docs/gates/s13_8.md` — a parity report with per-tier, per-fixture numbers side-by-side with PVlayout_Advance output, plus any accepted deviations with justification.
+6. **Deviation handling.** Any numeric deviation > tolerance is fixed in-spike — the spike closes only when parity holds.
+
+**Out of scope:**
+- New features. Any gap that requires new compute or new UI is a separate spike.
+- Performance optimization. Parity is about correctness; speed is S15.5's concern.
+- The subscription-model redesign from S13.7 (that's deliberative, this is verificative).
+
+**Deliverables:**
+- `docs/gates/s13_8.md` — the parity + gate report.
+- All gate / parity matrix items green, or documented as accepted with rationale.
+- Any bugs surfaced by the sweep fixed and re-verified.
+
+**Human Gate:**
+1. Read `s13_8.md`. Every fixture × plan cell has a number from both the app and PVlayout_Advance; deltas within tolerance or explicitly accepted.
+2. For each plan, open the app, walk the happy path (KMZ → Generate → toggle features → export formats). No surprise behavior, no unexpected "Pro" chips, no missing rows.
+3. Run `curl` against the sidecar with each plan's session established, attempt a forbidden operation (if any), receive expected 403 / 200.
+4. On sign-off, the desktop is ready to ship against the mvp_api entitlements contract. S14 starts the release pipeline work.
+
+**Dependencies:** S13 complete (all features landed). S13.7 complete (subscription model locked — if still Edition model, that's fine, but the sub-spike count under S13.7 must be zero open). Real test licenses provisioned for every tier.
 
 ---
 

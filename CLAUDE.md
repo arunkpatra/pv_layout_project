@@ -21,7 +21,7 @@ A ground-up rewrite of the **SolarLayout** desktop product — a native desktop 
 2. **[docs/SPIKE_PLAN.md](./docs/SPIKE_PLAN.md)** — the 17-spike project plan. We execute these sequentially with human gates between each.
 
 ### Working agreements
-- **Spike-based development.** Work proceeds in named spikes (S0 → S15, with intervening sub-spikes inserted as needs surface — currently S5.5, S8.7, S8.8, S10.5, S13.5, S13.6, S13.7, S15.5). Each spike has an explicit **Human Gate** defined in `SPIKE_PLAN.md`. Nothing else gets built until the current spike's gate passes.
+- **Spike-based development.** Work proceeds in named spikes (S0 → S15, with intervening sub-spikes inserted as needs surface — currently S5.5, S8.7, S8.8, S10.2, S10.5, S13.5, S13.6, S13.7, S15.5). Each spike has an explicit **Human Gate** defined in `SPIKE_PLAN.md`. Nothing else gets built until the current spike's gate passes.
 - **I pause at every gate.** When a spike's deliverables are ready, I stop and tell the human exactly what to run to verify. I do not start the next spike until the human signs off.
 - **No new features during migration.** If a request comes in that isn't "reach parity with PVlayout_Advance," it goes in a backlog. Keep scope honest.
 - **Functional parity is the contract.** Any feature that behaves one way in `PVlayout_Advance` must behave identically here unless we've explicitly decided otherwise. Golden-file tests in S3 catch silent drift.
@@ -45,6 +45,12 @@ Operationally:
 5. **Pause and surface** if an in-progress decision would force throw-away work in any future spike. Better to redesign the current spike than to ship debt that compounds across the next five.
 
 This applies to: scoping decisions, dependency choices, data schemas, file structure, naming, abstractions, what to test, what to defer. It does NOT apply to product features — those are governed by the SPIKE_PLAN scope rules and the "no scope creep" agreement above.
+
+### External contracts bind before code
+
+Names that cross a boundary to another repo or service — feature-key strings, API response shapes, export format IDs, sidecar route paths — have a source of truth outside this repo. Read that source before typing the name in this one. Preview and mock data is silent about contract divergence; assume it's lying until a contract test or the real file agrees. New names flow one direction: the external contract changes first, we mirror.
+
+Full principle, post-mortem of the S7/S10 incident that landed it, authoritative source-of-truth file table, and operational steps: [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md). Feature-key registry policy: [ADR-0005](./docs/adr/0005-feature-key-registry.md).
 
 ### What I never do without explicit human ask
 - Skip a Human Gate.
@@ -151,6 +157,8 @@ These exist elsewhere on disk and are referenced by this project but **never mod
 |---|---|---|
 | `PVlayout_Advance` | `/Users/arunkpatra/codebase/PVlayout_Advance` | Source of truth for all domain logic. We copy `core/`, `models/`, `utils/` into `python/pvlayout_engine/pvlayout_core/` in S1. We don't modify the source repo. |
 | `renewable_energy` | `/Users/arunkpatra/codebase/renewable_energy` | Hosts `apps/mvp_web` (marketing + dashboard on Vercel), `apps/mvp_api` (Hono backend serving `api.solarlayout.in`), `packages/mvp_db` (Prisma + Postgres). We consume `api.solarlayout.in/entitlements` and `/usage/report`. Anything else in that repo (old `apps/{web,api,layout-engine}`) is defunct — ignore. |
+
+Source-of-truth files for external contracts (feature keys, API shapes, usage payloads) are catalogued in [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md) under §2's "External contracts bind before code" principle.
 
 ---
 
@@ -282,3 +290,4 @@ At the start of every new session on this repo, before taking any action:
 4. Read `docs/gates/STATUS.md` to know which spike is active and whether the last gate passed.
 5. Skim `docs/adr/README.md` for the index of accepted ADRs; read any ADR relevant to the current spike.
 6. If asked to do work: confirm it matches the current spike's In-Scope section. If it doesn't, surface the mismatch to the human before proceeding.
+7. **If the spike touches an external contract** (feature gates, entitlements, sidecar API, export formats, telemetry), read the source-of-truth file(s) listed in §7 before writing any name that crosses the boundary. Preview / mock data is silent about contract divergence — assume it's lying until a contract test or the real file says otherwise.
