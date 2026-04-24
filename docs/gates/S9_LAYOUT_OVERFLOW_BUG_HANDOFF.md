@@ -1,12 +1,15 @@
-# S9 blocker — page-level scroll appeared after Inspector got real content
+# S9 blocker — page-level scroll appeared after Inspector got real content  *(HISTORICAL — resolved)*
 
 **Written:** 2026-04-24
-**Why this file exists:** S9 ships substantial new content into the right-hand Inspector (LayoutPanel + SummaryPanel + tabs) for the first time. The Tauri app now exhibits TWO new layout pathologies that didn't exist through S8:
+**Resolved:** 2026-04-24 — see §11 at bottom.
+**Why this file exists:** S9 was mid-gate with a viewport-scroll blocker triggered once LayoutPanel + SummaryPanel made the inspector tall enough to engage `overflow-y: auto`. This file briefed the fresh session so it could investigate from clean DOM evidence rather than chasing mid-session hunches. The resolution is appended below (§11); the original triage notes (§§1–10) are preserved verbatim as history for anyone hitting similar WKWebView + custom-scrollbar + nested-overflow cascades later.
+
+The two pathologies captured at the time of writing:
 
 1. **Page-level vertical scroll.** Scrolling the page moves the WHOLE AppShell — the top bar disappears off the top of the viewport while the status bar stays visible at the bottom. Should be impossible: AppShell is `h-screen overflow-hidden`.
 2. **Page-level horizontal scrollbar.** A horizontal scrollbar appears at the bottom of the viewport, partially obscuring the status bar.
 
-Three rounds of speculative fixes earlier in S8 wasted time. This handoff exists so a fresh session investigates from clean evidence rather than re-trying my mid-session hunches.
+Three rounds of speculative fixes in S8's bug debugging had wasted time; this handoff existed to prevent the same pattern in S9.
 
 **Read order for the new session:**
 
@@ -304,7 +307,7 @@ If both bugs fixed AND all S9 gate steps pass:
 
 1. Strip any diagnostic JS pasted into the console (it's not in source).
 2. Mark `docs/gates/STATUS.md` S9 row 🟢; update `docs/gates/s09.md` Status → Passed.
-3. Append §10 "Resolution" to this file (mirror the structure used in `S8_KMZ_RENDER_BUG_HANDOFF.md` §10).
+3. Append §11 "Resolution" to this file (mirror the structure used in `S8_KMZ_RENDER_BUG_HANDOFF.md` §10 — but numbered §11 here to avoid colliding with the pre-existing §10 "User's working style"; S8 has a duplicate §10 which we don't propagate).
 4. Commit the S9 batch: `s09: input panel + generate layout (tabbed inspector + canvas extension)`.
 5. Tag: `v0.0.12-s9`.
 6. Hand off: "S9 passed, ready for S10."
@@ -326,7 +329,7 @@ If both bugs fixed AND all S9 gate steps pass:
 
 ---
 
-## 10. Resolution (2026-04-24)
+## 11. Resolution (2026-04-24)
 
 S9 passed. Three distinct bugs were found and fixed via diagnostic-driven debugging — the layout-overflow bug described in §1 plus two gate-step regressions surfaced during the a–l walkthrough. None of §4's hypotheses matched the actual root causes; the diagnostic data drove each fix.
 
@@ -386,7 +389,7 @@ Diagnostic probes were never written to source (this handoff has the snippets fo
 
 ---
 
-## 11. S10 backlog items captured during S9 gate
+## 12. S10 backlog items captured during S9 gate
 
 Non-blocking observations from the gate walkthrough — do NOT address in S9; they're S10 (or later) scope. Captured here so they don't fall through the cracks.
 

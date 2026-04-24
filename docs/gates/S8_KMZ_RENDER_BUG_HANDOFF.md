@@ -1,7 +1,8 @@
-# S8 blocker — KMZ parses successfully but MapLibre doesn't render the overlay
+# S8 blocker — KMZ parses successfully but MapLibre doesn't render the overlay  *(HISTORICAL — resolved)*
 
 **Written:** 2026-04-24
-**Why this file exists:** S8 is mid-gate. Every deliverable passes EXCEPT MapLibre rendering the boundary / obstacles / TL lines after a successful parse. Three rounds of fixes landed; none produced a visible overlay. A fresh session needs to debug this from a clean state without repeating what's been tried.
+**Resolved:** 2026-04-24 — see §10 at bottom.
+**Why this file exists:** S8 was mid-gate with a MapLibre-render blocker — every deliverable passed except the boundary/obstacles/TL lines rendering after a successful parse. Three rounds of speculative fixes had failed to produce a visible overlay. This file briefed the fresh session so it could debug from a clean state without repeating what had been tried. The resolution is appended below (§10); the original triage notes (§§1–9) are preserved verbatim as history for anyone hitting similar Tauri 2 WKWebView + CSS cascade-layer issues later.
 
 **Read order for the new session:**
 
