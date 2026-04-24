@@ -345,6 +345,21 @@ class LayoutResponse(_Model):
     results: list[LayoutResult]
 
 
+class IcrOverrideWgs84(_Model):
+    """S11: a per-boundary override of one ICR's position.
+
+    The client sends the new centre in WGS84; the sidecar projects to
+    UTM using ``result.utm_epsg`` and updates
+    ``result.placed_icrs[icr_index].x/y`` (bottom-left corner) so the
+    rectangle's centroid lands at the requested point.
+    """
+
+    icr_index: int = Field(ge=0, description="Index into result.placed_icrs")
+    new_center_wgs84: UTMPoint = Field(
+        description="(longitude, latitude) of the ICR's new centroid"
+    )
+
+
 class RefreshInvertersRequest(_Model):
     """POST /refresh-inverters body.
 
@@ -352,6 +367,62 @@ class RefreshInvertersRequest(_Model):
     ICR positions) plus the current ``params``; the sidecar rebuilds
     ``usable_polygon`` from the result's persisted fields and reruns
     lightning-arrester + string-inverter placement.
+
+    S11: pass ``icr_override`` to move an ICR in the same round-trip.
+    Server projects WGS84→UTM, applies the override to
+    ``placed_icrs[icr_index]``, re-runs ``recompute_tables`` (to clear
+    tables under the new ICR footprint) then LA + string-inverter
+    placement in the legacy order.
+    """
+
+    result: LayoutResult
+    params: LayoutParameters
+    icr_override: IcrOverrideWgs84 | None = None
+
+
+# ---------------------------------------------------------------------------
+# S11: obstruction (road) add / remove
+# ---------------------------------------------------------------------------
+
+
+class RoadInput(_Model):
+    """S11: a user-drawn obstruction in WGS84 coordinates.
+
+    Matches the client's interaction model — drawn shapes are captured
+    in WGS84 on the map canvas and the sidecar projects them to UTM
+    before appending to ``result.placed_roads`` and recomputing tables.
+    """
+
+    road_type: str = Field(
+        default="rectangle",
+        description="'rectangle' | 'polygon' | 'line' (legacy parity)",
+    )
+    coords_wgs84: list[UTMPoint] = Field(
+        min_length=3,
+        description=(
+            "Closed ring for rectangles/polygons (first == last expected "
+            "but not required; the core projects and stores verbatim). "
+            "Minimum 3 vertices enforced at the wire — sub-1m² rects and "
+            "other too-small shapes are silent-cancelled post-projection "
+            "by the core's table-exclusion math."
+        ),
+    )
+
+
+class AddRoadRequest(_Model):
+    """POST /add-road body — append one obstruction and recompute."""
+
+    result: LayoutResult
+    params: LayoutParameters
+    road: RoadInput
+
+
+class RemoveRoadRequest(_Model):
+    """POST /remove-road body — pop last obstruction (LIFO) and recompute.
+
+    Matches PVlayout_Advance's "Undo Last" button — no index argument;
+    always pops ``placed_roads[-1]``. Client tracks its own undoStack
+    ordering.
     """
 
     result: LayoutResult

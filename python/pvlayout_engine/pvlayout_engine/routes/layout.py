@@ -1,5 +1,6 @@
 """
-Layout routes: ``/parse-kmz``, ``/layout``, ``/refresh-inverters``.
+Layout routes: ``/parse-kmz``, ``/layout``, ``/refresh-inverters``,
+``/add-road``, ``/remove-road``.
 
 S3 scope — these replace the dev-only echo endpoints from S2. They are
 the first real surface that exercises the vendored domain logic.
@@ -14,6 +15,19 @@ Design
   ICRs) and rebuilds ``usable_polygon`` in-memory before rerunning LA +
   string-inverter placement. Matches the PyQt app's ``_refresh_inverters``
   ordering: LAs first (they may remove tables), then string inverters.
+  S11: optionally accepts an ``icr_override`` to apply a WGS84→UTM ICR
+  move in the same round-trip.
+* ``/add-road`` (S11) appends a user-drawn obstruction (WGS84, projected
+  server-side) to ``result.placed_roads`` via ``road_manager.add_road``
+  and refreshes inverters.
+* ``/remove-road`` (S11) pops the last obstruction (LIFO, matches
+  legacy "Undo Last" button) and refreshes inverters.
+
+All S11 endpoints follow the same pattern: stateless — client owns the
+LayoutResult and passes it back on every request. Sidecar projects any
+WGS84 input to UTM via ``result.utm_epsg`` + ``geo_utils.wgs84_to_utm``,
+applies the delta, reruns the recompute pipeline, returns the updated
+LayoutResult.
 """
 from __future__ import annotations
 
@@ -27,17 +41,25 @@ from fastapi import File as FastAPIFile
 from pvlayout_core.core.kmz_parser import parse_kmz as core_parse_kmz
 from pvlayout_core.core.la_manager import place_lightning_arresters
 from pvlayout_core.core.layout_engine import run_layout_multi
+from pvlayout_core.core.road_manager import (
+    add_road as core_add_road,
+    recompute_tables,
+    remove_last_road as core_remove_last_road,
+)
 from pvlayout_core.core.string_inverter_manager import place_string_inverters
+from pvlayout_core.utils.geo_utils import wgs84_to_utm
 
 from pvlayout_engine import adapters
 from pvlayout_engine.geometry import reconstruct_usable_polygon
 from pvlayout_engine.schemas import (
+    AddRoadRequest,
     BoundaryInfo,
     LayoutRequest,
     LayoutResponse,
     LayoutResult,
     ParsedKMZ,
     RefreshInvertersRequest,
+    RemoveRoadRequest,
 )
 
 log = logging.getLogger("pvlayout_engine.routes.layout")
@@ -172,6 +194,13 @@ def refresh_inverters(request: RefreshInvertersRequest) -> LayoutResult:
     Called after an ICR drag or obstruction change when only the inverter
     layer needs refreshing. Rebuilds ``usable_polygon`` from the result's
     persistent fields, then reruns LA + string-inverter placement.
+
+    S11: ``request.icr_override`` optionally moves one ICR before the
+    refresh. The WGS84 centre is projected via ``result.utm_epsg`` +
+    ``wgs84_to_utm``; the ICR's bottom-left corner is shifted so the
+    rectangle's centroid lands at the requested point. Then
+    ``recompute_tables`` runs (to clear tables under the new footprint)
+    before the LA + string-inverter passes.
     """
     core_result = adapters.result_to_core(request.result)
     core_params = adapters.params_to_core(request.params)
@@ -187,10 +216,147 @@ def refresh_inverters(request: RefreshInvertersRequest) -> LayoutResult:
         )
     core_result.usable_polygon = usable
 
+    if request.icr_override is not None:
+        _apply_icr_override(core_result, request)
+
+    # ALWAYS rebuild placed_tables from tables_pre_icr before the LA pass.
+    # la_manager's step-2 coverage check iterates placed_tables and places
+    # additional LAs to protect uncovered tables; if we skip this, a
+    # refresh on a result whose placed_tables was already LA-reduced
+    # produces a DIFFERENT LA set than the /layout pass would have, which
+    # then removes a different (smaller) set of tables — /layout and
+    # /refresh-inverters diverge for the same input. Legacy
+    # PVlayout_Advance has the same invariant: tables_pre_icr is the
+    # source of truth; placed_tables is always derived (Agent 2's S10.5
+    # research report, "tables_pre_icr snapshot is the source of truth").
+    recompute_tables(core_result, core_params)
+
     place_lightning_arresters(core_result, core_params)
     place_string_inverters(core_result, core_params)
 
     return adapters.result_from_core(core_result)
+
+
+# ---------------------------------------------------------------------------
+# /add-road  (S11)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/add-road",
+    response_model=LayoutResult,
+    summary="Append a user-drawn obstruction and recompute (S11)",
+)
+def add_road(request: AddRoadRequest) -> LayoutResult:
+    """Project the WGS84 road to UTM, append to ``placed_roads``, and
+    recompute tables + LAs + inverters. Matches legacy ``_on_road_drawn``.
+    """
+    core_result = adapters.result_to_core(request.result)
+    core_params = adapters.params_to_core(request.params)
+
+    epsg = request.result.utm_epsg
+    if epsg == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="result.utm_epsg is missing; cannot project WGS84 road coords",
+        )
+
+    usable = reconstruct_usable_polygon(core_result, core_params.perimeter_road_width)
+    if usable is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not reconstruct usable polygon",
+        )
+    core_result.usable_polygon = usable
+
+    points_utm = wgs84_to_utm(
+        [(lng, lat) for (lng, lat) in request.road.coords_wgs84], epsg
+    )
+    # core_add_road appends to placed_roads AND calls recompute_tables.
+    # We then rerun LA + string inverters in legacy order.
+    core_add_road(core_result, core_params, points_utm, request.road.road_type)
+    place_lightning_arresters(core_result, core_params)
+    place_string_inverters(core_result, core_params)
+
+    return adapters.result_from_core(core_result)
+
+
+# ---------------------------------------------------------------------------
+# /remove-road  (S11)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/remove-road",
+    response_model=LayoutResult,
+    summary="Pop last obstruction (LIFO) and recompute (S11)",
+)
+def remove_road(request: RemoveRoadRequest) -> LayoutResult:
+    """Pop ``placed_roads[-1]``, recompute tables, rerun LA + inverters.
+
+    Matches legacy "Undo Last" button. Returns 422 if no roads remain —
+    the client's undo stack should be in sync, but we surface the
+    mismatch explicitly rather than silently no-op.
+    """
+    core_result = adapters.result_to_core(request.result)
+    core_params = adapters.params_to_core(request.params)
+
+    if not core_result.placed_roads:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No roads to remove; placed_roads is empty",
+        )
+
+    usable = reconstruct_usable_polygon(core_result, core_params.perimeter_road_width)
+    if usable is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not reconstruct usable polygon",
+        )
+    core_result.usable_polygon = usable
+
+    core_remove_last_road(core_result, core_params)
+    place_lightning_arresters(core_result, core_params)
+    place_string_inverters(core_result, core_params)
+
+    return adapters.result_from_core(core_result)
+
+
+# ---------------------------------------------------------------------------
+# S11 helpers
+# ---------------------------------------------------------------------------
+
+
+def _apply_icr_override(core_result, request: RefreshInvertersRequest) -> None:
+    """Project the override's WGS84 centre to UTM and move the target
+    ICR's bottom-left corner so the rectangle's centroid lands at the
+    requested point.
+
+    Raises 422 on out-of-range index or missing EPSG so the frontend
+    surfaces the mismatch instead of silently mis-placing the ICR.
+    """
+    assert request.icr_override is not None  # caller checked
+    override = request.icr_override
+    epsg = request.result.utm_epsg
+    if epsg == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="result.utm_epsg is missing; cannot project ICR override",
+        )
+    if override.icr_index < 0 or override.icr_index >= len(core_result.placed_icrs):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"icr_override.icr_index {override.icr_index} out of range; "
+                f"boundary has {len(core_result.placed_icrs)} ICRs"
+            ),
+        )
+    new_center_utm = wgs84_to_utm([tuple(override.new_center_wgs84)], epsg)[0]
+    icr = core_result.placed_icrs[override.icr_index]
+    # ICR is stored as axis-aligned rect via bottom-left + width + height.
+    # The client asked for a new CENTRE; translate to bottom-left.
+    icr.x = new_center_utm[0] - icr.width / 2.0
+    icr.y = new_center_utm[1] - icr.height / 2.0
 
 
 # ---------------------------------------------------------------------------
