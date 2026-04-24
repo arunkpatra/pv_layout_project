@@ -54,8 +54,10 @@ export type EntitlementsUser = z.infer<typeof entitlementsUserSchema>
  * The inner `data` payload of GET /entitlements.
  *
  * Enforcement truth is `availableFeatures` — a flat list of feature-key
- * strings (e.g. "plant_layout", "cables", "dxf"). FeatureGate checks
- * this set. `plans[]` drives the top-bar chip and the license-info
+ * strings. Valid key names are defined in `./feature-keys.ts` (the
+ * `FEATURE_KEYS` registry) which mirrors the `renewable_energy` seed
+ * per ADR-0005. FeatureGate checks this set using `FEATURE_KEYS.*`
+ * constants. `plans[]` drives the top-bar chip and the license-info
  * dialog but never enforcement.
  */
 export const entitlementsDataSchema = z.object({

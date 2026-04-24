@@ -59,15 +59,15 @@ def test_push_entitlements_updates_state(app_client: TestClient) -> None:
         "/session/entitlements",
         headers=auth_headers(),
         json={
-            "available_features": ["plant_layout", "cables"],
-            "plan_name": "Free",
+            "available_features": ["plant_layout", "cable_routing"],
+            "plan_name": "Pro",
         },
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["initialized"] is True
-    assert sorted(body["available_features"]) == ["cables", "plant_layout"]
-    assert body["plan_name"] == "Free"
+    assert sorted(body["available_features"]) == ["cable_routing", "plant_layout"]
+    assert body["plan_name"] == "Pro"
 
     # GET reflects the POST
     resp2 = app_client.get("/session", headers=auth_headers())
@@ -78,15 +78,15 @@ def test_second_push_replaces_rather_than_unions(app_client: TestClient) -> None
     app_client.post(
         "/session/entitlements",
         headers=auth_headers(),
-        json={"available_features": ["cables"], "plan_name": "Free"},
+        json={"available_features": ["cable_routing"], "plan_name": "Pro"},
     )
     app_client.post(
         "/session/entitlements",
         headers=auth_headers(),
-        json={"available_features": ["dxf"], "plan_name": "Pro Plus"},
+        json={"available_features": ["energy_yield"], "plan_name": "Pro Plus"},
     )
     resp = app_client.get("/session", headers=auth_headers())
-    assert resp.json()["available_features"] == ["dxf"]
+    assert resp.json()["available_features"] == ["energy_yield"]
     assert resp.json()["plan_name"] == "Pro Plus"
 
 
@@ -119,10 +119,10 @@ def _build_feature_app(config: SidecarConfig, state: SessionState) -> TestClient
 
     @app.get(
         "/protected",
-        dependencies=[Depends(require_feature("dxf"))],
+        dependencies=[Depends(require_feature("energy_yield"))],
     )
     def protected() -> dict[str, str]:
-        return {"ok": "dxf"}
+        return {"ok": "energy_yield"}
 
     return TestClient(app)
 
@@ -137,27 +137,27 @@ def test_require_feature_503_before_initialized(config: SidecarConfig) -> None:
 
 def test_require_feature_403_when_missing(config: SidecarConfig) -> None:
     state = SessionState()
-    state.update(available_features={"plant_layout"}, plan_name="Free")
+    state.update(available_features={"plant_layout"}, plan_name="Basic")
     client = _build_feature_app(config, state)
     resp = client.get("/protected")
     assert resp.status_code == status.HTTP_403_FORBIDDEN
     detail = resp.json()["detail"]
     assert detail["error"] == "feature_not_entitled"
-    assert detail["feature"] == "dxf"
+    assert detail["feature"] == "energy_yield"
 
 
 def test_require_feature_200_when_present(config: SidecarConfig) -> None:
     state = SessionState()
-    state.update(available_features={"dxf", "plant_layout"}, plan_name="Pro Plus")
+    state.update(available_features={"energy_yield", "plant_layout"}, plan_name="Pro Plus")
     client = _build_feature_app(config, state)
     resp = client.get("/protected")
     assert resp.status_code == 200
-    assert resp.json() == {"ok": "dxf"}
+    assert resp.json() == {"ok": "energy_yield"}
 
 
 def test_require_feature_reflects_clear(config: SidecarConfig) -> None:
     state = SessionState()
-    state.update(available_features={"dxf"}, plan_name="Pro Plus")
+    state.update(available_features={"energy_yield"}, plan_name="Pro Plus")
     state.clear()
     client = _build_feature_app(config, state)
     resp = client.get("/protected")

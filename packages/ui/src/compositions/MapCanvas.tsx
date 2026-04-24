@@ -52,6 +52,20 @@ export interface MapCanvasProps {
   icrsGeoJson?: FeatureCollection
   /** ICR labels — rendered as HTML overlays repositioned on map move. */
   icrLabels?: IcrLabel[]
+  /** Placed-string-inverter polygons (added in S10). */
+  stringInvertersGeoJson?: FeatureCollection
+  /** DC cable LineStrings (added in S10). */
+  dcCablesGeoJson?: FeatureCollection
+  /** AC cable LineStrings (added in S10). Visibility gated by `showAcCables`. */
+  acCablesGeoJson?: FeatureCollection
+  /** LA rect polygons (added in S10). Visibility gated by `showLas`. */
+  lasGeoJson?: FeatureCollection
+  /** LA protection-circle polygons (added in S10). Visibility gated by `showLas`. */
+  laCirclesGeoJson?: FeatureCollection
+  /** Toggle AC cable layer visibility (S10). Default: false. */
+  showAcCables?: boolean
+  /** Toggle LA rects + protection circles visibility (S10). Default: false. */
+  showLas?: boolean
   children?: ReactNode
   className?: string
   /** Expose the map instance after the first `load` event. */
@@ -73,6 +87,13 @@ export function MapCanvas({
   tablesGeoJson,
   icrsGeoJson,
   icrLabels,
+  stringInvertersGeoJson,
+  dcCablesGeoJson,
+  acCablesGeoJson,
+  lasGeoJson,
+  laCirclesGeoJson,
+  showAcCables = false,
+  showLas = false,
   children,
   className,
   onMapReady,
@@ -94,6 +115,11 @@ export function MapCanvas({
     lineObstructionsGeoJson,
     tablesGeoJson,
     icrsGeoJson,
+    stringInvertersGeoJson,
+    dcCablesGeoJson,
+    acCablesGeoJson,
+    lasGeoJson,
+    laCirclesGeoJson,
   })
   propsRef.current = {
     boundariesGeoJson,
@@ -101,7 +127,18 @@ export function MapCanvas({
     lineObstructionsGeoJson,
     tablesGeoJson,
     icrsGeoJson,
+    stringInvertersGeoJson,
+    dcCablesGeoJson,
+    acCablesGeoJson,
+    lasGeoJson,
+    laCirclesGeoJson,
   }
+
+  // Visibility refs — read by the load / styledata handlers so initial
+  // paint respects the current toggle state (prevents flash-of-visible
+  // before the visibility effect fires).
+  const visibilityRef = useRef({ showAcCables, showLas })
+  visibilityRef.current = { showAcCables, showLas }
 
   const { resolved } = useTheme()
   const styleUrl = resolved === "dark" ? STYLE_DARK_URL : STYLE_LIGHT_URL
@@ -133,6 +170,7 @@ export function MapCanvas({
 
     map.on("load", () => {
       hydrateSources(map, propsRef.current)
+      applyVisibility(map, visibilityRef.current)
       fitToBoundariesIfNew(map, propsRef.current.boundariesGeoJson, lastBoundariesKey)
       setMapReady(true)
       onMapReady?.(map)
@@ -165,6 +203,7 @@ export function MapCanvas({
     lastAppliedStyleUrl.current = styleUrl
     const onStyle = () => {
       hydrateSources(map, propsRef.current)
+      applyVisibility(map, visibilityRef.current)
       // Viewport is preserved — don't re-fit on theme swap.
       map.off("styledata", onStyle)
     }
@@ -182,6 +221,11 @@ export function MapCanvas({
       lineObstructionsGeoJson,
       tablesGeoJson,
       icrsGeoJson,
+      stringInvertersGeoJson,
+      dcCablesGeoJson,
+      acCablesGeoJson,
+      lasGeoJson,
+      laCirclesGeoJson,
     })
     fitToBoundariesIfNew(map, boundariesGeoJson, lastBoundariesKey)
   }, [
@@ -191,7 +235,20 @@ export function MapCanvas({
     lineObstructionsGeoJson,
     tablesGeoJson,
     icrsGeoJson,
+    stringInvertersGeoJson,
+    dcCablesGeoJson,
+    acCablesGeoJson,
+    lasGeoJson,
+    laCirclesGeoJson,
   ])
+
+  // ── Visibility toggles (S10) ─────────────────────────────────────────
+  useEffect(() => {
+    if (!mapReady) return
+    const map = mapRef.current
+    if (!map) return
+    applyVisibility(map, { showAcCables, showLas })
+  }, [mapReady, showAcCables, showLas])
 
   return (
     <div className={cn("relative w-full h-full overflow-hidden", className)}>
@@ -284,6 +341,11 @@ interface SourceData {
   lineObstructionsGeoJson?: FeatureCollection
   tablesGeoJson?: FeatureCollection
   icrsGeoJson?: FeatureCollection
+  stringInvertersGeoJson?: FeatureCollection
+  dcCablesGeoJson?: FeatureCollection
+  acCablesGeoJson?: FeatureCollection
+  lasGeoJson?: FeatureCollection
+  laCirclesGeoJson?: FeatureCollection
 }
 
 function hydrateSources(map: maplibregl.Map, data: SourceData) {
@@ -292,6 +354,47 @@ function hydrateSources(map: maplibregl.Map, data: SourceData) {
   setSource(map, "kmz-line-obstructions", data.lineObstructionsGeoJson)
   setSource(map, "kmz-tables", data.tablesGeoJson)
   setSource(map, "kmz-icrs", data.icrsGeoJson)
+  setSource(map, "kmz-string-inverters", data.stringInvertersGeoJson)
+  setSource(map, "kmz-dc-cables", data.dcCablesGeoJson)
+  setSource(map, "kmz-ac-cables", data.acCablesGeoJson)
+  setSource(map, "kmz-las", data.lasGeoJson)
+  setSource(map, "kmz-la-circles", data.laCirclesGeoJson)
+}
+
+/**
+ * Set layer-group visibility for the S10 toggles.
+ *
+ * AC cables:   `ac-cables`
+ * LAs:         `la-rects-fill` + `la-rects-outline` +
+ *              `la-circles-fill` + `la-circles-outline`
+ *
+ * Called from (a) the `load` handler (initial paint), (b) the
+ * `styledata` handler after a theme swap, and (c) the visibility
+ * effect on toggle change. Idempotent — setLayoutProperty is a no-op
+ * when the value matches.
+ */
+interface VisibilityState {
+  showAcCables: boolean
+  showLas: boolean
+}
+
+const AC_CABLE_LAYERS = ["ac-cables"] as const
+const LA_LAYERS = [
+  "la-rects-fill",
+  "la-rects-outline",
+  "la-circles-fill",
+  "la-circles-outline",
+] as const
+
+function applyVisibility(map: maplibregl.Map, v: VisibilityState) {
+  const acVis = v.showAcCables ? "visible" : "none"
+  for (const id of AC_CABLE_LAYERS) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", acVis)
+  }
+  const laVis = v.showLas ? "visible" : "none"
+  for (const id of LA_LAYERS) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", laVis)
+  }
 }
 
 function setSource(

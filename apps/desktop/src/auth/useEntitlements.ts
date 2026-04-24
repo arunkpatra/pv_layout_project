@@ -15,9 +15,16 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
 import {
   createEntitlementsClient,
   EntitlementsError,
+  FEATURE_KEYS,
   type Entitlements,
+  type FeatureKey,
 } from "@solarlayout/entitlements-client"
-import { PREVIEW_LICENSE_KEY } from "./licenseKey"
+import {
+  PREVIEW_LICENSE_KEY,
+  PREVIEW_LICENSE_KEY_BASIC,
+  PREVIEW_LICENSE_KEY_PRO,
+  PREVIEW_LICENSE_KEY_PRO_PLUS,
+} from "./licenseKey"
 
 const inTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -31,29 +38,101 @@ const entitlementsClient = createEntitlementsClient({ fetchImpl: pickFetch() })
 
 const KEY_QUERY_KEY = "entitlements" as const
 
-const PREVIEW_ENTITLEMENTS: Entitlements = {
-  user: { name: "Design Reviewer", email: "design@solarlayout.in" },
-  plans: [
-    {
-      planName: "Free",
-      features: ["Layout generation", "Cable routing"],
-      totalCalculations: 100,
-      usedCalculations: 5,
-      remainingCalculations: 95,
-    },
+/**
+ * Preview entitlements — three tier-accurate variants mirroring the
+ * renewable_energy seed (packages/mvp_db/prisma/seed-products.ts as of
+ * 2026-04-24). Each variant's `availableFeatures` matches exactly what
+ * the backend returns for a real user on that plan.
+ *
+ * Used in non-Tauri preview runs (vite dev / headless screenshot rig).
+ * In Tauri dev/production, entitlements come from the real
+ * api.solarlayout.in/entitlements endpoint via a user-entered license
+ * key. See ADR-0005.
+ *
+ * Picking between variants: the preview license key selects the tier.
+ * `PREVIEW_LICENSE_KEY_BASIC` → Basic, etc. The legacy `PREVIEW_LICENSE_KEY`
+ * resolves to Pro Plus (richest surface for design review) and is kept
+ * for backward compatibility with any existing preview flows.
+ */
+
+function previewEntitlements(
+  planName: string,
+  features: readonly FeatureKey[],
+  planFeatureLabels: string[]
+): Entitlements {
+  return {
+    user: { name: "Design Reviewer", email: "design@solarlayout.in" },
+    plans: [
+      {
+        planName,
+        features: planFeatureLabels,
+        totalCalculations: 100,
+        usedCalculations: 5,
+        remainingCalculations: 95,
+      },
+    ],
+    licensed: true,
+    availableFeatures: [...features],
+    totalCalculations: 100,
+    usedCalculations: 5,
+    remainingCalculations: 95,
+  }
+}
+
+export const PREVIEW_ENTITLEMENTS_BASIC: Entitlements = previewEntitlements(
+  "PV Layout Basic",
+  [FEATURE_KEYS.PLANT_LAYOUT, FEATURE_KEYS.OBSTRUCTION_EXCLUSION],
+  ["Plant Layout (MMS, Inverter, LA)", "Obstruction Exclusion"]
+)
+
+export const PREVIEW_ENTITLEMENTS_PRO: Entitlements = previewEntitlements(
+  "PV Layout Pro",
+  [
+    FEATURE_KEYS.PLANT_LAYOUT,
+    FEATURE_KEYS.OBSTRUCTION_EXCLUSION,
+    FEATURE_KEYS.CABLE_ROUTING,
+    FEATURE_KEYS.CABLE_MEASUREMENTS,
   ],
-  licensed: true,
-  availableFeatures: [
-    "plant_layout",
-    "cables",
-    "icr_drag",
-    "obstructions",
-    "dxf",
-    "energy",
+  [
+    "Plant Layout (MMS, Inverter, LA)",
+    "Obstruction Exclusion",
+    "AC & DC Cable Routing",
+    "Cable Quantity Measurements",
+  ]
+)
+
+export const PREVIEW_ENTITLEMENTS_PRO_PLUS: Entitlements = previewEntitlements(
+  "PV Layout Pro Plus",
+  [
+    FEATURE_KEYS.PLANT_LAYOUT,
+    FEATURE_KEYS.OBSTRUCTION_EXCLUSION,
+    FEATURE_KEYS.CABLE_ROUTING,
+    FEATURE_KEYS.CABLE_MEASUREMENTS,
+    FEATURE_KEYS.ENERGY_YIELD,
+    FEATURE_KEYS.GENERATION_ESTIMATES,
   ],
-  totalCalculations: 100,
-  usedCalculations: 5,
-  remainingCalculations: 95,
+  [
+    "Plant Layout (MMS, Inverter, LA)",
+    "Obstruction Exclusion",
+    "AC & DC Cable Routing",
+    "Cable Quantity Measurements",
+    "Energy Yield Analysis",
+    "Plant Generation Estimates",
+  ]
+)
+
+function entitlementsForPreviewKey(key: string): Entitlements | null {
+  switch (key) {
+    case PREVIEW_LICENSE_KEY_BASIC:
+      return PREVIEW_ENTITLEMENTS_BASIC
+    case PREVIEW_LICENSE_KEY_PRO:
+      return PREVIEW_ENTITLEMENTS_PRO
+    case PREVIEW_LICENSE_KEY_PRO_PLUS:
+    case PREVIEW_LICENSE_KEY:
+      return PREVIEW_ENTITLEMENTS_PRO_PLUS
+    default:
+      return null
+  }
 }
 
 export function useEntitlementsQuery(
@@ -66,9 +145,8 @@ export function useEntitlementsQuery(
         // Unreachable — caller guards with `enabled` — but belt-and-braces.
         throw new EntitlementsError(0, "missing license key")
       }
-      if (licenseKey === PREVIEW_LICENSE_KEY) {
-        return PREVIEW_ENTITLEMENTS
-      }
+      const preview = entitlementsForPreviewKey(licenseKey)
+      if (preview) return preview
       return entitlementsClient.getEntitlements(licenseKey)
     },
     enabled: Boolean(licenseKey),

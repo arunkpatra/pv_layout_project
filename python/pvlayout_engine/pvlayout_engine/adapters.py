@@ -23,6 +23,7 @@ Design notes
 """
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
@@ -30,6 +31,12 @@ from pvlayout_core.models import project as core
 from pvlayout_core.utils.geo_utils import utm_to_wgs84
 
 from pvlayout_engine import schemas
+
+# Circle approximation for LA protection zones. 64 sides keeps each chord
+# <=10m at the default 100m radius — well below typical table dimensions,
+# so the polygon is visually indistinguishable from a true circle at any
+# zoom level we render at.
+_LA_CIRCLE_SEGMENTS = 64
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +56,38 @@ def _rect_corners_wgs84(
     """
     corners_utm = [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)]
     return utm_to_wgs84(corners_utm, epsg)
+
+
+def _polyline_wgs84(
+    points_utm: list[tuple[float, float]],
+    start_utm: tuple[float, float],
+    end_utm: tuple[float, float],
+    epsg: int,
+) -> list[tuple[float, float]]:
+    """Return a WGS84 polyline for a cable run. Uses ``points_utm`` (the
+    domain model's ``route_utm``) if non-empty, otherwise falls back to a
+    straight line ``[start_utm, end_utm]`` — covers cable runs where the
+    core didn't populate a routed path (e.g. obstruction-free short hops).
+    """
+    pts = list(points_utm) if points_utm else [start_utm, end_utm]
+    return utm_to_wgs84(pts, epsg)
+
+
+def _circle_ring_wgs84(
+    cx: float, cy: float, r: float, epsg: int,
+    segments: int = _LA_CIRCLE_SEGMENTS,
+) -> list[tuple[float, float]]:
+    """Sample a circle at ``(cx, cy)`` UTM with radius ``r`` metres as a
+    closed polygon of ``segments+1`` points (last == first), then project
+    to WGS84. Used for LA protection zones.
+    """
+    ring_utm = [
+        (cx + r * math.cos(2 * math.pi * i / segments),
+         cy + r * math.sin(2 * math.pi * i / segments))
+        for i in range(segments)
+    ]
+    ring_utm.append(ring_utm[0])  # close the ring
+    return utm_to_wgs84(ring_utm, epsg)
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +169,32 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
         placed_string_inverters=[
             _inverter_from_core(i) for i in r.placed_string_inverters
         ],
+        # WGS84 rects for string inverters — see placed_tables_wgs84 above
+        # for the pattern rationale.
+        placed_string_inverters_wgs84=[
+            _rect_corners_wgs84(i.x, i.y, i.width, i.height, epsg)
+            for i in r.placed_string_inverters
+        ],
         dc_cable_runs=[_cable_from_core(c) for c in r.dc_cable_runs],
+        dc_cable_runs_wgs84=[
+            _polyline_wgs84(
+                list(c.route_utm),
+                (c.start_utm[0], c.start_utm[1]),
+                (c.end_utm[0], c.end_utm[1]),
+                epsg,
+            )
+            for c in r.dc_cable_runs
+        ],
         ac_cable_runs=[_cable_from_core(c) for c in r.ac_cable_runs],
+        ac_cable_runs_wgs84=[
+            _polyline_wgs84(
+                list(c.route_utm),
+                (c.start_utm[0], c.start_utm[1]),
+                (c.end_utm[0], c.end_utm[1]),
+                epsg,
+            )
+            for c in r.ac_cable_runs
+        ],
         total_dc_cable_m=r.total_dc_cable_m,
         total_ac_cable_m=r.total_ac_cable_m,
         string_kwp=r.string_kwp,
@@ -139,6 +202,19 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
         num_string_inverters=r.num_string_inverters,
         inverters_per_icr=r.inverters_per_icr,
         placed_las=[_la_from_core(la) for la in r.placed_las],
+        # WGS84 rects for LA footprints. LA center = (x + w/2, y + h/2)
+        # per la_manager placement convention.
+        placed_las_wgs84=[
+            _rect_corners_wgs84(la.x, la.y, la.width, la.height, epsg)
+            for la in r.placed_las
+        ],
+        placed_las_circles_wgs84=[
+            _circle_ring_wgs84(
+                la.x + la.width / 2, la.y + la.height / 2,
+                la.radius, epsg,
+            )
+            for la in r.placed_las
+        ],
         num_las=r.num_las,
         num_central_inverters=r.num_central_inverters,
         central_inverter_capacity_kwp=r.central_inverter_capacity_kwp,

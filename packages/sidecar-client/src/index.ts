@@ -190,8 +190,22 @@ export interface LayoutResult {
   placed_tables_wgs84: UTMPoint[][]
   placed_icrs_wgs84: UTMPoint[][]
   placed_string_inverters: PlacedStringInverter[]
+  /**
+   * WGS84 rect corner rings for string inverters — same length and order
+   * as `placed_string_inverters`. 5 points, closed (first === last).
+   * Pre-projected on the sidecar (S10) so the desktop can render without
+   * client-side projection.
+   */
+  placed_string_inverters_wgs84: UTMPoint[][]
   dc_cable_runs: CableRun[]
+  /**
+   * WGS84 polyline per DC cable run. Uses the routed path if present;
+   * falls back to a straight `[start, end]` segment. Same length and
+   * order as `dc_cable_runs`.
+   */
+  dc_cable_runs_wgs84: UTMPoint[][]
   ac_cable_runs: CableRun[]
+  ac_cable_runs_wgs84: UTMPoint[][]
   total_dc_cable_m: number
   total_ac_cable_m: number
   string_kwp: number
@@ -199,6 +213,19 @@ export interface LayoutResult {
   num_string_inverters: number
   inverters_per_icr: number
   placed_las: PlacedLA[]
+  /**
+   * WGS84 rect corner rings for LA footprints. Same length and order as
+   * `placed_las`. 5 points, closed.
+   */
+  placed_las_wgs84: UTMPoint[][]
+  /**
+   * WGS84 polygon approximations of each LA's protection circle. Same
+   * length and order as `placed_las`. 65 points (64 segments + closing),
+   * sampled at `la.radius` metres from the LA centre on the sidecar.
+   * MapCanvas renders these as translucent fills via the `las_circles`
+   * layer when the LA visibility toggle is on.
+   */
+  placed_las_circles_wgs84: UTMPoint[][]
   num_las: number
   num_central_inverters: number
   central_inverter_capacity_kwp: number

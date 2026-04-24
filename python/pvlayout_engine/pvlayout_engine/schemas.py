@@ -265,8 +265,15 @@ class LayoutResult(_Model):
     placed_tables_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     placed_icrs_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     placed_string_inverters: list[PlacedStringInverter] = Field(default_factory=list)
+    # WGS84 rect corner rings for string inverters — same convention as
+    # `placed_tables_wgs84`. Same length and order as `placed_string_inverters`.
+    placed_string_inverters_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     dc_cable_runs: list[CableRun] = Field(default_factory=list)
+    # WGS84 polyline per cable run. Uses `route_utm` if non-empty; falls
+    # back to `[start_utm, end_utm]`. Same length and order as the UTM lists.
+    dc_cable_runs_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     ac_cable_runs: list[CableRun] = Field(default_factory=list)
+    ac_cable_runs_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     total_dc_cable_m: float = 0.0
     total_ac_cable_m: float = 0.0
     string_kwp: float = 0.0
@@ -274,6 +281,14 @@ class LayoutResult(_Model):
     num_string_inverters: int = 0
     inverters_per_icr: float = 0.0
     placed_las: list[PlacedLA] = Field(default_factory=list)
+    # WGS84 rect corner rings for LA footprints — same convention as
+    # `placed_tables_wgs84`. Same length and order as `placed_las`.
+    placed_las_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
+    # WGS84 polygon approximations of each LA's protection circle — 64
+    # segments sampled at `la.radius` metres from the LA centre. Same
+    # length and order as `placed_las`. MapCanvas renders these as
+    # translucent fills via the `las_circles` layer (visibility-gated).
+    placed_las_circles_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     num_las: int = 0
     num_central_inverters: int = 0
     central_inverter_capacity_kwp: float = 0.0

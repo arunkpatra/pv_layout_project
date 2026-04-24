@@ -34,8 +34,11 @@ const sample = (overrides: Partial<LayoutResult> = {}): LayoutResult => ({
   placed_tables_wgs84: [closedRing, closedRing],
   placed_icrs_wgs84: [closedRing],
   placed_string_inverters: [],
+  placed_string_inverters_wgs84: [],
   dc_cable_runs: [],
+  dc_cable_runs_wgs84: [],
   ac_cable_runs: [],
+  ac_cable_runs_wgs84: [],
   total_dc_cable_m: 0,
   total_ac_cable_m: 0,
   string_kwp: 0,
@@ -43,6 +46,8 @@ const sample = (overrides: Partial<LayoutResult> = {}): LayoutResult => ({
   num_string_inverters: 0,
   inverters_per_icr: 0,
   placed_las: [],
+  placed_las_wgs84: [],
+  placed_las_circles_wgs84: [],
   num_las: 0,
   num_central_inverters: 0,
   central_inverter_capacity_kwp: 0,
@@ -103,6 +108,92 @@ describe("layoutToGeoJson", () => {
     expect(out.tables.features).toHaveLength(0)
     expect(out.icrs.features).toHaveLength(0)
     expect(out.icrLabels).toHaveLength(0)
+    expect(out.stringInverters.features).toHaveLength(0)
+    expect(out.dcCables.features).toHaveLength(0)
+    expect(out.acCables.features).toHaveLength(0)
+    expect(out.las.features).toHaveLength(0)
+    expect(out.laCircles.features).toHaveLength(0)
+  })
+
+  it("emits S10 layers for inverters, cables, LAs + protection circles", () => {
+    const invRing: [number, number][] = [
+      [76.4001, 14.80015],
+      [76.40012, 14.80015],
+      [76.40012, 14.80016],
+      [76.4001, 14.80016],
+      [76.4001, 14.80015],
+    ]
+    const dcLine: [number, number][] = [
+      [76.4001, 14.80015],
+      [76.4002, 14.80016],
+      [76.4003, 14.80016],
+    ]
+    const acLine: [number, number][] = [
+      [76.4003, 14.80016],
+      [76.4005, 14.80020],
+    ]
+    const circleRing: [number, number][] = Array.from({ length: 65 }, (_, i) => [
+      76.4001 + 0.0001 * Math.cos((2 * Math.PI * i) / 64),
+      14.8001 + 0.0001 * Math.sin((2 * Math.PI * i) / 64),
+    ]) as [number, number][]
+    circleRing[64] = circleRing[0]!
+
+    const out = layoutToGeoJson([
+      sample({
+        placed_string_inverters: [
+          {
+            x: 0, y: 0, width: 2, height: 1, index: 1,
+            capacity_kwp: 250, assigned_table_count: 10,
+          },
+        ],
+        placed_string_inverters_wgs84: [invRing],
+        dc_cable_runs: [
+          { start_utm: [0, 0], end_utm: [100, 50], route_utm: [], index: 1, cable_type: "dc", length_m: 200 },
+        ],
+        dc_cable_runs_wgs84: [dcLine],
+        ac_cable_runs: [
+          { start_utm: [100, 50], end_utm: [200, 150], route_utm: [], index: 1, cable_type: "ac", length_m: 141 },
+        ],
+        ac_cable_runs_wgs84: [acLine],
+        placed_las: [
+          { x: 0, y: 0, width: 40, height: 14, radius: 100, index: 1 },
+        ],
+        placed_las_wgs84: [closedRing],
+        placed_las_circles_wgs84: [circleRing],
+      }),
+    ])
+
+    expect(out.stringInverters.features).toHaveLength(1)
+    expect(out.stringInverters.features[0]!.properties).toMatchObject({
+      index: 1,
+      capacity_kwp: 250,
+    })
+
+    expect(out.dcCables.features).toHaveLength(1)
+    expect(out.dcCables.features[0]!.geometry.type).toBe("LineString")
+    expect(out.dcCables.features[0]!.geometry.coordinates).toEqual(dcLine)
+    expect(out.dcCables.features[0]!.properties).toMatchObject({ length_m: 200 })
+
+    expect(out.acCables.features).toHaveLength(1)
+    expect(out.acCables.features[0]!.geometry.coordinates).toEqual(acLine)
+
+    expect(out.las.features).toHaveLength(1)
+    expect(out.las.features[0]!.properties).toMatchObject({ index: 1, radius: 100 })
+
+    expect(out.laCircles.features).toHaveLength(1)
+    expect(out.laCircles.features[0]!.geometry.coordinates[0]!).toHaveLength(65)
+  })
+
+  it("skips degenerate cable lines (fewer than 2 points)", () => {
+    const out = layoutToGeoJson([
+      sample({
+        dc_cable_runs: [
+          { start_utm: [0, 0], end_utm: [0, 0], route_utm: [], index: 1, cable_type: "dc", length_m: 0 },
+        ],
+        dc_cable_runs_wgs84: [[]],
+      }),
+    ])
+    expect(out.dcCables.features).toHaveLength(0)
   })
 
   it("skips entries where wgs84 ring count doesn't match utm count", () => {

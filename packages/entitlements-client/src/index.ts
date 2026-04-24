@@ -30,3 +30,10 @@ export {
   type UsageReportRequest,
   type UsageReportResult,
 } from "./types"
+
+export {
+  FEATURE_KEYS,
+  ALL_FEATURE_KEYS,
+  isFeatureKey,
+  type FeatureKey,
+} from "./feature-keys"

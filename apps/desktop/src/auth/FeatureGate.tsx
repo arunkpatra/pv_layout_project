@@ -7,16 +7,23 @@
  * `require_feature` dependency. Defense in depth: shell hides, sidecar
  * enforces.
  *
+ * The `feature` prop is narrowed to `FeatureKey` — the typed registry
+ * defined in `@solarlayout/entitlements-client`. String literals fail
+ * typecheck; this is the structural guard that prevents the S7 invented-
+ * key failure mode from recurring (see ADR-0005).
+ *
  * Usage:
- *   <FeatureGate feature="dxf" fallback={<UpgradeBadge />}>
- *     <Button>Export DXF</Button>
+ *   import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
+ *   <FeatureGate feature={FEATURE_KEYS.CABLE_ROUTING} fallback={<UpgradeBadge />}>
+ *     <Button>Show AC cables</Button>
  *   </FeatureGate>
  */
 import type { ReactNode } from "react"
+import type { FeatureKey } from "@solarlayout/entitlements-client"
 import { useEntitlementsContext } from "./EntitlementsProvider"
 
 export interface FeatureGateProps {
-  feature: string
+  feature: FeatureKey
   children: ReactNode
   /** Rendered when not entitled. Default: null. */
   fallback?: ReactNode
@@ -32,7 +39,7 @@ export function FeatureGate({
   return <>{allowed ? children : fallback}</>
 }
 
-export function useHasFeature(feature: string): boolean {
+export function useHasFeature(feature: FeatureKey): boolean {
   const { entitlements } = useEntitlementsContext()
   return entitlements?.availableFeatures.includes(feature) ?? false
 }

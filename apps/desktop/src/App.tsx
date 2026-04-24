@@ -55,9 +55,11 @@ import { layoutToGeoJson } from "./project/layoutToGeoJson"
 import { useProjectStore } from "./state/project"
 import { useLayoutParamsStore } from "./state/layoutParams"
 import { useLayoutResultStore } from "./state/layoutResult"
+import { useLayerVisibilityStore } from "./state/layerVisibility"
 import { useLayoutMutation } from "./state/useLayoutMutation"
 import { LayoutPanel } from "./panels/LayoutPanel"
 import { SummaryPanel } from "./panels/SummaryPanel"
+import { VisibilitySection } from "./panels/VisibilitySection"
 
 /**
  * App shell orchestrator.
@@ -277,6 +279,9 @@ export function App(): JSX.Element {
   const layoutMutation = useLayoutMutation(sidecarClient)
   const clearLayoutResult = useLayoutResultStore((s) => s.clearResult)
   const resetLayoutParams = useLayoutParamsStore((s) => s.resetToDefaults)
+  const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
+  const showAcCables = useLayerVisibilityStore((s) => s.showAcCables)
+  const showLas = useLayerVisibilityStore((s) => s.showLas)
 
   // Bumped on each successful KMZ load so LayoutPanel remounts with the
   // reset defaults — plain RHF reset wouldn't re-seed `defaultValues` since
@@ -335,11 +340,13 @@ export function App(): JSX.Element {
       if (!result) return // user cancelled the native dialog
       // New project = fresh start. Drop the previous layout so the canvas
       // doesn't show stale tables/ICRs, reset the input panel's params to
-      // defaults, and force LayoutPanel to remount so RHF picks up the
-      // reset values (RHF's `defaultValues` is captured at mount — an
-      // in-place reset wouldn't propagate to the visible form fields).
+      // defaults, reset visibility toggles to PyQt5 defaults (both off),
+      // and force LayoutPanel to remount so RHF picks up the reset values
+      // (RHF's `defaultValues` is captured at mount — an in-place reset
+      // wouldn't propagate to the visible form fields).
       clearLayoutResult()
       resetLayoutParams()
+      resetLayerVisibility()
       setLayoutFormKey((k) => k + 1)
       setProject({ kmz: result.parsed, fileName: result.fileName })
       setPaletteOpen(false)
@@ -350,7 +357,14 @@ export function App(): JSX.Element {
     } finally {
       setOpening(false)
     }
-  }, [sidecarClient, opening, setProject, clearLayoutResult, resetLayoutParams])
+  }, [
+    sidecarClient,
+    opening,
+    setProject,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+  ])
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
   // (the `.` in the Rust menu-item id is translated to `/` at emit time
@@ -509,6 +523,13 @@ export function App(): JSX.Element {
             tablesGeoJson={layoutGeoJson?.tables}
             icrsGeoJson={layoutGeoJson?.icrs}
             icrLabels={layoutGeoJson?.icrLabels}
+            stringInvertersGeoJson={layoutGeoJson?.stringInverters}
+            dcCablesGeoJson={layoutGeoJson?.dcCables}
+            acCablesGeoJson={layoutGeoJson?.acCables}
+            lasGeoJson={layoutGeoJson?.las}
+            laCirclesGeoJson={layoutGeoJson?.laCircles}
+            showAcCables={showAcCables}
+            showLas={showLas}
           >
             <CommandBarHint onClick={openPalette} />
             {!project && (
@@ -558,6 +579,7 @@ export function App(): JSX.Element {
                   generating={layoutMutation.isPending}
                   noProject={!project}
                 />
+                {layoutResult && <VisibilitySection />}
                 <SummaryPanel generating={layoutMutation.isPending} />
               </TabsContent>
               <TabsContent

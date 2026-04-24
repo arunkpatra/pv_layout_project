@@ -25,6 +25,26 @@
     "kmz-icrs": {
       "type": "geojson",
       "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-string-inverters": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-dc-cables": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-ac-cables": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-las": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    },
+    "kmz-la-circles": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
     }
   },
   "layers": [
@@ -130,6 +150,104 @@
       },
       "paint": {
         "line-color": "rgba(255, 180, 100, 0.9)",
+        "line-width": 1
+      }
+    },
+    {
+      "id": "dc-cables",
+      "type": "line",
+      "source": "kmz-dc-cables",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(140, 180, 230, 0.70)",
+        "line-width": 0.8
+      }
+    },
+    {
+      "id": "ac-cables",
+      "type": "line",
+      "source": "kmz-ac-cables",
+      "layout": {
+        "visibility": "none",
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(255, 130, 100, 0.85)",
+        "line-width": 1.2
+      }
+    },
+    {
+      "id": "string-inverters-fill",
+      "type": "fill",
+      "source": "kmz-string-inverters",
+      "paint": {
+        "fill-color": "rgba(180, 140, 240, 0.75)"
+      }
+    },
+    {
+      "id": "string-inverters-outline",
+      "type": "line",
+      "source": "kmz-string-inverters",
+      "layout": {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(220, 180, 255, 0.95)",
+        "line-width": 0.8
+      }
+    },
+    {
+      "id": "la-circles-fill",
+      "type": "fill",
+      "source": "kmz-la-circles",
+      "layout": {
+        "visibility": "none"
+      },
+      "paint": {
+        "fill-color": "rgba(255, 140, 90, 0.12)"
+      }
+    },
+    {
+      "id": "la-circles-outline",
+      "type": "line",
+      "source": "kmz-la-circles",
+      "layout": {
+        "visibility": "none",
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(255, 120, 80, 0.35)",
+        "line-width": 0.8
+      }
+    },
+    {
+      "id": "la-rects-fill",
+      "type": "fill",
+      "source": "kmz-las",
+      "layout": {
+        "visibility": "none"
+      },
+      "paint": {
+        "fill-color": "rgba(255, 110, 90, 0.85)"
+      }
+    },
+    {
+      "id": "la-rects-outline",
+      "type": "line",
+      "source": "kmz-las",
+      "layout": {
+        "visibility": "none",
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      "paint": {
+        "line-color": "rgba(255, 170, 140, 0.95)",
         "line-width": 1
       }
     }

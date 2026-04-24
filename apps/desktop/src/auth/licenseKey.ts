@@ -13,11 +13,18 @@ import { invoke } from "@tauri-apps/api/core"
 const KEYRING_KEY = "__solarlayout_license_key_preview__"
 
 /**
- * Sentinel key recognised in preview mode (vite preview / headless
- * screenshot rig). Matches the sl_live_ prefix so isPlausibleLicenseKey
- * still accepts it; the entitlements hook returns stubbed data for it
- * without hitting api.solarlayout.in.
+ * Sentinel keys recognised in preview mode (vite preview / headless
+ * screenshot rig). All match the sl_live_ prefix so isPlausibleLicenseKey
+ * still accepts them; the entitlements hook returns tier-accurate stubbed
+ * data for each without hitting api.solarlayout.in.
+ *
+ * Three tier variants mirror the renewable_energy seed plans per ADR-0005.
+ * The legacy `PREVIEW_LICENSE_KEY` resolves to Pro Plus for backward
+ * compatibility with design-review flows that didn't need tier switching.
  */
+export const PREVIEW_LICENSE_KEY_BASIC = "sl_live_preview_basic"
+export const PREVIEW_LICENSE_KEY_PRO = "sl_live_preview_pro"
+export const PREVIEW_LICENSE_KEY_PRO_PLUS = "sl_live_preview_pro_plus"
 export const PREVIEW_LICENSE_KEY = "sl_live_preview_mode_design_review_only"
 
 function inTauri(): boolean {

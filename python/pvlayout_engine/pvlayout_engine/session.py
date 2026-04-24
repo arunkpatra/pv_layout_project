@@ -100,10 +100,20 @@ def get_session(request: Request) -> SessionState:
 def require_feature(feature_key: str):
     """Build a FastAPI dependency that enforces a single feature key.
 
+    ``feature_key`` must be one of the six values in the renewable_energy
+    seed (see ADR-0005 and ``packages/entitlements-client/src/feature-keys.ts``
+    on the desktop side). Per the S10.2 product decisions, exports
+    (DXF, KMZ, PDF, CSV) are **ungated** — no ``require_feature`` on
+    those endpoints. The helper remains for endpoints that gate on
+    compute capability, e.g. ``/energy-yield`` on ``"energy_yield"``.
+
     Usage::
 
-        @router.post("/export/dxf", dependencies=[Depends(require_feature("dxf"))])
-        def export_dxf(...): ...
+        @router.post(
+            "/energy-yield",
+            dependencies=[Depends(require_feature("energy_yield"))],
+        )
+        def energy_yield(...): ...
 
     Behaviour:
       * 503 ``session_not_initialized`` — before the shell pushes entitlements.

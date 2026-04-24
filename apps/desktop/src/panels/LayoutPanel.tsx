@@ -27,6 +27,7 @@ import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Button,
+  Chip,
   InspectorSection,
   Label,
   NumberInput,
@@ -40,8 +41,10 @@ import {
   DEFAULT_LAYOUT_PARAMETERS,
   type LayoutParameters,
 } from "@solarlayout/sidecar-client"
+import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import { useLayoutParamsStore } from "../state/layoutParams"
 import { layoutParametersSchema } from "../state/layoutParams"
+import { useHasFeature } from "../auth/FeatureGate"
 
 interface LayoutPanelProps {
   onGenerate: (params: LayoutParameters) => void
@@ -83,9 +86,19 @@ export function LayoutPanel({
   const tiltOverride = watch("tilt_angle") !== null
   const pitchOverride = watch("row_spacing") !== null
 
+  // Belt-and-braces coercion: if the user isn't entitled to cable_routing,
+  // force enable_cable_calc to false at submit time regardless of what
+  // the form currently holds. Guards against stale persisted params
+  // surviving a license downgrade — the UI gate in CableCalcFieldRow
+  // handles the steady-state display.
+  const hasCableRouting = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
+
   const onSubmit: SubmitHandler<LayoutParameters> = (values) => {
-    setAll(values)
-    onGenerate(values)
+    const coerced: LayoutParameters = hasCableRouting
+      ? values
+      : { ...values, enable_cable_calc: false }
+    setAll(coerced)
+    onGenerate(coerced)
   }
 
   return (
@@ -260,13 +273,10 @@ export function LayoutPanel({
             />
           </FieldRow>
         )}
-        <FieldRow label="Calculate cables">
-          <Switch
-            checked={watch("enable_cable_calc")}
-            onCheckedChange={(checked) => setValue("enable_cable_calc", checked)}
-            aria-label="Enable cable calculation"
-          />
-        </FieldRow>
+        <CableCalcFieldRow
+          checked={watch("enable_cable_calc")}
+          onCheckedChange={(checked) => setValue("enable_cable_calc", checked)}
+        />
       </InspectorSection>
 
       {/* ── Generate ────────────────────────────────────────────────── */}
@@ -319,6 +329,47 @@ function FieldRow({
           {error}
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * "Calculate cables" row — gated on `CABLE_ROUTING` (Pro-tier). On Basic
+ * the switch is disabled and a "Pro" chip appears inline with the label,
+ * matching the VisibilitySection pattern. Basic users cannot request
+ * cable routing because the `cable_routing` seed feature isn't in their
+ * entitlements (ADR-0005 §1).
+ */
+function CableCalcFieldRow({
+  checked,
+  onCheckedChange,
+}: {
+  checked: boolean
+  onCheckedChange: (next: boolean) => void
+}) {
+  const entitled = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
+  return (
+    <div className="flex flex-col gap-[4px] py-[6px]">
+      <div className="flex items-center justify-between gap-[12px]">
+        <div className="flex flex-1 items-center gap-[8px] min-w-0">
+          <Label className="truncate">Calculate cables</Label>
+          {!entitled && (
+            <Chip tone="accent" aria-label="Calculate cables requires Pro">
+              Pro
+            </Chip>
+          )}
+        </div>
+        <div className="w-[150px] flex justify-end">
+          <Switch
+            checked={entitled ? checked : false}
+            disabled={!entitled}
+            onCheckedChange={(next) => {
+              if (entitled) onCheckedChange(next)
+            }}
+            aria-label="Enable cable calculation"
+          />
+        </div>
+      </div>
     </div>
   )
 }
