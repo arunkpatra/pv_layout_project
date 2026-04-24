@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S10.5 — Drawing/editing pipeline ADR
+**Active spike:** S11 — Interactivity: ICR drag + obstruction drawing
 **Status:** ⚪ pending start
-**Previous gate:** S10 + S10.2 passed 2026-04-24 — [`s10.md`](./s10.md), [`s10_2.md`](./s10_2.md)
+**Previous gate:** S10.5 passed 2026-04-24 — [`s10_5.md`](./s10_5.md)
 
 ## Progress
 
@@ -27,7 +27,7 @@
 | S9    | Input panel + Generate Layout                  | 🟢 passed | [s09.md](./s09.md) |
 | S10   | Inverters, cables, LAs                         | 🟢 passed | [s10.md](./s10.md) |
 | S10.2 | Feature-key alignment with backend seed        | 🟢 passed | [s10_2.md](./s10_2.md) |
-| S10.5 | Drawing/editing pipeline ADR                   | ⚪ pending | — |
+| S10.5 | Drawing/editing pipeline ADR                   | 🟢 passed | [s10_5.md](./s10_5.md) |
 | S11   | ICR drag + obstruction drawing                 | ⚪ pending | — |
 | S12   | Exports: KMZ + PDF                             | ⚪ pending | — |
 | S13   | PRO_PLUS: DXF + energy yield + CSV             | ⚪ pending | — |
