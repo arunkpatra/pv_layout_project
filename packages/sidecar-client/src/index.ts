@@ -37,6 +37,168 @@ export interface HealthResponse {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Layout — types only (S8.8); the runLayout() method lands in S9.
+// Shapes mirror pvlayout_engine.schemas.LayoutParameters / LayoutResult.
+// ─────────────────────────────────────────────────────────────────────
+
+/** UTM (easting, northing) — metres. */
+export type UTMPoint = [number, number]
+
+export type DesignType = "fixed_tilt"
+export type Orientation = "portrait" | "landscape"
+export type DesignMode = "string_inverter" | "central_inverter"
+
+export interface ModuleSpec {
+  length: number
+  width: number
+  wattage: number
+}
+
+export interface TableConfig {
+  modules_in_row: number
+  rows_per_table: number
+  orientation: Orientation
+}
+
+export interface LayoutParameters {
+  design_type: DesignType
+  /** `null` = auto-derive from latitude. */
+  tilt_angle: number | null
+  /** `null` = auto-derive from latitude + tilt for zero winter-solstice shading. */
+  row_spacing: number | null
+  /** Optional alternative to row_spacing. */
+  gcr: number | null
+  perimeter_road_width: number
+  module: ModuleSpec
+  table: TableConfig
+  table_gap_ew: number
+  table_gap_ns: number
+  max_strings_per_inverter: number
+  design_mode: DesignMode
+  max_smb_per_central_inv: number
+  enable_cable_calc: boolean
+}
+
+/** Default LayoutParameters — mirrors the pydantic field defaults. */
+export const DEFAULT_LAYOUT_PARAMETERS: LayoutParameters = {
+  design_type: "fixed_tilt",
+  tilt_angle: null,
+  row_spacing: null,
+  gcr: null,
+  perimeter_road_width: 6.0,
+  module: {
+    length: 2.38,
+    width: 1.13,
+    wattage: 580.0,
+  },
+  table: {
+    modules_in_row: 28,
+    rows_per_table: 2,
+    orientation: "portrait",
+  },
+  table_gap_ew: 1.0,
+  table_gap_ns: 0.0,
+  max_strings_per_inverter: 20,
+  design_mode: "string_inverter",
+  max_smb_per_central_inv: 10,
+  enable_cable_calc: false,
+}
+
+export interface PlacedTable {
+  x: number
+  y: number
+  width: number
+  height: number
+  row_index: number
+  col_index: number
+}
+
+export interface PlacedRoad {
+  points_utm: UTMPoint[]
+  index: number
+  road_type: string
+}
+
+export interface PlacedICR {
+  x: number
+  y: number
+  width: number
+  height: number
+  index: number
+}
+
+export interface PlacedStringInverter {
+  x: number
+  y: number
+  width: number
+  height: number
+  index: number
+  capacity_kwp: number
+  assigned_table_count: number
+}
+
+export interface CableRun {
+  start_utm: UTMPoint
+  end_utm: UTMPoint
+  route_utm: UTMPoint[]
+  index: number
+  cable_type: string
+  length_m: number
+}
+
+export interface PlacedLA {
+  x: number
+  y: number
+  width: number
+  height: number
+  radius: number
+  index: number
+}
+
+/**
+ * LayoutResult — mirror of pvlayout_engine.schemas.LayoutResult.
+ *
+ * `energy_result` is omitted for now — populated only when /energy-yield
+ * is called (S13). The `placed_tables`, `placed_icrs`, etc. are in UTM
+ * (metres). S9 adds `placed_tables_wgs84` / `placed_icrs_wgs84` so the
+ * MapCanvas can render without client-side projection.
+ */
+export interface LayoutResult {
+  boundary_name: string
+  placed_tables: PlacedTable[]
+  placed_icrs: PlacedICR[]
+  placed_roads: PlacedRoad[]
+  tables_pre_icr: PlacedTable[]
+  total_modules: number
+  total_capacity_kwp: number
+  total_capacity_mwp: number
+  total_area_m2: number
+  total_area_acres: number
+  net_layout_area_m2: number
+  gcr_achieved: number
+  row_pitch_m: number
+  tilt_angle_deg: number
+  utm_epsg: number
+  boundary_wgs84: UTMPoint[]
+  obstacle_polygons_wgs84: UTMPoint[][]
+  placed_string_inverters: PlacedStringInverter[]
+  dc_cable_runs: CableRun[]
+  ac_cable_runs: CableRun[]
+  total_dc_cable_m: number
+  total_ac_cable_m: number
+  string_kwp: number
+  inverter_capacity_kwp: number
+  num_string_inverters: number
+  inverters_per_icr: number
+  placed_las: PlacedLA[]
+  num_las: number
+  num_central_inverters: number
+  central_inverter_capacity_kwp: number
+  plant_ac_capacity_mw: number
+  dc_ac_ratio: number
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Client
 // ─────────────────────────────────────────────────────────────────────
 

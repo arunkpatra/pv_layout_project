@@ -11,7 +11,6 @@ import { listen } from "@tauri-apps/api/event"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   createSidecarClient,
-  type ParsedKMZ,
   type SidecarClient,
 } from "@solarlayout/sidecar-client"
 import type { Entitlements } from "@solarlayout/entitlements-client"
@@ -48,6 +47,7 @@ import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
 import { openAndParseKmz } from "./project/kmzLoader"
 import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
+import { useProjectStore } from "./state/project"
 
 /**
  * App shell orchestrator.
@@ -96,13 +96,12 @@ export function App(): JSX.Element {
   const [validationError, setValidationError] = useState<string | null>(null)
   const activeKey = pendingKey ?? savedKey
 
-  // Project state — the currently loaded KMZ. Arrives in S8; replaced on
-  // each new open. A future spike may promote this to Zustand when the
-  // project grows to hold layout results, selection, history, etc.
-  const [project, setProject] = useState<{
-    kmz: ParsedKMZ
-    fileName: string
-  } | null>(null)
+  // Project state — the currently loaded KMZ. Lives in a Zustand slice
+  // (S8.8 / ADR-0003) so siblings (TopBar, StatusBar, MapCanvas, soon
+  // Inspector panels) can subscribe with narrow selectors instead of
+  // prop-drilling through this component.
+  const project = useProjectStore((s) => s.project)
+  const setProject = useProjectStore((s) => s.setProject)
   const [openError, setOpenError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
 
@@ -300,7 +299,7 @@ export function App(): JSX.Element {
     } finally {
       setOpening(false)
     }
-  }, [sidecarClient, opening])
+  }, [sidecarClient, opening, setProject])
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
   // (the `.` in the Rust menu-item id is translated to `/` at emit time
