@@ -4,9 +4,9 @@
 
 ## Current state
 
-**Active spike:** S10 — Inverters, cables, LAs (PRO features, read-only)
+**Active spike:** S10.5 — Drawing/editing pipeline ADR
 **Status:** ⚪ pending start
-**Previous gate:** S9 passed 2026-04-24 — [`s09.md`](./s09.md)
+**Previous gate:** S10 + S10.2 passed 2026-04-24 — [`s10.md`](./s10.md), [`s10_2.md`](./s10_2.md)
 
 ## Progress
 
@@ -25,13 +25,15 @@
 | S8.7  | Frontend test harness + CI                     | 🟢 passed | [s08_7.md](./s08_7.md) |
 | S8.8  | State architecture cleanup (ADR-0003 + 0004)   | 🟢 passed | [s08_8.md](./s08_8.md) |
 | S9    | Input panel + Generate Layout                  | 🟢 passed | [s09.md](./s09.md) |
-| S10   | Inverters, cables, LAs                         | ⚪ pending | — |
+| S10   | Inverters, cables, LAs                         | 🟢 passed | [s10.md](./s10.md) |
+| S10.2 | Feature-key alignment with backend seed        | 🟢 passed | [s10_2.md](./s10_2.md) |
 | S10.5 | Drawing/editing pipeline ADR                   | ⚪ pending | — |
 | S11   | ICR drag + obstruction drawing                 | ⚪ pending | — |
 | S12   | Exports: KMZ + PDF                             | ⚪ pending | — |
 | S13   | PRO_PLUS: DXF + energy yield + CSV             | ⚪ pending | — |
 | S13.5 | Dark theme parity                              | ⚪ pending | — |
 | S13.7 | Subscription model redesign (brainstorm)       | ⚪ pending | — |
+| S13.8 | Parity & gates end-to-end verification         | ⚪ pending | — |
 | S14   | Auto-updater + code signing + notarization     | ⚪ pending | — |
 | S15   | Release pipeline + download delivery           | ⚪ pending | — |
 | S15.5 | Sidecar bundle slimming (deferred opt)         | ⚪ pending | — |
