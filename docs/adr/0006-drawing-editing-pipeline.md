@@ -1,7 +1,7 @@
 # ADR 0006: Drawing / editing pipeline — custom on raw MapLibre events
 Date: 2026-04-24
 Spike: S10.5
-Status: accepted (pending demo validation)
+Status: accepted
 
 ## Context
 
@@ -89,15 +89,46 @@ The library path's benefits (reusable UX patterns, vertex-edit polish, mode brea
 
 `/add-road` and `/refresh-inverters` payloads shift from UTM to WGS84. Sidecar projects internally via pyproj. Matches S9's precedent. Lands with S11 implementation; SPIKE_PLAN S11 entry is amended at that time.
 
-### Throwaway demo (S10.5 Phase 3)
+### Throwaway demo (S10.5 Phase 3) — completed 2026-04-24
 
-- Branch `spike/s10_5-custom-drawing-demo`, not merged.
-- Scope: ICR point drag + rectangle draw only (skip polygon, line, selection).
-- 4-hour hard time-box.
-- Validates: MapLibre event pipeline, `map.unproject` accuracy at 3 zoom levels, preview-source `setData` at 60fps, theme-swap-during-draw abort, LOC honesty check, probe-log signal quality.
-- If the demo fails to converge in 4 hours: escalate. Re-open library path with the new data, extend the box, or scope-down S11.
-- Artifacts recorded in `docs/gates/s10_5.md`: screen recording, LOC tally, gotchas, any amendments to this ADR.
-- Demo branch deleted after ADR accepted. S11 re-implements from scratch using the lessons.
+- Branch `spike/s10_5-custom-drawing-demo`, not merged. Deleted post-gate.
+- Scope: ICR point drag + rectangle draw only (polygon, line, selection deferred to S11).
+- Outcome: ✅ validated. Findings captured in [`docs/gates/s10_5.md`](../gates/s10_5.md).
+
+### Demo findings — adopted as design rules
+
+The demo surfaced two design refinements, both folded into the spec and captured here so future spikes inherit them:
+
+**1. High-frequency canvas interactions bypass React.** The first demo version routed every mousemove through Zustand → React subscriber → useMemo → prop → MapCanvas effect → `hydrateSources`. Each event paid a full React render cycle (10-30ms); the preview lagged the cursor visibly and "danced around." Mode modules now write preview geometry directly to the MapLibre source via `apps/desktop/src/canvas/preview.ts` (`setDrawPreview` / `clearDrawPreview`). Zustand tracks mode + session start/end + undoStack (low-frequency semantic state); per-pixel preview is a render-loop concern, not a React concern. **This rule applies to any future high-frequency interaction work** (e.g. panning ICR markers, live-updating cable paths during drag).
+
+**2. ICR drag translates the polygon ring, not just a marker.** First demo version rendered only a vertex dot at the cursor. PVlayout_Advance translates the rectangle itself (Agent 2's research report). On mousedown, mode captures the hit feature's `coordinates[0]` ring; on mousemove, ring + delta → `setDrawPreview`. Commit payload reports `newCenter = originalCenter + dragDelta` — the ICR centroid's new position, not the mouseup pixel.
+
+### S11 UX pattern — preview persists until sidecar ack
+
+The demo's `onCommit` callbacks were `console.info` stubs. S11's real behavior keeps the preview visible between release and sidecar response:
+
+```
+[mouseup — drag released]
+  → POST /refresh-inverters { boundary_index, icr_index, new_center_wgs84 }   (80ms debounce per spec)
+  preview STAYS VISIBLE (dashed preview rect = "pending ack")
+  mode → 'awaiting-ack' (new EditingMode value)
+  InteractionController attaches no handlers in this mode; user can't drag/draw until ack settles
+
+[sidecar response — ~100-300ms]
+  setLayoutResult(new_result) → atomic canvas swap (tables, inverters, LAs, cables all recomputed)
+  clearDrawPreview(map)
+  mode → 'idle'
+
+[sidecar error]
+  toast with error message
+  clearDrawPreview(map)
+  mode → 'idle'
+  original ICR unchanged (no optimistic update to unwind)
+```
+
+Why preview-persists: the alternative (clear preview + original ICR stays + 100-300ms stall + swap) creates a disorienting snap-back-then-move sequence. Keeping the dashed preview explicitly labels the in-flight state without lying about positions (an optimistic client-side ICR move would have stale tables under it). On error, there's nothing to unwind.
+
+S11 amends the `EditingMode` union with `awaiting-ack`. InteractionController handles it as a no-op mode. Mutation success/error handlers in App.tsx drive the transition back to `idle`.
 
 ### What this ADR does NOT bind
 

@@ -591,10 +591,16 @@ Revenue is protected by (a) the feature keys that determine **what gets computed
 **Goal:** The two interactive features that define the app — drag an ICR to reposition it, or draw an obstruction — both trigger live recomputation and canvas update.
 
 **In scope:**
-- MapLibre drag handler on ICR markers. Optimistic move locally, debounced 80ms `POST /refresh-inverters` with new ICR position. Canvas repaints with new inverter clusters and LAs, with tables inside the footprint cleared.
-- MapLibre GL Draw tools: rectangle, polygon, line. Drawing commits a `POST /add-road` with UTM coordinates.
-- "Remove last obstruction" button → `POST /remove-road`.
-- Undo stack (limited, 10 entries) for obstruction adds.
+- **Interaction pipeline** per [ADR-0006](./adr/0006-drawing-editing-pipeline.md) + [design spec](./superpowers/specs/2026-04-24-s10_5-drawing-editing-pipeline-design.md): custom on raw MapLibre events, Zustand `editingState` slice, InteractionController + pure mode modules, direct-to-MapLibre `setDrawPreview` for high-frequency transient geometry.
+- **Coordinate policy:** WGS84 end-to-end on client; sidecar projects via pyproj (S9 precedent). `/add-road` and `/refresh-inverters` accept WGS84 (amendment from original spec text which said UTM).
+- **MapLibre drag handler on ICR markers.** Debounced 80ms `POST /refresh-inverters` with WGS84 new center on mouseup. Canvas repaints with new inverter clusters and LAs, with tables inside the footprint cleared.
+- **Preview persists until sidecar ack** — mouseup does NOT clear the dashed preview. Mode transitions from `drag-icr` → new `awaiting-ack` state (not directly to `idle`). InteractionController treats `awaiting-ack` as a no-op mode (no handlers attached; user can't re-interact until the mutation settles). On sidecar response: `setLayoutResult(new)` + `clearDrawPreview(map)` + mode `idle` land atomically. On error: toast + `clearDrawPreview` + mode `idle` with no optimistic state to unwind. See ADR-0006 "S11 UX pattern" for the full flow.
+- **Original ICR dim/dash during drag** — optional polish that matches PVlayout_Advance (legacy makes dragged rect semi-transparent + dashed). Either remove the dragged ICR from `kmz-icrs` temporarily and render it via preview, or use a MapLibre data-driven paint expression keyed on `properties.index`. The simpler of the two in S11.
+- **Draw tools: rectangle (must), polygon + line (stretch).** Rectangle is the must-have because it's the most common obstruction shape (blocks, pads, rectangular corridors). Polygon + line follow the same mode-module pattern and can be landed in-spike if time allows, else bumped to a small follow-up.
+- **Obstruction commits** → `POST /add-road` with WGS84 `coords_wgs84` list + `road_type`. Same preview-persists-until-ack UX as ICR drag.
+- **"Remove last obstruction" button** → `POST /remove-road { index }`.
+- **Undo stack** (LIFO, unbounded in practice per legacy parity; optional 10-entry cap). Obstructions only; no ICR-drag undo.
+- **Debug probes first-class** per the spec (`canvas/debug.ts` probe factory, `VITE_INTERACTION_DEBUG` gate, production tree-shake). Established pattern from S10.5 demo.
 - **Feature gating (resolved in S10.2):**
   - **ICR drag — ungated.** Drag is an interaction on top of `plant_layout` (Basic-tier); any user entitled to compute a layout can reposition its ICRs. No `FEATURE_KEYS.*` wrap, no `FeatureGate`. The recomputation that follows a drag is still naturally gated by the user's tier (a Basic drag re-runs a Basic-tier layout — no cables appear because `cable_routing` is off).
   - **Obstruction drawing — gate on `FEATURE_KEYS.OBSTRUCTION_EXCLUSION`.** Existing Basic-tier seed key (labeled "Obstruction Exclusion"). S11 uses the real key directly; no seed change needed.

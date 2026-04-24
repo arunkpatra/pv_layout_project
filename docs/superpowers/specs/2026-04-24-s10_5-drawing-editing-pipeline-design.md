@@ -77,7 +77,9 @@ packages/sidecar-client/src/
 
 ### Data flow
 
-**Obstruction draw (rect/polygon/line):**
+**Key rule (adopted from S10.5 demo findings, 2026-04-24):** High-frequency canvas interactions (drag, rubber-band draw) **bypass React entirely** for transient preview geometry. Mode modules call `setDrawPreview(map, previewFc, verticesFc)` from `apps/desktop/src/canvas/preview.ts`, which writes directly to the `kmz-draw-preview` + `kmz-draw-vertices` MapLibre sources. Zustand tracks mode + session start/end + undoStack (low-frequency semantic state); per-pixel preview is a render-loop concern, not a React concern. Going through Zustand → React subscriber → useMemo → prop → MapCanvas effect took 10-30ms per event and produced visible jitter in the demo.
+
+**Obstruction draw (rect):**
 
 ```
 User clicks [Rect] button
@@ -88,21 +90,20 @@ editingState slice updates mode + clears inProgressGeometry
   ↓
 InteractionController detaches prior handlers + attaches rectDraw.ts handlers
   ↓
-mousedown → set rect anchor
-mousemove → compute current rect, setInProgressGeometry({ type: 'rect', anchor, cursor })
+mousedown → set rect anchor; store mode session via setInProgressGeometry (single low-freq call)
+mousemove → compute current rect ring, setDrawPreview(map, previewFc, null)  ← direct to MapLibre
   ↓
-(every setInProgressGeometry triggers re-render that passes updated geojson to MapCanvas,
- which calls setData on kmz-draw-preview source → MapLibre repaints preview polygon)
+(MapLibre renders preview polygon immediately; no React render)
   ↓
-mouseup → compute final WGS84 ring, validate (min 1m² post-projection sanity),
-           emit commitIntent via callback to App.tsx
+mouseup → compute final WGS84 ring, emit commitIntent via callback to App.tsx
+         setInProgressGeometry(null), clearDrawPreview(map)
   ↓
-App.tsx → useAddRoadMutation → POST /add-road { coords_wgs84, road_type: 'rectangle' }
+App.tsx → useAddRoadMutation → POST /add-road { road_type, coords_wgs84 }
   ↓
 sidecar projects to UTM, appends PlacedRoad, recomputes via run_layout_multi from tables_pre_icr
   ↓
 LayoutResponse replaces layoutResult → canvas re-renders → editingState pushes onto undoStack,
-clears inProgressGeometry, returns to idle mode
+returns to idle mode
 ```
 
 **ICR drag:**
@@ -110,21 +111,27 @@ clears inProgressGeometry, returns to idle mode
 ```
 mousedown on kmz-icrs feature (via queryRenderedFeatures hit test)
   ↓
-editingState: mode = 'drag-icr', selectedIcrIndex = <idx>
+Capture feature.geometry.coordinates[0] as originalRing, compute originalCenter (ring centroid)
+Record clickPoint.
+editingState: setInProgressGeometry({ type: 'icr-drag', originalRing, originalCenter, newCenter: originalCenter })
+                                                              ← session-start signal, single low-freq call
   ↓
-mousemove → update preview icon position via setInProgressGeometry({ type: 'icr-drag', newCenter_wgs84 })
-(canvas shows icon at new position; placed_tables_wgs84 and inverter features untouched)
+mousemove → compute delta = (lngLat - clickPoint); translate originalRing by delta
+            setDrawPreview(map, translatedRingFc, centroidPointFc)  ← direct to MapLibre
+(canvas shows ICR rect at new position; no React render, no layoutResult mutation)
   ↓
-mouseup → validate (new center inside usable_polygon?)
+mouseup → emit commit { boundary_name, icr_index, newCenter = originalCenter + delta }
+         via callback to App.tsx (see S11 UX pattern below — preview persists until sidecar ack)
   ↓
-if invalid: snap back, reset, return to idle
-if valid: debounce 80ms → useRefreshInvertersMutation → POST /refresh-inverters
+S11: App.tsx → useRefreshInvertersMutation → POST /refresh-inverters
    { boundary_index, icr_index, new_center_wgs84 }
   ↓
 sidecar places LAs first, then string inverters (CRITICAL ORDER), returns LayoutResponse
   ↓
-layoutResult replaces → canvas re-renders fully
+layoutResult replaces → clearDrawPreview(map) → canvas atomic swap → idle mode
 ```
+
+**S11 extension — preview persists until sidecar ack:** on drag release, the preview ring stays visible (dashed = "pending ack") while the sidecar recomputes. Mode transitions to a new `awaiting-ack` state (rather than `idle`), preventing further interaction during the round-trip. On response, `setLayoutResult` + `clearDrawPreview` + mode `idle` land atomically. On error, `clearDrawPreview` + toast + mode `idle` with no optimistic state to unwind. See [ADR-0006 Consequences](../../adr/0006-drawing-editing-pipeline.md) "S11 UX pattern" for the full flow.
 
 ---
 
