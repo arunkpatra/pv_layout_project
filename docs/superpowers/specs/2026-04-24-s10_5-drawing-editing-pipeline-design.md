@@ -250,6 +250,10 @@ interface Mode {
 }
 ```
 
+**Keyboard events.** MapLibre captures pointer events on the map canvas but does NOT emit keyboard events — its canvas isn't focusable. Escape-to-abort, Enter-to-commit-line, Delete-to-remove-selection bindings register at the `document` level inside each mode's `attach()`, and the returned detach fn removes them. The keydown handler gates on the mode-active check so we don't hijack global shortcuts when nothing is in progress.
+
+This is a divergence from PVlayout_Advance (matplotlib canvas captures keyboard events natively because matplotlib backs its canvas with a QWidget). Behaviorally equivalent to the user.
+
 ### `icrDrag.ts`
 
 - On `mousedown`: `queryRenderedFeatures({ layers: ['kmz-icrs-fill'] })`. If hit, capture `icrIndex`, set mode cursor, begin drag.
