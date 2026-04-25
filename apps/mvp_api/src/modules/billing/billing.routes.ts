@@ -129,8 +129,9 @@ billingRoutes.post("/billing/verify-session", async (c) => {
 billingRoutes.get("/billing/entitlements", async (c) => {
   const user = c.get("user")
 
+  // Exclude deactivated entitlements at DB level; exclude exhausted in JS
   const entitlements = await db.entitlement.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, deactivatedAt: null },
     orderBy: { purchasedAt: "desc" },
     include: {
       product: {
@@ -139,11 +140,15 @@ billingRoutes.get("/billing/entitlements", async (c) => {
     },
   })
 
+  const active = entitlements.filter(
+    (e) => e.usedCalculations < e.totalCalculations,
+  )
+
   const licenseKey = await db.licenseKey.findFirst({
     where: { userId: user.id, revokedAt: null },
   })
 
-  const mapped = entitlements.map((e) => ({
+  const mapped = active.map((e) => ({
     product: e.product.slug,
     productName: e.product.name,
     totalCalculations: e.totalCalculations,

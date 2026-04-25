@@ -342,4 +342,51 @@ describe("GET /billing/entitlements", () => {
     expect(body.data.entitlements).toHaveLength(0)
     expect(body.data.licenseKey).toBeNull()
   })
+
+  it("excludes exhausted entitlements (usedCalculations >= totalCalculations)", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_exhausted",
+        totalCalculations: 5,
+        usedCalculations: 5,
+        purchasedAt: new Date("2026-04-22"),
+        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+      },
+    ])
+    mockLicenseKeyFindFirst.mockImplementation(async () => null as never)
+    const app = makeApp()
+    const res = await app.request("/billing/entitlements", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { entitlements: unknown[] }
+    }
+    expect(body.data.entitlements).toHaveLength(0)
+  })
+
+  it("includes active entitlement with remaining calculations", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_active",
+        totalCalculations: 10,
+        usedCalculations: 3,
+        purchasedAt: new Date("2026-04-22"),
+        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+      },
+    ])
+    const app = makeApp()
+    const res = await app.request("/billing/entitlements", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    const body = (await res.json()) as {
+      success: boolean
+      data: { entitlements: { remainingCalculations: number }[] }
+    }
+    expect(body.data.entitlements).toHaveLength(1)
+    expect(body.data.entitlements[0]!.remainingCalculations).toBe(7)
+  })
 })
