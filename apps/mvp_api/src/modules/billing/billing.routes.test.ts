@@ -95,6 +95,14 @@ const mockEntitlementFindMany = mock(async () => [
 const mockLicenseKeyFindFirst = mock(async () => ({
   key: "sl_live_testkey123",
 }))
+const mockUsageRecordFindMany = mock(async () => [
+  {
+    featureKey: "pv-layout",
+    createdAt: new Date("2026-04-22T10:00:00Z"),
+    product: { name: "PV Layout Pro" },
+  },
+])
+const mockUsageRecordCount = mock(async () => 1)
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -118,6 +126,10 @@ mock.module("../../lib/db.js", () => ({
     licenseKey: {
       findFirst: mockLicenseKeyFindFirst,
       create: mock(async () => ({})),
+    },
+    usageRecord: {
+      findMany: mockUsageRecordFindMany,
+      count: mockUsageRecordCount,
     },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -480,5 +492,77 @@ describe("GET /billing/entitlements", () => {
     expect(body.data.entitlements).toHaveLength(1)
     expect(body.data.entitlements[0]!.state).toBe("DEACTIVATED")
     expect(body.data.entitlements[0]!.deactivatedAt).not.toBeNull()
+  })
+})
+
+describe("GET /billing/usage", () => {
+  beforeEach(() => {
+    mockUsageRecordFindMany.mockImplementation(async () => [
+      {
+        featureKey: "pv-layout",
+        createdAt: new Date("2026-04-22T10:00:00Z"),
+        product: { name: "PV Layout Pro" },
+      },
+    ])
+    mockUsageRecordCount.mockImplementation(async () => 1)
+  })
+
+  it("returns paginated usage records for authenticated user", async () => {
+    const app = makeApp()
+    const res = await app.request("/billing/usage?page=1&pageSize=20", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: {
+        data: Array<{ featureKey: string; productName: string; createdAt: string }>
+        pagination: { page: number; pageSize: number; total: number; totalPages: number }
+      }
+    }
+    expect(body.success).toBe(true)
+    expect(body.data.data).toHaveLength(1)
+    expect(body.data.data[0]!.featureKey).toBe("pv-layout")
+    expect(body.data.data[0]!.productName).toBe("PV Layout Pro")
+    expect(body.data.data[0]!.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(body.data.pagination.page).toBe(1)
+    expect(body.data.pagination.total).toBe(1)
+    expect(body.data.pagination.totalPages).toBe(1)
+  })
+
+  it("returns empty data with pagination when no usage records", async () => {
+    mockUsageRecordFindMany.mockImplementation(async () => [] as never)
+    mockUsageRecordCount.mockImplementation(async () => 0)
+    const app = makeApp()
+    const res = await app.request("/billing/usage", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: {
+        data: unknown[]
+        pagination: { total: number; totalPages: number }
+      }
+    }
+    expect(body.data.data).toHaveLength(0)
+    expect(body.data.pagination.total).toBe(0)
+    expect(body.data.pagination.totalPages).toBe(1)
+  })
+
+  it("defaults to page=1 pageSize=20 when params are omitted", async () => {
+    const app = makeApp()
+    await app.request("/billing/usage", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    const calls = mockUsageRecordFindMany.mock.calls as unknown as Array<
+      [{ skip: number; take: number }]
+    >
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall![0].skip).toBe(0)
+    expect(lastCall![0].take).toBe(20)
   })
 })

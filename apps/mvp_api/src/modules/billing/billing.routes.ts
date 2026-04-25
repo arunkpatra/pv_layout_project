@@ -175,3 +175,41 @@ billingRoutes.get("/billing/entitlements", async (c) => {
     }),
   )
 })
+
+// GET /billing/usage
+billingRoutes.get("/billing/usage", async (c) => {
+  const user = c.get("user")
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10))
+  const pageSize = Math.min(
+    100,
+    Math.max(1, parseInt(c.req.query("pageSize") ?? "20", 10)),
+  )
+  const skip = (page - 1) * pageSize
+
+  const [records, total] = await Promise.all([
+    db.usageRecord.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      include: { product: { select: { name: true } } },
+    }),
+    db.usageRecord.count({ where: { userId: user.id } }),
+  ])
+
+  return c.json(
+    ok({
+      data: records.map((r) => ({
+        featureKey: r.featureKey,
+        productName: r.product.name,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+    }),
+  )
+})
