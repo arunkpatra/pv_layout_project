@@ -423,7 +423,7 @@ describe("GET /billing/entitlements", () => {
         deactivatedAt: new Date("2026-03-15"),
         product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
       },
-    ])
+    ] as never)
     const app = makeApp()
     const res = await app.request("/billing/entitlements", {
       method: "GET",
@@ -458,7 +458,7 @@ describe("GET /billing/entitlements", () => {
         deactivatedAt: new Date("2026-03-15"),
         product: { slug: "pv-layout-basic", name: "PV Layout Basic" },
       },
-    ])
+    ] as never)
     mockLicenseKeyFindFirst.mockImplementation(async () => null as never)
     const app = makeApp()
     const res = await app.request("/billing/entitlements", {
