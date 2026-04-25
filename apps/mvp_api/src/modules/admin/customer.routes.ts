@@ -17,27 +17,15 @@ const EntitlementStatusSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
 })
 
-customerRoutes.use(
-  "/admin/customers*",
-  clerkAuth,
-  requireRole("ADMIN", "OPS"),
-)
-customerRoutes.use(
-  "/admin/entitlements*",
-  clerkAuth,
-  requireRole("ADMIN", "OPS"),
-)
+customerRoutes.use("/admin/*", clerkAuth, requireRole("ADMIN", "OPS"))
 
 customerRoutes.get("/admin/customers", async (c) => {
-  const page = parseInt(c.req.query("page") ?? "1", 10)
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1)
   const pageSize = Math.min(
-    parseInt(c.req.query("pageSize") ?? "20", 10),
+    Math.max(1, parseInt(c.req.query("pageSize") ?? "20", 10) || 20),
     100,
   )
-  const result = await listCustomers({
-    page: isNaN(page) ? 1 : page,
-    pageSize: isNaN(pageSize) ? 20 : pageSize,
-  })
+  const result = await listCustomers({ page, pageSize })
   return c.json(ok(result))
 })
 

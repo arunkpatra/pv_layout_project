@@ -250,26 +250,19 @@ describe("PATCH /admin/entitlements/:id/status", () => {
 })
 
 describe("Role enforcement", () => {
-  it("returns 403 when user has no admin/ops role on customer routes", async () => {
-    const { requireRole } = await import("../../middleware/rbac.js")
-    const app = new Hono<MvpHonoEnv>()
-    app.use("*", async (c, next) => {
-      c.set("user", {
-        id: "usr_plain",
-        clerkId: "ck_plain",
-        email: "plain@test.com",
-        name: "Plain",
-        stripeCustomerId: null,
-        roles: [],
-        status: "ACTIVE",
-      })
-      return next()
+  it("returns 403 when user has no admin/ops role", async () => {
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_plain",
+      clerkId: "ck_ops",
+      email: "plain@test.com",
+      name: "Plain",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }))
+    const res = await makeApp().request("/admin/customers", {
+      headers: { Authorization: "Bearer token" },
     })
-    app.get("/admin/customers", requireRole("ADMIN", "OPS"), (c) =>
-      c.json({ ok: true }),
-    )
-    app.onError(errorHandler)
-    const res = await app.request("/admin/customers")
     expect(res.status).toBe(403)
   })
 })
