@@ -1139,13 +1139,14 @@ export function CustomerTrendChart({ data }: { data: CustomerTrendPoint[] }) {
 
 - [ ] **Step 3: Create `dashboard-client.tsx`**
 
+`DashboardClient` receives `granularity` as a prop from the server page — it does NOT use `useSearchParams`. This matches the pattern used by `ProductDetailClient`.
+
 ```typescript
 // apps/mvp_admin/app/(admin)/dashboard/_components/dashboard-client.tsx
 "use client"
 
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
 import {
   useAdminDashboardSummary,
   useAdminDashboardTrends,
@@ -1172,13 +1173,11 @@ function formatCurrency(usd: number) {
   }).format(usd)
 }
 
-export function DashboardClient() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const raw = searchParams.get("granularity")
-  const granularity: "daily" | "weekly" | "monthly" =
-    raw === "daily" || raw === "weekly" || raw === "monthly" ? raw : "monthly"
-
+export function DashboardClient({
+  granularity,
+}: {
+  granularity: "daily" | "weekly" | "monthly"
+}) {
   const {
     data: summary,
     isLoading: summaryLoading,
@@ -1249,21 +1248,21 @@ export function DashboardClient() {
           variant={granularity === "daily" ? "default" : "outline"}
           asChild
         >
-          <Link href="/?granularity=daily">Daily</Link>
+          <Link href="/dashboard?granularity=daily">Daily</Link>
         </Button>
         <Button
           size="sm"
           variant={granularity === "weekly" ? "default" : "outline"}
           asChild
         >
-          <Link href="/?granularity=weekly">Weekly</Link>
+          <Link href="/dashboard?granularity=weekly">Weekly</Link>
         </Button>
         <Button
           size="sm"
           variant={granularity === "monthly" ? "default" : "outline"}
           asChild
         >
-          <Link href="/?granularity=monthly">Monthly</Link>
+          <Link href="/dashboard?granularity=monthly">Monthly</Link>
         </Button>
       </div>
 
@@ -1303,16 +1302,27 @@ export function DashboardClient() {
 
 - [ ] **Step 4: Update `dashboard/page.tsx`**
 
+The server page reads `searchParams.granularity` and passes it as a prop to `DashboardClient` — same pattern as `ProductDetailPage`. No `<Suspense>` wrapper needed.
+
 Replace the entire content of `apps/mvp_admin/app/(admin)/dashboard/page.tsx`:
 
 ```typescript
-import { Suspense } from "react"
 import type { Metadata } from "next"
 import { DashboardClient } from "./_components/dashboard-client"
 
 export const metadata: Metadata = { title: "Dashboard" }
 
-export default function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ granularity?: string }>
+}) {
+  const { granularity: rawGranularity } = await searchParams
+  const granularity =
+    rawGranularity === "daily" || rawGranularity === "weekly"
+      ? rawGranularity
+      : "monthly"
+
   return (
     <div className="space-y-4">
       <div>
@@ -1323,9 +1333,7 @@ export default function DashboardPage() {
           Overview metrics for SolarLayout.
         </p>
       </div>
-      <Suspense>
-        <DashboardClient />
-      </Suspense>
+      <DashboardClient granularity={granularity} />
     </div>
   )
 }
