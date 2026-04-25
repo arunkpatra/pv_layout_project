@@ -24,3 +24,43 @@ export type AdminUsersResponse = {
   data: UserListItem[]
   pagination: PaginationMeta
 }
+
+export type CustomerListItem = {
+  id: string
+  name: string | null
+  email: string
+  roles: string[]
+  status: string
+  createdAt: string
+  totalSpendUsd: number
+  activeEntitlementCount: number
+}
+
+export type AdminCustomersResponse = {
+  data: CustomerListItem[]
+  pagination: PaginationMeta
+}
+
+export type EntitlementDetail = {
+  id: string
+  productId: string
+  productName: string
+  productSlug: string
+  totalCalculations: number
+  usedCalculations: number
+  remainingCalculations: number
+  purchasedAt: string
+  deactivatedAt: string | null
+  state: "ACTIVE" | "EXHAUSTED" | "DEACTIVATED"
+}
+
+export type CustomerDetail = {
+  id: string
+  name: string | null
+  email: string
+  roles: string[]
+  status: string
+  createdAt: string
+  totalSpendUsd: number
+  entitlements: EntitlementDetail[]
+}
