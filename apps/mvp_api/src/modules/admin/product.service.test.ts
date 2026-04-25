@@ -138,3 +138,60 @@ describe("getProduct", () => {
     await expect(getProduct("nonexistent")).rejects.toMatchObject({ statusCode: 404 })
   })
 })
+
+const { getProductSales } = await import("./product.service.js")
+
+describe("getProductSales", () => {
+  beforeEach(() => {
+    mockProductFindUnique.mockReset()
+    mockProductFindUnique.mockImplementation(async () => ({
+      id: "prod1",
+    }))
+    mockCheckoutSessionFindMany.mockReset()
+  })
+
+  it("returns monthly data with 12 periods, zeros for missing periods", async () => {
+    mockCheckoutSessionFindMany.mockImplementation(async () => [])
+    const result = await getProductSales("pv-layout-pro", "monthly")
+    expect(result.granularity).toBe("monthly")
+    expect(result.data).toHaveLength(12)
+    for (const point of result.data) {
+      expect(point.revenueUsd).toBe(0)
+      expect(point.purchaseCount).toBe(0)
+    }
+  })
+
+  it("returns daily data with 30 periods", async () => {
+    mockCheckoutSessionFindMany.mockImplementation(async () => [])
+    const result = await getProductSales("pv-layout-pro", "daily")
+    expect(result.granularity).toBe("daily")
+    expect(result.data).toHaveLength(30)
+  })
+
+  it("returns weekly data with 12 periods", async () => {
+    mockCheckoutSessionFindMany.mockImplementation(async () => [])
+    const result = await getProductSales("pv-layout-pro", "weekly")
+    expect(result.granularity).toBe("weekly")
+    expect(result.data).toHaveLength(12)
+  })
+
+  it("aggregates revenue and count for sessions in the current month", async () => {
+    const now = new Date()
+    const currentMonth = now.toISOString().slice(0, 7)
+    mockCheckoutSessionFindMany.mockImplementation(async () => [
+      { amountTotal: 4999, processedAt: new Date(now) },
+      { amountTotal: 9999, processedAt: new Date(now) },
+    ])
+    const result = await getProductSales("pv-layout-pro", "monthly")
+    const currentPeriod = result.data.find((d) => d.period === currentMonth)!
+    expect(currentPeriod.purchaseCount).toBe(2)
+    expect(currentPeriod.revenueUsd).toBeCloseTo(149.98)
+  })
+
+  it("throws 404 when product not found", async () => {
+    mockProductFindUnique.mockImplementation(async () => null as never)
+    await expect(
+      getProductSales("nonexistent", "monthly"),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
