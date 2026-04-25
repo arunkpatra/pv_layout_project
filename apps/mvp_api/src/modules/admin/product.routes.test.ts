@@ -256,6 +256,7 @@ describe("GET /admin/products/summary", () => {
     }
     expect(body.success).toBe(true)
     expect(typeof body.data.totalRevenueUsd).toBe("number")
+    expect(body.data.totalRevenueUsd).toBeCloseTo(49.99)
     expect(typeof body.data.totalPurchases).toBe("number")
     expect(typeof body.data.activeEntitlements).toBe("number")
   })

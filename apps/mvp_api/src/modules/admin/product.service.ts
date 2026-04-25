@@ -200,7 +200,7 @@ export async function getProductsSummary(): Promise<ProductsSummary> {
   ])
 
   return {
-    totalRevenueUsd: ((revenueAgg._sum.amountTotal ?? 0) as number) / 100,
+    totalRevenueUsd: (revenueAgg._sum.amountTotal ?? 0) / 100,
     totalPurchases,
     activeEntitlements,
   }
