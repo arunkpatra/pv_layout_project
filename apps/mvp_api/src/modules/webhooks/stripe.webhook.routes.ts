@@ -33,7 +33,7 @@ stripeWebhookRoutes.post("/webhooks/stripe", async (c) => {
       id: string
       amount_total: number | null
       currency: string | null
-      metadata: Record<string, string>
+      metadata: Record<string, string> | null
     }
 
     console.log(
@@ -42,7 +42,6 @@ stripeWebhookRoutes.post("/webhooks/stripe", async (c) => {
         event: "checkout.session.completed",
         stripeSessionId: session.id,
         product: session.metadata?.product,
-        userId: session.metadata?.userId,
         amountTotal: session.amount_total,
         currency: session.currency,
       }),

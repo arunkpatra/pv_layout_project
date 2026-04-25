@@ -41,7 +41,7 @@ mock.module("../../lib/db.js", () => ({
 }))
 
 const mockConstructEvent = mock(
-  (_body: unknown, _sig: unknown, _secret: unknown) => ({
+  async (_body: unknown, _sig: unknown, _secret: unknown) => ({
     type: "checkout.session.completed",
     data: {
       object: {
@@ -88,7 +88,7 @@ describe("POST /webhooks/stripe", () => {
       processedAt: null,
       user: { id: "usr_test1", email: "test@example.com" },
     }))
-    mockConstructEvent.mockImplementation(() => ({
+    mockConstructEvent.mockImplementation(async () => ({
       type: "checkout.session.completed",
       data: {
         object: {
@@ -116,7 +116,7 @@ describe("POST /webhooks/stripe", () => {
   })
 
   it("returns 200 and ignores unhandled event types", async () => {
-    mockConstructEvent.mockImplementation(() => ({
+    mockConstructEvent.mockImplementation(async () => ({
       type: "customer.created",
       data: {
         object: { id: "", metadata: { userId: "", product: "" } },
@@ -136,7 +136,7 @@ describe("POST /webhooks/stripe", () => {
   })
 
   it("writes amountTotal and currency to checkoutSession.update when event includes them", async () => {
-    mockConstructEvent.mockImplementation(() => ({
+    mockConstructEvent.mockImplementation(async () => ({
       type: "checkout.session.completed",
       data: {
         object: {
@@ -168,7 +168,7 @@ describe("POST /webhooks/stripe", () => {
   })
 
   it("returns 400 when signature verification fails", async () => {
-    mockConstructEvent.mockImplementation(() => {
+    mockConstructEvent.mockImplementation(async () => {
       throw new Error("Invalid signature")
     })
     const app = makeApp()
