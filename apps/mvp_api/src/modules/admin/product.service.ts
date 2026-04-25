@@ -57,9 +57,9 @@ function getCutoff(
   now: Date,
 ): Date {
   const d = new Date(now)
-  if (granularity === "daily") d.setDate(d.getDate() - 30)
-  else if (granularity === "weekly") d.setDate(d.getDate() - 12 * 7)
-  else d.setMonth(d.getMonth() - 12)
+  if (granularity === "daily") d.setDate(d.getDate() - 29)
+  else if (granularity === "weekly") d.setDate(d.getDate() - 11 * 7)
+  else d.setMonth(d.getMonth() - 11)
   return d
 }
 
@@ -105,6 +105,7 @@ export async function listProducts(params: {
       },
     }),
     db.product.count(),
+    // No Prisma relation between CheckoutSession and Product; join by productSlug in JS
     db.checkoutSession.findMany({
       where: { processedAt: { not: null } },
       select: { productSlug: true, amountTotal: true },
@@ -205,6 +206,7 @@ export async function getProductSales(
   const sessions = await db.checkoutSession.findMany({
     where: {
       productSlug: slug,
+      // Prisma merges `not: null` and `gte: cutoff` as AND on the same field
       processedAt: { not: null, gte: cutoff },
     },
     select: { amountTotal: true, processedAt: true },
