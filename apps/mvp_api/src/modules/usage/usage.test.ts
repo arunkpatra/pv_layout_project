@@ -8,6 +8,8 @@ const mockUser = {
   email: "test@example.com",
   name: "Test User",
   stripeCustomerId: null,
+  roles: [],
+  status: "ACTIVE",
 }
 
 const mockLicenseKey = {

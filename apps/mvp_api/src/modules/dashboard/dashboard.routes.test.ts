@@ -14,18 +14,31 @@ mock.module("../../middleware/clerk-auth.js", () => ({
       email: "test@example.com",
       name: "Test User",
       stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
     })
     return next()
   },
 }))
 
 // Mock db (needed to prevent clerk-auth from crashing on module load in parallel test runs)
+// upsert must return a full user shape in case the real clerkAuth runs due to Bun module caching
 mock.module("../../lib/db.js", () => ({
   db: {
     user: {
       findFirst: async () => null,
-      upsert: async () => ({}),
+      upsert: async () => ({
+        id: "usr_test1",
+        clerkId: "clerk_user_123",
+        email: "test@example.com",
+        name: "Test User",
+        stripeCustomerId: null,
+        roles: [],
+        status: "ACTIVE",
+      }),
     },
+    product: { findFirst: async () => null },
+    $transaction: async () => {},
   },
 }))
 

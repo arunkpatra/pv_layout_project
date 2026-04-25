@@ -5,14 +5,30 @@ import { err } from "../lib/response.js"
 
 export type MvpHonoEnv = {
   Variables: {
-    user: { id: string; clerkId: string; email: string; name: string | null; stripeCustomerId: string | null }
+    user: {
+      id: string
+      clerkId: string
+      email: string
+      name: string | null
+      stripeCustomerId: string | null
+      roles: string[]
+      status: string
+    }
     licenseKey?: {
       id: string
       key: string
       userId: string
       createdAt: Date
       revokedAt: Date | null
-      user: { id: string; clerkId: string; email: string; name: string | null; stripeCustomerId: string | null }
+      user: {
+        id: string
+        clerkId: string
+        email: string
+        name: string | null
+        stripeCustomerId: string | null
+        roles: string[]
+        status: string
+      }
     }
   }
 }
