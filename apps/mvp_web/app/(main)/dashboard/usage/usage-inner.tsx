@@ -26,7 +26,8 @@ export function UsagePageInner() {
   const router = useRouter()
 
   const pageParam = searchParams.get("page")
-  const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1
+  const parsed = parseInt(pageParam ?? "", 10)
+  const page = isNaN(parsed) || parsed < 1 ? 1 : parsed
 
   const { data, isLoading, isError } = useUserUsage(page, PAGE_SIZE)
 
@@ -129,7 +130,7 @@ export function UsagePageInner() {
                 variant="outline"
                 size="sm"
                 onClick={() => goToPage(page - 1)}
-                disabled={page <= 1}
+                disabled={page <= 1 || isLoading}
               >
                 ← Previous
               </Button>
@@ -140,7 +141,7 @@ export function UsagePageInner() {
                 variant="outline"
                 size="sm"
                 onClick={() => goToPage(page + 1)}
-                disabled={page >= totalPages}
+                disabled={page >= totalPages || isLoading}
               >
                 Next →
               </Button>
