@@ -89,6 +89,16 @@ describe("getDashboardTrends", () => {
     expect(result.customers).toHaveLength(30)
   })
 
+  it("returns weekly trends with 12 periods", async () => {
+    mockCheckoutSessionFindMany.mockImplementation(async () => [])
+    mockUserFindMany.mockImplementation(async () => [])
+    const result = await getDashboardTrends("weekly")
+    expect(result.granularity).toBe("weekly")
+    expect(result.revenue).toHaveLength(12)
+    expect(result.customers).toHaveLength(12)
+    for (const r of result.revenue) expect(r.revenueUsd).toBe(0)
+  })
+
   it("aggregates revenue and customer counts into correct period buckets", async () => {
     const now = new Date()
     const currentMonth = now.toISOString().slice(0, 7)
