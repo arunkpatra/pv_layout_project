@@ -203,6 +203,7 @@
         "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
         "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL",
         "NEXT_PUBLIC_MVP_API_URL",
+        "CLERK_SECRET_KEY",
         "NODE_ENV"
       ]
     },
