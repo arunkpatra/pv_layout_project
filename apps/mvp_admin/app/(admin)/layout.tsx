@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { auth } from "@clerk/nextjs/server"
 import { AdminSidebar } from "@/components/admin-sidebar"
 import { Separator } from "@renewable-energy/ui/components/separator"
