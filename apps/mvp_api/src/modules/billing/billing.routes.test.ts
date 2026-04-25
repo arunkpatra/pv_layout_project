@@ -423,7 +423,7 @@ describe("GET /billing/entitlements", () => {
         deactivatedAt: new Date("2026-03-15"),
         product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
       },
-    ] as never)
+    ])
     const app = makeApp()
     const res = await app.request("/billing/entitlements", {
       method: "GET",
@@ -433,7 +433,7 @@ describe("GET /billing/entitlements", () => {
     const body = (await res.json()) as {
       success: boolean
       data: {
-        entitlements: Array<{ id: string; state: string; remainingCalculations: number }>
+        entitlements: Array<{ id: string; state: string; remainingCalculations: number; deactivatedAt: string | null }>
       }
     }
     expect(body.data.entitlements).toHaveLength(3)
@@ -443,5 +443,42 @@ describe("GET /billing/entitlements", () => {
     expect(byId["ent_exhausted"]!.state).toBe("EXHAUSTED")
     expect(byId["ent_exhausted"]!.remainingCalculations).toBe(0)
     expect(byId["ent_deactivated"]!.state).toBe("DEACTIVATED")
+    expect(byId["ent_active"]!.deactivatedAt).toBeNull()
+    expect(byId["ent_deactivated"]!.deactivatedAt).not.toBeNull()
+    expect(byId["ent_deactivated"]!.remainingCalculations).toBe(10)
+  })
+
+  it("returns DEACTIVATED state when entitlement is both deactivated and exhausted", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_deactivated_exhausted",
+        totalCalculations: 5,
+        usedCalculations: 5,
+        purchasedAt: new Date("2026-03-01"),
+        deactivatedAt: new Date("2026-03-15"),
+        product: { slug: "pv-layout-basic", name: "PV Layout Basic" },
+      },
+    ])
+    mockLicenseKeyFindFirst.mockImplementation(async () => null as never)
+    const app = makeApp()
+    const res = await app.request("/billing/entitlements", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: {
+        entitlements: Array<{
+          id: string
+          state: string
+          deactivatedAt: string | null
+          remainingCalculations: number
+        }>
+      }
+    }
+    expect(body.data.entitlements).toHaveLength(1)
+    expect(body.data.entitlements[0]!.state).toBe("DEACTIVATED")
+    expect(body.data.entitlements[0]!.deactivatedAt).not.toBeNull()
   })
 })
