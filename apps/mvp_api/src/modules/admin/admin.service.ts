@@ -23,10 +23,7 @@ export type PaginationMeta = {
 }
 
 function clerkClient() {
-  if (!env.CLERK_SECRET_KEY) {
-    throw new AppError("INTERNAL_ERROR", "CLERK_SECRET_KEY not configured", 500)
-  }
-  return createClerkClient({ secretKey: env.CLERK_SECRET_KEY })
+  return createClerkClient({ secretKey: env.CLERK_SECRET_KEY ?? "" })
 }
 
 export async function listAdminUsers(params: {
