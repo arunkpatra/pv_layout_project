@@ -146,6 +146,14 @@ describe("getProductSales", () => {
     mockProductFindUnique.mockReset()
     mockProductFindUnique.mockImplementation(async () => ({
       id: "prod1",
+      slug: "pv-layout-pro",
+      name: "PV Layout Pro",
+      priceAmount: 4999,
+      priceCurrency: "usd",
+      calculations: 10,
+      active: true,
+      isFree: false,
+      entitlements: [{ deactivatedAt: null }],
     }))
     mockCheckoutSessionFindMany.mockReset()
   })
@@ -179,8 +187,8 @@ describe("getProductSales", () => {
     const now = new Date()
     const currentMonth = now.toISOString().slice(0, 7)
     mockCheckoutSessionFindMany.mockImplementation(async () => [
-      { amountTotal: 4999, processedAt: new Date(now) },
-      { amountTotal: 9999, processedAt: new Date(now) },
+      { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date(now) },
+      { productSlug: "pv-layout-pro", amountTotal: 9999, processedAt: new Date(now) },
     ])
     const result = await getProductSales("pv-layout-pro", "monthly")
     const currentPeriod = result.data.find((d) => d.period === currentMonth)!
