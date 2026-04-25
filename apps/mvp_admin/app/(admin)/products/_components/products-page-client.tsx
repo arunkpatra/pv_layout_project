@@ -27,13 +27,25 @@ export function ProductsPageClient() {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10))
 
   const { data, isLoading, error } = useAdminProducts({ page, pageSize: 20 })
+  const { data: allProducts } = useAdminProducts({ page: 1, pageSize: 100 })
+
+  const totalRevenue = allProducts?.data.reduce((sum, p) => sum + p.totalRevenueUsd, 0) ?? 0
+  const totalPurchases = allProducts?.data.reduce((sum, p) => sum + p.purchaseCount, 0) ?? 0
+  const totalActiveEntitlements = allProducts?.data.reduce((sum, p) => sum + p.activeEntitlementCount, 0) ?? 0
 
   if (isLoading) {
     return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          ))}
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -48,6 +60,20 @@ export function ProductsPageClient() {
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Total Revenue</p>
+          <p className="mt-1 text-2xl font-semibold">{formatCurrency(totalRevenue)}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Total Purchases</p>
+          <p className="mt-1 text-2xl font-semibold">{totalPurchases}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Active Entitlements</p>
+          <p className="mt-1 text-2xl font-semibold">{totalActiveEntitlements}</p>
+        </div>
+      </div>
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {!data || data.data.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
