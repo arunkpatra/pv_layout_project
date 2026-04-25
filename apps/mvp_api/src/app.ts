@@ -14,6 +14,7 @@ import { billingRoutes } from "./modules/billing/billing.routes.js"
 import { stripeWebhookRoutes } from "./modules/webhooks/stripe.webhook.routes.js"
 import { entitlementsRoutes } from "./modules/entitlements/entitlements.routes.js"
 import { usageRoutes } from "./modules/usage/usage.routes.js"
+import { adminRoutes } from "./modules/admin/admin.routes.js"
 
 export const app = new Hono<MvpHonoEnv>()
 
@@ -28,7 +29,7 @@ app.use(
   "*",
   cors({
     origin: corsOrigins,
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   }),
 )
@@ -45,6 +46,7 @@ app.route("/", billingRoutes)
 app.route("/", stripeWebhookRoutes)
 app.route("/", entitlementsRoutes)
 app.route("/", usageRoutes)
+app.route("/", adminRoutes)
 
 app.get("/", async (c) => {
   const status = {
