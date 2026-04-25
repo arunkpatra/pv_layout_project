@@ -1,0 +1,140 @@
+import { describe, it, expect, mock, beforeEach } from "bun:test"
+
+const mockProductFindMany = mock(async () => [
+  {
+    id: "prod1",
+    slug: "pv-layout-pro",
+    name: "PV Layout Pro",
+    priceAmount: 4999,
+    priceCurrency: "usd",
+    calculations: 10,
+    active: true,
+    isFree: false,
+    entitlements: [
+      { deactivatedAt: null },
+      { deactivatedAt: new Date() },
+    ],
+  },
+])
+const mockProductCount = mock(async () => 1)
+const mockProductFindUnique = mock(async () => ({
+  id: "prod1",
+  slug: "pv-layout-pro",
+  name: "PV Layout Pro",
+  priceAmount: 4999,
+  priceCurrency: "usd",
+  calculations: 10,
+  active: true,
+  isFree: false,
+  entitlements: [{ deactivatedAt: null }],
+}))
+const mockCheckoutSessionFindMany = mock(async () => [
+  { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date("2026-04-01") },
+  { productSlug: "pv-layout-pro", amountTotal: null, processedAt: new Date("2026-04-10") },
+])
+
+mock.module("../../lib/db.js", () => ({
+  db: {
+    product: {
+      findMany: mockProductFindMany,
+      count: mockProductCount,
+      findUnique: mockProductFindUnique,
+    },
+    checkoutSession: {
+      findMany: mockCheckoutSessionFindMany,
+    },
+  },
+}))
+
+const { listProducts, getProduct } = await import("./product.service.js")
+
+describe("listProducts", () => {
+  beforeEach(() => {
+    mockProductFindMany.mockReset()
+    mockProductFindMany.mockImplementation(async () => [
+      {
+        id: "prod1",
+        slug: "pv-layout-pro",
+        name: "PV Layout Pro",
+        priceAmount: 4999,
+        priceCurrency: "usd",
+        calculations: 10,
+        active: true,
+        isFree: false,
+        entitlements: [
+          { deactivatedAt: null },
+          { deactivatedAt: new Date() },
+        ],
+      },
+    ])
+    mockProductCount.mockReset()
+    mockProductCount.mockImplementation(async () => 1)
+    mockCheckoutSessionFindMany.mockReset()
+    mockCheckoutSessionFindMany.mockImplementation(async () => [
+      { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date("2026-04-01") },
+      { productSlug: "pv-layout-pro", amountTotal: null, processedAt: new Date("2026-04-10") },
+    ])
+  })
+
+  it("returns paginated list with computed revenue, purchase count, and active entitlements", async () => {
+    const result = await listProducts({ page: 1, pageSize: 20 })
+    expect(result.data).toHaveLength(1)
+    const p = result.data[0]!
+    expect(p.slug).toBe("pv-layout-pro")
+    expect(p.totalRevenueUsd).toBeCloseTo(49.99)
+    expect(p.purchaseCount).toBe(2)
+    expect(p.activeEntitlementCount).toBe(1)
+    expect(result.pagination.total).toBe(1)
+  })
+
+  it("treats null amountTotal as zero in revenue sum", async () => {
+    mockCheckoutSessionFindMany.mockImplementation(async () => [
+      { productSlug: "pv-layout-pro", amountTotal: null, processedAt: new Date() },
+    ])
+    const result = await listProducts({ page: 1, pageSize: 20 })
+    expect(result.data[0]!.totalRevenueUsd).toBe(0)
+  })
+
+  it("counts only sessions for matching productSlug", async () => {
+    mockCheckoutSessionFindMany.mockImplementation(async () => [
+      { productSlug: "pv-layout-basic", amountTotal: 999, processedAt: new Date() },
+    ])
+    const result = await listProducts({ page: 1, pageSize: 20 })
+    expect(result.data[0]!.purchaseCount).toBe(0)
+    expect(result.data[0]!.totalRevenueUsd).toBe(0)
+  })
+})
+
+describe("getProduct", () => {
+  beforeEach(() => {
+    mockProductFindUnique.mockReset()
+    mockProductFindUnique.mockImplementation(async () => ({
+      id: "prod1",
+      slug: "pv-layout-pro",
+      name: "PV Layout Pro",
+      priceAmount: 4999,
+      priceCurrency: "usd",
+      calculations: 10,
+      active: true,
+      isFree: false,
+      entitlements: [{ deactivatedAt: null }],
+    }))
+    mockCheckoutSessionFindMany.mockReset()
+    mockCheckoutSessionFindMany.mockImplementation(async () => [
+      { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date("2026-04-01") },
+    ])
+  })
+
+  it("returns product with metrics", async () => {
+    const result = await getProduct("pv-layout-pro")
+    expect(result.slug).toBe("pv-layout-pro")
+    expect(result.totalRevenueUsd).toBeCloseTo(49.99)
+    expect(result.purchaseCount).toBe(1)
+    expect(result.activeEntitlementCount).toBe(1)
+  })
+
+  it("throws 404 when product not found", async () => {
+    mockProductFindUnique.mockImplementation(async () => null as never)
+    await expect(getProduct("nonexistent")).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
