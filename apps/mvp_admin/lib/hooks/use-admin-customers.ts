@@ -58,7 +58,7 @@ export function useUpdateEntitlementStatus() {
   return useMutation<
     void,
     Error,
-    { entitlementId: string; status: "ACTIVE" | "INACTIVE"; customerId: string; filter: "active" | "all" }
+    { entitlementId: string; status: "ACTIVE" | "INACTIVE"; customerId: string }
   >({
     mutationFn: async ({ entitlementId, status }) => {
       const token = await getToken()
@@ -76,9 +76,12 @@ export function useUpdateEntitlementStatus() {
       if (!res.ok)
         throw new Error(`Failed to update entitlement status: ${res.status}`)
     },
-    onSuccess: (_data, { customerId, filter }) => {
+    onSuccess: (_data, { customerId }) => {
       void queryClient.invalidateQueries({
-        queryKey: ["admin-customer", customerId, filter],
+        queryKey: ["admin-customer", customerId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-customers"],
       })
     },
   })

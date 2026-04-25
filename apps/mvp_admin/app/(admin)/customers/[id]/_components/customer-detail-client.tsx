@@ -57,11 +57,9 @@ function StateBadge({ state }: { state: EntitlementDetail["state"] }) {
 function EntitlementActions({
   entitlement,
   customerId,
-  filter,
 }: {
   entitlement: EntitlementDetail
   customerId: string
-  filter: "active" | "all"
 }) {
   const router = useRouter()
   const { mutate, isPending } = useUpdateEntitlementStatus()
@@ -81,7 +79,6 @@ function EntitlementActions({
             entitlementId: entitlement.id,
             status: isActive ? "INACTIVE" : "ACTIVE",
             customerId,
-            filter,
           },
           { onSuccess: () => router.refresh() },
         )
@@ -217,7 +214,6 @@ export function CustomerDetailClient({
                       <EntitlementActions
                         entitlement={ent}
                         customerId={customerId}
-                        filter={filter}
                       />
                     </TableCell>
                   </TableRow>
