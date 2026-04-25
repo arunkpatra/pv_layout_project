@@ -82,6 +82,11 @@ function PlansPageInner() {
             data: { products: Product[] }
           }
           if (data.success) setProducts(data.data.products)
+        } else {
+          setProductsError(
+            "Failed to load plans. Please refresh and try again.",
+          )
+          return
         }
       } catch (err) {
         console.error("Failed to load products:", err)
