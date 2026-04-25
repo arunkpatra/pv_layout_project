@@ -565,4 +565,37 @@ describe("GET /billing/usage", () => {
     expect(lastCall![0].skip).toBe(0)
     expect(lastCall![0].take).toBe(20)
   })
+
+  it("clamps pageSize to maximum of 100", async () => {
+    const app = makeApp()
+    await app.request("/billing/usage?pageSize=999", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    const calls = (mockUsageRecordFindMany.mock.calls as unknown as Array<[{ take: number }]>)
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall![0].take).toBe(100)
+  })
+
+  it("clamps pageSize to minimum of 1", async () => {
+    const app = makeApp()
+    await app.request("/billing/usage?pageSize=0", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    const calls = (mockUsageRecordFindMany.mock.calls as unknown as Array<[{ take: number }]>)
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall![0].take).toBe(1)
+  })
+
+  it("defaults pageSize to 20 for malformed input", async () => {
+    const app = makeApp()
+    await app.request("/billing/usage?pageSize=abc", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    const calls = (mockUsageRecordFindMany.mock.calls as unknown as Array<[{ take: number }]>)
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall![0].take).toBe(20)
+  })
 })

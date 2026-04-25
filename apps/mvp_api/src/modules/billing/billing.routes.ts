@@ -180,9 +180,10 @@ billingRoutes.get("/billing/entitlements", async (c) => {
 billingRoutes.get("/billing/usage", async (c) => {
   const user = c.get("user")
   const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10))
+  const parsedPageSize = parseInt(c.req.query("pageSize") ?? "20", 10)
   const pageSize = Math.min(
     100,
-    Math.max(1, parseInt(c.req.query("pageSize") ?? "20", 10)),
+    Math.max(1, isNaN(parsedPageSize) ? 20 : parsedPageSize),
   )
   const skip = (page - 1) * pageSize
 
