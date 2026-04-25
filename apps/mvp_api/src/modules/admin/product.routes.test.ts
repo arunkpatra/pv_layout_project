@@ -1,0 +1,223 @@
+import { describe, expect, it, mock, beforeEach } from "bun:test"
+import { Hono } from "hono"
+import { errorHandler, type MvpHonoEnv } from "../../middleware/error-handler.js"
+
+// ─── @clerk/backend mock ─────────────────────────────────────────────────────
+mock.module("@clerk/backend", () => ({
+  verifyToken: async (_token: string) => ({ sub: "ck_ops" }),
+  createClerkClient: () => ({
+    users: {
+      getUser: async () => ({
+        id: "ck_ops",
+        emailAddresses: [{ id: "ea_1", emailAddress: "ops@test.com" }],
+        primaryEmailAddressId: "ea_1",
+        firstName: "Ops",
+        lastName: null,
+        publicMetadata: { roles: ["OPS"] },
+      }),
+      createUser: async () => ({}),
+      updateUser: async () => ({}),
+    },
+  }),
+}))
+
+// ─── db mock ─────────────────────────────────────────────────────────────────
+const mockUserFindFirst = mock(async () => ({
+  id: "usr_ops",
+  clerkId: "ck_ops",
+  email: "ops@test.com",
+  name: "Ops",
+  stripeCustomerId: null,
+  roles: ["OPS"],
+  status: "ACTIVE",
+}))
+
+const mockProductFindMany = mock(async () => [
+  {
+    id: "prod1",
+    slug: "pv-layout-pro",
+    name: "PV Layout Pro",
+    priceAmount: 4999,
+    priceCurrency: "usd",
+    calculations: 10,
+    active: true,
+    isFree: false,
+    entitlements: [{ deactivatedAt: null }],
+  },
+])
+const mockProductCount = mock(async () => 1)
+const mockProductFindUnique = mock(async () => ({
+  id: "prod1",
+  slug: "pv-layout-pro",
+  name: "PV Layout Pro",
+  priceAmount: 4999,
+  priceCurrency: "usd",
+  calculations: 10,
+  active: true,
+  isFree: false,
+  entitlements: [{ deactivatedAt: null }],
+}))
+const mockCheckoutSessionFindMany = mock(async () => [
+  { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date() },
+])
+
+mock.module("../../lib/db.js", () => ({
+  db: {
+    user: { findFirst: mockUserFindFirst },
+    product: {
+      findMany: mockProductFindMany,
+      count: mockProductCount,
+      findUnique: mockProductFindUnique,
+    },
+    checkoutSession: { findMany: mockCheckoutSessionFindMany },
+  },
+}))
+
+const { productRoutes } = await import("./product.routes.js")
+
+function makeApp() {
+  const app = new Hono<MvpHonoEnv>()
+  app.route("/", productRoutes)
+  app.onError(errorHandler)
+  return app
+}
+
+beforeEach(() => {
+  mockUserFindFirst.mockReset()
+  mockUserFindFirst.mockImplementation(async () => ({
+    id: "usr_ops",
+    clerkId: "ck_ops",
+    email: "ops@test.com",
+    name: "Ops",
+    stripeCustomerId: null,
+    roles: ["OPS"],
+    status: "ACTIVE",
+  }))
+  mockProductFindMany.mockReset()
+  mockProductFindMany.mockImplementation(async () => [
+    {
+      id: "prod1",
+      slug: "pv-layout-pro",
+      name: "PV Layout Pro",
+      priceAmount: 4999,
+      priceCurrency: "usd",
+      calculations: 10,
+      active: true,
+      isFree: false,
+      entitlements: [{ deactivatedAt: null }],
+    },
+  ])
+  mockProductCount.mockReset()
+  mockProductCount.mockImplementation(async () => 1)
+  mockProductFindUnique.mockReset()
+  mockProductFindUnique.mockImplementation(async () => ({
+    id: "prod1",
+    slug: "pv-layout-pro",
+    name: "PV Layout Pro",
+    priceAmount: 4999,
+    priceCurrency: "usd",
+    calculations: 10,
+    active: true,
+    isFree: false,
+    entitlements: [{ deactivatedAt: null }],
+  }))
+  mockCheckoutSessionFindMany.mockReset()
+  mockCheckoutSessionFindMany.mockImplementation(async () => [
+    { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date() },
+  ])
+})
+
+describe("GET /admin/products", () => {
+  it("returns 200 with paginated product list (OPS role)", async () => {
+    const res = await makeApp().request("/admin/products", {
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { data: unknown[]; pagination: { total: number } }
+    }
+    expect(body.success).toBe(true)
+    expect(body.data.data).toHaveLength(1)
+    expect(body.data.pagination.total).toBe(1)
+  })
+})
+
+describe("GET /admin/products/:slug", () => {
+  it("returns 200 with product detail", async () => {
+    const res = await makeApp().request("/admin/products/pv-layout-pro", {
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { slug: string; totalRevenueUsd: number }
+    }
+    expect(body.data.slug).toBe("pv-layout-pro")
+    expect(body.data.totalRevenueUsd).toBeCloseTo(49.99)
+  })
+
+  it("returns 404 when product not found", async () => {
+    mockProductFindUnique.mockImplementation(async () => null as never)
+    const res = await makeApp().request("/admin/products/nonexistent", {
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe("GET /admin/products/:slug/sales", () => {
+  it("returns 200 with monthly sales data by default", async () => {
+    const res = await makeApp().request("/admin/products/pv-layout-pro/sales", {
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { granularity: string; data: unknown[] }
+    }
+    expect(body.data.granularity).toBe("monthly")
+    expect(body.data.data).toHaveLength(12)
+  })
+
+  it("returns daily data when granularity=daily", async () => {
+    const res = await makeApp().request(
+      "/admin/products/pv-layout-pro/sales?granularity=daily",
+      { headers: { Authorization: "Bearer token" } },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { granularity: string; data: unknown[] }
+    }
+    expect(body.data.granularity).toBe("daily")
+    expect(body.data.data).toHaveLength(30)
+  })
+
+  it("returns 404 when product not found", async () => {
+    mockProductFindUnique.mockImplementation(async () => null as never)
+    const res = await makeApp().request(
+      "/admin/products/nonexistent/sales",
+      { headers: { Authorization: "Bearer token" } },
+    )
+    expect(res.status).toBe(404)
+  })
+})
+
+describe("Role enforcement", () => {
+  it("returns 403 when user has no admin/ops role", async () => {
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_plain",
+      clerkId: "ck_ops",
+      email: "plain@test.com",
+      name: "Plain",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }))
+    const res = await makeApp().request("/admin/products", {
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(403)
+  })
+})

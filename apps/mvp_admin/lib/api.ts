@@ -64,3 +64,32 @@ export type CustomerDetail = {
   totalSpendUsd: number
   entitlements: EntitlementDetail[]
 }
+
+export type ProductListItem = {
+  slug: string
+  name: string
+  priceAmount: number
+  priceCurrency: string
+  calculations: number
+  active: boolean
+  isFree: boolean
+  totalRevenueUsd: number
+  purchaseCount: number
+  activeEntitlementCount: number
+}
+
+export type AdminProductsResponse = {
+  data: ProductListItem[]
+  pagination: PaginationMeta
+}
+
+export type SalesDataPoint = {
+  period: string
+  revenueUsd: number
+  purchaseCount: number
+}
+
+export type ProductSalesResponse = {
+  granularity: "daily" | "weekly" | "monthly"
+  data: SalesDataPoint[]
+}
