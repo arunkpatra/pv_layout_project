@@ -5,28 +5,50 @@ import {
   type MvpHonoEnv,
 } from "../../middleware/error-handler.js"
 
-// Mock Clerk auth — sets user on context
-mock.module("../../middleware/clerk-auth.js", () => ({
-  clerkAuth: async (c: { set: (key: string, value: unknown) => void }, next: () => Promise<void>) => {
-    c.set("user", {
-      id: "usr_test1",
-      clerkId: "clerk_user_123",
-      email: "test@example.com",
-      name: "Test User",
-      stripeCustomerId: null,
-      roles: [],
-      status: "ACTIVE",
-    })
-    return next()
-  },
+// ─── @clerk/backend mock ────────────────────────────────────────────────────
+// clerkAuth calls verifyToken (always) and createClerkClient.users.getUser
+// (only when user is not in the DB).  We make findFirst return a user so the
+// getUser branch is never exercised — but register a safe mock anyway in case
+// the module registry picks up a stale mock from an earlier test file.
+mock.module("@clerk/backend", () => ({
+  verifyToken: async (_token: string) => ({ sub: "clerk_user_123" }),
+  createClerkClient: () => ({
+    users: {
+      getUser: async () => ({
+        id: "clerk_user_123",
+        emailAddresses: [{ id: "ea_1", emailAddress: "test@example.com" }],
+        primaryEmailAddressId: "ea_1",
+        firstName: "Test",
+        lastName: "User",
+        publicMetadata: { roles: [] },
+      }),
+      createUser: async () => ({
+        id: "clerk_user_123",
+        emailAddresses: [{ id: "ea_1", emailAddress: "test@example.com" }],
+        primaryEmailAddressId: "ea_1",
+        firstName: "Test",
+        lastName: "User",
+      }),
+      updateUser: async () => ({}),
+    },
+  }),
 }))
 
-// Mock db (needed to prevent clerk-auth from crashing on module load in parallel test runs)
-// upsert must return a full user shape in case the real clerkAuth runs due to Bun module caching
+// ─── db mock ────────────────────────────────────────────────────────────────
+// findFirst must return a user so clerkAuth short-circuits without calling
+// createClerkClient.users.getUser.
 mock.module("../../lib/db.js", () => ({
   db: {
     user: {
-      findFirst: async () => null,
+      findFirst: async () => ({
+        id: "usr_test1",
+        clerkId: "clerk_user_123",
+        email: "test@example.com",
+        name: "Test User",
+        stripeCustomerId: null,
+        roles: [],
+        status: "ACTIVE",
+      }),
       upsert: async () => ({
         id: "usr_test1",
         clerkId: "clerk_user_123",
@@ -42,7 +64,7 @@ mock.module("../../lib/db.js", () => ({
   },
 }))
 
-// Mock S3 presigned URL helper
+// ─── S3 presigned URL helper mock ───────────────────────────────────────────
 const mockGetPresignedDownloadUrl = mock(
   async (_key: string, _filename: string, _expiresIn: number) =>
     "https://s3.example.com/presigned-url"
