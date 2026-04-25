@@ -33,7 +33,7 @@ const mockCheckoutSessionFindMany = mock(async () => [
   { productSlug: "pv-layout-pro", amountTotal: null, processedAt: new Date("2026-04-10") },
 ])
 const mockCheckoutSessionAggregate = mock(async () => ({
-  _sum: { amountTotal: 14997 },
+  _sum: { amountTotal: 14997 as number | null },
 }))
 const mockCheckoutSessionCount = mock(async () => 3)
 const mockEntitlementCount = mock(async () => 2)

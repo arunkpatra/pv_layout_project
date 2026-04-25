@@ -1,12 +1,12 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test"
 
 // ─── db mocks ────────────────────────────────────────────────────────────────
-const mockCheckoutSessionAggregate = mock(async () => ({ _sum: { amountTotal: 9998 } }))
+const mockCheckoutSessionAggregate = mock(async () => ({ _sum: { amountTotal: 9998 as number | null } }))
 const mockUserCount = mock(async () => 3)
 const mockCheckoutSessionCount = mock(async () => 2)
 const mockEntitlementCount = mock(async () => 1)
-const mockCheckoutSessionFindMany = mock(async () => [])
-const mockUserFindMany = mock(async () => [])
+const mockCheckoutSessionFindMany = mock(async () => [] as Array<{ amountTotal: number | null; processedAt: Date | null }>)
+const mockUserFindMany = mock(async () => [] as Array<{ createdAt: Date }>)
 
 mock.module("../../lib/db.js", () => ({
   db: {
