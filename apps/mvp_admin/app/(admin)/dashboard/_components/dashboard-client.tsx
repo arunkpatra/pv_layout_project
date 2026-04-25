@@ -21,6 +21,18 @@ const CustomerTrendChart = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> },
 )
 
+const PurchaseTrendChart = dynamic(
+  () =>
+    import("./purchase-trend-chart").then((m) => m.PurchaseTrendChart),
+  { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> },
+)
+
+const CalculationTrendChart = dynamic(
+  () =>
+    import("./calculation-trend-chart").then((m) => m.CalculationTrendChart),
+  { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> },
+)
+
 function formatCurrency(usd: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -128,14 +140,12 @@ export function DashboardClient({
         </div>
       ) : trendsLoading ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border border-border bg-card p-6 space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-          <div className="rounded-lg border border-border bg-card p-6 space-y-2">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-48 w-full" />
-          </div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-border bg-card p-6 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -150,6 +160,18 @@ export function DashboardClient({
               New customers per period
             </h2>
             <CustomerTrendChart data={trends?.customers ?? []} />
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6 space-y-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              Purchases per period
+            </h2>
+            <PurchaseTrendChart data={trends?.purchases ?? []} />
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6 space-y-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              Calculations per period
+            </h2>
+            <CalculationTrendChart data={trends?.calculations ?? []} />
           </div>
         </div>
       )}

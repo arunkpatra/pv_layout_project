@@ -36,6 +36,7 @@ const mockCheckoutSessionCount = mock(async () => 1)
 const mockUsageRecordCount = mock(async () => 1)
 const mockCheckoutSessionFindMany = mock(async () => [])
 const mockUserFindMany = mock(async () => [])
+const mockUsageRecordFindMany = mock(async () => [])
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -45,7 +46,7 @@ mock.module("../../lib/db.js", () => ({
       count: mockCheckoutSessionCount,
       findMany: mockCheckoutSessionFindMany,
     },
-    usageRecord: { count: mockUsageRecordCount },
+    usageRecord: { count: mockUsageRecordCount, findMany: mockUsageRecordFindMany },
   },
 }))
 
@@ -83,6 +84,8 @@ beforeEach(() => {
   mockCheckoutSessionFindMany.mockImplementation(async () => [])
   mockUserFindMany.mockReset()
   mockUserFindMany.mockImplementation(async () => [])
+  mockUsageRecordFindMany.mockReset()
+  mockUsageRecordFindMany.mockImplementation(async () => [])
 })
 
 describe("GET /admin/dashboard/summary", () => {
@@ -121,11 +124,13 @@ describe("GET /admin/dashboard/trends", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       success: boolean
-      data: { granularity: string; revenue: unknown[]; customers: unknown[] }
+      data: { granularity: string; revenue: unknown[]; customers: unknown[]; purchases: unknown[]; calculations: unknown[] }
     }
     expect(body.data.granularity).toBe("monthly")
     expect(body.data.revenue).toHaveLength(12)
     expect(body.data.customers).toHaveLength(12)
+    expect(body.data.purchases).toHaveLength(12)
+    expect(body.data.calculations).toHaveLength(12)
   })
 
   it("returns daily trends when granularity=daily", async () => {

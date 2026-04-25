@@ -112,10 +112,22 @@ export type CustomerTrendPoint = {
   count: number
 }
 
+export type PurchaseTrendPoint = {
+  period: string
+  count: number
+}
+
+export type CalculationTrendPoint = {
+  period: string
+  count: number
+}
+
 export type DashboardTrends = {
   granularity: "daily" | "weekly" | "monthly"
   revenue: RevenueTrendPoint[]
   customers: CustomerTrendPoint[]
+  purchases: PurchaseTrendPoint[]
+  calculations: CalculationTrendPoint[]
 }
 
 export type ProductsSummary = {

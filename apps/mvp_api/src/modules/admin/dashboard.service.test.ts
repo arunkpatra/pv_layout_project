@@ -7,6 +7,7 @@ const mockCheckoutSessionCount = mock(async () => 2)
 const mockUsageRecordCount = mock(async () => 1)
 const mockCheckoutSessionFindMany = mock(async () => [] as Array<{ amountTotal: number | null; processedAt: Date | null }>)
 const mockUserFindMany = mock(async () => [] as Array<{ createdAt: Date }>)
+const mockUsageRecordFindMany = mock(async () => [] as Array<{ createdAt: Date }>)
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -21,6 +22,7 @@ mock.module("../../lib/db.js", () => ({
     },
     usageRecord: {
       count: mockUsageRecordCount,
+      findMany: mockUsageRecordFindMany,
     },
   },
 }))
@@ -68,17 +70,23 @@ describe("getDashboardTrends", () => {
   beforeEach(() => {
     mockCheckoutSessionFindMany.mockReset()
     mockUserFindMany.mockReset()
+    mockUsageRecordFindMany.mockReset()
+    mockUsageRecordFindMany.mockImplementation(async () => [])
   })
 
-  it("returns monthly trends with 12 revenue periods and 12 customer periods, zeros when no data", async () => {
+  it("returns monthly trends with 12 periods for all four series, zeros when no data", async () => {
     mockCheckoutSessionFindMany.mockImplementation(async () => [])
     mockUserFindMany.mockImplementation(async () => [])
     const result = await getDashboardTrends("monthly")
     expect(result.granularity).toBe("monthly")
     expect(result.revenue).toHaveLength(12)
     expect(result.customers).toHaveLength(12)
+    expect(result.purchases).toHaveLength(12)
+    expect(result.calculations).toHaveLength(12)
     for (const r of result.revenue) expect(r.revenueUsd).toBe(0)
     for (const c of result.customers) expect(c.count).toBe(0)
+    for (const p of result.purchases) expect(p.count).toBe(0)
+    for (const c of result.calculations) expect(c.count).toBe(0)
   })
 
   it("returns daily trends with 30 periods", async () => {
@@ -87,6 +95,8 @@ describe("getDashboardTrends", () => {
     const result = await getDashboardTrends("daily")
     expect(result.revenue).toHaveLength(30)
     expect(result.customers).toHaveLength(30)
+    expect(result.purchases).toHaveLength(30)
+    expect(result.calculations).toHaveLength(30)
   })
 
   it("returns weekly trends with 12 periods", async () => {
@@ -96,10 +106,12 @@ describe("getDashboardTrends", () => {
     expect(result.granularity).toBe("weekly")
     expect(result.revenue).toHaveLength(12)
     expect(result.customers).toHaveLength(12)
+    expect(result.purchases).toHaveLength(12)
+    expect(result.calculations).toHaveLength(12)
     for (const r of result.revenue) expect(r.revenueUsd).toBe(0)
   })
 
-  it("aggregates revenue and customer counts into correct period buckets", async () => {
+  it("aggregates revenue, customers, purchases and calculations into correct period buckets", async () => {
     const now = new Date()
     const currentMonth = now.toISOString().slice(0, 7)
     mockCheckoutSessionFindMany.mockImplementation(async () => [
@@ -111,10 +123,18 @@ describe("getDashboardTrends", () => {
       { createdAt: new Date(now) },
       { createdAt: new Date(now) },
     ])
+    mockUsageRecordFindMany.mockImplementation(async () => [
+      { createdAt: new Date(now) },
+      { createdAt: new Date(now) },
+    ])
     const result = await getDashboardTrends("monthly")
     const revPeriod = result.revenue.find((r) => r.period === currentMonth)!
     expect(revPeriod.revenueUsd).toBeCloseTo(149.98)
     const custPeriod = result.customers.find((c) => c.period === currentMonth)!
     expect(custPeriod.count).toBe(3)
+    const purPeriod = result.purchases.find((p) => p.period === currentMonth)!
+    expect(purPeriod.count).toBe(2)
+    const calcPeriod = result.calculations.find((c) => c.period === currentMonth)!
+    expect(calcPeriod.count).toBe(2)
   })
 })

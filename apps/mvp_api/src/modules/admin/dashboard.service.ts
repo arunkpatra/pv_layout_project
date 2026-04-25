@@ -23,10 +23,22 @@ export type CustomerTrendPoint = {
   count: number
 }
 
+export type PurchaseTrendPoint = {
+  period: string
+  count: number
+}
+
+export type CalculationTrendPoint = {
+  period: string
+  count: number
+}
+
 export type DashboardTrends = {
   granularity: Granularity
   revenue: RevenueTrendPoint[]
   customers: CustomerTrendPoint[]
+  purchases: PurchaseTrendPoint[]
+  calculations: CalculationTrendPoint[]
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
@@ -55,7 +67,7 @@ export async function getDashboardTrends(
   const now = new Date()
   const cutoff = getCutoff(granularity, now)
 
-  const [sessions, users] = await Promise.all([
+  const [sessions, users, usageRecords] = await Promise.all([
     db.checkoutSession.findMany({
       where: { processedAt: { not: null, gte: cutoff } },
       select: { amountTotal: true, processedAt: true },
@@ -64,16 +76,25 @@ export async function getDashboardTrends(
       where: { createdAt: { gte: cutoff } },
       select: { createdAt: true },
     }),
+    db.usageRecord.findMany({
+      where: { createdAt: { gte: cutoff } },
+      select: { createdAt: true },
+    }),
   ])
 
   const periods = generatePeriods(granularity, now)
 
   const revenueMap = new Map<string, number>(periods.map((p) => [p, 0]))
+  const purchaseMap = new Map<string, number>(periods.map((p) => [p, 0]))
   for (const s of sessions) {
     const period = getPeriod(granularity, s.processedAt!)
-    const prev = revenueMap.get(period)
-    if (prev !== undefined) {
-      revenueMap.set(period, prev + (s.amountTotal ?? 0) / 100)
+    const prevRev = revenueMap.get(period)
+    if (prevRev !== undefined) {
+      revenueMap.set(period, prevRev + (s.amountTotal ?? 0) / 100)
+    }
+    const prevPur = purchaseMap.get(period)
+    if (prevPur !== undefined) {
+      purchaseMap.set(period, prevPur + 1)
     }
   }
 
@@ -86,9 +107,20 @@ export async function getDashboardTrends(
     }
   }
 
+  const calculationMap = new Map<string, number>(periods.map((p) => [p, 0]))
+  for (const r of usageRecords) {
+    const period = getPeriod(granularity, r.createdAt)
+    const prev = calculationMap.get(period)
+    if (prev !== undefined) {
+      calculationMap.set(period, prev + 1)
+    }
+  }
+
   return {
     granularity,
     revenue: periods.map((p) => ({ period: p, revenueUsd: revenueMap.get(p)! })),
     customers: periods.map((p) => ({ period: p, count: customerMap.get(p)! })),
+    purchases: periods.map((p) => ({ period: p, count: purchaseMap.get(p)! })),
+    calculations: periods.map((p) => ({ period: p, count: calculationMap.get(p)! })),
   }
 }
