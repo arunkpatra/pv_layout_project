@@ -1,109 +1,281 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useAuth } from "@clerk/nextjs"
-import { DownloadCard } from "@/components/download-card"
 import Link from "next/link"
+import { Copy, Download } from "lucide-react"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@renewable-energy/ui/components/card"
+import { Button } from "@renewable-energy/ui/components/button"
+import { Skeleton } from "@renewable-energy/ui/components/skeleton"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@renewable-energy/ui/components/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@renewable-energy/ui/components/tooltip"
+import {
+  useEntitlements,
+  useUserUsage,
+} from "@/components/hooks/use-billing"
 
 const MVP_API_URL =
   process.env.NEXT_PUBLIC_MVP_API_URL ?? "http://localhost:3003"
 
-const products = [
-  {
-    name: "PV Layout Basic",
-    price: "$1.99",
-    calculations: "5 layout calculations per purchase",
-    productSlug: "pv-layout-basic" as const,
-  },
-  {
-    name: "PV Layout Pro",
-    price: "$4.99",
-    calculations: "10 layout calculations per purchase",
-    productSlug: "pv-layout-pro" as const,
-    highlighted: true,
-  },
-  {
-    name: "PV Layout Pro Plus",
-    price: "$14.99",
-    calculations: "50 layout and yield calculations per purchase",
-    productSlug: "pv-layout-pro-plus" as const,
-  },
-]
-
-interface EntitlementItem {
-  product: string
-  remainingCalculations: number
-}
-
 export default function DashboardPage() {
   const { getToken } = useAuth()
-  const [entitlements, setEntitlements] = useState<EntitlementItem[]>([])
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const token = await getToken()
-        if (!token) return
-        const res = await fetch(`${MVP_API_URL}/billing/entitlements`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.success) setEntitlements(data.data.entitlements)
-        }
-      } catch {
-        // silent
-      }
-    }
-    load()
-  }, [getToken])
+  const {
+    data: entData,
+    isLoading: entLoading,
+    isError: entError,
+  } = useEntitlements()
 
-  function getRemainingForProduct(slug: string): number {
-    return entitlements
-      .filter((e) => e.product === slug)
-      .reduce((sum, e) => sum + e.remainingCalculations, 0)
+  const {
+    data: usageData,
+    isLoading: usageLoading,
+    isError: usageError,
+  } = useUserUsage(1, 5)
+
+  const activeEntitlements = entData?.entitlements.filter(
+    (e) => e.state === "ACTIVE",
+  ) ?? []
+
+  const remainingCalculations = activeEntitlements.reduce(
+    (sum, e) => sum + e.remainingCalculations,
+    0,
+  )
+
+  const activeCount = activeEntitlements.length
+
+  const licenseKey = entData?.licenseKey ?? null
+  const maskedKey = licenseKey ? `${licenseKey.slice(0, 8)}...` : null
+
+  const firstActiveSlug = activeEntitlements[0]?.product ?? null
+
+  async function handleCopyKey() {
+    if (!licenseKey) return
+    await navigator.clipboard.writeText(licenseKey)
   }
 
+  async function handleDownload(productSlug: string) {
+    const token = await getToken()
+    const res = await fetch(
+      `${MVP_API_URL}/dashboard/download/${productSlug}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+    if (!res.ok) return
+    const { data } = (await res.json()) as { data: { url: string } }
+    window.open(data.url, "_blank")
+  }
+
+  const usageRecords = usageData?.data ?? []
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Downloads
+          Dashboard
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Download the SolarLayout desktop application for your plan.
+          Overview of your SolarLayout account.
         </p>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {products.map((product) => {
-          const remaining = getRemainingForProduct(product.productSlug)
-          return (
-            <div key={product.productSlug} className="space-y-2">
-              <DownloadCard
-                name={product.name}
-                price={product.price}
-                calculations={product.calculations}
-                productSlug={product.productSlug}
-                apiBaseUrl={MVP_API_URL}
-                highlighted={product.highlighted}
-              />
-              <div className="text-center text-sm text-muted-foreground">
-                {remaining > 0 ? (
-                  <span>{remaining} calculations remaining</span>
-                ) : (
-                  <Link
-                    href={`/dashboard/plan?product=${product.productSlug}`}
-                    className="text-primary underline underline-offset-4"
-                  >
-                    Buy calculations
-                  </Link>
-                )}
-              </div>
-            </div>
-          )
-        })}
+      {/* Row 1 — Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* Remaining Calculations */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Remaining Calculations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {entLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : entError ? (
+              <span className="text-2xl font-bold text-foreground">—</span>
+            ) : (
+              <span
+                data-testid="remaining-calculations-value"
+                className="text-4xl font-bold text-foreground"
+              >
+                {remainingCalculations}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Active Entitlements */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Entitlements
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {entLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : entError ? (
+              <span className="text-2xl font-bold text-foreground">—</span>
+            ) : (
+              <span
+                data-testid="active-entitlements-value"
+                className="text-4xl font-bold text-foreground"
+              >
+                {activeCount}
+              </span>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Row 2 — License key + Download */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* License Key */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Your License Key
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {entLoading ? (
+              <Skeleton className="h-8 w-48" />
+            ) : maskedKey ? (
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-base text-foreground">
+                  {maskedKey}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyKey}
+                  className="gap-1.5"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Purchase a plan to get your license key.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Download */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Download SolarLayout
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {entLoading ? (
+              <Skeleton className="h-9 w-32" />
+            ) : firstActiveSlug ? (
+              <Button
+                onClick={() => handleDownload(firstActiveSlug)}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-block">
+                      <Button disabled className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Purchase a plan to download.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 3 — Recent Activity */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Recent Activity
+            </CardTitle>
+            <Link
+              href="/dashboard/usage"
+              className="text-xs text-primary underline-offset-4 hover:underline"
+            >
+              View all →
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {usageLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : usageError ? (
+            <p className="text-sm text-destructive">
+              Failed to load recent activity.
+            </p>
+          ) : usageRecords.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No calculations run yet. Download the app to get started.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Feature</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {usageRecords.map((record, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-mono text-xs">
+                        {record.featureKey}
+                      </TableCell>
+                      <TableCell>{record.productName}</TableCell>
+                      <TableCell>
+                        {new Date(record.createdAt).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
