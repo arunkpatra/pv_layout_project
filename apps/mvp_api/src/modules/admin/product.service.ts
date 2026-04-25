@@ -1,5 +1,12 @@
 import { db } from "../../lib/db.js"
 import { AppError } from "../../lib/errors.js"
+import {
+  type Granularity,
+  getISOWeek,
+  getPeriod,
+  getCutoff,
+  generatePeriods,
+} from "./sales-utils.js"
 
 export type ProductListItem = {
   slug: string
@@ -28,64 +35,8 @@ export type SalesDataPoint = {
 }
 
 export type ProductSalesResult = {
-  granularity: "daily" | "weekly" | "monthly"
+  granularity: Granularity
   data: SalesDataPoint[]
-}
-
-function getISOWeek(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  const week = Math.ceil(
-    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  )
-  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`
-}
-
-function getPeriod(
-  granularity: "daily" | "weekly" | "monthly",
-  date: Date,
-): string {
-  if (granularity === "daily") return date.toISOString().slice(0, 10)
-  if (granularity === "weekly") return getISOWeek(date)
-  return date.toISOString().slice(0, 7)
-}
-
-function getCutoff(
-  granularity: "daily" | "weekly" | "monthly",
-  now: Date,
-): Date {
-  const d = new Date(now)
-  if (granularity === "daily") d.setDate(d.getDate() - 29)
-  else if (granularity === "weekly") d.setDate(d.getDate() - 11 * 7)
-  else d.setMonth(d.getMonth() - 11)
-  return d
-}
-
-function generatePeriods(
-  granularity: "daily" | "weekly" | "monthly",
-  now: Date,
-): string[] {
-  if (granularity === "daily") {
-    return Array.from({ length: 30 }, (_, i) => {
-      const d = new Date(now)
-      d.setDate(d.getDate() - (29 - i))
-      return d.toISOString().slice(0, 10)
-    })
-  }
-  if (granularity === "weekly") {
-    return Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(now)
-      d.setDate(d.getDate() - (11 - i) * 7)
-      return getISOWeek(d)
-    })
-  }
-  return Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now)
-    d.setMonth(d.getMonth() - (11 - i))
-    return d.toISOString().slice(0, 7)
-  })
 }
 
 export async function listProducts(params: {
@@ -190,7 +141,7 @@ export async function getProduct(slug: string): Promise<ProductListItem> {
 
 export async function getProductSales(
   slug: string,
-  granularity: "daily" | "weekly" | "monthly",
+  granularity: Granularity,
 ): Promise<ProductSalesResult> {
   const product = await db.product.findUnique({
     where: { slug },
