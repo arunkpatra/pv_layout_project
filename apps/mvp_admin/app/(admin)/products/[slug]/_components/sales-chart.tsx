@@ -3,7 +3,6 @@
 import {
   ComposedChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -16,16 +15,13 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@renewable-energy/ui/components/chart"
+
 import type { SalesDataPoint } from "@/lib/api"
 
 const chartConfig = {
   revenueUsd: {
     label: "Revenue (USD)",
-    color: "hsl(var(--chart-1))",
-  },
-  purchaseCount: {
-    label: "Purchases",
-    color: "hsl(var(--chart-2))",
+    color: "var(--chart-1)",
   },
 } satisfies ChartConfig
 
@@ -48,13 +44,6 @@ export function SalesChart({ data }: { data: SalesDataPoint[] }) {
           tickLine={false}
           axisLine={false}
         />
-        <YAxis
-          yAxisId="count"
-          orientation="right"
-          tick={{ fontSize: 11 }}
-          tickLine={false}
-          axisLine={false}
-        />
         <ChartTooltip content={<ChartTooltipContent />} />
         <ChartLegend content={<ChartLegendContent />} />
         <Bar
@@ -62,14 +51,6 @@ export function SalesChart({ data }: { data: SalesDataPoint[] }) {
           dataKey="revenueUsd"
           fill="var(--color-revenueUsd)"
           radius={[2, 2, 0, 0]}
-        />
-        <Line
-          yAxisId="count"
-          type="monotone"
-          dataKey="purchaseCount"
-          stroke="var(--color-purchaseCount)"
-          strokeWidth={2}
-          dot={false}
         />
       </ComposedChart>
     </ChartContainer>
