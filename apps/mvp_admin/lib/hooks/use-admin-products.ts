@@ -5,6 +5,7 @@ import {
   type AdminProductsResponse,
   type ProductListItem,
   type ProductSalesResponse,
+  type ProductsSummary,
 } from "../api"
 
 export function useAdminProducts(params: { page: number; pageSize: number }) {
@@ -74,5 +75,25 @@ export function useAdminProductSales(
       return body.data
     },
     enabled: !!slug,
+  })
+}
+
+export function useAdminProductsSummary() {
+  const { getToken } = useAuth()
+  return useQuery<ProductsSummary>({
+    queryKey: ["admin-products-summary"],
+    queryFn: async () => {
+      const token = await getToken()
+      const res = await fetch(`${MVP_API_URL}/admin/products/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok)
+        throw new Error(`Failed to fetch products summary: ${res.status}`)
+      const body = (await res.json()) as {
+        success: boolean
+        data: ProductsSummary
+      }
+      return body.data
+    },
   })
 }
