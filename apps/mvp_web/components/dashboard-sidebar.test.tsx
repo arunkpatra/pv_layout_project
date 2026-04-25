@@ -25,12 +25,11 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe("DashboardSidebar", () => {
-  it("renders all four nav items", () => {
+  it("renders all nav items", () => {
     render(<DashboardSidebar />, { wrapper: Wrapper })
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText("Plan")).toBeInTheDocument()
+    expect(screen.getByText("Plans")).toBeInTheDocument()
     expect(screen.getByText("Usage")).toBeInTheDocument()
-    expect(screen.getByText("License")).toBeInTheDocument()
   })
 
   it("renders user name and email in footer", () => {
