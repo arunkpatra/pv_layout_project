@@ -88,6 +88,7 @@ const mockEntitlementFindMany = mock(async () => [
     totalCalculations: 10,
     usedCalculations: 3,
     purchasedAt: new Date("2026-04-22"),
+    deactivatedAt: null,
     product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
   },
 ])
@@ -301,7 +302,7 @@ describe("GET /billing/entitlements", () => {
     const body = (await res.json()) as {
       success: boolean
       data: {
-        entitlements: { product: string; remainingCalculations: number }[]
+        entitlements: Array<{ product: string; remainingCalculations: number; state: string }>
         licenseKey: string | null
       }
     }
@@ -310,6 +311,7 @@ describe("GET /billing/entitlements", () => {
     const first = body.data.entitlements[0]!
     expect(first.product).toBe("pv-layout-pro")
     expect(first.remainingCalculations).toBe(7)
+    expect(first.state).toBe("ACTIVE")
     expect(body.data.licenseKey).toBe("sl_live_testkey123")
   })
 
@@ -343,13 +345,14 @@ describe("GET /billing/entitlements", () => {
     expect(body.data.licenseKey).toBeNull()
   })
 
-  it("excludes exhausted entitlements (usedCalculations >= totalCalculations)", async () => {
+  it("marks exhausted entitlements with state EXHAUSTED", async () => {
     mockEntitlementFindMany.mockImplementation(async () => [
       {
         id: "ent_exhausted",
         totalCalculations: 5,
         usedCalculations: 5,
         purchasedAt: new Date("2026-04-22"),
+        deactivatedAt: null,
         product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
       },
     ])
@@ -362,9 +365,11 @@ describe("GET /billing/entitlements", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       success: boolean
-      data: { entitlements: unknown[] }
+      data: { entitlements: Array<{ state: string; remainingCalculations: number }> }
     }
-    expect(body.data.entitlements).toHaveLength(0)
+    expect(body.data.entitlements).toHaveLength(1)
+    expect(body.data.entitlements[0]!.state).toBe("EXHAUSTED")
+    expect(body.data.entitlements[0]!.remainingCalculations).toBe(0)
   })
 
   it("includes active entitlement with remaining calculations", async () => {
@@ -374,6 +379,7 @@ describe("GET /billing/entitlements", () => {
         totalCalculations: 10,
         usedCalculations: 3,
         purchasedAt: new Date("2026-04-22"),
+        deactivatedAt: null,
         product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
       },
     ])
@@ -384,9 +390,59 @@ describe("GET /billing/entitlements", () => {
     })
     const body = (await res.json()) as {
       success: boolean
-      data: { entitlements: { remainingCalculations: number }[] }
+      data: { entitlements: Array<{ remainingCalculations: number; state: string }> }
     }
     expect(body.data.entitlements).toHaveLength(1)
     expect(body.data.entitlements[0]!.remainingCalculations).toBe(7)
+    expect(body.data.entitlements[0]!.state).toBe("ACTIVE")
+  })
+
+  it("returns all entitlements with state field including exhausted and deactivated", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_active",
+        totalCalculations: 10,
+        usedCalculations: 3,
+        purchasedAt: new Date("2026-04-22"),
+        deactivatedAt: null,
+        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+      },
+      {
+        id: "ent_exhausted",
+        totalCalculations: 5,
+        usedCalculations: 5,
+        purchasedAt: new Date("2026-03-01"),
+        deactivatedAt: null,
+        product: { slug: "pv-layout-basic", name: "PV Layout Basic" },
+      },
+      {
+        id: "ent_deactivated",
+        totalCalculations: 10,
+        usedCalculations: 0,
+        purchasedAt: new Date("2026-02-01"),
+        deactivatedAt: new Date("2026-03-15"),
+        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+      },
+    ] as never)
+    const app = makeApp()
+    const res = await app.request("/billing/entitlements", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: {
+        entitlements: Array<{ id: string; state: string; remainingCalculations: number }>
+      }
+    }
+    expect(body.data.entitlements).toHaveLength(3)
+    const byId = Object.fromEntries(body.data.entitlements.map(e => [e.id, e]))
+    expect(byId["ent_active"]!.state).toBe("ACTIVE")
+    expect(byId["ent_active"]!.remainingCalculations).toBe(7)
+    expect(byId["ent_exhausted"]!.state).toBe("EXHAUSTED")
+    expect(byId["ent_exhausted"]!.remainingCalculations).toBe(0)
+    expect(byId["ent_deactivated"]!.state).toBe("DEACTIVATED")
   })
 })

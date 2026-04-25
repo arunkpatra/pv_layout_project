@@ -73,8 +73,8 @@ billingRoutes.post("/billing/checkout", async (c) => {
     customer: user.stripeCustomerId!,
     line_items: [{ price: product.stripePriceId, quantity: 1 }],
     metadata: { userId: user.id, product: product.slug },
-    success_url: `${baseUrl}/dashboard/plan?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/dashboard/plan`,
+    success_url: `${baseUrl}/dashboard/plans?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${baseUrl}/dashboard/plans`,
   })
 
   await db.checkoutSession.create({
@@ -129,9 +129,8 @@ billingRoutes.post("/billing/verify-session", async (c) => {
 billingRoutes.get("/billing/entitlements", async (c) => {
   const user = c.get("user")
 
-  // Exclude deactivated entitlements at DB level; exclude exhausted in JS
   const entitlements = await db.entitlement.findMany({
-    where: { userId: user.id, deactivatedAt: null },
+    where: { userId: user.id },
     orderBy: { purchasedAt: "desc" },
     include: {
       product: {
@@ -140,22 +139,34 @@ billingRoutes.get("/billing/entitlements", async (c) => {
     },
   })
 
-  const active = entitlements.filter(
-    (e) => e.usedCalculations < e.totalCalculations,
-  )
-
   const licenseKey = await db.licenseKey.findFirst({
     where: { userId: user.id, revokedAt: null },
   })
 
-  const mapped = active.map((e) => ({
-    product: e.product.slug,
-    productName: e.product.name,
-    totalCalculations: e.totalCalculations,
-    usedCalculations: e.usedCalculations,
-    remainingCalculations: e.totalCalculations - e.usedCalculations,
-    purchasedAt: e.purchasedAt.toISOString(),
-  }))
+  const mapped = entitlements.map((e) => {
+    let state: "ACTIVE" | "EXHAUSTED" | "DEACTIVATED"
+    if (e.deactivatedAt !== null) {
+      state = "DEACTIVATED"
+    } else if (e.usedCalculations >= e.totalCalculations) {
+      state = "EXHAUSTED"
+    } else {
+      state = "ACTIVE"
+    }
+    return {
+      id: e.id,
+      product: e.product.slug,
+      productName: e.product.name,
+      totalCalculations: e.totalCalculations,
+      usedCalculations: e.usedCalculations,
+      remainingCalculations: Math.max(
+        0,
+        e.totalCalculations - e.usedCalculations,
+      ),
+      purchasedAt: e.purchasedAt.toISOString(),
+      deactivatedAt: e.deactivatedAt?.toISOString() ?? null,
+      state,
+    }
+  })
 
   return c.json(
     ok({
