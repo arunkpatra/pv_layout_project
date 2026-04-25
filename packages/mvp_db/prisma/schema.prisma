@@ -92,14 +92,15 @@ model ProductFeature {
 }
 
 model Entitlement {
-  id                String   @id @default("")
+  id                String    @id @default("")
   userId            String
-  user              User     @relation(fields: [userId], references: [id])
+  user              User      @relation(fields: [userId], references: [id])
   productId         String
-  product           Product  @relation(fields: [productId], references: [id])
+  product           Product   @relation(fields: [productId], references: [id])
   totalCalculations Int
-  usedCalculations  Int      @default(0)
-  purchasedAt       DateTime @default(now())
+  usedCalculations  Int       @default(0)
+  purchasedAt       DateTime  @default(now())
+  deactivatedAt     DateTime?
 
   @@map("entitlements")
 }
@@ -112,6 +113,8 @@ model CheckoutSession {
   stripeCheckoutSessionId  String    @unique
   stripeCheckoutSessionUrl String
   status                   String?
+  amountTotal              Int?
+  currency                 String?
   processedAt              DateTime?
   createdAt                DateTime  @default(now())
 
