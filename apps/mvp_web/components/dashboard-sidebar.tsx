@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   CreditCard,
   BarChart3,
-  Key,
   LogOut,
   ChevronsUpDown,
   Sun,
@@ -40,9 +39,8 @@ import {
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Plan", href: "/dashboard/plan", icon: CreditCard },
+  { label: "Plans", href: "/dashboard/plans", icon: CreditCard },
   { label: "Usage", href: "/dashboard/usage", icon: BarChart3 },
-  { label: "License", href: "/dashboard/license", icon: Key },
 ]
 
 function NavUser({
