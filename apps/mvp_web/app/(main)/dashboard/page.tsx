@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
 import { Copy, Download } from "lucide-react"
@@ -35,6 +36,7 @@ const MVP_API_URL =
 
 export default function DashboardPage() {
   const { getToken } = useAuth()
+  const [copied, setCopied] = useState(false)
 
   const {
     data: entData,
@@ -66,20 +68,32 @@ export default function DashboardPage() {
 
   async function handleCopyKey() {
     if (!licenseKey) return
-    await navigator.clipboard.writeText(licenseKey)
+    try {
+      if (!navigator.clipboard) return
+      await navigator.clipboard.writeText(licenseKey)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard unavailable or permission denied — silently ignore
+    }
   }
 
   async function handleDownload(productSlug: string) {
-    const token = await getToken()
-    const res = await fetch(
-      `${MVP_API_URL}/dashboard/download/${productSlug}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    )
-    if (!res.ok) return
-    const { data } = (await res.json()) as { data: { url: string } }
-    window.open(data.url, "_blank")
+    try {
+      const token = await getToken()
+      const res = await fetch(
+        `${MVP_API_URL}/dashboard/download/${productSlug}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (!res.ok) {
+        console.error("Download failed:", res.status)
+        return
+      }
+      const { data } = (await res.json()) as { data: { url: string } }
+      window.open(data.url, "_blank")
+    } catch (err) {
+      console.error("Download error:", err)
+    }
   }
 
   const usageRecords = usageData?.data ?? []
@@ -259,8 +273,8 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usageRecords.map((record, idx) => (
-                    <TableRow key={idx}>
+                  {usageRecords.map((record) => (
+                    <TableRow key={`${record.featureKey}-${record.createdAt}`}>
                       <TableCell className="font-mono text-xs">
                         {record.featureKey}
                       </TableCell>
