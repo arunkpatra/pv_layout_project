@@ -22,17 +22,21 @@ const mockProductFindUnique = mock(async () => ({
 const mockLicenseKeyFindFirst = mock(async () => ({
   key: "sl_live_existingkey",
 }))
+const mockTxEntitlementCreate = mock(async () => ({}))
+const mockTxLicenseKeyCreate = mock(async () => ({}))
+const mockTxCheckoutSessionUpdate = mock(async () => ({}))
+const mockTx = {
+  entitlement: { create: mockTxEntitlementCreate },
+  licenseKey: { create: mockTxLicenseKeyCreate },
+  checkoutSession: { update: mockTxCheckoutSessionUpdate },
+}
 mock.module("../../lib/db.js", () => ({
   db: {
     checkoutSession: { findUnique: mockCheckoutSessionFindUnique },
     product: { findUnique: mockProductFindUnique },
     licenseKey: { findFirst: mockLicenseKeyFindFirst },
-    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
-      fn({
-        entitlement: { create: mock(async () => ({})) },
-        licenseKey: { create: mock(async () => ({})) },
-        checkoutSession: { update: mock(async () => ({})) },
-      }),
+    $transaction: async (fn: (tx: typeof mockTx) => Promise<unknown>) =>
+      fn(mockTx),
   },
 }))
 
@@ -70,6 +74,12 @@ describe("POST /webhooks/stripe", () => {
   beforeEach(() => {
     mockConstructEvent.mockReset()
     mockCheckoutSessionFindUnique.mockReset()
+    mockTxEntitlementCreate.mockReset()
+    mockTxLicenseKeyCreate.mockReset()
+    mockTxCheckoutSessionUpdate.mockReset()
+    mockTxEntitlementCreate.mockImplementation(async () => ({}))
+    mockTxLicenseKeyCreate.mockImplementation(async () => ({}))
+    mockTxCheckoutSessionUpdate.mockImplementation(async () => ({}))
     mockCheckoutSessionFindUnique.mockImplementation(async () => ({
       id: "cs_db_1",
       stripeCheckoutSessionId: "cs_test_123",
@@ -83,6 +93,8 @@ describe("POST /webhooks/stripe", () => {
       data: {
         object: {
           id: "cs_test_123",
+          amount_total: null,
+          currency: null,
           metadata: { userId: "usr_test1", product: "pv-layout-basic" },
         },
       },
@@ -121,6 +133,38 @@ describe("POST /webhooks/stripe", () => {
     })
     expect(res.status).toBe(200)
     expect(mockCheckoutSessionFindUnique).not.toHaveBeenCalled()
+  })
+
+  it("writes amountTotal and currency to checkoutSession.update when event includes them", async () => {
+    mockConstructEvent.mockImplementation(() => ({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_123",
+          amount_total: 4999,
+          currency: "usd",
+          metadata: { userId: "usr_test1", product: "pv-layout-basic" },
+        },
+      },
+    }))
+    const app = makeApp()
+    const res = await app.request("/webhooks/stripe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "stripe-signature": "test_sig",
+      },
+      body: JSON.stringify({ type: "checkout.session.completed" }),
+    })
+    expect(res.status).toBe(200)
+    const calls = mockTxCheckoutSessionUpdate.mock.calls as unknown as {
+      data: Record<string, unknown>
+    }[][]
+    expect(calls.length).toBe(1)
+    const arg = calls[0]![0]!
+    expect(arg.data.amountTotal).toBe(4999)
+    expect(arg.data.currency).toBe("usd")
+    expect(arg.data.processedAt).toBeInstanceOf(Date)
   })
 
   it("returns 400 when signature verification fails", async () => {
