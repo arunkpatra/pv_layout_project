@@ -398,7 +398,6 @@ describe("GET /billing/entitlements", () => {
   })
 
   it("returns all entitlements with state field including exhausted and deactivated", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockEntitlementFindMany.mockImplementation(async () => [
       {
         id: "ent_active",
