@@ -1,7 +1,10 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAdminProducts } from "@/lib/hooks/use-admin-products"
+import {
+  useAdminProducts,
+  useAdminProductsSummary,
+} from "@/lib/hooks/use-admin-products"
 import {
   Table,
   TableBody,
@@ -27,11 +30,11 @@ export function ProductsPageClient() {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10))
 
   const { data, isLoading, error } = useAdminProducts({ page, pageSize: 20 })
-  const { data: allProducts } = useAdminProducts({ page: 1, pageSize: 100 })
+  const { data: summary } = useAdminProductsSummary()
 
-  const totalRevenue = allProducts?.data.reduce((sum, p) => sum + p.totalRevenueUsd, 0) ?? 0
-  const totalPurchases = allProducts?.data.reduce((sum, p) => sum + p.purchaseCount, 0) ?? 0
-  const totalActiveEntitlements = allProducts?.data.reduce((sum, p) => sum + p.activeEntitlementCount, 0) ?? 0
+  const totalRevenue = summary?.totalRevenueUsd ?? 0
+  const totalPurchases = summary?.totalPurchases ?? 0
+  const totalActiveEntitlements = summary?.activeEntitlements ?? 0
 
   if (isLoading) {
     return (

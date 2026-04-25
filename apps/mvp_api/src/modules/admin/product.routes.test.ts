@@ -60,6 +60,11 @@ const mockProductFindUnique = mock(async () => ({
 const mockCheckoutSessionFindMany = mock(async () => [
   { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date() },
 ])
+const mockCheckoutSessionAggregate = mock(async () => ({
+  _sum: { amountTotal: 4999 },
+}))
+const mockCheckoutSessionCount = mock(async () => 1)
+const mockEntitlementCount = mock(async () => 1)
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -69,7 +74,12 @@ mock.module("../../lib/db.js", () => ({
       count: mockProductCount,
       findUnique: mockProductFindUnique,
     },
-    checkoutSession: { findMany: mockCheckoutSessionFindMany },
+    checkoutSession: {
+      findMany: mockCheckoutSessionFindMany,
+      aggregate: mockCheckoutSessionAggregate,
+      count: mockCheckoutSessionCount,
+    },
+    entitlement: { count: mockEntitlementCount },
   },
 }))
 
@@ -125,6 +135,14 @@ beforeEach(() => {
   mockCheckoutSessionFindMany.mockImplementation(async () => [
     { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date() },
   ])
+  mockCheckoutSessionAggregate.mockReset()
+  mockCheckoutSessionAggregate.mockImplementation(async () => ({
+    _sum: { amountTotal: 4999 },
+  }))
+  mockCheckoutSessionCount.mockReset()
+  mockCheckoutSessionCount.mockImplementation(async () => 1)
+  mockEntitlementCount.mockReset()
+  mockEntitlementCount.mockImplementation(async () => 1)
 })
 
 describe("GET /admin/products", () => {
@@ -219,5 +237,32 @@ describe("Role enforcement", () => {
       headers: { Authorization: "Bearer token" },
     })
     expect(res.status).toBe(403)
+  })
+})
+
+describe("GET /admin/products/summary", () => {
+  it("returns 200 with summary shape for OPS role", async () => {
+    const res = await makeApp().request("/admin/products/summary", {
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: {
+        totalRevenueUsd: number
+        totalPurchases: number
+        activeEntitlements: number
+      }
+    }
+    expect(body.success).toBe(true)
+    expect(typeof body.data.totalRevenueUsd).toBe("number")
+    expect(body.data.totalRevenueUsd).toBeCloseTo(49.99)
+    expect(typeof body.data.totalPurchases).toBe("number")
+    expect(typeof body.data.activeEntitlements).toBe("number")
+  })
+
+  it("returns 401 when no Authorization header", async () => {
+    const res = await makeApp().request("/admin/products/summary")
+    expect(res.status).toBe(401)
   })
 })

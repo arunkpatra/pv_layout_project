@@ -1,8 +1,19 @@
 import type { Metadata } from "next"
+import { DashboardClient } from "./_components/dashboard-client"
 
 export const metadata: Metadata = { title: "Dashboard" }
 
-export default function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ granularity?: string }>
+}) {
+  const { granularity: rawGranularity } = await searchParams
+  const granularity =
+    rawGranularity === "daily" || rawGranularity === "weekly"
+      ? rawGranularity
+      : "monthly"
+
   return (
     <div className="space-y-4">
       <div>
@@ -10,14 +21,10 @@ export default function DashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Overview metrics and operational summaries will appear here.
+          Overview metrics for SolarLayout.
         </p>
       </div>
-      <div className="rounded-lg border border-border bg-muted/20 p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          Dashboard content — coming in a later spike.
-        </p>
-      </div>
+      <DashboardClient granularity={granularity} />
     </div>
   )
 }

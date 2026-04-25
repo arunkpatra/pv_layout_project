@@ -93,3 +93,32 @@ export type ProductSalesResponse = {
   granularity: "daily" | "weekly" | "monthly"
   data: SalesDataPoint[]
 }
+
+export type DashboardSummary = {
+  totalRevenueUsd: number
+  totalCustomers: number
+  totalPurchases: number
+  activeEntitlements: number
+}
+
+export type RevenueTrendPoint = {
+  period: string
+  revenueUsd: number
+}
+
+export type CustomerTrendPoint = {
+  period: string
+  count: number
+}
+
+export type DashboardTrends = {
+  granularity: "daily" | "weekly" | "monthly"
+  revenue: RevenueTrendPoint[]
+  customers: CustomerTrendPoint[]
+}
+
+export type ProductsSummary = {
+  totalRevenueUsd: number
+  totalPurchases: number
+  activeEntitlements: number
+}
