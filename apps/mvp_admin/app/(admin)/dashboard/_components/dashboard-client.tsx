@@ -40,7 +40,6 @@ export function DashboardClient({
   } = useAdminDashboardSummary()
   const {
     data: trends,
-    isLoading: trendsLoading,
     error: trendsError,
   } = useAdminDashboardTrends(granularity)
 
@@ -132,21 +131,13 @@ export function DashboardClient({
             <h2 className="text-sm font-semibold text-foreground">
               Revenue over time
             </h2>
-            {trendsLoading ? (
-              <Skeleton className="h-48 w-full" />
-            ) : (
-              <RevenueTrendChart data={trends?.revenue ?? []} />
-            )}
+            <RevenueTrendChart data={trends?.revenue ?? []} />
           </div>
           <div className="rounded-lg border border-border bg-card p-6 space-y-2">
             <h2 className="text-sm font-semibold text-foreground">
               New customers per period
             </h2>
-            {trendsLoading ? (
-              <Skeleton className="h-48 w-full" />
-            ) : (
-              <CustomerTrendChart data={trends?.customers ?? []} />
-            )}
+            <CustomerTrendChart data={trends?.customers ?? []} />
           </div>
         </div>
       )}
