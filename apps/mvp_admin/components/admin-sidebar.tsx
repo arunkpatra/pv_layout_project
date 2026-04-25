@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Building2,
+  Package,
   LogOut,
   ChevronsUpDown,
   ShieldCheck,
@@ -42,6 +43,7 @@ import { Badge } from "@renewable-energy/ui/components/badge"
 const BASE_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Customers", href: "/customers", icon: Building2 },
+  { label: "Products", href: "/products", icon: Package },
 ]
 const ADMIN_NAV = [{ label: "Users", href: "/users", icon: Users }]
 
