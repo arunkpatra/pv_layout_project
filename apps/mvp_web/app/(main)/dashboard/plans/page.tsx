@@ -21,7 +21,10 @@ import {
   TableRow,
 } from "@renewable-energy/ui/components/table"
 import { toast } from "sonner"
-import { useEntitlements } from "@/components/hooks/use-billing"
+import {
+  useEntitlements,
+  type EntitlementState,
+} from "@/components/hooks/use-billing"
 
 const MVP_API_URL =
   process.env.NEXT_PUBLIC_MVP_API_URL ?? "http://localhost:3003"
@@ -57,6 +60,7 @@ function PlansPageInner() {
 
   const [products, setProducts] = useState<Product[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
+  const [productsError, setProductsError] = useState<string | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const hasVerified = useRef(false)
 
@@ -81,6 +85,7 @@ function PlansPageInner() {
         }
       } catch (err) {
         console.error("Failed to load products:", err)
+        setProductsError("Failed to load plans. Please refresh and try again.")
       } finally {
         setProductsLoading(false)
       }
@@ -103,6 +108,10 @@ function PlansPageInner() {
           },
           body: JSON.stringify({ sessionId }),
         })
+        if (!res.ok) {
+          toast.error("Failed to verify your purchase. Please contact support.")
+          return
+        }
         const data = (await res.json()) as {
           success: boolean
           data: { verified: boolean }
@@ -112,11 +121,14 @@ function PlansPageInner() {
             "Purchase successful! Your entitlement has been activated.",
           )
           await refetchEntitlements()
+        } else {
+          toast.error("Purchase verification failed. Please contact support.")
         }
+        router.replace("/dashboard/plans")
       } catch (err) {
         console.error("Session verification failed:", err)
+        toast.error("Failed to verify your purchase. Please contact support.")
       }
-      router.replace("/dashboard/plans")
     }
     verify()
   }, [sessionId, getToken, router, refetchEntitlements])
@@ -150,7 +162,7 @@ function PlansPageInner() {
     }
   }
 
-  const stateBadge = (state: "ACTIVE" | "EXHAUSTED" | "DEACTIVATED") => {
+  const stateBadge = (state: EntitlementState) => {
     if (state === "ACTIVE")
       return (
         <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
@@ -190,6 +202,12 @@ function PlansPageInner() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
+        ) : productsError ? (
+          <p className="text-sm text-destructive">{productsError}</p>
+        ) : products.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No plans are available at this time.
+          </p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
@@ -198,7 +216,10 @@ function PlansPageInner() {
                   <CardTitle className="text-lg">{product.name}</CardTitle>
                   <div className="mt-2">
                     <span className="text-3xl font-bold text-foreground">
-                      ${(product.priceAmount / 100).toFixed(2)}
+                      {new Intl.NumberFormat("en-IN", {
+                        style: "currency",
+                        currency: product.priceCurrency,
+                      }).format(product.priceAmount / 100)}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -219,7 +240,7 @@ function PlansPageInner() {
                   </ul>
                   <Button
                     onClick={() => handlePurchase(product.slug)}
-                    disabled={checkoutLoading !== null}
+                    disabled={checkoutLoading === product.slug}
                     className="w-full"
                   >
                     {checkoutLoading === product.slug ? (
