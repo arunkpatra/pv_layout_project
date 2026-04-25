@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "roles" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "status" TEXT NOT NULL DEFAULT 'ACTIVE';
