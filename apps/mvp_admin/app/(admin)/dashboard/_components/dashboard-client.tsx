@@ -40,6 +40,7 @@ export function DashboardClient({
   } = useAdminDashboardSummary()
   const {
     data: trends,
+    isLoading: trendsLoading,
     error: trendsError,
   } = useAdminDashboardTrends(granularity)
 
@@ -124,6 +125,17 @@ export function DashboardClient({
       {trendsError ? (
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
           {trendsError.message}
+        </div>
+      ) : trendsLoading ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-lg border border-border bg-card p-6 space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+          <div className="rounded-lg border border-border bg-card p-6 space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-48 w-full" />
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
