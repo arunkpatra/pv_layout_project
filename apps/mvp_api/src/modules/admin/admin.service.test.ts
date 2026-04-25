@@ -39,6 +39,21 @@ const mockDb = {
       status: "ACTIVE",
       createdAt: new Date(),
     })),
+    upsert: mock(
+      async (args: {
+        where: Record<string, unknown>
+        create: Record<string, unknown>
+        update: Record<string, unknown>
+      }) => ({
+        id: "usr_1",
+        clerkId: "clerk_1",
+        email: "admin@test.com",
+        name: "Admin User",
+        roles: (args.create["roles"] as string[]) ?? [],
+        status: "ACTIVE",
+        createdAt: new Date(),
+      }),
+    ),
     update: mock(async () => ({})),
   },
 }
@@ -104,7 +119,7 @@ describe("listAdminUsers", () => {
 describe("createAdminUser", () => {
   beforeEach(() => {
     mockCreateUser.mockReset()
-    mockDb.user.create.mockReset()
+    mockDb.user.upsert.mockReset()
   })
 
   it("calls Clerk createUser with skipPasswordRequirement and publicMetadata roles", async () => {
@@ -115,13 +130,17 @@ describe("createAdminUser", () => {
       firstName: "New",
       lastName: "Admin",
     }))
-    mockDb.user.create.mockImplementation(
-      async (args: { data: Record<string, unknown> }) => ({
+    mockDb.user.upsert.mockImplementation(
+      async (args: {
+        where: Record<string, unknown>
+        create: Record<string, unknown>
+        update: Record<string, unknown>
+      }) => ({
         id: "usr_new",
         clerkId: "clerk_new_1",
         email: "new@test.com",
         name: "New Admin",
-        roles: (args.data["roles"] as string[]) ?? [],
+        roles: (args.create["roles"] as string[]) ?? [],
         status: "ACTIVE",
         createdAt: new Date(),
       }),

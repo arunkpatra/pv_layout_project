@@ -104,15 +104,37 @@ export async function createAdminUser(params: {
     skipPasswordRequirement: true,
   })
 
-  const user = await db.user.create({
-    data: {
-      clerkId: clerkUser.id,
-      email,
-      name: name.trim(),
-      roles,
-      status: "ACTIVE",
-    },
-  })
+  let user
+  try {
+    user = await db.user.upsert({
+      where: { clerkId: clerkUser.id },
+      create: {
+        clerkId: clerkUser.id,
+        email,
+        name: name.trim(),
+        roles,
+        status: "ACTIVE",
+      },
+      update: {
+        email,
+        name: name.trim(),
+        roles,
+        status: "ACTIVE",
+      },
+    })
+  } catch (dbErr) {
+    // Best-effort cleanup: delete the Clerk user to avoid orphaned accounts
+    try {
+      await clerk.users.deleteUser(clerkUser.id)
+    } catch {
+      // Log but don't rethrow — the original DB error is the important one
+      console.error(
+        "[admin] Failed to cleanup Clerk user after DB error:",
+        clerkUser.id,
+      )
+    }
+    throw dbErr
+  }
 
   return {
     id: user.id,
