@@ -36,6 +36,8 @@ model User {
   clerkId          String            @unique
   email            String            @unique
   name             String?
+  roles            String[]          @default([])
+  status           String            @default("ACTIVE")
   stripeCustomerId String?           @unique
   createdAt        DateTime          @default(now())
   licenseKeys      LicenseKey[]

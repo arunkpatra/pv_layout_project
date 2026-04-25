@@ -14,6 +14,8 @@ mock.module("../../middleware/clerk-auth.js", () => ({
       email: "test@example.com",
       name: "Test User",
       stripeCustomerId: "cus_existing",
+      roles: [],
+      status: "ACTIVE",
     })
     return next()
   },
@@ -54,7 +56,10 @@ const mockUserFindFirst = mock(async () => ({
   id: "usr_test1",
   clerkId: "clerk_user_123",
   email: "test@example.com",
+  name: "Test User",
   stripeCustomerId: "cus_existing",
+  roles: [],
+  status: "ACTIVE",
 }))
 const mockUserCreate = mock(async () => ({
   id: "usr_test1",
@@ -132,7 +137,10 @@ describe("POST /billing/checkout", () => {
       id: "usr_test1",
       clerkId: "clerk_user_123",
       email: "test@example.com",
+      name: "Test User",
       stripeCustomerId: "cus_existing",
+      roles: [],
+      status: "ACTIVE",
     }))
     mockProductFindUnique.mockImplementation(async () => ({
       id: "prod_test1",

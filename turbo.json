@@ -194,6 +194,21 @@
       "dependsOn": ["mvp-db:generate"],
       "persistent": true,
       "cache": false
+    },
+    "@renewable-energy/mvp-admin#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL",
+        "NEXT_PUBLIC_MVP_API_URL",
+        "NODE_ENV"
+      ]
+    },
+    "@renewable-energy/mvp-admin#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
     }
   }
 }

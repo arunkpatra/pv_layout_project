@@ -45,6 +45,10 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
       throw new AppError("BAD_REQUEST", "Clerk user has no email address", 400)
     }
 
+    const seedRoles = Array.isArray(clerkUser.publicMetadata?.roles)
+      ? (clerkUser.publicMetadata.roles as string[])
+      : []
+
     user = await db.user.upsert({
       where: { clerkId },
       create: {
@@ -54,6 +58,8 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
           [clerkUser.firstName, clerkUser.lastName]
             .filter(Boolean)
             .join(" ") || null,
+        roles: seedRoles,
+        status: "ACTIVE",
       },
       update: {
         email,
@@ -93,6 +99,19 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
     }
   }
 
-  c.set("user", user)
+  // Reject inactive users regardless of roles
+  if (user.status !== "ACTIVE") {
+    throw new AppError("UNAUTHORIZED", "Account is not active", 401)
+  }
+
+  c.set("user", {
+    id: user.id,
+    clerkId: user.clerkId,
+    email: user.email,
+    name: user.name,
+    stripeCustomerId: user.stripeCustomerId ?? null,
+    roles: user.roles as string[],
+    status: user.status,
+  })
   await next()
 }
