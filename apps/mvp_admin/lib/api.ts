@@ -99,7 +99,7 @@ export type DashboardSummary = {
   totalRevenueUsd: number
   totalCustomers: number
   totalPurchases: number
-  activeEntitlements: number
+  totalCalculations: number
 }
 
 export type RevenueTrendPoint = {

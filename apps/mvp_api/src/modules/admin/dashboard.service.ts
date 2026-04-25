@@ -10,7 +10,7 @@ export type DashboardSummary = {
   totalRevenueUsd: number
   totalCustomers: number
   totalPurchases: number
-  activeEntitlements: number
+  totalCalculations: number
 }
 
 export type RevenueTrendPoint = {
@@ -30,7 +30,7 @@ export type DashboardTrends = {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [revenueAgg, totalCustomers, totalPurchases, activeEntitlements] =
+  const [revenueAgg, totalCustomers, totalPurchases, totalCalculations] =
     await Promise.all([
       db.checkoutSession.aggregate({
         _sum: { amountTotal: true },
@@ -38,14 +38,14 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       }),
       db.user.count(),
       db.checkoutSession.count({ where: { processedAt: { not: null } } }),
-      db.entitlement.count({ where: { deactivatedAt: null } }),
+      db.usageRecord.count(),
     ])
 
   return {
     totalRevenueUsd: ((revenueAgg._sum.amountTotal ?? 0) as number) / 100,
     totalCustomers,
     totalPurchases,
-    activeEntitlements,
+    totalCalculations,
   }
 }
 

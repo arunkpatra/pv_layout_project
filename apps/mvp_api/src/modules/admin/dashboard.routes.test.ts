@@ -33,7 +33,7 @@ const mockCheckoutSessionAggregate = mock(async () => ({
 }))
 const mockUserCount = mock(async () => 2)
 const mockCheckoutSessionCount = mock(async () => 1)
-const mockEntitlementCount = mock(async () => 1)
+const mockUsageRecordCount = mock(async () => 1)
 const mockCheckoutSessionFindMany = mock(async () => [])
 const mockUserFindMany = mock(async () => [])
 
@@ -45,7 +45,7 @@ mock.module("../../lib/db.js", () => ({
       count: mockCheckoutSessionCount,
       findMany: mockCheckoutSessionFindMany,
     },
-    entitlement: { count: mockEntitlementCount },
+    usageRecord: { count: mockUsageRecordCount },
   },
 }))
 
@@ -77,8 +77,8 @@ beforeEach(() => {
   mockUserCount.mockImplementation(async () => 2)
   mockCheckoutSessionCount.mockReset()
   mockCheckoutSessionCount.mockImplementation(async () => 1)
-  mockEntitlementCount.mockReset()
-  mockEntitlementCount.mockImplementation(async () => 1)
+  mockUsageRecordCount.mockReset()
+  mockUsageRecordCount.mockImplementation(async () => 1)
   mockCheckoutSessionFindMany.mockReset()
   mockCheckoutSessionFindMany.mockImplementation(async () => [])
   mockUserFindMany.mockReset()
@@ -97,14 +97,14 @@ describe("GET /admin/dashboard/summary", () => {
         totalRevenueUsd: number
         totalCustomers: number
         totalPurchases: number
-        activeEntitlements: number
+        totalCalculations: number
       }
     }
     expect(body.success).toBe(true)
     expect(typeof body.data.totalRevenueUsd).toBe("number")
     expect(typeof body.data.totalCustomers).toBe("number")
     expect(typeof body.data.totalPurchases).toBe("number")
-    expect(typeof body.data.activeEntitlements).toBe("number")
+    expect(typeof body.data.totalCalculations).toBe("number")
   })
 
   it("returns 401 when no Authorization header", async () => {

@@ -4,7 +4,7 @@ import { describe, it, expect, mock, beforeEach } from "bun:test"
 const mockCheckoutSessionAggregate = mock(async () => ({ _sum: { amountTotal: 9998 as number | null } }))
 const mockUserCount = mock(async () => 3)
 const mockCheckoutSessionCount = mock(async () => 2)
-const mockEntitlementCount = mock(async () => 1)
+const mockUsageRecordCount = mock(async () => 1)
 const mockCheckoutSessionFindMany = mock(async () => [] as Array<{ amountTotal: number | null; processedAt: Date | null }>)
 const mockUserFindMany = mock(async () => [] as Array<{ createdAt: Date }>)
 
@@ -19,8 +19,8 @@ mock.module("../../lib/db.js", () => ({
       count: mockUserCount,
       findMany: mockUserFindMany,
     },
-    entitlement: {
-      count: mockEntitlementCount,
+    usageRecord: {
+      count: mockUsageRecordCount,
     },
   },
 }))
@@ -37,8 +37,8 @@ describe("getDashboardSummary", () => {
     mockUserCount.mockImplementation(async () => 3)
     mockCheckoutSessionCount.mockReset()
     mockCheckoutSessionCount.mockImplementation(async () => 2)
-    mockEntitlementCount.mockReset()
-    mockEntitlementCount.mockImplementation(async () => 1)
+    mockUsageRecordCount.mockReset()
+    mockUsageRecordCount.mockImplementation(async () => 1)
   })
 
   it("returns correct all-time totals", async () => {
@@ -46,7 +46,7 @@ describe("getDashboardSummary", () => {
     expect(result.totalRevenueUsd).toBeCloseTo(99.98)
     expect(result.totalCustomers).toBe(3)
     expect(result.totalPurchases).toBe(2)
-    expect(result.activeEntitlements).toBe(1)
+    expect(result.totalCalculations).toBe(1)
   })
 
   it("returns zeros when no data exists", async () => {
@@ -55,12 +55,12 @@ describe("getDashboardSummary", () => {
     }))
     mockUserCount.mockImplementation(async () => 0)
     mockCheckoutSessionCount.mockImplementation(async () => 0)
-    mockEntitlementCount.mockImplementation(async () => 0)
+    mockUsageRecordCount.mockImplementation(async () => 0)
     const result = await getDashboardSummary()
     expect(result.totalRevenueUsd).toBe(0)
     expect(result.totalCustomers).toBe(0)
     expect(result.totalPurchases).toBe(0)
-    expect(result.activeEntitlements).toBe(0)
+    expect(result.totalCalculations).toBe(0)
   })
 })
 

@@ -84,12 +84,12 @@ export function DashboardClient({
             )}
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Active Entitlements</p>
+            <p className="text-xs text-muted-foreground">Calculations</p>
             {summaryLoading ? (
               <Skeleton className="mt-1 h-8 w-16" />
             ) : (
               <p className="mt-1 text-2xl font-semibold">
-                {summary?.activeEntitlements ?? 0}
+                {summary?.totalCalculations ?? 0}
               </p>
             )}
           </div>
