@@ -45,12 +45,6 @@ mock.module("../../lib/stripe.js", () => ({
   }),
 }))
 
-// Mock provision
-const mockProvision = mock(async () => ({ provisioned: true }))
-mock.module("./provision.js", () => ({
-  provisionEntitlement: mockProvision,
-}))
-
 // Mock DB
 const mockUserFindFirst = mock(async () => ({
   id: "usr_test1",
@@ -83,7 +77,10 @@ const mockCheckoutSessionCreate = mock(async () => ({ id: "csdb_test1" }))
 const mockCheckoutSessionFindUnique = mock(async () => ({
   id: "csdb_test1",
   stripeCheckoutSessionId: "cs_test_123",
+  userId: "usr_test1",
+  productSlug: "pv-layout-basic",
   processedAt: null,
+  user: { id: "usr_test1", email: "test@example.com" },
 }))
 const mockEntitlementFindMany = mock(async () => [
   {
@@ -114,11 +111,19 @@ mock.module("../../lib/db.js", () => ({
       update: mock(async () => ({})),
     },
     entitlement: {
+      create: mock(async () => ({})),
       findMany: mockEntitlementFindMany,
     },
     licenseKey: {
       findFirst: mockLicenseKeyFindFirst,
+      create: mock(async () => ({})),
     },
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        entitlement: { create: mock(async () => ({})) },
+        licenseKey: { create: mock(async () => ({})) },
+        checkoutSession: { update: mock(async () => ({})) },
+      }),
   },
 }))
 
@@ -216,13 +221,26 @@ describe("POST /billing/verify-session", () => {
     mockCheckoutSessionFindUnique.mockImplementation(async () => ({
       id: "csdb_test1",
       stripeCheckoutSessionId: "cs_test_123",
+      userId: "usr_test1",
+      productSlug: "pv-layout-basic",
       processedAt: null,
+      user: { id: "usr_test1", email: "test@example.com" },
     }))
     mockCheckoutRetrieve.mockImplementation(async () => ({
       id: "cs_test_123",
       status: "complete",
     }))
-    mockProvision.mockImplementation(async () => ({ provisioned: true }))
+    mockProductFindUnique.mockImplementation(async () => ({
+      id: "prod_test1",
+      slug: "pv-layout-basic",
+      stripePriceId: "price_test_basic",
+      calculations: 5,
+      active: true,
+      isFree: false,
+    }))
+    mockLicenseKeyFindFirst.mockImplementation(async () => ({
+      key: "sl_live_testkey123",
+    }))
   })
 
   it("returns verified true when session is complete", async () => {
@@ -248,7 +266,10 @@ describe("POST /billing/verify-session", () => {
     mockCheckoutSessionFindUnique.mockImplementation(async () => ({
       id: "csdb_test1",
       stripeCheckoutSessionId: "cs_test_123",
+      userId: "usr_test1",
+      productSlug: "pv-layout-basic",
       processedAt: new Date(),
+      user: { id: "usr_test1", email: "test@example.com" },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any)
     const app = makeApp()

@@ -5,9 +5,35 @@ import {
   type MvpHonoEnv,
 } from "../../middleware/error-handler.js"
 
-const mockProvision = mock(async () => ({ provisioned: true }))
-mock.module("../billing/provision.js", () => ({
-  provisionEntitlement: mockProvision,
+// Mock DB — provision.ts uses db.$transaction and db.checkoutSession.findUnique
+const mockCheckoutSessionFindUnique = mock(async () => ({
+  id: "cs_db_1",
+  stripeCheckoutSessionId: "cs_test_123",
+  userId: "usr_test1",
+  productSlug: "pv-layout-basic",
+  processedAt: null,
+  user: { id: "usr_test1", email: "test@example.com" },
+}))
+const mockProductFindUnique = mock(async () => ({
+  id: "prod_test1",
+  slug: "pv-layout-basic",
+  calculations: 5,
+}))
+const mockLicenseKeyFindFirst = mock(async () => ({
+  key: "sl_live_existingkey",
+}))
+mock.module("../../lib/db.js", () => ({
+  db: {
+    checkoutSession: { findUnique: mockCheckoutSessionFindUnique },
+    product: { findUnique: mockProductFindUnique },
+    licenseKey: { findFirst: mockLicenseKeyFindFirst },
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        entitlement: { create: mock(async () => ({})) },
+        licenseKey: { create: mock(async () => ({})) },
+        checkoutSession: { update: mock(async () => ({})) },
+      }),
+  },
 }))
 
 const mockConstructEvent = mock(
@@ -42,9 +68,16 @@ function makeApp() {
 
 describe("POST /webhooks/stripe", () => {
   beforeEach(() => {
-    mockProvision.mockReset()
     mockConstructEvent.mockReset()
-    mockProvision.mockImplementation(async () => ({ provisioned: true }))
+    mockCheckoutSessionFindUnique.mockReset()
+    mockCheckoutSessionFindUnique.mockImplementation(async () => ({
+      id: "cs_db_1",
+      stripeCheckoutSessionId: "cs_test_123",
+      userId: "usr_test1",
+      productSlug: "pv-layout-basic",
+      processedAt: null,
+      user: { id: "usr_test1", email: "test@example.com" },
+    }))
     mockConstructEvent.mockImplementation(() => ({
       type: "checkout.session.completed",
       data: {
@@ -67,7 +100,7 @@ describe("POST /webhooks/stripe", () => {
       body: JSON.stringify({ type: "checkout.session.completed" }),
     })
     expect(res.status).toBe(200)
-    expect(mockProvision).toHaveBeenCalledWith("cs_test_123")
+    expect(mockCheckoutSessionFindUnique).toHaveBeenCalled()
   })
 
   it("returns 200 and ignores unhandled event types", async () => {
@@ -87,7 +120,7 @@ describe("POST /webhooks/stripe", () => {
       body: JSON.stringify({ type: "customer.created" }),
     })
     expect(res.status).toBe(200)
-    expect(mockProvision).not.toHaveBeenCalled()
+    expect(mockCheckoutSessionFindUnique).not.toHaveBeenCalled()
   })
 
   it("returns 400 when signature verification fails", async () => {
