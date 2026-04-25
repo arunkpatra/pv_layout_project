@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   Users,
+  Building2,
   LogOut,
   ChevronsUpDown,
   ShieldCheck,
@@ -40,6 +41,7 @@ import { Badge } from "@renewable-energy/ui/components/badge"
 
 const BASE_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Customers", href: "/customers", icon: Building2 },
 ]
 const ADMIN_NAV = [{ label: "Users", href: "/users", icon: Users }]
 
