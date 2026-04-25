@@ -45,6 +45,10 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
       throw new AppError("BAD_REQUEST", "Clerk user has no email address", 400)
     }
 
+    const seedRoles = Array.isArray(clerkUser.publicMetadata?.roles)
+      ? (clerkUser.publicMetadata.roles as string[])
+      : []
+
     user = await db.user.upsert({
       where: { clerkId },
       create: {
@@ -54,7 +58,7 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
           [clerkUser.firstName, clerkUser.lastName]
             .filter(Boolean)
             .join(" ") || null,
-        roles: [],
+        roles: seedRoles,
         status: "ACTIVE",
       },
       update: {
