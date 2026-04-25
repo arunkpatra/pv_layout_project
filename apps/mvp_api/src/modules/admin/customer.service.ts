@@ -153,3 +153,29 @@ export async function getCustomer(
     entitlements,
   }
 }
+
+export async function updateEntitlementStatus(params: {
+  entitlementId: string
+  status: "ACTIVE" | "INACTIVE"
+}): Promise<{
+  id: string
+  deactivatedAt: Date | null
+}> {
+  const { entitlementId, status } = params
+
+  const existing = await db.entitlement.findUnique({
+    where: { id: entitlementId },
+  })
+  if (!existing) {
+    throw new AppError(
+      "NOT_FOUND",
+      `Entitlement ${entitlementId} not found`,
+      404,
+    )
+  }
+
+  return db.entitlement.update({
+    where: { id: entitlementId },
+    data: { deactivatedAt: status === "INACTIVE" ? new Date() : null },
+  })
+}

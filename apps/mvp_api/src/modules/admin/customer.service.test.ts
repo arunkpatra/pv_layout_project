@@ -1,5 +1,19 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test"
 
+const mockEntitlementFindUnique = mock(async () => ({
+  id: "ent1",
+  userId: "usr1",
+  productId: "prod1",
+  totalCalculations: 10,
+  usedCalculations: 3,
+  deactivatedAt: null,
+  purchasedAt: new Date("2026-01-15"),
+}))
+const mockEntitlementUpdate = mock(async () => ({
+  id: "ent1",
+  deactivatedAt: new Date(),
+}))
+
 const mockUserFindMany = mock(async () => [
   {
     id: "usr1",
@@ -62,10 +76,14 @@ mock.module("../../lib/db.js", () => ({
       count: mockUserCount,
       findUnique: mockUserFindUnique,
     },
+    entitlement: {
+      findUnique: mockEntitlementFindUnique,
+      update: mockEntitlementUpdate,
+    },
   },
 }))
 
-const { listCustomers, getCustomer } = await import("./customer.service.js")
+const { listCustomers, getCustomer, updateEntitlementStatus } = await import("./customer.service.js")
 
 describe("listCustomers", () => {
   beforeEach(() => {
@@ -182,5 +200,48 @@ describe("getCustomer", () => {
     await expect(getCustomer("nonexistent", "active")).rejects.toMatchObject({
       statusCode: 404,
     })
+  })
+})
+
+describe("updateEntitlementStatus", () => {
+  beforeEach(() => {
+    mockEntitlementFindUnique.mockReset()
+    mockEntitlementFindUnique.mockImplementation(async () => ({
+      id: "ent1",
+      userId: "usr1",
+      productId: "prod1",
+      totalCalculations: 10,
+      usedCalculations: 3,
+      deactivatedAt: null,
+      purchasedAt: new Date("2026-01-15"),
+    }))
+    mockEntitlementUpdate.mockReset()
+    mockEntitlementUpdate.mockImplementation(async () => ({
+      id: "ent1",
+      deactivatedAt: new Date(),
+    }))
+  })
+
+  it("sets deactivatedAt to now when status is INACTIVE", async () => {
+    await updateEntitlementStatus({ entitlementId: "ent1", status: "INACTIVE" })
+    const calls = mockEntitlementUpdate.mock.calls
+    expect(calls.length).toBe(1)
+    const arg = (calls as unknown as Array<[{ data: { deactivatedAt: Date | null } }]>)[0]![0]
+    expect(arg.data.deactivatedAt).toBeInstanceOf(Date)
+  })
+
+  it("sets deactivatedAt to null when status is ACTIVE", async () => {
+    await updateEntitlementStatus({ entitlementId: "ent1", status: "ACTIVE" })
+    const calls = mockEntitlementUpdate.mock.calls
+    expect(calls.length).toBe(1)
+    const arg = (calls as unknown as Array<[{ data: { deactivatedAt: null } }]>)[0]![0]
+    expect(arg.data.deactivatedAt).toBeNull()
+  })
+
+  it("throws 404 when entitlement not found", async () => {
+    mockEntitlementFindUnique.mockImplementation(async () => null as never)
+    await expect(
+      updateEntitlementStatus({ entitlementId: "nonexistent", status: "INACTIVE" }),
+    ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
