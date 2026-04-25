@@ -31,7 +31,9 @@ stripeWebhookRoutes.post("/webhooks/stripe", async (c) => {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as {
       id: string
-      metadata: Record<string, string>
+      amount_total: number | null
+      currency: string | null
+      metadata: Record<string, string> | null
     }
 
     console.log(
@@ -40,12 +42,16 @@ stripeWebhookRoutes.post("/webhooks/stripe", async (c) => {
         event: "checkout.session.completed",
         stripeSessionId: session.id,
         product: session.metadata?.product,
-        userId: session.metadata?.userId,
+        amountTotal: session.amount_total,
+        currency: session.currency,
       }),
     )
 
     try {
-      await provisionEntitlement(session.id)
+      await provisionEntitlement(session.id, {
+        amountTotal: session.amount_total,
+        currency: session.currency,
+      })
     } catch (err) {
       console.error("Provisioning failed for session:", session.id, err)
       return c.json({ error: "Provisioning failed" }, 500)

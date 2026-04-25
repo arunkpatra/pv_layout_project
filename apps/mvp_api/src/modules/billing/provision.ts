@@ -4,9 +4,13 @@ import crypto from "node:crypto"
 /**
  * Provision an entitlement and (optionally) a license key for a completed checkout session.
  * Idempotent: if checkoutSession.processedAt is set, returns immediately.
+ *
+ * @param purchase - Purchase amount from Stripe. Pass from webhook handler.
+ *   Omit (or pass undefined) from the verify-session safety net path.
  */
 export async function provisionEntitlement(
   stripeCheckoutSessionId: string,
+  purchase?: { amountTotal: number | null; currency: string | null },
 ): Promise<{ provisioned: boolean }> {
   const session = await db.checkoutSession.findUnique({
     where: { stripeCheckoutSessionId },
@@ -59,7 +63,12 @@ export async function provisionEntitlement(
 
     await tx.checkoutSession.update({
       where: { id: session.id },
-      data: { processedAt: new Date() },
+      data: {
+        processedAt: new Date(),
+        ...(purchase !== undefined
+          ? { amountTotal: purchase.amountTotal, currency: purchase.currency }
+          : {}),
+      },
     })
   })
 
