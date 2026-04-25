@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 import { clerkAuth } from "../../middleware/clerk-auth.js"
 import { requireRole } from "../../middleware/rbac.js"
-import { listProducts, getProduct, getProductSales } from "./product.service.js"
+import { listProducts, getProduct, getProductSales, getProductsSummary } from "./product.service.js"
 import { ok } from "../../lib/response.js"
 
 export const productRoutes = new Hono<MvpHonoEnv>()
@@ -16,6 +16,13 @@ productRoutes.get("/admin/products", async (c) => {
     100,
   )
   const result = await listProducts({ page, pageSize })
+  return c.json(ok(result))
+})
+
+// NOTE: summary route MUST be registered before /:slug to prevent Hono matching
+// "summary" as the :slug param value
+productRoutes.get("/admin/products/summary", async (c) => {
+  const result = await getProductsSummary()
   return c.json(ok(result))
 })
 

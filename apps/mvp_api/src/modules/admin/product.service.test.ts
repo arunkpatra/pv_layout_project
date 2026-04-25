@@ -32,6 +32,11 @@ const mockCheckoutSessionFindMany = mock(async () => [
   { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date("2026-04-01") },
   { productSlug: "pv-layout-pro", amountTotal: null, processedAt: new Date("2026-04-10") },
 ])
+const mockCheckoutSessionAggregate = mock(async () => ({
+  _sum: { amountTotal: 14997 },
+}))
+const mockCheckoutSessionCount = mock(async () => 3)
+const mockEntitlementCount = mock(async () => 2)
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -42,6 +47,11 @@ mock.module("../../lib/db.js", () => ({
     },
     checkoutSession: {
       findMany: mockCheckoutSessionFindMany,
+      aggregate: mockCheckoutSessionAggregate,
+      count: mockCheckoutSessionCount,
+    },
+    entitlement: {
+      count: mockEntitlementCount,
     },
   },
 }))
@@ -201,5 +211,39 @@ describe("getProductSales", () => {
     await expect(
       getProductSales("nonexistent", "monthly"),
     ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+const { getProductsSummary } = await import("./product.service.js")
+
+describe("getProductsSummary", () => {
+  beforeEach(() => {
+    mockCheckoutSessionAggregate.mockReset()
+    mockCheckoutSessionAggregate.mockImplementation(async () => ({
+      _sum: { amountTotal: 14997 },
+    }))
+    mockCheckoutSessionCount.mockReset()
+    mockCheckoutSessionCount.mockImplementation(async () => 3)
+    mockEntitlementCount.mockReset()
+    mockEntitlementCount.mockImplementation(async () => 2)
+  })
+
+  it("returns correct all-product totals", async () => {
+    const result = await getProductsSummary()
+    expect(result.totalRevenueUsd).toBeCloseTo(149.97)
+    expect(result.totalPurchases).toBe(3)
+    expect(result.activeEntitlements).toBe(2)
+  })
+
+  it("returns zeros when no sessions or entitlements exist", async () => {
+    mockCheckoutSessionAggregate.mockImplementation(async () => ({
+      _sum: { amountTotal: null },
+    }))
+    mockCheckoutSessionCount.mockImplementation(async () => 0)
+    mockEntitlementCount.mockImplementation(async () => 0)
+    const result = await getProductsSummary()
+    expect(result.totalRevenueUsd).toBe(0)
+    expect(result.totalPurchases).toBe(0)
+    expect(result.activeEntitlements).toBe(0)
   })
 })

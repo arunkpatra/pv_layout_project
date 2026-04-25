@@ -182,3 +182,26 @@ export async function getProductSales(
     data: periods.map((p) => ({ period: p, ...grouped.get(p)! })),
   }
 }
+
+export type ProductsSummary = {
+  totalRevenueUsd: number
+  totalPurchases: number
+  activeEntitlements: number
+}
+
+export async function getProductsSummary(): Promise<ProductsSummary> {
+  const [revenueAgg, totalPurchases, activeEntitlements] = await Promise.all([
+    db.checkoutSession.aggregate({
+      _sum: { amountTotal: true },
+      where: { processedAt: { not: null } },
+    }),
+    db.checkoutSession.count({ where: { processedAt: { not: null } } }),
+    db.entitlement.count({ where: { deactivatedAt: null } }),
+  ])
+
+  return {
+    totalRevenueUsd: ((revenueAgg._sum.amountTotal ?? 0) as number) / 100,
+    totalPurchases,
+    activeEntitlements,
+  }
+}
