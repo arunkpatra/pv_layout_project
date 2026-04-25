@@ -34,6 +34,7 @@ export type CustomerListItem = {
   createdAt: string
   totalSpendUsd: number
   activeEntitlementCount: number
+  totalCalculations: number
 }
 
 export type AdminCustomersResponse = {

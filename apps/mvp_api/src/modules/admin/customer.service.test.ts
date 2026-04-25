@@ -27,6 +27,7 @@ const mockUserFindMany = mock(async () => [
       { deactivatedAt: null },
       { deactivatedAt: new Date() },
     ],
+    _count: { usageRecords: 7 },
   },
 ])
 const mockUserCount = mock(async () => 1)
@@ -101,6 +102,7 @@ describe("listCustomers", () => {
           { deactivatedAt: null },
           { deactivatedAt: new Date() },
         ],
+        _count: { usageRecords: 7 },
       },
     ])
     mockUserCount.mockReset()
@@ -114,6 +116,7 @@ describe("listCustomers", () => {
     expect(customer.id).toBe("usr1")
     expect(customer.totalSpendUsd).toBeCloseTo(49.99)
     expect(customer.activeEntitlementCount).toBe(1)
+    expect(customer.totalCalculations).toBe(7)
     expect(result.pagination.total).toBe(1)
   })
 
@@ -128,6 +131,7 @@ describe("listCustomers", () => {
         createdAt: new Date("2026-01-01"),
         checkoutSessions: [{ amountTotal: null }],
         entitlements: [],
+        _count: { usageRecords: 0 },
       },
     ])
     const result = await listCustomers({ page: 1, pageSize: 20 })

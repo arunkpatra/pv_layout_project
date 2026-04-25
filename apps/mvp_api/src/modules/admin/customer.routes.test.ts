@@ -41,6 +41,7 @@ const mockUserFindMany = mock(async () => [
     createdAt: new Date("2026-01-01"),
     checkoutSessions: [{ amountTotal: 4999 }],
     entitlements: [{ deactivatedAt: null }],
+    _count: { usageRecords: 3 },
   },
 ])
 const mockUserCount = mock(async () => 1)
@@ -125,6 +126,7 @@ beforeEach(() => {
       createdAt: new Date("2026-01-01"),
       checkoutSessions: [{ amountTotal: 4999 }],
       entitlements: [{ deactivatedAt: null }],
+      _count: { usageRecords: 3 },
     },
   ])
   mockUserCount.mockReset()

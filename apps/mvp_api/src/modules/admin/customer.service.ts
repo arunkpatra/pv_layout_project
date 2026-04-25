@@ -10,6 +10,7 @@ export type CustomerListItem = {
   createdAt: string
   totalSpendUsd: number
   activeEntitlementCount: number
+  totalCalculations: number
 }
 
 export type EntitlementState = "ACTIVE" | "EXHAUSTED" | "DEACTIVATED"
@@ -70,6 +71,7 @@ export async function listCustomers(params: {
       include: {
         checkoutSessions: { select: { amountTotal: true } },
         entitlements: { select: { deactivatedAt: true } },
+        _count: { select: { usageRecords: true } },
       },
     }),
     db.user.count(),
@@ -90,6 +92,7 @@ export async function listCustomers(params: {
     activeEntitlementCount: u.entitlements.filter(
       (e) => e.deactivatedAt === null,
     ).length,
+    totalCalculations: u._count.usageRecords,
   }))
 
   return {

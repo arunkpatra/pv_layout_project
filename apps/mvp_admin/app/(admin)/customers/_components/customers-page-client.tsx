@@ -70,6 +70,7 @@ export function CustomersPageClient() {
                 <TableHead>Joined</TableHead>
                 <TableHead>Total Spend</TableHead>
                 <TableHead>Active Entitlements</TableHead>
+                <TableHead>Calculations</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -91,6 +92,7 @@ export function CustomersPageClient() {
                   </TableCell>
                   <TableCell>{formatCurrency(customer.totalSpendUsd)}</TableCell>
                   <TableCell>{customer.activeEntitlementCount}</TableCell>
+                  <TableCell>{customer.totalCalculations}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
