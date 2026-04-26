@@ -1,4 +1,4 @@
-import { Geist } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import type { Metadata } from "next"
 import { ClerkProvider } from "@clerk/nextjs"
 
@@ -13,6 +13,11 @@ import { Toaster } from "@renewable-energy/ui/components/sonner"
 const fontSans = Geist({
   subsets: ["latin"],
   variable: "--font-sans",
+})
+
+const fontMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
 })
 
 export const metadata: Metadata = {
@@ -34,7 +39,7 @@ export default function RootLayout({
       <html
         lang="en"
         suppressHydrationWarning
-        className={`${fontSans.variable} font-sans antialiased`}
+        className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased`}
       >
         <body>
           <ThemeProvider>
