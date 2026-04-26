@@ -157,6 +157,51 @@ export async function getCustomer(
   }
 }
 
+export async function updateEntitlementUsed(params: {
+  entitlementId: string
+  usedCalculations: number
+}): Promise<{
+  id: string
+  usedCalculations: number
+  totalCalculations: number
+}> {
+  const { entitlementId, usedCalculations } = params
+
+  const existing = await db.entitlement.findUnique({
+    where: { id: entitlementId },
+    select: { id: true, totalCalculations: true },
+  })
+  if (!existing) {
+    throw new AppError(
+      "NOT_FOUND",
+      `Entitlement ${entitlementId} not found`,
+      404,
+    )
+  }
+
+  if (usedCalculations < 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Used calculations cannot be negative",
+      400,
+    )
+  }
+
+  if (usedCalculations > existing.totalCalculations) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `Used calculations (${usedCalculations}) cannot exceed total (${existing.totalCalculations})`,
+      400,
+    )
+  }
+
+  return db.entitlement.update({
+    where: { id: entitlementId },
+    data: { usedCalculations },
+    select: { id: true, usedCalculations: true, totalCalculations: true },
+  })
+}
+
 export async function updateEntitlementStatus(params: {
   entitlementId: string
   status: "ACTIVE" | "INACTIVE"

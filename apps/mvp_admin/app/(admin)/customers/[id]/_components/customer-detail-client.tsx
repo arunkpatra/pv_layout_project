@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { MoreHorizontal, Ban, Pencil } from "lucide-react"
 import {
   useAdminCustomer,
   useUpdateEntitlementStatus,
+  useUpdateEntitlementUsed,
 } from "@/lib/hooks/use-admin-customers"
 import type { EntitlementDetail } from "@/lib/api"
 import {
@@ -19,6 +21,14 @@ import {
 import { Badge } from "@renewable-energy/ui/components/badge"
 import { Button } from "@renewable-energy/ui/components/button"
 import { Skeleton } from "@renewable-energy/ui/components/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@renewable-energy/ui/components/dialog"
+import { Input } from "@renewable-energy/ui/components/input"
+import { Label } from "@renewable-energy/ui/components/label"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,44 +79,145 @@ function EntitlementActions({
   customerId: string
 }) {
   const router = useRouter()
-  const { mutate, isPending } = useUpdateEntitlementStatus()
+  const { mutate: mutateStatus, isPending: statusPending } =
+    useUpdateEntitlementStatus()
+  const { mutate: mutateUsed, isPending: usedPending } =
+    useUpdateEntitlementUsed()
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [usedValue, setUsedValue] = useState(
+    String(entitlement.usedCalculations),
+  )
+  const [editError, setEditError] = useState<string | null>(null)
 
   const isActive = entitlement.state === "ACTIVE"
 
+  function openEdit() {
+    setUsedValue(String(entitlement.usedCalculations))
+    setEditError(null)
+    setEditOpen(true)
+  }
+
+  function handleSaveUsed() {
+    const parsed = parseInt(usedValue, 10)
+    if (isNaN(parsed) || parsed < 0) {
+      setEditError("Enter a valid number (0 or above).")
+      return
+    }
+    setEditError(null)
+    mutateUsed(
+      {
+        entitlementId: entitlement.id,
+        usedCalculations: parsed,
+        customerId,
+      },
+      {
+        onSuccess: () => {
+          setEditOpen(false)
+          router.refresh()
+        },
+        onError: (err) => setEditError(err.message),
+      },
+    )
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <MoreHorizontal className="h-4 w-4" />
-          <span className="sr-only">Actions</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit Plan
-        </DropdownMenuItem>
-        {entitlement.state !== "EXHAUSTED" && (
-          <DropdownMenuItem
-            disabled={isPending}
-            onClick={() =>
-              mutate(
-                {
-                  entitlementId: entitlement.id,
-                  status: isActive ? "INACTIVE" : "ACTIVE",
-                  customerId,
-                },
-                { onSuccess: () => router.refresh() },
-              )
-            }
-            className={isActive ? "text-destructive focus:text-destructive" : ""}
-          >
-            <Ban className="mr-2 h-4 w-4" />
-            {isActive ? "Deactivate" : "Reactivate"}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+            <span className="sr-only">Actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={openEdit}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit Plan
           </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {entitlement.state !== "EXHAUSTED" && (
+            <DropdownMenuItem
+              disabled={statusPending}
+              onClick={() =>
+                mutateStatus(
+                  {
+                    entitlementId: entitlement.id,
+                    status: isActive ? "INACTIVE" : "ACTIVE",
+                    customerId,
+                  },
+                  { onSuccess: () => router.refresh() },
+                )
+              }
+              className={
+                isActive
+                  ? "text-destructive focus:text-destructive"
+                  : ""
+              }
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              {isActive ? "Deactivate" : "Reactivate"}
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Plan — {entitlement.productName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Total calculations</span>
+              <span className="font-semibold">
+                {entitlement.totalCalculations}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="used-calcs">Used calculations</Label>
+              <Input
+                id="used-calcs"
+                type="number"
+                min={0}
+                max={entitlement.totalCalculations}
+                value={usedValue}
+                onChange={(e) => setUsedValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveUsed()
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Remaining will be{" "}
+                {Math.max(
+                  0,
+                  entitlement.totalCalculations -
+                    (parseInt(usedValue, 10) || 0),
+                )}
+              </p>
+            </div>
+            {editError && (
+              <p className="text-sm text-destructive">{editError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveUsed}
+                disabled={usedPending}
+              >
+                {usedPending ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

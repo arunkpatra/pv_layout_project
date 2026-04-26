@@ -86,3 +86,47 @@ export function useUpdateEntitlementStatus() {
     },
   })
 }
+
+export function useUpdateEntitlementUsed() {
+  const { getToken } = useAuth()
+  const queryClient = useQueryClient()
+  return useMutation<
+    { id: string; usedCalculations: number; totalCalculations: number },
+    Error,
+    { entitlementId: string; usedCalculations: number; customerId: string }
+  >({
+    mutationFn: async ({ entitlementId, usedCalculations }) => {
+      const token = await getToken()
+      const res = await fetch(
+        `${MVP_API_URL}/admin/entitlements/${entitlementId}/used`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ usedCalculations }),
+        },
+      )
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: { message?: string }
+        } | null
+        throw new Error(
+          body?.error?.message ??
+            `Failed to update used calculations: ${res.status}`,
+        )
+      }
+      const body = (await res.json()) as {
+        success: boolean
+        data: { id: string; usedCalculations: number; totalCalculations: number }
+      }
+      return body.data
+    },
+    onSuccess: (_data, { customerId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-customer", customerId],
+      })
+    },
+  })
+}
