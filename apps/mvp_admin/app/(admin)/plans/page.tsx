@@ -5,9 +5,9 @@ import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { ProductsPageClient } from "./_components/products-page-client"
 
-export const metadata: Metadata = { title: "Products" }
+export const metadata: Metadata = { title: "Plans" }
 
-export default async function ProductsPage() {
+export default async function PlansPage() {
   const { sessionClaims } = await auth()
   const meta = sessionClaims?.metadata as Record<string, unknown> | undefined
   const roles = Array.isArray(meta?.["roles"])
@@ -20,10 +20,10 @@ export default async function ProductsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Products
+          Plans
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          All products with sales revenue and entitlement metrics.
+          All plans with sales revenue and entitlement metrics.
         </p>
       </div>
       <ProductsPageClient />

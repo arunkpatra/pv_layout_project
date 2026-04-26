@@ -43,7 +43,7 @@ import { Badge } from "@renewable-energy/ui/components/badge"
 const BASE_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Customers", href: "/customers", icon: Building2 },
-  { label: "Products", href: "/products", icon: Package },
+  { label: "Plans", href: "/plans", icon: Package },
 ]
 const ADMIN_NAV = [{ label: "Users", href: "/users", icon: Users }]
 

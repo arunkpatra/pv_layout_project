@@ -62,10 +62,10 @@ export function ProductDetailClient({
     <div className="space-y-6">
       {/* Back link */}
       <Link
-        href="/products"
+        href="/plans"
         className="text-sm text-muted-foreground hover:text-foreground"
       >
-        ← Products
+        ← Plans
       </Link>
 
       {/* Summary card */}
@@ -120,21 +120,21 @@ export function ProductDetailClient({
               variant={granularity === "daily" ? "default" : "outline"}
               asChild
             >
-              <Link href={`/products/${slug}?granularity=daily`}>Daily</Link>
+              <Link href={`/plans/${slug}?granularity=daily`}>Daily</Link>
             </Button>
             <Button
               size="sm"
               variant={granularity === "weekly" ? "default" : "outline"}
               asChild
             >
-              <Link href={`/products/${slug}?granularity=weekly`}>Weekly</Link>
+              <Link href={`/plans/${slug}?granularity=weekly`}>Weekly</Link>
             </Button>
             <Button
               size="sm"
               variant={granularity === "monthly" ? "default" : "outline"}
               asChild
             >
-              <Link href={`/products/${slug}?granularity=monthly`}>
+              <Link href={`/plans/${slug}?granularity=monthly`}>
                 Monthly
               </Link>
             </Button>

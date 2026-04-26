@@ -80,13 +80,13 @@ export function ProductsPageClient() {
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {!data || data.data.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
-            No products found.
+            No plans found.
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
+                <TableHead>Plan</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Total Revenue</TableHead>
                 <TableHead>Purchases</TableHead>
@@ -99,7 +99,7 @@ export function ProductsPageClient() {
                 <TableRow
                   key={product.slug}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/products/${product.slug}`)}
+                  onClick={() => router.push(`/plans/${product.slug}`)}
                 >
                   <TableCell>
                     <p className="font-medium text-foreground">{product.name}</p>
@@ -141,7 +141,7 @@ export function ProductsPageClient() {
               size="sm"
               variant="outline"
               disabled={page <= 1}
-              onClick={() => router.push(`/products?page=${page - 1}`)}
+              onClick={() => router.push(`/plans?page=${page - 1}`)}
             >
               Previous
             </Button>
@@ -149,7 +149,7 @@ export function ProductsPageClient() {
               size="sm"
               variant="outline"
               disabled={page >= data.pagination.totalPages}
-              onClick={() => router.push(`/products?page=${page + 1}`)}
+              onClick={() => router.push(`/plans?page=${page + 1}`)}
             >
               Next
             </Button>
