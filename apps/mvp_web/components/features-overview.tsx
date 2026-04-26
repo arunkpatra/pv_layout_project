@@ -114,7 +114,7 @@ export function FeaturesOverview() {
     </SectionBand>
 
     {/* Free license key banner — full bleed */}
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 border-b border-accent/30 bg-accent px-6 py-4 text-center text-sm text-[#1C1C1C]">
+    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-b border-accent/30 bg-accent px-6 py-2.5 text-center text-sm text-[#1C1C1C]">
       <span>
         <strong>Start free</strong> — 5 full-featured calculations, no
         credit card required.
