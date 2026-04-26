@@ -126,7 +126,7 @@ export default function DashboardPage() {
       {entLoading ? (
         <Skeleton className="h-28 w-full rounded-lg" />
       ) : licenseKey ? (
-        <div className="@container flex flex-col overflow-hidden rounded-lg bg-accent text-[#1C1C1C] @sm:flex-row @sm:items-stretch">
+        <div className="flex flex-col overflow-hidden rounded-lg bg-accent text-[#1C1C1C] lg:flex-row lg:items-stretch">
           {/* Left — icon + text */}
           <div className="flex items-center gap-4 px-6 py-5">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#1C1C1C]/10">
@@ -141,7 +141,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Right — key + actions */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-t-[#1C1C1C]/10 px-6 py-5 @sm:ml-auto @sm:border-l @sm:border-l-[#1C1C1C]/10 @sm:border-t-0">
+          <div className="flex flex-wrap items-center gap-3 border-t border-[#1C1C1C]/10 px-6 py-5 lg:ml-auto lg:border-l lg:border-t-0">
             <span className="font-mono text-lg font-bold tracking-wide">
               {keyRevealed ? licenseKey : maskedKey}
             </span>
