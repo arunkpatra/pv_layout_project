@@ -51,7 +51,7 @@ export function ScreenshotsSection() {
           href="/products"
           className="inline-flex items-center gap-1.5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-[#1C1C1C] transition-colors hover:bg-accent/90"
         >
-          See what you get
+          Explore the product
         </Link>
       </div>
     </SectionBand>
