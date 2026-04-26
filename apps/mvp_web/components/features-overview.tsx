@@ -49,6 +49,7 @@ const plans = [
 
 export function FeaturesOverview() {
   return (
+    <>
     <SectionBand>
       <SectionHead
         eyebrow="01 / Products"
@@ -110,19 +111,21 @@ export function FeaturesOverview() {
         ))}
       </div>
 
-      {/* Free license key banner */}
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-3 rounded-lg bg-accent px-6 py-4 text-center text-sm text-[#1C1C1C]">
-        <span>
-          <strong>Start free</strong> — 5 full-featured calculations, no
-          credit card required.
-        </span>
-        <Link
-          href="/sign-up"
-          className="inline-flex items-center gap-1.5 rounded-md bg-[#1C1C1C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1C1C1C]/90"
-        >
-          Get your free license key →
-        </Link>
-      </div>
     </SectionBand>
+
+    {/* Free license key banner — full bleed */}
+    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 border-b border-accent/30 bg-accent px-6 py-4 text-center text-sm text-[#1C1C1C]">
+      <span>
+        <strong>Start free</strong> — 5 full-featured calculations, no
+        credit card required.
+      </span>
+      <Link
+        href="/sign-up"
+        className="inline-flex items-center gap-1.5 rounded-md bg-[#1C1C1C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1C1C1C]/90"
+      >
+        Get your free license key →
+      </Link>
+    </div>
+    </>
   )
 }
