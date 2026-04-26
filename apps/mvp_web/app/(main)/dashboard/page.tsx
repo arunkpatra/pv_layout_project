@@ -272,13 +272,13 @@ export default function DashboardPage() {
         </Card>
 
         {/* Download */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Download SolarLayout
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             {entLoading ? (
               <Skeleton className="h-9 w-32" />
             ) : hasActiveEntitlement ? (
