@@ -22,7 +22,7 @@ Current phase: `v0.x.x` (pre-1.0, public beta).
 | `apps/mvp_api` | Vercel (auto) | Push to `main` |
 | `apps/mvp_admin` | Vercel (auto) | Push to `main` |
 | `apps/layout-engine` | AWS Lambda | Manual workflow dispatch |
-| Desktop EXE (`pv_layout.exe`) | S3 buckets | Manual upload |
+| Desktop app (`pv_layout.zip`) | S3 buckets | Manual upload |
 
 ## Creating a Release
 
@@ -64,9 +64,9 @@ Before tagging:
 4. **Desktop EXE (if updated):**
    ```bash
    source aws-creds/renewable-energy-app.env
-   aws s3 cp <path-to-exe> s3://solarlayout-local-downloads/downloads/pv_layout.exe --copy-props none
-   aws s3 cp <path-to-exe> s3://solarlayout-staging-downloads/downloads/pv_layout.exe --copy-props none
-   aws s3 cp <path-to-exe> s3://solarlayout-prod-downloads/downloads/pv_layout.exe --copy-props none
+   aws s3 cp <path-to-zip> s3://solarlayout-local-downloads/downloads/pv_layout.zip --copy-props none
+   aws s3 cp <path-to-zip> s3://solarlayout-staging-downloads/downloads/pv_layout.zip --copy-props none
+   aws s3 cp <path-to-zip> s3://solarlayout-prod-downloads/downloads/pv_layout.zip --copy-props none
    ```
 
 ## Hotfix Process
