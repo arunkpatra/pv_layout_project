@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 const plans = [
   {
-    name: "PV Layout Basic",
+    name: "Basic",
     price: "$1.99",
     calcs: "5 layout calculations per purchase",
     highlighted: false,
@@ -27,7 +27,7 @@ const plans = [
     ],
   },
   {
-    name: "PV Layout Pro",
+    name: "Pro",
     price: "$4.99",
     calcs: "10 layout calculations per purchase",
     highlighted: true,
@@ -40,7 +40,7 @@ const plans = [
     ],
   },
   {
-    name: "PV Layout Pro Plus",
+    name: "Pro Plus",
     price: "$14.99",
     calcs: "50 layout and yield calculations per purchase",
     highlighted: false,
