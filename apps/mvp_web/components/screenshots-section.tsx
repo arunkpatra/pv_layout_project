@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { SectionBand } from "./section-band"
 import { SectionHead } from "./section-head"
 import { WindowFrame } from "./window-frame"
@@ -43,6 +44,15 @@ export function ScreenshotsSection() {
             <YieldReportScreenshot />
           </WindowFrame>
         </div>
+      </div>
+
+      <div className="mt-8 flex justify-center">
+        <Link
+          href="/products"
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-[#1C1C1C] transition-colors hover:bg-accent/90"
+        >
+          See what you get
+        </Link>
       </div>
     </SectionBand>
   )
