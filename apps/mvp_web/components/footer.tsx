@@ -30,7 +30,7 @@ function LinkColumn({
 }) {
   return (
     <div>
-      <h3 className="mb-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-[#9CA3AF]">
+      <h3 className="mb-3.5 font-mono text-[11px] font-medium tracking-[0.1em] text-[#9CA3AF] uppercase">
         {heading}
       </h3>
       <ul className="flex flex-col gap-2">
@@ -80,14 +80,11 @@ export function Footer() {
                   <path d="m19.07 4.93-1.41 1.41" />
                 </svg>
               </div>
-              <span className="text-lg font-bold text-white">
-                SolarLayout
-              </span>
+              <span className="text-lg font-bold text-white">SolarLayout</span>
             </div>
             <p className="text-sm text-[#9CA3AF]">
-              Utility-scale PV layout, cabling, and yield — built by
-              solar industry veterans for the Indian and global solar
-              market.
+              Utility-scale PV layout, cabling, and yield — built by solar
+              industry veterans for the Indian and global solar market.
             </p>
             <div className="flex gap-2.5">
               <a
@@ -138,7 +135,7 @@ export function Footer() {
         {/* Legal bar */}
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-[#1F2A30] pt-6 font-mono text-[12.5px] text-[#9CA3AF] sm:flex-row">
           <span>
-            &copy; {new Date().getFullYear()} SolarLayout &middot;
+            &copy; {new Date().getFullYear()} &nbsp; SolarLayout &middot;
             Bangalore, India &middot; All rights reserved.
           </span>
           <a
