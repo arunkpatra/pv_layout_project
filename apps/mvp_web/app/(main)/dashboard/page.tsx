@@ -60,7 +60,7 @@ export default function DashboardPage() {
     0,
   )
 
-  const activeCount = activeEntitlements.length
+  const calculationsPerformed = usageData?.pagination.total ?? 0
 
   const licenseKey = entData?.licenseKey ?? null
   const maskedKey = licenseKey
@@ -77,7 +77,7 @@ export default function DashboardPage() {
   const highestTierName = activeEntitlements.find(
     (e) => e.product === highestTierSlug,
   )?.productName
-  const isFree = activeCount > 0 && !highestTierSlug
+  const isFree = activeEntitlements.length > 0 && !highestTierSlug
 
   async function handleCopyKey() {
     if (!licenseKey) return
@@ -206,24 +206,24 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Active Entitlements */}
+        {/* Calculations Performed */}
         <Card>
           <CardHeader>
             <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-              Active Entitlements
+              Calculations Performed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {entLoading ? (
+            {usageLoading ? (
               <Skeleton className="h-8 w-24" />
-            ) : entError ? (
+            ) : usageError ? (
               <span className="text-2xl font-bold text-foreground">—</span>
             ) : (
               <span
-                data-testid="active-entitlements-value"
+                data-testid="calculations-performed-value"
                 className="text-4xl font-bold text-foreground"
               >
-                {activeCount}
+                {calculationsPerformed}
               </span>
             )}
           </CardContent>
