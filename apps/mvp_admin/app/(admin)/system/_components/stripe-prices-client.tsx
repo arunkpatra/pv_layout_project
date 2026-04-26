@@ -23,25 +23,33 @@ export function StripePricesClient() {
   const { mutate, isPending } = useUpdateStripePrice()
   const [editingSlug, setEditingSlug] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   function startEdit(slug: string, currentValue: string) {
     setEditingSlug(slug)
     setEditValue(currentValue)
+    setSaveError(null)
   }
 
   function cancelEdit() {
     setEditingSlug(null)
     setEditValue("")
+    setSaveError(null)
   }
 
   function saveEdit(slug: string) {
     if (!editValue.trim()) return
+    setSaveError(null)
     mutate(
       { slug, stripePriceId: editValue.trim() },
       {
         onSuccess: () => {
           setEditingSlug(null)
           setEditValue("")
+          setSaveError(null)
+        },
+        onError: (err) => {
+          setSaveError(err.message)
         },
       },
     )
@@ -147,6 +155,12 @@ export function StripePricesClient() {
           ))}
         </TableBody>
       </Table>
+
+      {saveError && (
+        <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {saveError}
+        </div>
+      )}
     </div>
   )
 }

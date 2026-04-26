@@ -1,5 +1,6 @@
 import { db } from "../../lib/db.js"
 import { AppError } from "../../lib/errors.js"
+import { getStripeClient } from "../../lib/stripe.js"
 import {
   type Granularity,
   getISOWeek,
@@ -195,10 +196,32 @@ export async function updateStripePriceId(
 ): Promise<{ slug: string; stripePriceId: string }> {
   const product = await db.product.findUnique({
     where: { slug },
-    select: { id: true },
+    select: { id: true, isFree: true },
   })
   if (!product) {
     throw new AppError("NOT_FOUND", `Product ${slug} not found`, 404)
+  }
+
+  // Free plans use a sentinel price ID — skip Stripe validation
+  if (!product.isFree) {
+    const stripe = getStripeClient()
+    try {
+      const price = await stripe.prices.retrieve(stripePriceId)
+      if (!price.active) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          `Stripe price ${stripePriceId} exists but is not active`,
+          400,
+        )
+      }
+    } catch (err) {
+      if (err instanceof AppError) throw err
+      throw new AppError(
+        "VALIDATION_ERROR",
+        `Stripe price ${stripePriceId} does not exist or could not be verified`,
+        400,
+      )
+    }
   }
 
   const updated = await db.product.update({

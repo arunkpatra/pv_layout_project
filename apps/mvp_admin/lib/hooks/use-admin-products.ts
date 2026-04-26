@@ -146,8 +146,15 @@ export function useUpdateStripePrice() {
           body: JSON.stringify({ stripePriceId }),
         },
       )
-      if (!res.ok)
-        throw new Error(`Failed to update stripe price: ${res.status}`)
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: { message?: string }
+        } | null
+        throw new Error(
+          body?.error?.message ??
+            `Failed to update stripe price: ${res.status}`,
+        )
+      }
       const body = (await res.json()) as {
         success: boolean
         data: { slug: string; stripePriceId: string }
