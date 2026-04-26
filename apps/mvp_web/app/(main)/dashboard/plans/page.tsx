@@ -282,7 +282,7 @@ function PlansPageInner() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Product</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Plan</TableHead>
                   <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Purchased</TableHead>
                   <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Total</TableHead>
                   <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Used</TableHead>
