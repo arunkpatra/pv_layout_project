@@ -182,7 +182,7 @@ export default function DashboardPage() {
                   className="gap-1.5"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  Copy
+                  {copied ? "Copied!" : "Copy"}
                 </Button>
               </div>
             ) : (

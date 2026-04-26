@@ -160,7 +160,7 @@ export function PricingCards() {
                 </Button>
               ) : (
                 <Button asChild variant="outline" className="w-full">
-                  <Link href={`/dashboard/plan?product=${tier.slug}`}>
+                  <Link href="/dashboard/plans">
                     Buy Now
                   </Link>
                 </Button>

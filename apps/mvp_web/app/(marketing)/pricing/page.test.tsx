@@ -49,10 +49,7 @@ test("renders Buy Now buttons as links to dashboard plan page", () => {
   render(<PricingPage />)
   const buyLinks = screen.getAllByRole("link", { name: /Buy Now/i })
   expect(buyLinks.length).toBeGreaterThanOrEqual(3)
-  expect(buyLinks[0]).toHaveAttribute(
-    "href",
-    "/dashboard/plan?product=pv-layout-basic"
-  )
+  expect(buyLinks[0]).toHaveAttribute("href", "/dashboard/plans")
 })
 
 test("renders feature comparison table", () => {
