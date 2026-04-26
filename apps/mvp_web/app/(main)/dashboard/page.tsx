@@ -276,15 +276,18 @@ export default function DashboardPage() {
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No active plan.{" "}
-                <Link
-                  href="/dashboard/plans"
-                  className="text-primary underline-offset-4 hover:underline"
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  No active plan.
+                </p>
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
                 >
-                  Buy a plan →
-                </Link>
-              </p>
+                  <Link href="/dashboard/plans">Buy a Plan</Link>
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
