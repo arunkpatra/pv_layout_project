@@ -168,7 +168,7 @@ export function DownloadModal({
 
           <Button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !agreed}
             className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
           >
             {submitting ? "Submitting\u2026" : "Submit & Download"}
