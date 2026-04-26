@@ -12,7 +12,7 @@ export function HeroSection() {
 
           <h1 className="mt-[18px] text-[38px] font-bold leading-[1.05] tracking-[-0.025em] sm:text-[56px]">
             From KMZ boundary to{" "}
-            <em className="not-italic text-primary">bankable layout</em>,
+            <em className="not-italic text-primary">complete layout</em>,
             in minutes.
           </h1>
 

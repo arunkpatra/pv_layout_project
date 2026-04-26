@@ -6,7 +6,7 @@ import { SectionHead } from "@/components/section-head"
 export const metadata: Metadata = {
   title: "How It Works",
   description:
-    "From boundary to bankable layout in minutes. Learn how SolarLayout automates PV plant design.",
+    "From boundary to complete layout in minutes. Learn how SolarLayout automates PV plant design.",
 }
 
 const steps = [
@@ -125,7 +125,7 @@ export default function HowItWorksPage() {
     <>
       <PageHeader
         breadcrumb={["SolarLayout", "How it works"]}
-        title="From boundary to bankable layout — in minutes."
+        title="From boundary to complete layout — in minutes."
         description="SolarLayout replaces the manual loop between Google Earth Pro, AutoCAD and PVsyst with a single Windows application that produces a layout, a cable schedule, and a yield report from one KMZ boundary."
       />
 

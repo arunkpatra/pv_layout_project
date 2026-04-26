@@ -24,7 +24,7 @@ test("renders page heading", () => {
   expect(
     screen.getByRole("heading", {
       level: 1,
-      name: /From boundary to bankable layout/i,
+      name: /From boundary to complete layout/i,
     })
   ).toBeInTheDocument()
 })
