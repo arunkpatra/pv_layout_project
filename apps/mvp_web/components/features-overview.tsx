@@ -55,8 +55,6 @@ export function FeaturesOverview() {
         eyebrow="01 / Products"
         title="Choose the right plan for your project."
         description="Pick the depth of automation your project stage needs. Calculations are pooled per purchase."
-        ctaHref="/products"
-        ctaLabel="All products →"
       />
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -111,21 +109,14 @@ export function FeaturesOverview() {
         ))}
       </div>
 
+      <div className="mt-8 flex justify-center">
+        <Link
+          href="/pricing"
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-[#1C1C1C] transition-colors hover:bg-accent/90"
+        >
+          Explore pricing
+        </Link>
+      </div>
     </SectionBand>
-
-    {/* Free license key banner — full bleed */}
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-b border-accent/30 bg-accent px-6 py-2.5 text-center text-sm text-[#1C1C1C]">
-      <span>
-        <strong>Start free</strong> — 5 full-featured calculations, no
-        credit card required.
-      </span>
-      <Link
-        href="/sign-up"
-        className="inline-flex items-center gap-1.5 rounded-md bg-[#1C1C1C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1C1C1C]/90"
-      >
-        Get your free license key →
-      </Link>
-    </div>
-    </>
   )
 }
