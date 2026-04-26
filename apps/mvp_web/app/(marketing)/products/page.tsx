@@ -203,8 +203,12 @@ export default function ProductsPage() {
                 Download PV Layout
               </Button>
             </DownloadModal>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/pricing">See pricing</Link>
+            <Button
+              asChild
+              size="lg"
+              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              <Link href="/sign-up">Get Free License Key</Link>
             </Button>
           </div>
         </div>
