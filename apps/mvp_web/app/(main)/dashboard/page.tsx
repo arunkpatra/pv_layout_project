@@ -134,27 +134,45 @@ export default function DashboardPage() {
             <span className="font-mono text-sm">
               {keyRevealed ? licenseKey : maskedKey}
             </span>
-            <button
-              type="button"
-              onClick={() => setKeyRevealed(!keyRevealed)}
-              className="text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-              aria-label={keyRevealed ? "Hide license key" : "Show license key"}
-            >
-              {keyRevealed ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyKey}
-              className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              {copied ? "Copied!" : "Copy"}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setKeyRevealed(!keyRevealed)}
+                    className="text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                    aria-label={keyRevealed ? "Hide license key" : "Show license key"}
+                  >
+                    {keyRevealed ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {keyRevealed ? "Hide key" : "Show key"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyKey}
+                    className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? "Copied!" : "Copy"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Copy license key to clipboard
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       ) : (
