@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Upload, Server, Activity, Download } from "lucide-react"
 import { SectionBand } from "./section-band"
 import { SectionHead } from "./section-head"
@@ -36,8 +37,6 @@ export function HowItWorksSummary() {
         eyebrow="02 / Pipeline"
         title="From boundary to deliverable."
         description="Four steps. No re-keying coordinates between Google Earth, AutoCAD and PVsyst."
-        ctaHref="/how-it-works"
-        ctaLabel="Read the workflow →"
       />
 
       <div className="grid overflow-hidden rounded-[var(--radius)] border border-border bg-card sm:grid-cols-2 lg:grid-cols-4">
@@ -61,6 +60,15 @@ export function HowItWorksSummary() {
             </p>
           </div>
         ))}
+      </div>
+
+      <div className="mt-8 flex justify-center">
+        <Link
+          href="/how-it-works"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-card"
+        >
+          Read the workflow →
+        </Link>
       </div>
     </SectionBand>
   )
