@@ -49,7 +49,6 @@ const plans = [
 
 export function FeaturesOverview() {
   return (
-    <>
     <SectionBand>
       <SectionHead
         eyebrow="01 / Products"
