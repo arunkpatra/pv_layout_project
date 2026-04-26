@@ -302,7 +302,7 @@ export default function DashboardPage() {
           <CardContent className="mt-auto">
             {entLoading ? (
               <Skeleton className="h-9 w-32" />
-            ) : hasActiveEntitlement ? (
+            ) : (
               <Button
                 onClick={handleDownload}
                 className="gap-2 bg-accent text-accent-foreground hover:!bg-accent/90"
@@ -310,22 +310,6 @@ export default function DashboardPage() {
                 <Download className="h-4 w-4" />
                 Download
               </Button>
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-block">
-                      <Button disabled className="gap-2">
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Purchase a plan to download.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             )}
           </CardContent>
         </Card>
