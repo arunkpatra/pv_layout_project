@@ -125,7 +125,7 @@ export default function PricingPage() {
           </span>
           <Button
             asChild
-            size="sm"
+            size="lg"
             className="bg-accent text-accent-foreground hover:bg-accent/90"
           >
             <Link href="/sign-up">Get Free License Key</Link>
