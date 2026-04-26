@@ -29,12 +29,16 @@ test("renders page heading", () => {
   ).toBeInTheDocument()
 })
 
-test("renders all three tier names", () => {
+test("renders plan cards with all three tier names", () => {
   render(<PricingPage />)
-  expect(screen.getAllByText("Basic").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("Pro").length).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("Pro Plus").length
+    screen.getAllByText("PV Layout Basic").length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText("PV Layout Pro").length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText("PV Layout Pro Plus").length
   ).toBeGreaterThanOrEqual(1)
 })
 
@@ -58,6 +62,13 @@ test("renders Buy buttons as links to dashboard plan page", () => {
   expect(buyLinks[0]).toHaveAttribute("href", "/dashboard/plans")
 })
 
+test("renders free trial callout", () => {
+  render(<PricingPage />)
+  expect(
+    screen.getByText(/Free trial included/i)
+  ).toBeInTheDocument()
+})
+
 test("renders feature comparison table", () => {
   render(<PricingPage />)
   expect(
@@ -72,15 +83,5 @@ test("renders top-up note", () => {
   render(<PricingPage />)
   expect(
     screen.getAllByText(/Top-ups/i).length
-  ).toBeGreaterThanOrEqual(1)
-  expect(screen.queryByText(/Phase 2/i)).not.toBeInTheDocument()
-})
-
-test("renders sub-heading text", () => {
-  render(<PricingPage />)
-  expect(
-    screen.getAllByText(
-      /Pay once\. Use as many times as your plan allows\./i
-    ).length
   ).toBeGreaterThanOrEqual(1)
 })

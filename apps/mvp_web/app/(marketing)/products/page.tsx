@@ -1,139 +1,33 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { Download } from "lucide-react"
 import { Button } from "@renewable-energy/ui/components/button"
 import { DownloadModal } from "@/components/download-modal"
 import { PageHeader } from "@/components/page-header"
-import { SectionBand } from "@/components/section-band"
 
 export const metadata: Metadata = {
   title: "Products",
   description:
-    "PV Layout — automated solar plant layout design for Windows. Three plans for every stage of utility-scale solar development.",
+    "PV Layout — automated solar plant layout design for Windows.",
 }
-
-const plans = [
-  {
-    name: "PV Layout Basic",
-    price: "$1.99",
-    calcs: "5 layout calculations per purchase",
-    highlighted: false,
-    features: [
-      "KMZ boundary input with multiple plant areas",
-      "Automatic MMS table placement within boundary",
-      "Inverter and lightning arrester placement",
-      "Obstruction exclusion (ponds, water bodies, transmission lines)",
-      "KMZ and DXF export",
-    ],
-  },
-  {
-    name: "PV Layout Pro",
-    price: "$4.99",
-    calcs: "10 layout calculations per purchase",
-    highlighted: true,
-    features: [
-      "All Basic features included",
-      "AC and DC cable placement with full routing",
-      "Cable quantity measurements",
-      "ICR building placement (1 per 18 MWp)",
-      "KMZ, DXF, and PDF export",
-    ],
-  },
-  {
-    name: "PV Layout Pro Plus",
-    price: "$14.99",
-    calcs: "50 layout and yield calculations per purchase",
-    highlighted: false,
-    features: [
-      "All Pro features included",
-      "Energy yield analysis",
-      "P50 / P75 / P90 exceedance values",
-      "Plant generation estimates",
-      "Complete PDF report with capacity, cables, and yield",
-    ],
-  },
-]
 
 export default function ProductsPage() {
   return (
-    <>
-      <PageHeader
-        breadcrumb={["SolarLayout", "Products"]}
-        title="PV Layout"
-        description="One desktop application, three plans for every stage of utility-scale solar PV plant development. Calculations are pooled per purchase; top up at any time at the same rate."
-      >
-        <div>
-          <DownloadModal productName="PV Layout">
-            <Button
-              size="lg"
-              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              <Download className="h-5 w-5" />
-              Download PV Layout
-            </Button>
-          </DownloadModal>
-          <div className="mt-3.5 rounded-lg border border-[#BBE0CB] bg-[#F0F8F3] px-[18px] py-3.5 text-sm text-[#374151]">
-            <strong className="text-[#1A5C3A]">Free trial included</strong>
-            {" — "}sign up and get 5 full-featured calculations, no credit card
-            required.
-          </div>
-        </div>
-      </PageHeader>
-
-      <SectionBand>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`flex flex-col rounded-[var(--radius)] border border-border bg-card${plan.highlighted ? " border-accent shadow-[0_0_0_1px_var(--accent)_inset]" : ""}`}
-            >
-              <div className="border-b border-border px-6 pb-[18px] pt-6">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-xl font-semibold tracking-[-0.01em]">
-                    {plan.name}
-                  </h3>
-                  <span
-                    className={`rounded-full px-2.5 py-[5px] text-xs font-semibold${plan.highlighted ? " bg-accent text-[#1C1C1C]" : " bg-primary text-white"}`}
-                  >
-                    {plan.price}
-                  </span>
-                </div>
-                <div className="mt-2 font-mono text-[13px] text-muted-foreground">
-                  {plan.calcs}
-                </div>
-              </div>
-              <div className="flex flex-1 flex-col gap-3.5 px-6 py-5">
-                <ul className="m-0 flex flex-1 list-none flex-col gap-2.5 p-0">
-                  {plan.features.map((f) => (
-                    <li
-                      key={f}
-                      className="flex gap-2.5 text-sm leading-[1.45] text-[#374151]"
-                    >
-                      <span className="mt-2 h-[5px] w-[5px] shrink-0 rounded-full bg-accent" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="px-6 pb-6">
-                <Button
-                  asChild
-                  variant={plan.highlighted ? "default" : "outline"}
-                  className="w-full"
-                >
-                  <Link href="/dashboard/plans">Buy now</Link>
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-12 rounded-[var(--radius)] border border-border bg-card p-6 text-center text-[15px] text-[#374151]">
-          <strong className="text-foreground">Need more calculations?</strong>{" "}
-          Top up anytime at the same rate. Entitlements are tied to your
-          registered email address.
-        </div>
-      </SectionBand>
-    </>
+    <PageHeader
+      breadcrumb={["SolarLayout", "Products"]}
+      title="PV Layout"
+      description="One desktop application for utility-scale solar PV plant development. Upload your KMZ boundary, generate layouts, route cables, and estimate energy yield — in minutes."
+    >
+      <div>
+        <DownloadModal productName="PV Layout">
+          <Button
+            size="lg"
+            className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            <Download className="h-5 w-5" />
+            Download PV Layout
+          </Button>
+        </DownloadModal>
+      </div>
+    </PageHeader>
   )
 }
