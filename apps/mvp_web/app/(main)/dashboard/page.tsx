@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
-import { Copy, Download, Eye, EyeOff } from "lucide-react"
+import { Copy, Download, Eye, EyeOff, KeyRound } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -126,58 +126,64 @@ export default function DashboardPage() {
       {entLoading ? (
         <Skeleton className="h-28 w-full rounded-lg" />
       ) : licenseKey ? (
-        <div className="rounded-lg bg-accent px-6 py-5 text-[#1C1C1C]">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em]">
-            Your License Key
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-xl font-bold tracking-wide">
-              {keyRevealed ? licenseKey : maskedKey}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setKeyRevealed(!keyRevealed)}
-                      className="rounded-md border border-[#1C1C1C]/20 p-1.5 transition-colors hover:bg-[#1C1C1C]/10"
-                      aria-label={keyRevealed ? "Hide license key" : "Show license key"}
-                    >
-                      {keyRevealed ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {keyRevealed ? "Hide key" : "Show key"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      onClick={handleCopyKey}
-                      className="gap-1.5 bg-[#1C1C1C] text-white hover:bg-[#1C1C1C]/90"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      {copied ? "Copied!" : "Copy"}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Copy license key to clipboard
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+        <div className="flex items-stretch gap-0 overflow-hidden rounded-lg bg-accent text-[#1C1C1C]">
+          {/* Left — icon + text */}
+          <div className="flex items-center gap-4 px-6 py-5">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#1C1C1C]/10">
+              <KeyRound className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-sm font-bold">Your License Key</div>
+              <p className="mt-0.5 text-xs text-[#1C1C1C]/60">
+                Use this key in the desktop app to activate your plan.
+              </p>
             </div>
           </div>
-          <p className="mt-2 text-xs text-[#1C1C1C]/60">
-            Use this key in the desktop application to activate your plan.
-          </p>
+
+          {/* Right — key + actions */}
+          <div className="ml-auto flex items-center gap-3 border-l border-[#1C1C1C]/10 px-6 py-5">
+            <span className="font-mono text-lg font-bold tracking-wide">
+              {keyRevealed ? licenseKey : maskedKey}
+            </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setKeyRevealed(!keyRevealed)}
+                    className="rounded-md border border-[#1C1C1C]/20 p-1.5 transition-colors hover:bg-[#1C1C1C]/10"
+                    aria-label={keyRevealed ? "Hide license key" : "Show license key"}
+                  >
+                    {keyRevealed ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {keyRevealed ? "Hide key" : "Show key"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    onClick={handleCopyKey}
+                    className="gap-1.5 bg-white text-[#1C1C1C] hover:bg-white/90"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? "Copied!" : "Copy"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Copy license key to clipboard
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-3 text-center text-sm text-muted-foreground">
