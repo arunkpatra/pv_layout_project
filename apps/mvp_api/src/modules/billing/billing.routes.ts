@@ -73,6 +73,8 @@ billingRoutes.post("/billing/checkout", async (c) => {
     customer: user.stripeCustomerId!,
     line_items: [{ price: product.stripePriceId, quantity: 1 }],
     metadata: { userId: user.id, product: product.slug },
+    billing_address_collection: "required",
+    phone_number_collection: { enabled: true },
     success_url: `${baseUrl}/dashboard/plans?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/dashboard/plans`,
   })
