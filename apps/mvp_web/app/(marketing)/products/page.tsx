@@ -1,14 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Download } from "lucide-react"
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@renewable-energy/ui/components/card"
 import { Button } from "@renewable-energy/ui/components/button"
 import { DownloadModal } from "@/components/download-modal"
+import { PageHeader } from "@/components/page-header"
+import { SectionBand } from "@/components/section-band"
 
 export const metadata: Metadata = {
   title: "Products",
@@ -20,7 +16,8 @@ const plans = [
   {
     name: "PV Layout Basic",
     price: "$1.99",
-    calculations: "5 layout calculations per purchase",
+    calcs: "5 layout calculations per purchase",
+    highlighted: false,
     features: [
       "KMZ boundary input with multiple plant areas",
       "Automatic MMS table placement within boundary",
@@ -32,7 +29,8 @@ const plans = [
   {
     name: "PV Layout Pro",
     price: "$4.99",
-    calculations: "10 layout calculations per purchase",
+    calcs: "10 layout calculations per purchase",
+    highlighted: true,
     features: [
       "All Basic features included",
       "AC and DC cable placement with full routing",
@@ -40,12 +38,12 @@ const plans = [
       "ICR building placement (1 per 18 MWp)",
       "KMZ, DXF, and PDF export",
     ],
-    highlighted: true,
   },
   {
     name: "PV Layout Pro Plus",
     price: "$14.99",
-    calculations: "50 layout and yield calculations per purchase",
+    calcs: "50 layout and yield calculations per purchase",
+    highlighted: false,
     features: [
       "All Pro features included",
       "Energy yield analysis",
@@ -58,20 +56,13 @@ const plans = [
 
 export default function ProductsPage() {
   return (
-    <div className="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            PV Layout
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            One desktop application, three plans for every stage of
-            utility-scale solar PV plant development.
-          </p>
-        </div>
-
-        {/* Download CTA */}
-        <div className="mt-8 flex justify-center">
+    <>
+      <PageHeader
+        breadcrumb={["SolarLayout", "Products"]}
+        title="PV Layout"
+        description="One desktop application, three plans for every stage of utility-scale solar PV plant development. Calculations are pooled per purchase; top up at any time at the same rate."
+      >
+        <div>
           <DownloadModal productName="PV Layout">
             <Button
               size="lg"
@@ -81,65 +72,68 @@ export default function ProductsPage() {
               Download PV Layout
             </Button>
           </DownloadModal>
-        </div>
-
-        {/* Free trial callout */}
-        <div className="mx-auto mt-6 max-w-md rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-center dark:border-green-900 dark:bg-green-950/20">
-          <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">Free trial included</strong>
+          <div className="mt-3.5 rounded-lg border border-[#BBE0CB] bg-[#F0F8F3] px-[18px] py-3.5 text-sm text-[#374151]">
+            <strong className="text-[#1A5C3A]">Free trial included</strong>
             {" — "}sign up and get 5 full-featured calculations, no credit card
             required.
-          </p>
+          </div>
         </div>
+      </PageHeader>
 
-        {/* Plan cards */}
-        <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      <SectionBand>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
           {plans.map((plan) => (
-            <Card
+            <div
               key={plan.name}
-              className={`flex flex-col ${plan.highlighted ? "border-accent ring-2 ring-accent/20" : ""}`}
+              className={`flex flex-col rounded-[var(--radius)] border border-border bg-card${plan.highlighted ? " border-accent shadow-[0_0_0_1px_var(--accent)_inset]" : ""}`}
             >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl">{plan.name}</CardTitle>
-                  <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+              <div className="border-b border-border px-6 pb-[18px] pt-6">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-xl font-semibold tracking-[-0.01em]">
+                    {plan.name}
+                  </h3>
+                  <span
+                    className={`rounded-full px-2.5 py-[5px] text-xs font-semibold${plan.highlighted ? " bg-accent text-[#1C1C1C]" : " bg-primary text-white"}`}
+                  >
                     {plan.price}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {plan.calculations}
-                </p>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col">
-                <ul className="flex-1 space-y-2">
-                  {plan.features.map((feature) => (
+                <div className="mt-2 font-mono text-[13px] text-muted-foreground">
+                  {plan.calcs}
+                </div>
+              </div>
+              <div className="flex flex-1 flex-col gap-3.5 px-6 py-5">
+                <ul className="m-0 flex flex-1 list-none flex-col gap-2.5 p-0">
+                  {plan.features.map((f) => (
                     <li
-                      key={feature}
-                      className="flex items-start gap-2 text-sm text-muted-foreground"
+                      key={f}
+                      className="flex gap-2.5 text-sm leading-[1.45] text-[#374151]"
                     >
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-                      {feature}
+                      <span className="mt-2 h-[5px] w-[5px] shrink-0 rounded-full bg-accent" />
+                      {f}
                     </li>
                   ))}
                 </ul>
-                <Button asChild variant="outline" className="mt-6 w-full">
-                  <Link href="/dashboard/plans">Buy Now</Link>
+              </div>
+              <div className="px-6 pb-6">
+                <Button
+                  asChild
+                  variant={plan.highlighted ? "default" : "outline"}
+                  className="w-full"
+                >
+                  <Link href="/dashboard/plans">Buy now</Link>
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
 
-        {/* Top-up note */}
-        <div className="mt-12 rounded-lg border border-border bg-card p-6 text-center">
-          <p className="text-muted-foreground">
-            <strong className="text-foreground">
-              Need more calculations?
-            </strong>{" "}
-            Top up anytime at the same rate.
-          </p>
+        <div className="mt-12 rounded-[var(--radius)] border border-border bg-card p-6 text-center text-[15px] text-[#374151]">
+          <strong className="text-foreground">Need more calculations?</strong>{" "}
+          Top up anytime at the same rate. Entitlements are tied to your
+          registered email address.
         </div>
-      </div>
-    </div>
+      </SectionBand>
+    </>
   )
 }
