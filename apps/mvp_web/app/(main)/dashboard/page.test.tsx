@@ -235,7 +235,7 @@ describe("Dashboard home page", () => {
       })
       render(<DashboardPage />)
       expect(screen.getByText("pv_layout")).toBeInTheDocument()
-      expect(screen.getByText("PV Layout Pro")).toBeInTheDocument()
+      expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
       // Date rendered via toLocaleDateString — check at least one cell exists
       const dateCells = screen.getAllByRole("cell")
       expect(dateCells.length).toBeGreaterThan(0)

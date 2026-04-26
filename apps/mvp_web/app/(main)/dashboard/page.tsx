@@ -66,6 +66,16 @@ export default function DashboardPage() {
 
   const hasActiveEntitlement = activeEntitlements.length > 0
 
+  // Determine the highest tier plan
+  const TIER_ORDER = ["pv-layout-pro-plus", "pv-layout-pro", "pv-layout-basic"]
+  const highestTierSlug = TIER_ORDER.find((slug) =>
+    activeEntitlements.some((e) => e.product === slug),
+  )
+  const highestTierName = activeEntitlements.find(
+    (e) => e.product === highestTierSlug,
+  )?.productName
+  const isFree = activeCount > 0 && !highestTierSlug
+
   async function handleCopyKey() {
     if (!licenseKey) return
     try {
@@ -108,6 +118,33 @@ export default function DashboardPage() {
           Overview of your SolarLayout account.
         </p>
       </div>
+
+      {/* License Key Banner */}
+      {entLoading ? (
+        <Skeleton className="h-12 w-full rounded-lg" />
+      ) : licenseKey ? (
+        <div className="flex items-center justify-between rounded-lg bg-primary px-5 py-3 text-primary-foreground">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground/70">
+              License Key
+            </span>
+            <span className="font-mono text-sm">{maskedKey}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyKey}
+            className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            {copied ? "Copied!" : "Copy"}
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-3 text-center text-sm text-muted-foreground">
+          Purchase a plan to get your license key.
+        </div>
+      )}
 
       {/* Row 1 — Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -158,36 +195,42 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Row 2 — License key + Download */}
+      {/* Row 2 — Plan + Download */}
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* License Key */}
+        {/* Your Plan */}
         <Card>
           <CardHeader>
             <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-              Your License Key
+              Your Plan
             </CardTitle>
           </CardHeader>
           <CardContent>
             {entLoading ? (
-              <Skeleton className="h-8 w-48" />
-            ) : maskedKey ? (
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-base text-foreground">
-                  {maskedKey}
+              <Skeleton className="h-8 w-32" />
+            ) : entError ? (
+              <span className="text-2xl font-bold text-foreground">—</span>
+            ) : highestTierName ? (
+              <span className="text-2xl font-bold text-foreground">
+                {highestTierName}
+              </span>
+            ) : isFree ? (
+              <div>
+                <span className="text-2xl font-bold text-foreground">
+                  Free
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyKey}
-                  className="gap-1.5"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  {copied ? "Copied!" : "Copy"}
-                </Button>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  All Pro Plus features included.
+                </p>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Purchase a plan to get your license key.
+                No active plan.{" "}
+                <Link
+                  href="/dashboard/plans"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Buy a plan →
+                </Link>
               </p>
             )}
           </CardContent>
