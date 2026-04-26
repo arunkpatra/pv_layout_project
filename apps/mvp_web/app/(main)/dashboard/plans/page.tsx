@@ -190,7 +190,7 @@ function PlansPageInner() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-bold tracking-[-0.02em] text-foreground">
           Plans
         </h1>
         <p className="mt-1 text-muted-foreground">
@@ -200,7 +200,7 @@ function PlansPageInner() {
 
       {/* Buy section */}
       <div className="space-y-4">
-        <h2 className="text-base font-semibold text-foreground">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-foreground">
           Buy Calculations
         </h2>
         {productsLoading ? (
@@ -266,7 +266,7 @@ function PlansPageInner() {
 
       {/* Purchase history */}
       <div className="space-y-4">
-        <h2 className="text-base font-semibold text-foreground">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-foreground">
           Your Purchases
         </h2>
         {entLoading ? (
@@ -282,12 +282,12 @@ function PlansPageInner() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Purchased</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Used</TableHead>
-                  <TableHead>Remaining</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Product</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Purchased</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Total</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Used</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Remaining</TableHead>
+                  <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

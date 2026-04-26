@@ -101,7 +101,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-bold tracking-[-0.02em] text-foreground">
           Dashboard
         </h1>
         <p className="mt-1 text-muted-foreground">
@@ -114,7 +114,7 @@ export default function DashboardPage() {
         {/* Remaining Calculations */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Remaining Calculations
             </CardTitle>
           </CardHeader>
@@ -137,7 +137,7 @@ export default function DashboardPage() {
         {/* Active Entitlements */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Active Entitlements
             </CardTitle>
           </CardHeader>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
         {/* License Key */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Your License Key
             </CardTitle>
           </CardHeader>
@@ -196,7 +196,7 @@ export default function DashboardPage() {
         {/* Download */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Download SolarLayout
             </CardTitle>
           </CardHeader>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Recent Activity
             </CardTitle>
             <Link
@@ -267,9 +267,9 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Feature</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Feature</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Product</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
