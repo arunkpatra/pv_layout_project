@@ -131,8 +131,10 @@ billingRoutes.post("/billing/verify-session", async (c) => {
 billingRoutes.get("/billing/entitlements", async (c) => {
   const user = c.get("user")
 
+  // Exclude deactivated entitlements from user dashboard.
+  // Exhausted entitlements are kept — they serve as purchase history.
   const entitlements = await db.entitlement.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, deactivatedAt: null },
     orderBy: { purchasedAt: "desc" },
     include: {
       product: {

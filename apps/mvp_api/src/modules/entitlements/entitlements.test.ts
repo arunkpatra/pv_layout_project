@@ -162,7 +162,8 @@ describe("GET /entitlements", () => {
     }
     expect(body.data.licensed).toBe(false)
     expect(body.data.availableFeatures).toHaveLength(0)
-    expect(body.data.plans[0]!.remainingCalculations).toBe(0)
+    // Exhausted entitlements are now filtered out — plans should be empty
+    expect(body.data.plans).toHaveLength(0)
   })
 
   it("returns licensed false when no entitlements", async () => {

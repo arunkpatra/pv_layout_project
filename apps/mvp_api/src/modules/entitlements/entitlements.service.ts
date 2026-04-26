@@ -25,8 +25,10 @@ export async function computeEntitlementSummary(user: {
   name: string | null
   email: string
 }): Promise<EntitlementSummary> {
-  const entitlements = await db.entitlement.findMany({
-    where: { userId: user.id },
+  // Only return usable entitlements — exclude deactivated and exhausted.
+  // The desktop app only needs entitlements the user can actively use.
+  const allEntitlements = await db.entitlement.findMany({
+    where: { userId: user.id, deactivatedAt: null },
     orderBy: { product: { displayOrder: "asc" } },
     include: {
       product: {
@@ -34,6 +36,11 @@ export async function computeEntitlementSummary(user: {
       },
     },
   })
+
+  // Further exclude exhausted (usedCalculations >= totalCalculations)
+  const entitlements = allEntitlements.filter(
+    (e) => e.usedCalculations < e.totalCalculations,
+  )
 
   const totalCalculations = entitlements.reduce(
     (sum, e) => sum + e.totalCalculations,
@@ -47,10 +54,8 @@ export async function computeEntitlementSummary(user: {
 
   const featureSet = new Set<string>()
   for (const e of entitlements) {
-    if (e.totalCalculations - e.usedCalculations > 0) {
-      for (const f of e.product.features) {
-        featureSet.add(f.featureKey)
-      }
+    for (const f of e.product.features) {
+      featureSet.add(f.featureKey)
     }
   }
 
