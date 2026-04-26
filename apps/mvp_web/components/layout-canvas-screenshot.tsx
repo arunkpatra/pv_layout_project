@@ -2,8 +2,8 @@ export function LayoutCanvasScreenshot() {
   return (
     <svg
       viewBox="0 0 800 460"
-      preserveAspectRatio="xMidYMid meet"
-      className="block h-auto w-full"
+      preserveAspectRatio="xMidYMin slice"
+      className="block h-full w-full"
     >
       <rect width="800" height="460" fill="#FAFBFC" />
       <pattern
