@@ -128,7 +128,7 @@ export async function getCustomer(
     throw new AppError("NOT_FOUND", `Customer ${id} not found`, 404)
   }
 
-  const entitlements: EntitlementDetail[] = user.entitlements.map((e) => ({
+  const allEntitlements: EntitlementDetail[] = user.entitlements.map((e) => ({
     id: e.id,
     productId: e.product.id,
     productName: e.product.name,
@@ -140,6 +140,13 @@ export async function getCustomer(
     deactivatedAt: e.deactivatedAt?.toISOString() ?? null,
     state: deriveEntitlementState(e),
   }))
+
+  // The DB filter only checks deactivatedAt for "active" — also exclude
+  // EXHAUSTED entitlements (usedCalculations >= totalCalculations)
+  const entitlements =
+    filter === "active"
+      ? allEntitlements.filter((e) => e.state === "ACTIVE")
+      : allEntitlements
 
   return {
     id: user.id,
