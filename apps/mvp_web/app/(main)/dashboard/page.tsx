@@ -256,6 +256,13 @@ export default function DashboardPage() {
                 <p className="mt-1.5 text-sm text-muted-foreground">
                   All Pro Plus features included.
                 </p>
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
+                >
+                  <Link href="/dashboard/plans">Purchase Plan</Link>
+                </Button>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
