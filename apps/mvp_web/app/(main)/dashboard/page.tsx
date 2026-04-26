@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
   const licenseKey = entData?.licenseKey ?? null
   const maskedKey = licenseKey
-    ? `${licenseKey.slice(0, 8)}${"•".repeat(12)}`
+    ? `${licenseKey.slice(0, 8)}${"●".repeat(12)}`
     : null
 
   const hasActiveEntitlement = activeEntitlements.length > 0
