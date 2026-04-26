@@ -18,7 +18,7 @@ export function HeroSection() {
 
           <p className="mt-5 max-w-[54ch] text-lg text-[#374151]">
             SolarLayout reads your KMZ boundary, places MMS tables,
-            routes DC cables, positions inverters and estimates energy
+            routes cables, positions inverters and estimates energy
             yield — in minutes, not days.
           </p>
 
