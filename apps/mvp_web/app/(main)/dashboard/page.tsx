@@ -146,16 +146,16 @@ export default function DashboardPage() {
                 <Eye className="h-4 w-4" />
               )}
             </button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyKey}
+              className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {copied ? "Copied!" : "Copy"}
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopyKey}
-            className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-          >
-            <Copy className="h-3.5 w-3.5" />
-            {copied ? "Copied!" : "Copy"}
-          </Button>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-3 text-center text-sm text-muted-foreground">
