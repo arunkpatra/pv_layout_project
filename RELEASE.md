@@ -4,8 +4,13 @@ This document describes how to cut a release for the SolarLayout platform.
 
 ## Versioning
 
-We use [calendar versioning](https://calver.org/): `YYYY.MM.DD` (e.g., `2026.04.26`).
-If multiple releases happen on the same day, append a patch number: `2026.04.26.1`.
+We use [Semantic Versioning](https://semver.org/): `vMAJOR.MINOR.PATCH` (e.g., `v0.1.0`).
+
+- **MAJOR** — breaking changes (API contracts, DB schema incompatibility)
+- **MINOR** — new features, new pages, new API endpoints
+- **PATCH** — bug fixes, copy changes, styling tweaks
+
+Current phase: `v0.x.x` (pre-1.0, public beta).
 
 ## What Gets Deployed
 
@@ -19,35 +24,44 @@ If multiple releases happen on the same day, append a patch number: `2026.04.26.
 | `apps/layout-engine` | AWS Lambda | Manual workflow dispatch |
 | Desktop EXE (`pv_layout.exe`) | S3 buckets | Manual upload |
 
+## Creating a Release
+
+### 1. Make sure all gates pass
+
+```bash
+bun run lint && bun run typecheck && bun run test && bun run build
+```
+
+### 2. Create and push a tag
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+This triggers the **Release** workflow which:
+- Runs all gates (lint, typecheck, test, build)
+- Creates a GitHub Release with auto-generated notes from commits since the last tag
+- Marks the release as pre-release for `v0.x.x`
+
+### 3. Verify
+
+- Check the **Actions** tab — the Release workflow should complete successfully
+- Check **Releases** — the new release should appear with auto-generated notes
+- Check **Vercel** — deployments should be live (triggered by the push to main, not the tag)
+
 ## Pre-Release Checklist
 
-Before creating a release:
+Before tagging:
 
-1. **All gates pass on the branch:**
+1. **All changes merged to `main`** and CI passing
+2. **Database migrations (if any):** apply to staging first, then prod
+3. **Seed data (if changed):**
    ```bash
-   bun run lint && bun run typecheck && bun run test && bun run build
-   ```
-
-2. **Branch is up to date with main:**
-   ```bash
-   git fetch origin main
-   git rebase origin/main
-   ```
-
-3. **Database migrations (if any):**
-   - Run `bun run db:status` to check pending migrations
-   - Apply with `bun run db:migrate` on staging first, then prod
-
-4. **Seed data (if changed):**
-   ```bash
-   # Staging
    MVP_DATABASE_URL="<staging-url>" bun run packages/mvp_db/prisma/seed-products.ts
-
-   # Production
    MVP_DATABASE_URL="<prod-url>" bun run packages/mvp_db/prisma/seed-products.ts
    ```
-
-5. **Desktop EXE (if updated):**
+4. **Desktop EXE (if updated):**
    ```bash
    source aws-creds/renewable-energy-app.env
    aws s3 cp <path-to-exe> s3://solarlayout-local-downloads/downloads/pv_layout.exe --copy-props none
@@ -55,57 +69,9 @@ Before creating a release:
    aws s3 cp <path-to-exe> s3://solarlayout-prod-downloads/downloads/pv_layout.exe --copy-props none
    ```
 
-## Creating a Release
-
-### Option 1: GitHub UI
-
-1. Go to **Releases** > **Draft a new release**
-2. Click **Choose a tag** > type the version (e.g., `2026.04.26`) > **Create new tag**
-3. Set target to `main`
-4. Title: `2026.04.26`
-5. Click **Generate release notes** (auto-generates from PRs/commits)
-6. Review and edit the notes
-7. Publish
-
-### Option 2: GitHub CLI
-
-```bash
-# Create tag and release with auto-generated notes
-gh release create 2026.04.26 --target main --generate-notes --title "2026.04.26"
-```
-
-### Option 3: Automated (GitHub Actions)
-
-Run the **Create Release** workflow from the Actions tab:
-1. Go to **Actions** > **Create Release**
-2. Click **Run workflow**
-3. Enter the version tag (or leave blank for today's date)
-4. The workflow creates the tag, generates release notes, and publishes
-
-## Post-Release
-
-1. **Verify Vercel deployments** completed successfully for all apps
-2. **Verify production** — check key pages and API health
-3. **Layout engine** (if changed) — run the Deploy Layout Engine workflow
-4. **Monitor** — check Vercel logs and error tracking for the first hour
-
 ## Hotfix Process
 
-For urgent fixes after a release:
-
-1. Create a fix on `main` directly (or a short-lived branch)
+1. Fix on `main` (or short-lived branch → merge to main)
 2. Run all gates
-3. Push to `main` — Vercel auto-deploys
-4. Create a patch release: `2026.04.26.1`
-
-## Environment URLs
-
-Read from `.env.production` — never hardcode:
-
-| App | URL |
-|---|---|
-| Web (public) | `renewable-energy-web.vercel.app` |
-| API | `renewable-energy-api.vercel.app` |
-| MVP Web | Check Vercel dashboard |
-| MVP API | Check Vercel dashboard |
-| MVP Admin | Check Vercel dashboard |
+3. Tag as patch: `git tag v0.1.1 && git push origin v0.1.1`
+4. Vercel auto-deploys on push; release workflow creates the GitHub Release

@@ -1,12 +1,9 @@
-name: Create Release
+name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Release version (e.g., 2026.04.26). Leave blank for today's date."
-        required: false
-        type: string
+  push:
+    tags:
+      - "v*"
 
 concurrency:
   group: release
@@ -14,7 +11,7 @@ concurrency:
 
 jobs:
   release:
-    name: Create Release
+    name: Gate & Release
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -52,24 +49,16 @@ jobs:
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xhc3NpYy13YXNwLTU1LmNsZXJrLmFjY291bnRzLmRldiQ
 
-      - name: Determine version
-        id: version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            echo "tag=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=$(date +%Y.%m.%d)" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create release
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          RELEASE_SHA: ${{ github.sha }}
+          TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" \
-            --target "$RELEASE_SHA" \
+          PRERELEASE_FLAG=""
+          if echo "$TAG_NAME" | grep -q "^v0\."; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "$TAG_NAME" \
             --generate-notes \
-            --title "$RELEASE_TAG"
+            --title "$TAG_NAME" \
+            $PRERELEASE_FLAG
