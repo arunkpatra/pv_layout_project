@@ -31,18 +31,31 @@ test("renders all form fields", () => {
   expect(
     screen.getAllByPlaceholderText("you@company.com").length,
   ).toBeGreaterThanOrEqual(1)
+  // Subject is now a <select> dropdown
   expect(
-    screen.getAllByPlaceholderText("What is this regarding?").length,
+    screen.getAllByText("Subject").length,
   ).toBeGreaterThanOrEqual(1)
   expect(
     screen.getAllByPlaceholderText("Tell us more...").length,
   ).toBeGreaterThanOrEqual(1)
 })
 
-test("renders Send Message button", () => {
+test("renders subject dropdown options", () => {
+  render(<ContactForm />)
+  const select = screen.getByRole("combobox")
+  expect(select).toBeInTheDocument()
+  expect(
+    screen.getByText("Sales enquiry"),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText("Technical question"),
+  ).toBeInTheDocument()
+})
+
+test("renders Send message button", () => {
   render(<ContactForm />)
   const buttons = screen.getAllByRole("button", {
-    name: /Send Message/i,
+    name: /Send message/i,
   })
   expect(buttons.length).toBeGreaterThanOrEqual(1)
 })
@@ -72,9 +85,9 @@ test("shows success toast on valid submit", async () => {
     screen.getAllByPlaceholderText("you@company.com")[0]!,
     "test@example.com",
   )
-  await user.type(
-    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
-    "Support",
+  await user.selectOptions(
+    screen.getByRole("combobox"),
+    "Sales enquiry",
   )
   await user.type(
     screen.getAllByPlaceholderText("Tell us more...")[0]!,
@@ -82,7 +95,7 @@ test("shows success toast on valid submit", async () => {
   )
 
   const buttons = screen.getAllByRole("button", {
-    name: /Send Message/i,
+    name: /Send message/i,
   })
   await user.click(buttons[0]!)
 
@@ -115,9 +128,9 @@ test("shows error toast on API failure", async () => {
     screen.getAllByPlaceholderText("you@company.com")[0]!,
     "test@example.com",
   )
-  await user.type(
-    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
-    "Support",
+  await user.selectOptions(
+    screen.getByRole("combobox"),
+    "Sales enquiry",
   )
   await user.type(
     screen.getAllByPlaceholderText("Tell us more...")[0]!,
@@ -125,7 +138,7 @@ test("shows error toast on API failure", async () => {
   )
 
   const buttons = screen.getAllByRole("button", {
-    name: /Send Message/i,
+    name: /Send message/i,
   })
   await user.click(buttons[0]!)
 
@@ -149,9 +162,9 @@ test("shows error toast on network failure", async () => {
     screen.getAllByPlaceholderText("you@company.com")[0]!,
     "test@example.com",
   )
-  await user.type(
-    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
-    "Support",
+  await user.selectOptions(
+    screen.getByRole("combobox"),
+    "Sales enquiry",
   )
   await user.type(
     screen.getAllByPlaceholderText("Tell us more...")[0]!,
@@ -159,7 +172,7 @@ test("shows error toast on network failure", async () => {
   )
 
   const buttons = screen.getAllByRole("button", {
-    name: /Send Message/i,
+    name: /Send message/i,
   })
   await user.click(buttons[0]!)
 
@@ -190,27 +203,27 @@ test("clears form fields after successful submit", async () => {
   const emailInput = screen.getAllByPlaceholderText(
     "you@company.com",
   )[0]! as HTMLInputElement
-  const subjectInput = screen.getAllByPlaceholderText(
-    "What is this regarding?",
-  )[0]! as HTMLInputElement
+  const subjectSelect = screen.getByRole(
+    "combobox",
+  ) as HTMLSelectElement
   const messageInput = screen.getAllByPlaceholderText(
     "Tell us more...",
   )[0]! as HTMLTextAreaElement
 
   await user.type(nameInput, "Test User")
   await user.type(emailInput, "test@example.com")
-  await user.type(subjectInput, "Support")
+  await user.selectOptions(subjectSelect, "Sales enquiry")
   await user.type(messageInput, "I need help.")
 
   const buttons = screen.getAllByRole("button", {
-    name: /Send Message/i,
+    name: /Send message/i,
   })
   await user.click(buttons[0]!)
 
   await waitFor(() => {
     expect(nameInput.value).toBe("")
     expect(emailInput.value).toBe("")
-    expect(subjectInput.value).toBe("")
+    expect(subjectSelect.value).toBe("")
     expect(messageInput.value).toBe("")
   })
 })
@@ -237,9 +250,9 @@ test("sends correct payload to API", async () => {
     screen.getAllByPlaceholderText("you@company.com")[0]!,
     "test@example.com",
   )
-  await user.type(
-    screen.getAllByPlaceholderText("What is this regarding?")[0]!,
-    "Support",
+  await user.selectOptions(
+    screen.getByRole("combobox"),
+    "Sales enquiry",
   )
   await user.type(
     screen.getAllByPlaceholderText("Tell us more...")[0]!,
@@ -247,7 +260,7 @@ test("sends correct payload to API", async () => {
   )
 
   const buttons = screen.getAllByRole("button", {
-    name: /Send Message/i,
+    name: /Send message/i,
   })
   await user.click(buttons[0]!)
 
@@ -260,7 +273,7 @@ test("sends correct payload to API", async () => {
         body: JSON.stringify({
           name: "Test User",
           email: "test@example.com",
-          subject: "Support",
+          subject: "Sales enquiry",
           message: "I need help with the software.",
         }),
       }),

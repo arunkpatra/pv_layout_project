@@ -24,7 +24,7 @@ test("renders page heading", () => {
   expect(
     screen.getByRole("heading", {
       level: 1,
-      name: /How SolarLayout Works/i,
+      name: /From boundary to bankable layout/i,
     })
   ).toBeInTheDocument()
 })
@@ -32,16 +32,16 @@ test("renders page heading", () => {
 test("renders all four steps", () => {
   render(<HowItWorksPage />)
   expect(
-    screen.getAllByText("Import Your Boundary").length
+    screen.getAllByText(/Import your boundary/i).length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("Configure Your Parameters").length
+    screen.getAllByText(/Configure your parameters/i).length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("Generate Your Layout").length
+    screen.getAllByText(/Generate your layout/i).length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("Export Your Results").length
+    screen.getAllByText(/Export your results/i).length
   ).toBeGreaterThanOrEqual(1)
 })
 
@@ -59,13 +59,12 @@ test("renders step descriptions from PRD", () => {
 test("renders supported features", () => {
   render(<HowItWorksPage />)
   expect(
-    screen.getAllByText("Supported Features").length
+    screen.getAllByText(/Supported features/i).length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText(/KMZ boundary input with multiple plant areas/i)
-      .length
+    screen.getAllByText(/Multiple plant areas/i).length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText(/P50 \/ P75 \/ P90 exceedance values/i).length
+    screen.getAllByText(/P50 \/ P75 \/ P90 exceedance/i).length
   ).toBeGreaterThanOrEqual(1)
 })

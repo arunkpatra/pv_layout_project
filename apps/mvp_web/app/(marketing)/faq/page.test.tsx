@@ -7,7 +7,7 @@ test("renders page heading", () => {
   render(<FaqPage />)
   const headings = screen.getAllByRole("heading", {
     level: 1,
-    name: /Frequently Asked Questions/i,
+    name: /Frequently asked questions/i,
   })
   expect(headings.length).toBeGreaterThanOrEqual(1)
 })
@@ -15,22 +15,22 @@ test("renders page heading", () => {
 test("renders all FAQ category headings", () => {
   render(<FaqPage />)
   const categories = [
-    "About the Software",
-    "Products & Downloads",
-    "Entitlements & Calculations",
-    "Payments",
-    "Support",
+    /About the software/i,
+    /Products & downloads/i,
+    /Entitlements & calculations/i,
+    /Payments/i,
+    /Support/i,
   ]
   for (const category of categories) {
     const matches = screen.getAllByRole("heading", {
-      level: 2,
+      level: 3,
       name: category,
     })
     expect(matches.length).toBeGreaterThanOrEqual(1)
   }
 })
 
-test("renders specific questions as accordion triggers", () => {
+test("renders specific questions as summary elements", () => {
   render(<FaqPage />)
   const questions = [
     /What is SolarLayout\?/i,
@@ -39,13 +39,15 @@ test("renders specific questions as accordion triggers", () => {
     /How do I contact support\?/i,
   ]
   for (const q of questions) {
-    const buttons = screen.getAllByRole("button", { name: q })
-    expect(buttons.length).toBeGreaterThanOrEqual(1)
+    const matches = screen.getAllByText(q)
+    expect(matches.length).toBeGreaterThanOrEqual(1)
   }
 })
 
 test("renders all 18 FAQ items", () => {
   render(<FaqPage />)
-  const triggers = screen.getAllByRole("button")
-  expect(triggers.length).toBeGreaterThanOrEqual(18)
+  // FAQ uses <details> elements, count them
+  const { container } = render(<FaqPage />)
+  const details = container.querySelectorAll("details")
+  expect(details.length).toBeGreaterThanOrEqual(18)
 })
