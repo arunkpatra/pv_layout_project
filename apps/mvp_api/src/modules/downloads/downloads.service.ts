@@ -22,8 +22,8 @@ export type DownloadRegisterInput = z.infer<typeof DownloadRegisterSchema>
 
 // ─── Product to S3 key mapping ────────────────────────────────────────────────
 
-const DOWNLOAD_S3_KEY = "downloads/pv_layout.exe"
-const DOWNLOAD_FILENAME = "pv_layout.exe"
+const DOWNLOAD_S3_KEY = "downloads/pv_layout.zip"
+const DOWNLOAD_FILENAME = "pv_layout.zip"
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 

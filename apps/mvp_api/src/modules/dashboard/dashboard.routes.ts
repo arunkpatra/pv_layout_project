@@ -4,8 +4,8 @@ import { getPresignedDownloadUrl } from "../../lib/s3.js"
 import { ok } from "../../lib/response.js"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 
-const DOWNLOAD_S3_KEY = "downloads/pv_layout.exe"
-const DOWNLOAD_FILENAME = "pv_layout.exe"
+const DOWNLOAD_S3_KEY = "downloads/pv_layout.zip"
+const DOWNLOAD_FILENAME = "pv_layout.zip"
 
 export const dashboardRoutes = new Hono<MvpHonoEnv>()
 

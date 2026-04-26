@@ -23,7 +23,7 @@ Resources are namespaced by environment. Last verified: 2026-04-20.
 
 **Key layout within each MVP download bucket:**
 ```
-downloads/pv_layout.exe             ← PV Layout desktop app (single exe for all tiers)
+downloads/pv_layout.zip             ← PV Layout desktop app (single zip for all tiers)
 ```
 
 **Configuration applied to all buckets:**

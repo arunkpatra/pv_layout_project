@@ -30,7 +30,7 @@ mock.module("../../lib/db.js", () => ({
 
 const mockGetPresignedDownloadUrl = mock(() =>
   Promise.resolve(
-    "https://s3.amazonaws.com/test-bucket/downloads/pv-layout-basic.exe?signed",
+    "https://s3.amazonaws.com/test-bucket/downloads/pv_layout.zip?signed",
   ),
 )
 
@@ -162,8 +162,8 @@ describe("registerDownload", () => {
     )
 
     expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv_layout.exe",
-      "pv_layout.exe",
+      "downloads/pv_layout.zip",
+      "pv_layout.zip",
       3600,
     )
   })
@@ -179,8 +179,8 @@ describe("registerDownload", () => {
     )
 
     expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv_layout.exe",
-      "pv_layout.exe",
+      "downloads/pv_layout.zip",
+      "pv_layout.zip",
       3600,
     )
   })
@@ -234,7 +234,7 @@ describe("POST /download-register", () => {
     )
     mockGetPresignedDownloadUrl.mockImplementation(() =>
       Promise.resolve(
-        "https://s3.amazonaws.com/test-bucket/downloads/pv-layout-basic.exe?signed",
+        "https://s3.amazonaws.com/test-bucket/downloads/pv_layout.zip?signed",
       ),
     )
   })

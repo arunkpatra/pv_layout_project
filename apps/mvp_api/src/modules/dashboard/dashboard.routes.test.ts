@@ -104,8 +104,8 @@ describe("GET /dashboard/download", () => {
     expect(body.success).toBe(true)
     expect(body.data.url).toContain("s3.example.com")
     expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv_layout.exe",
-      "pv_layout.exe",
+      "downloads/pv_layout.zip",
+      "pv_layout.zip",
       60
     )
   })
