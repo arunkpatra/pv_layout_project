@@ -157,7 +157,7 @@ export function CustomerDetailClient({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">
-            Entitlements
+            Plans
           </h2>
           <div className="flex gap-1">
             <Button
@@ -186,7 +186,7 @@ export function CustomerDetailClient({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
+                  <TableHead>Plan</TableHead>
                   <TableHead>Purchased</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Used</TableHead>
