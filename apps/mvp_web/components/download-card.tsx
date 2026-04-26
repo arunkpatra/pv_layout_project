@@ -11,13 +11,10 @@ import {
 } from "@renewable-energy/ui/components/card"
 import { Button } from "@renewable-energy/ui/components/button"
 
-type ProductSlug = "pv-layout-basic" | "pv-layout-pro" | "pv-layout-pro-plus"
-
 interface DownloadCardProps {
   name: string
   price: string
   calculations: string
-  productSlug: ProductSlug
   apiBaseUrl: string
   highlighted?: boolean
 }
@@ -26,7 +23,6 @@ export function DownloadCard({
   name,
   price,
   calculations,
-  productSlug,
   apiBaseUrl,
   highlighted,
 }: DownloadCardProps) {
@@ -41,7 +37,7 @@ export function DownloadCard({
     try {
       const token = await getToken()
       const res = await fetch(
-        `${apiBaseUrl}/dashboard/download/${productSlug}`,
+        `${apiBaseUrl}/dashboard/download`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -60,7 +56,7 @@ export function DownloadCard({
 
       const a = document.createElement("a")
       a.href = body.data.url
-      a.download = `${productSlug}.exe`
+      a.download = "pv_layout.exe"
       document.body.appendChild(a)
       a.click()
       a.remove()

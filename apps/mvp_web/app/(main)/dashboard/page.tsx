@@ -64,7 +64,7 @@ export default function DashboardPage() {
   const licenseKey = entData?.licenseKey ?? null
   const maskedKey = licenseKey ? `${licenseKey.slice(0, 8)}...` : null
 
-  const firstActiveSlug = activeEntitlements[0]?.product ?? null
+  const hasActiveEntitlement = activeEntitlements.length > 0
 
   async function handleCopyKey() {
     if (!licenseKey) return
@@ -78,11 +78,11 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleDownload(productSlug: string) {
+  async function handleDownload() {
     try {
       const token = await getToken()
       const res = await fetch(
-        `${MVP_API_URL}/dashboard/download/${productSlug}`,
+        `${MVP_API_URL}/dashboard/download`,
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (!res.ok) {
@@ -203,9 +203,9 @@ export default function DashboardPage() {
           <CardContent>
             {entLoading ? (
               <Skeleton className="h-9 w-32" />
-            ) : firstActiveSlug ? (
+            ) : hasActiveEntitlement ? (
               <Button
-                onClick={() => handleDownload(firstActiveSlug)}
+                onClick={handleDownload}
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />

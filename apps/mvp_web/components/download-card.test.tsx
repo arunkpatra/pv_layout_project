@@ -25,18 +25,17 @@ describe("DownloadCard", () => {
   })
 
   const defaultProps = {
-    name: "PV Layout Basic",
-    price: "$1.99",
-    calculations: "5 layout calculations",
-    productSlug: "pv-layout-basic" as const,
+    name: "PV Layout",
+    price: "From $1.99",
+    calculations: "Plans from 5 to 50 calculations",
     apiBaseUrl: "https://api.example.com",
   }
 
   it("renders product name, price, and calculations", () => {
     render(<DownloadCard {...defaultProps} />)
-    expect(screen.getByText("PV Layout Basic")).toBeInTheDocument()
-    expect(screen.getByText("$1.99")).toBeInTheDocument()
-    expect(screen.getByText("5 layout calculations")).toBeInTheDocument()
+    expect(screen.getByText("PV Layout")).toBeInTheDocument()
+    expect(screen.getByText("From $1.99")).toBeInTheDocument()
+    expect(screen.getByText("Plans from 5 to 50 calculations")).toBeInTheDocument()
   })
 
   it("renders Download button", () => {
@@ -75,7 +74,7 @@ describe("DownloadCard", () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.example.com/dashboard/download/pv-layout-basic",
+        "https://api.example.com/dashboard/download",
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: "Bearer mock-clerk-token",

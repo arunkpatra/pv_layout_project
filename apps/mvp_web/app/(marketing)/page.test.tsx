@@ -38,14 +38,13 @@ test("renders Explore Products CTA", () => {
   expect(links.length).toBeGreaterThanOrEqual(1)
 })
 
-test("renders Features Overview section", () => {
+test("renders Features Overview section with all three plans", () => {
   render(<HomePage />)
-  const basic = screen.getAllByText("PV Layout Basic")
-  expect(basic.length).toBeGreaterThanOrEqual(1)
-  const pro = screen.getAllByText("PV Layout Pro")
-  expect(pro.length).toBeGreaterThanOrEqual(1)
-  const proPlus = screen.getAllByText("PV Layout Pro Plus")
-  expect(proPlus.length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("PV Layout Basic").length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText("PV Layout Pro Plus").length
+  ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders How It Works summary steps", () => {

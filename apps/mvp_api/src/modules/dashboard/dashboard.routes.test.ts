@@ -82,7 +82,7 @@ function makeApp() {
   return app
 }
 
-describe("GET /dashboard/download/:product", () => {
+describe("GET /dashboard/download", () => {
   beforeEach(() => {
     mockGetPresignedDownloadUrl.mockReset()
     mockGetPresignedDownloadUrl.mockImplementation(
@@ -90,9 +90,9 @@ describe("GET /dashboard/download/:product", () => {
     )
   })
 
-  it("returns 200 with url for pv-layout-basic", async () => {
+  it("returns 200 with presigned url", async () => {
     const app = makeApp()
-    const res = await app.request("/dashboard/download/pv-layout-basic", {
+    const res = await app.request("/dashboard/download", {
       method: "GET",
       headers: { Authorization: "Bearer valid-token" },
     })
@@ -104,49 +104,16 @@ describe("GET /dashboard/download/:product", () => {
     expect(body.success).toBe(true)
     expect(body.data.url).toContain("s3.example.com")
     expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv-layout-basic.exe",
-      "pv-layout-basic.exe",
+      "downloads/pv_layout.exe",
+      "pv_layout.exe",
       60
     )
-  })
-
-  it("returns 200 for pv-layout-pro", async () => {
-    const app = makeApp()
-    const res = await app.request("/dashboard/download/pv-layout-pro", {
-      method: "GET",
-      headers: { Authorization: "Bearer valid-token" },
-    })
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as {
-      success: boolean
-      data: { url: string }
-    }
-    expect(body.success).toBe(true)
-    expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv-layout-pro.exe",
-      "pv-layout-pro.exe",
-      60
-    )
-  })
-
-  it("returns 400 for invalid product slug", async () => {
-    const app = makeApp()
-    const res = await app.request(
-      "/dashboard/download/nonexistent-product",
-      {
-        method: "GET",
-        headers: { Authorization: "Bearer valid-token" },
-      }
-    )
-    expect(res.status).toBe(400)
-    const body = (await res.json()) as { success: boolean }
-    expect(body.success).toBe(false)
   })
 
   it("returns 500 when S3 is not configured (url is null)", async () => {
     mockGetPresignedDownloadUrl.mockImplementation(async () => null as unknown as string)
     const app = makeApp()
-    const res = await app.request("/dashboard/download/pv-layout-basic", {
+    const res = await app.request("/dashboard/download", {
       method: "GET",
       headers: { Authorization: "Bearer valid-token" },
     })

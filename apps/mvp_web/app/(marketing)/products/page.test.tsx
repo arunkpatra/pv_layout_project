@@ -26,34 +26,43 @@ import ProductsPage from "./page"
 test("renders page heading", () => {
   render(<ProductsPage />)
   expect(
-    screen.getByRole("heading", { level: 1, name: /Our Products/i })
+    screen.getByRole("heading", { level: 1, name: /PV Layout/i })
   ).toBeInTheDocument()
 })
 
-test("renders all three product cards", () => {
+test("renders all three plan cards", () => {
   render(<ProductsPage />)
-  const basic = screen.getAllByText("PV Layout Basic")
-  expect(basic.length).toBeGreaterThanOrEqual(1)
-  const pro = screen.getAllByText("PV Layout Pro")
-  expect(pro.length).toBeGreaterThanOrEqual(1)
-  const proPlus = screen.getAllByText("PV Layout Pro Plus")
-  expect(proPlus.length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("PV Layout Basic").length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText("PV Layout Pro Plus").length
+  ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders prices", () => {
   render(<ProductsPage />)
-  const price1 = screen.getAllByText("$1.99")
-  expect(price1.length).toBeGreaterThanOrEqual(1)
-  const price2 = screen.getAllByText("$4.99")
-  expect(price2.length).toBeGreaterThanOrEqual(1)
-  const price3 = screen.getAllByText("$14.99")
-  expect(price3.length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("$1.99").length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("$4.99").length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText("$14.99").length).toBeGreaterThanOrEqual(1)
 })
 
-test("renders download buttons", () => {
+test("renders single download button", () => {
   render(<ProductsPage />)
   const downloadButtons = screen.getAllByRole("button", {
     name: /Download/i,
   })
-  expect(downloadButtons.length).toBeGreaterThanOrEqual(3)
+  expect(downloadButtons).toHaveLength(1)
+})
+
+test("renders Buy Now links for each plan", () => {
+  render(<ProductsPage />)
+  const buyLinks = screen.getAllByRole("link", { name: /Buy Now/i })
+  expect(buyLinks.length).toBe(3)
+})
+
+test("renders free trial callout", () => {
+  render(<ProductsPage />)
+  expect(
+    screen.getByText(/Free trial included/i)
+  ).toBeInTheDocument()
 })

@@ -103,8 +103,9 @@ describe("DownloadRegisterSchema", () => {
     expect(result.success).toBe(false)
   })
 
-  test("accepts all three valid product names", () => {
+  test("accepts all valid product names", () => {
     const products = [
+      "PV Layout",
       "PV Layout Basic",
       "PV Layout Pro",
       "PV Layout Pro Plus",
@@ -161,8 +162,8 @@ describe("registerDownload", () => {
     )
 
     expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv-layout-pro.exe",
-      "pv-layout-pro.exe",
+      "downloads/pv_layout.exe",
+      "pv_layout.exe",
       3600,
     )
   })
@@ -178,8 +179,8 @@ describe("registerDownload", () => {
     )
 
     expect(mockGetPresignedDownloadUrl).toHaveBeenCalledWith(
-      "downloads/pv-layout-pro-plus.exe",
-      "pv-layout-pro-plus.exe",
+      "downloads/pv_layout.exe",
+      "pv_layout.exe",
       3600,
     )
   })

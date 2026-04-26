@@ -1,13 +1,22 @@
 import type { Metadata } from "next"
-import { ProductCard } from "@/components/product-card"
+import Link from "next/link"
+import { Download } from "lucide-react"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@renewable-energy/ui/components/card"
+import { Button } from "@renewable-energy/ui/components/button"
+import { DownloadModal } from "@/components/download-modal"
 
 export const metadata: Metadata = {
   title: "Products",
   description:
-    "Download PV Layout Basic, Pro, or Pro Plus — automated solar plant layout design solutions for Windows.",
+    "PV Layout — automated solar plant layout design for Windows. Three plans for every stage of utility-scale solar development.",
 }
 
-const products = [
+const plans = [
   {
     name: "PV Layout Basic",
     price: "$1.99",
@@ -25,7 +34,7 @@ const products = [
     price: "$4.99",
     calculations: "10 layout calculations per purchase",
     features: [
-      "All PV Layout Basic features",
+      "All Basic features included",
       "AC and DC cable placement with full routing",
       "Cable quantity measurements",
       "ICR building placement (1 per 18 MWp)",
@@ -38,7 +47,7 @@ const products = [
     price: "$14.99",
     calculations: "50 layout and yield calculations per purchase",
     features: [
-      "All PV Layout Pro features",
+      "All Pro features included",
       "Energy yield analysis",
       "P50 / P75 / P90 exceedance values",
       "Plant generation estimates",
@@ -53,26 +62,82 @@ export default function ProductsPage() {
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Our Products
+            PV Layout
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Three desktop solutions for every stage of utility-scale solar PV
-            plant development. From quick capacity estimates to detailed
-            bankable layouts with energy yield analysis.
+            One desktop application, three plans for every stage of
+            utility-scale solar PV plant development.
           </p>
         </div>
 
+        {/* Download CTA */}
+        <div className="mt-8 flex justify-center">
+          <DownloadModal productName="PV Layout">
+            <Button
+              size="lg"
+              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              <Download className="h-5 w-5" />
+              Download PV Layout
+            </Button>
+          </DownloadModal>
+        </div>
+
+        {/* Free trial callout */}
+        <div className="mx-auto mt-6 max-w-md rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-center dark:border-green-900 dark:bg-green-950/20">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">Free trial included</strong>
+            {" — "}sign up and get 5 full-featured calculations, no credit card
+            required.
+          </p>
+        </div>
+
+        {/* Plan cards */}
         <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <ProductCard
-              key={product.name}
-              name={product.name}
-              price={product.price}
-              calculations={product.calculations}
-              features={product.features}
-              highlighted={product.highlighted}
-            />
+          {plans.map((plan) => (
+            <Card
+              key={plan.name}
+              className={`flex flex-col ${plan.highlighted ? "border-accent ring-2 ring-accent/20" : ""}`}
+            >
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    {plan.price}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {plan.calculations}
+                </p>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col">
+                <ul className="flex-1 space-y-2">
+                  {plan.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-start gap-2 text-sm text-muted-foreground"
+                    >
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Button asChild variant="outline" className="mt-6 w-full">
+                  <Link href="/dashboard/plans">Buy Now</Link>
+                </Button>
+              </CardContent>
+            </Card>
           ))}
+        </div>
+
+        {/* Top-up note */}
+        <div className="mt-12 rounded-lg border border-border bg-card p-6 text-center">
+          <p className="text-muted-foreground">
+            <strong className="text-foreground">
+              Need more calculations?
+            </strong>{" "}
+            Top up anytime at the same rate.
+          </p>
         </div>
       </div>
     </div>
