@@ -272,7 +272,7 @@ export default function DashboardPage() {
                   size="sm"
                   className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
                 >
-                  <Link href="/dashboard/plans">Purchase Plan</Link>
+                  <Link href="/dashboard/plans">Buy Calculations</Link>
                 </Button>
               </div>
             ) : (
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                   size="sm"
                   className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
                 >
-                  <Link href="/dashboard/plans">Buy a Plan</Link>
+                  <Link href="/dashboard/plans">Buy Calculations</Link>
                 </Button>
               </div>
             )}
