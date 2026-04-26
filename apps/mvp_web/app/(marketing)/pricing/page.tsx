@@ -118,10 +118,18 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <div className="mx-auto mt-6 max-w-[560px] rounded-lg border border-[#BBE0CB] bg-[#F0F8F3] px-[18px] py-3.5 text-center text-sm text-[#374151]">
-          <strong className="text-[#1A5C3A]">Free trial included</strong>
-          {" — "}sign up and get 5 full-featured calculations, no credit
-          card required.
+        <div className="mx-auto mt-6 flex max-w-[640px] flex-wrap items-center justify-center gap-x-4 gap-y-3 rounded-lg border border-[#BBE0CB] bg-[#F0F8F3] px-[18px] py-3.5 text-center text-sm text-[#374151]">
+          <span>
+            <strong className="text-[#1A5C3A]">Free trial included</strong>
+            {" — "}5 full-featured calculations, no credit card required.
+          </span>
+          <Button
+            asChild
+            size="sm"
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            <Link href="/sign-up">Get Free License Key</Link>
+          </Button>
         </div>
       </SectionBand>
 
