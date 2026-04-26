@@ -189,6 +189,36 @@ export type ProductsSummary = {
   activeEntitlements: number
 }
 
+export async function updateStripePriceId(
+  slug: string,
+  stripePriceId: string,
+): Promise<{ slug: string; stripePriceId: string }> {
+  const product = await db.product.findUnique({
+    where: { slug },
+    select: { id: true },
+  })
+  if (!product) {
+    throw new AppError("NOT_FOUND", `Product ${slug} not found`, 404)
+  }
+
+  const updated = await db.product.update({
+    where: { slug },
+    data: { stripePriceId },
+    select: { slug: true, stripePriceId: true },
+  })
+
+  return updated
+}
+
+export async function listProductStripePrices(): Promise<
+  { slug: string; name: string; stripePriceId: string; isFree: boolean }[]
+> {
+  return db.product.findMany({
+    orderBy: { displayOrder: "asc" },
+    select: { slug: true, name: true, stripePriceId: true, isFree: true },
+  })
+}
+
 export async function getProductsSummary(): Promise<ProductsSummary> {
   const [revenueAgg, totalPurchases, activeEntitlements] = await Promise.all([
     db.checkoutSession.aggregate({
