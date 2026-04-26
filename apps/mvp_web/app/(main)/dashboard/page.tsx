@@ -129,7 +129,7 @@ export default function DashboardPage() {
         <div className="flex flex-col overflow-hidden rounded-lg bg-accent text-[#1C1C1C] md:flex-row md:items-stretch">
           {/* Left — icon + text */}
           <div className="flex items-center gap-4 px-6 py-5">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-white/30">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#1C1C1C]">
               <KeyRound className="h-6 w-6 text-white" />
             </div>
             <div>
