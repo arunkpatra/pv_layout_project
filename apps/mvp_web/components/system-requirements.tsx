@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { SectionBand } from "./section-band"
 import { SectionHead } from "./section-head"
 
@@ -78,6 +79,15 @@ export function SystemRequirements() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8 flex justify-center">
+        <Link
+          href="/faq"
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-[#1C1C1C] transition-colors hover:bg-accent/90"
+        >
+          Frequently asked questions
+        </Link>
       </div>
     </SectionBand>
   )
