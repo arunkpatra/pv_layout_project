@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Sun, Menu } from "lucide-react"
+import { Sun, Menu, Download } from "lucide-react"
 import { SignedIn, SignedOut } from "@clerk/nextjs"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
@@ -28,25 +28,32 @@ export function Header() {
   const [open, setOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-card">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <Sun className="h-7 w-7 text-accent" />
-          <span className="text-xl font-bold text-primary">SolarLayout</span>
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-[1.4]">
+      <div className="mx-auto flex max-w-[1200px] items-center gap-8 px-6 py-3.5">
+        {/* Brand */}
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-primary">
+            <Sun className="h-4 w-4 text-white" />
+          </span>
+          <span className="text-[15px] font-semibold tracking-tight text-foreground">
+            SolarLayout
+            <span className="ml-1.5 font-mono text-xs font-normal text-muted-foreground">
+              / pv layout
+            </span>
+          </span>
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="ml-auto hidden items-center gap-1 md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted",
+                "rounded-md px-3 py-2 text-sm transition-colors hover:bg-secondary hover:text-primary",
                 pathname === link.href
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                  ? "font-medium text-primary"
+                  : "text-[#374151]"
               )}
             >
               {link.label}
@@ -66,11 +73,11 @@ export function Header() {
               <Link href="/dashboard">Dashboard</Link>
             </Button>
           </SignedIn>
-          <Button
-            asChild
-            className="bg-accent text-accent-foreground [a]:hover:bg-accent/80"
-          >
-            <Link href="/products">Download Now</Link>
+          <Button asChild className="gap-2">
+            <Link href="/products">
+              Download
+              <Download className="h-4 w-4" />
+            </Link>
           </Button>
         </div>
 
@@ -87,10 +94,15 @@ export function Header() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-72">
-            <div className="flex items-center gap-2 pt-2 pb-6">
-              <Sun className="h-6 w-6 text-accent" />
-              <span className="text-lg font-bold text-primary">
+            <div className="flex items-center gap-2.5 pt-2 pb-6">
+              <span className="grid h-7 w-7 place-items-center rounded-md bg-primary">
+                <Sun className="h-4 w-4 text-white" />
+              </span>
+              <span className="text-[15px] font-semibold tracking-tight text-foreground">
                 SolarLayout
+                <span className="ml-1.5 font-mono text-xs font-normal text-muted-foreground">
+                  / pv layout
+                </span>
               </span>
             </div>
             <nav className="flex flex-col gap-1">
@@ -100,10 +112,10 @@ export function Header() {
                   href={link.href}
                   onClick={() => setOpen(false)}
                   className={cn(
-                    "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted",
+                    "rounded-md px-3 py-2 text-sm transition-colors hover:bg-secondary hover:text-primary",
                     pathname === link.href
-                      ? "text-primary"
-                      : "text-muted-foreground"
+                      ? "font-medium text-primary"
+                      : "text-[#374151]"
                   )}
                 >
                   {link.label}
@@ -125,12 +137,10 @@ export function Header() {
                   </Link>
                 </Button>
               </SignedIn>
-              <Button
-                asChild
-                className="w-full bg-accent text-accent-foreground [a]:hover:bg-accent/80"
-              >
+              <Button asChild className="w-full gap-2">
                 <Link href="/products" onClick={() => setOpen(false)}>
-                  Download Now
+                  Download
+                  <Download className="h-4 w-4" />
                 </Link>
               </Button>
             </div>
