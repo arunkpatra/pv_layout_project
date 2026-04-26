@@ -25,11 +25,12 @@ export function ScreenshotsSection() {
             <LayoutCanvasScreenshot />
           </WindowFrame>
         </div>
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 lg:row-span-2">
           <WindowFrame
             title="BoQ — cable schedule"
             caption="Cable schedule — automatic from layout"
             captionMeta="Pro / Pro Plus"
+            className="flex-1"
           >
             <CableScheduleScreenshot />
           </WindowFrame>
@@ -37,6 +38,7 @@ export function ScreenshotsSection() {
             title="Yield report"
             caption="Yield report — P50/P75/P90, monthly generation"
             captionMeta="Pro Plus only"
+            className="flex-1"
           >
             <YieldReportScreenshot />
           </WindowFrame>
