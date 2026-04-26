@@ -20,6 +20,7 @@ export function ScreenshotsSection() {
             caption="Layout canvas — table grid, inverters, exclusions"
             captionMeta="View · Layout/2D"
             className="h-full"
+            contentClassName="bg-[linear-gradient(to_right,#FAFBFC_75%,#fff_75%)]"
           >
             <LayoutCanvasScreenshot />
           </WindowFrame>

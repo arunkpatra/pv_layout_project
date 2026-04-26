@@ -5,6 +5,7 @@ interface WindowFrameProps {
   captionMeta?: string
   children: React.ReactNode
   className?: string
+  contentClassName?: string
 }
 
 export function WindowFrame({
@@ -14,6 +15,7 @@ export function WindowFrame({
   captionMeta,
   children,
   className,
+  contentClassName,
 }: WindowFrameProps) {
   return (
     <div className={`flex flex-col overflow-hidden rounded-[12px] border border-border bg-card${className ? ` ${className}` : ""}`}>
@@ -30,7 +32,7 @@ export function WindowFrame({
           </span>
         )}
       </div>
-      <div className="flex-1 bg-[#FAFBFC]">{children}</div>
+      <div className={`flex-1 bg-[#FAFBFC]${contentClassName ? ` ${contentClassName}` : ""}`}>{children}</div>
       {caption && (
         <div className="flex items-center justify-between border-t border-border bg-white px-3.5 py-3">
           <span className="text-[13px] font-medium">{caption}</span>
