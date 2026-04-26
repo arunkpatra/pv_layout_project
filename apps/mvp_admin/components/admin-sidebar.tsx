@@ -8,6 +8,7 @@ import {
   Users,
   Building2,
   Package,
+  Settings,
   LogOut,
   ChevronsUpDown,
   ShieldCheck,
@@ -45,7 +46,10 @@ const BASE_NAV = [
   { label: "Customers", href: "/customers", icon: Building2 },
   { label: "Plans", href: "/plans", icon: Package },
 ]
-const ADMIN_NAV = [{ label: "Users", href: "/users", icon: Users }]
+const ADMIN_NAV = [
+  { label: "Users", href: "/users", icon: Users },
+  { label: "System", href: "/system", icon: Settings },
+]
 
 function NavUser({
   user,

@@ -7,6 +7,7 @@ import {
   listCustomers,
   getCustomer,
   updateEntitlementStatus,
+  updateEntitlementUsed,
 } from "./customer.service.js"
 import { ok } from "../../lib/response.js"
 import { ValidationError } from "../../lib/errors.js"
@@ -15,6 +16,10 @@ export const customerRoutes = new Hono<MvpHonoEnv>()
 
 const EntitlementStatusSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
+})
+
+const EntitlementUsedSchema = z.object({
+  usedCalculations: z.number().int().min(0),
 })
 
 customerRoutes.use("/admin/*", clerkAuth, requireRole("ADMIN", "OPS"))
@@ -46,6 +51,19 @@ customerRoutes.patch("/admin/entitlements/:id/status", async (c) => {
   const updated = await updateEntitlementStatus({
     entitlementId: id,
     status: parsed.data.status,
+  })
+  return c.json(ok(updated))
+})
+
+customerRoutes.patch("/admin/entitlements/:id/used", async (c) => {
+  const { id } = c.req.param()
+  const parsed = EntitlementUsedSchema.safeParse(await c.req.json())
+  if (!parsed.success) {
+    throw new ValidationError(parsed.error.flatten().fieldErrors)
+  }
+  const updated = await updateEntitlementUsed({
+    entitlementId: id,
+    usedCalculations: parsed.data.usedCalculations,
   })
   return c.json(ok(updated))
 })

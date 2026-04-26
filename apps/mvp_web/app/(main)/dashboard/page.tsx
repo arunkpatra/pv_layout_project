@@ -199,7 +199,7 @@ export default function DashboardPage() {
               <div>
                 <span
                   data-testid="remaining-calculations-value"
-                  className="text-4xl font-bold text-foreground"
+                  className="block text-4xl font-bold text-foreground"
                 >
                   {remainingCalculations}
                 </span>
@@ -272,19 +272,22 @@ export default function DashboardPage() {
                   size="sm"
                   className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
                 >
-                  <Link href="/dashboard/plans">Purchase Plan</Link>
+                  <Link href="/dashboard/plans">Buy Calculations</Link>
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No active plan.{" "}
-                <Link
-                  href="/dashboard/plans"
-                  className="text-primary underline-offset-4 hover:underline"
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  No active plan.
+                </p>
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
                 >
-                  Buy a plan →
-                </Link>
-              </p>
+                  <Link href="/dashboard/plans">Buy Calculations</Link>
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -299,7 +302,7 @@ export default function DashboardPage() {
           <CardContent className="mt-auto">
             {entLoading ? (
               <Skeleton className="h-9 w-32" />
-            ) : hasActiveEntitlement ? (
+            ) : (
               <Button
                 onClick={handleDownload}
                 className="gap-2 bg-accent text-accent-foreground hover:!bg-accent/90"
@@ -307,22 +310,6 @@ export default function DashboardPage() {
                 <Download className="h-4 w-4" />
                 Download
               </Button>
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-block">
-                      <Button disabled className="gap-2">
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Purchase a plan to download.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             )}
           </CardContent>
         </Card>

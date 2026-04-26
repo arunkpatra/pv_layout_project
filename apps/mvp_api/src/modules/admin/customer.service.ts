@@ -128,7 +128,7 @@ export async function getCustomer(
     throw new AppError("NOT_FOUND", `Customer ${id} not found`, 404)
   }
 
-  const entitlements: EntitlementDetail[] = user.entitlements.map((e) => ({
+  const allEntitlements: EntitlementDetail[] = user.entitlements.map((e) => ({
     id: e.id,
     productId: e.product.id,
     productName: e.product.name,
@@ -140,6 +140,13 @@ export async function getCustomer(
     deactivatedAt: e.deactivatedAt?.toISOString() ?? null,
     state: deriveEntitlementState(e),
   }))
+
+  // The DB filter only checks deactivatedAt for "active" — also exclude
+  // EXHAUSTED entitlements (usedCalculations >= totalCalculations)
+  const entitlements =
+    filter === "active"
+      ? allEntitlements.filter((e) => e.state === "ACTIVE")
+      : allEntitlements
 
   return {
     id: user.id,
@@ -155,6 +162,51 @@ export async function getCustomer(
       ) / 100,
     entitlements,
   }
+}
+
+export async function updateEntitlementUsed(params: {
+  entitlementId: string
+  usedCalculations: number
+}): Promise<{
+  id: string
+  usedCalculations: number
+  totalCalculations: number
+}> {
+  const { entitlementId, usedCalculations } = params
+
+  const existing = await db.entitlement.findUnique({
+    where: { id: entitlementId },
+    select: { id: true, totalCalculations: true },
+  })
+  if (!existing) {
+    throw new AppError(
+      "NOT_FOUND",
+      `Entitlement ${entitlementId} not found`,
+      404,
+    )
+  }
+
+  if (usedCalculations < 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Used calculations cannot be negative",
+      400,
+    )
+  }
+
+  if (usedCalculations > existing.totalCalculations) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `Used calculations (${usedCalculations}) cannot exceed total (${existing.totalCalculations})`,
+      400,
+    )
+  }
+
+  return db.entitlement.update({
+    where: { id: entitlementId },
+    data: { usedCalculations },
+    select: { id: true, usedCalculations: true, totalCalculations: true },
+  })
 }
 
 export async function updateEntitlementStatus(params: {

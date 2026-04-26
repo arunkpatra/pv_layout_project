@@ -1,9 +1,18 @@
 import { Hono } from "hono"
+import { z } from "zod"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 import { clerkAuth } from "../../middleware/clerk-auth.js"
 import { requireRole } from "../../middleware/rbac.js"
-import { listProducts, getProduct, getProductSales, getProductsSummary } from "./product.service.js"
+import {
+  listProducts,
+  getProduct,
+  getProductSales,
+  getProductsSummary,
+  updateStripePriceId,
+  listProductStripePrices,
+} from "./product.service.js"
 import { ok } from "../../lib/response.js"
+import { ValidationError } from "../../lib/errors.js"
 
 export const productRoutes = new Hono<MvpHonoEnv>()
 
@@ -19,12 +28,22 @@ productRoutes.get("/admin/products", async (c) => {
   return c.json(ok(result))
 })
 
-// NOTE: summary route MUST be registered before /:slug to prevent Hono matching
-// "summary" as the :slug param value
+// NOTE: static routes MUST be registered before /:slug to prevent Hono matching
+// them as the :slug param value
 productRoutes.get("/admin/products/summary", async (c) => {
   const result = await getProductsSummary()
   return c.json(ok(result))
 })
+
+// ADMIN-only: list all products with their Stripe price IDs
+productRoutes.get(
+  "/admin/products/stripe-prices",
+  requireRole("ADMIN"),
+  async (c) => {
+    const prices = await listProductStripePrices()
+    return c.json(ok(prices))
+  },
+)
 
 // NOTE: sales route MUST be registered before /:slug to prevent Hono matching
 // "sales" as the :slug param value
@@ -42,3 +61,23 @@ productRoutes.get("/admin/products/:slug", async (c) => {
   const product = await getProduct(slug)
   return c.json(ok(product))
 })
+
+// --- ADMIN-only routes (no OPS access) ---
+
+const StripePriceSchema = z.object({
+  stripePriceId: z.string().min(1, "stripePriceId is required"),
+})
+
+productRoutes.patch(
+  "/admin/products/:slug/stripe-price",
+  requireRole("ADMIN"),
+  async (c) => {
+    const { slug } = c.req.param()
+    const parsed = StripePriceSchema.safeParse(await c.req.json())
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.flatten().fieldErrors)
+    }
+    const result = await updateStripePriceId(slug, parsed.data.stripePriceId)
+    return c.json(ok(result))
+  },
+)
