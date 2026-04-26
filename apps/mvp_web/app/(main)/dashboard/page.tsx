@@ -141,7 +141,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Right — key + actions */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-[#1C1C1C]/10 px-6 py-5 @sm:ml-auto @sm:border-l @sm:border-t-0">
+          <div className="flex flex-wrap items-center gap-3 border-t border-t-[#1C1C1C]/10 px-6 py-5 @sm:ml-auto @sm:border-l @sm:border-l-[#1C1C1C]/10 @sm:border-t-0">
             <span className="font-mono text-lg font-bold tracking-wide">
               {keyRevealed ? licenseKey : maskedKey}
             </span>
