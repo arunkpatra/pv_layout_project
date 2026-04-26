@@ -1,60 +1,67 @@
-import { Upload, Settings, Layout, FileOutput } from "lucide-react"
+import { Upload, Server, Activity, Download } from "lucide-react"
+import { SectionBand } from "./section-band"
+import { SectionHead } from "./section-head"
 
 const steps = [
   {
     icon: Upload,
-    title: "Upload KMZ",
+    label: "Step 01",
+    title: "Import boundary",
     description: "Upload your site boundary file",
   },
   {
-    icon: Settings,
-    title: "Enter Parameters",
+    icon: Server,
+    label: "Step 02",
+    title: "Configure parameters",
     description: "Configure module and plant specs",
   },
   {
-    icon: Layout,
-    title: "Generate Layout",
+    icon: Activity,
+    label: "Step 03",
+    title: "Generate layout",
     description: "Software creates your layout automatically",
   },
   {
-    icon: FileOutput,
-    title: "Export Results",
+    icon: Download,
+    label: "Step 04",
+    title: "Export deliverables",
     description: "Download KMZ, DXF, and PDF reports",
   },
 ]
 
 export function HowItWorksSummary() {
   return (
-    <section className="bg-muted px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            How It Works
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            From Boundary to Layout to Yield — in minutes.
-          </p>
-        </div>
+    <SectionBand muted>
+      <SectionHead
+        eyebrow="02 / Pipeline"
+        title="From boundary to deliverable."
+        description="Four steps. No re-keying coordinates between Google Earth, AutoCAD and PVsyst."
+        ctaHref="/how-it-works"
+        ctaLabel="Read the workflow →"
+      />
 
-        <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map((step, index) => (
-            <div key={step.title} className="text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <step.icon className="h-7 w-7" />
-              </div>
-              <div className="mt-2 text-sm font-semibold text-accent">
-                Step {index + 1}
-              </div>
-              <h3 className="mt-1 text-lg font-semibold text-foreground">
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {step.description}
-              </p>
+      <div className="grid overflow-hidden rounded-[var(--radius)] border border-border bg-card sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((step) => (
+          <div
+            key={step.label}
+            className="flex flex-col gap-2.5 border-b border-border p-6 sm:border-r sm:[&:nth-child(2)]:border-r-0 lg:border-b-0 lg:border-r lg:[&:nth-child(2)]:border-r lg:last:border-r-0"
+          >
+            <div className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-[#FBFCFD] text-primary">
+              <step.icon className="h-[18px] w-[18px]" />
             </div>
-          ))}
-        </div>
+
+            <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+              {step.label}
+            </span>
+
+            <h4 className="text-base font-semibold">{step.title}</h4>
+
+            <p className="text-[13.5px] leading-[1.5] text-muted-foreground">
+              {step.description}
+            </p>
+          </div>
+        ))}
       </div>
-    </section>
+    </SectionBand>
   )
 }
