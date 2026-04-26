@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { PageHeader } from "@/components/page-header"
 import { SectionBand } from "@/components/section-band"
 
@@ -68,6 +69,21 @@ export default function AboutPage() {
               ))}
             </div>
           </div>
+        </div>
+      </SectionBand>
+
+      {/* Bottom CTA */}
+      <SectionBand muted>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h2 className="text-[28px] font-semibold tracking-[-0.015em]">
+            Want to know more? Get in touch.
+          </h2>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-[#1C1C1C] transition-colors hover:bg-accent/90"
+          >
+            Contact us
+          </Link>
         </div>
       </SectionBand>
     </>

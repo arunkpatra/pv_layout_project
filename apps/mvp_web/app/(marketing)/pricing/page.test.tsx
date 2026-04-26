@@ -32,13 +32,13 @@ test("renders page heading", () => {
 test("renders plan cards with all three tier names", () => {
   render(<PricingPage />)
   expect(
-    screen.getAllByText("PV Layout Basic").length
+    screen.getAllByText("Basic").length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("PV Layout Pro").length
+    screen.getAllByText("Pro").length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("PV Layout Pro Plus").length
+    screen.getAllByText("Pro Plus").length
   ).toBeGreaterThanOrEqual(1)
 })
 

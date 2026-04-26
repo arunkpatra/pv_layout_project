@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { PageHeader } from "@/components/page-header"
 import { SectionBand } from "@/components/section-band"
 import { SectionHead } from "@/components/section-head"
@@ -186,6 +187,21 @@ export default function HowItWorksPage() {
               </div>
             </div>
           ))}
+        </div>
+      </SectionBand>
+
+      {/* Bottom CTA */}
+      <SectionBand>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h2 className="text-[28px] font-semibold tracking-[-0.015em]">
+            Ready to try? Start with 5 free calculations.
+          </h2>
+          <Link
+            href="/sign-up"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-[#1C1C1C] transition-colors hover:bg-accent/90"
+          >
+            Get Free License Key
+          </Link>
         </div>
       </SectionBand>
     </>
