@@ -35,9 +35,6 @@ export function Header() {
           </span>
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
             SolarLayout
-            <span className="ml-1.5 font-mono text-xs font-normal text-muted-foreground">
-              / pv layout
-            </span>
           </span>
         </Link>
 
@@ -98,9 +95,6 @@ export function Header() {
               </span>
               <span className="text-[15px] font-semibold tracking-tight text-foreground">
                 SolarLayout
-                <span className="ml-1.5 font-mono text-xs font-normal text-muted-foreground">
-                  / pv layout
-                </span>
               </span>
             </div>
             <nav className="flex flex-col gap-1">
