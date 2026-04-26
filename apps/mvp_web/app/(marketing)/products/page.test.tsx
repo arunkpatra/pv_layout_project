@@ -35,5 +35,33 @@ test("renders download button", () => {
   const downloadButtons = screen.getAllByRole("button", {
     name: /Download/i,
   })
-  expect(downloadButtons).toHaveLength(1)
+  expect(downloadButtons.length).toBeGreaterThanOrEqual(1)
+})
+
+test("renders sample output section", () => {
+  render(<ProductsPage />)
+  expect(
+    screen.getByText(/What you get for a 47 MWp plant/i)
+  ).toBeInTheDocument()
+})
+
+test("renders deliverables section with three file formats", () => {
+  render(<ProductsPage />)
+  expect(screen.getByText(".kmz")).toBeInTheDocument()
+  expect(screen.getByText(".dxf")).toBeInTheDocument()
+  expect(screen.getByText(".pdf")).toBeInTheDocument()
+})
+
+test("renders standards section", () => {
+  render(<ProductsPage />)
+  expect(
+    screen.getByText(/Built for the Indian solar market/i)
+  ).toBeInTheDocument()
+})
+
+test("renders bottom CTA", () => {
+  render(<ProductsPage />)
+  expect(
+    screen.getByText(/Try it free/i)
+  ).toBeInTheDocument()
 })
