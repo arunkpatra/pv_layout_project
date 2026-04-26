@@ -193,24 +193,13 @@ export default function ProductsPage() {
           <h2 className="text-[28px] font-semibold tracking-[-0.015em]">
             Try it free. 5 calculations, no credit card.
           </h2>
-          <div className="flex flex-wrap justify-center gap-3">
-            <DownloadModal productName="PV Layout">
-              <Button
-                size="lg"
-                className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                <Download className="h-5 w-5" />
-                Download PV Layout
-              </Button>
-            </DownloadModal>
-            <Button
-              asChild
-              size="lg"
-              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              <Link href="/sign-up">Get Free License Key</Link>
-            </Button>
-          </div>
+          <Button
+            asChild
+            size="lg"
+            className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            <Link href="/sign-up">Get Free License Key</Link>
+          </Button>
         </div>
       </SectionBand>
     </>
