@@ -4,6 +4,7 @@ interface WindowFrameProps {
   caption?: string
   captionMeta?: string
   children: React.ReactNode
+  className?: string
 }
 
 export function WindowFrame({
@@ -12,9 +13,10 @@ export function WindowFrame({
   caption,
   captionMeta,
   children,
+  className,
 }: WindowFrameProps) {
   return (
-    <div className="overflow-hidden rounded-[12px] border border-border bg-card">
+    <div className={`flex flex-col overflow-hidden rounded-[12px] border border-border bg-card${className ? ` ${className}` : ""}`}>
       <div className="flex items-center gap-2.5 border-b border-border bg-[#FAFBFC] px-3.5 py-2.5 font-mono text-xs text-muted-foreground">
         <div className="flex gap-[5px]">
           <span className="h-[9px] w-[9px] rounded-full bg-[#E5E7EB]" />
@@ -28,7 +30,7 @@ export function WindowFrame({
           </span>
         )}
       </div>
-      <div className="bg-[#FAFBFC]">{children}</div>
+      <div className="flex-1 bg-[#FAFBFC]">{children}</div>
       {caption && (
         <div className="flex items-center justify-between border-t border-border bg-white px-3.5 py-3">
           <span className="text-[13px] font-medium">{caption}</span>

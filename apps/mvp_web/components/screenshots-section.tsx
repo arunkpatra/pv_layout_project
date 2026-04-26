@@ -19,6 +19,7 @@ export function ScreenshotsSection() {
             title="SolarLayout — Project: Karnataka_47MW_phase1.slpx"
             caption="Layout canvas — table grid, inverters, exclusions"
             captionMeta="View · Layout/2D"
+            className="h-full"
           >
             <LayoutCanvasScreenshot />
           </WindowFrame>
