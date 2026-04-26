@@ -196,12 +196,23 @@ export default function DashboardPage() {
             ) : entError ? (
               <span className="text-2xl font-bold text-foreground">—</span>
             ) : (
-              <span
-                data-testid="remaining-calculations-value"
-                className="text-4xl font-bold text-foreground"
-              >
-                {remainingCalculations}
-              </span>
+              <div>
+                <span
+                  data-testid="remaining-calculations-value"
+                  className="text-4xl font-bold text-foreground"
+                >
+                  {remainingCalculations}
+                </span>
+                {remainingCalculations === 0 && (
+                  <Button
+                    asChild
+                    size="sm"
+                    className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
+                  >
+                    <Link href="/dashboard/plans">Buy Calculations</Link>
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
