@@ -24,57 +24,64 @@ test("renders page heading", () => {
   expect(
     screen.getByRole("heading", {
       level: 1,
-      name: /Simple, Transparent Pricing/i,
+      name: /Simple, transparent pricing/i,
     })
   ).toBeInTheDocument()
 })
 
-test("renders all three tier names", () => {
+test("renders plan cards with all three tier names", () => {
   render(<PricingPage />)
-  expect(screen.getAllByText("PV Layout Basic").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("PV Layout Pro Plus").length
+    screen.getAllByText("Basic").length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText("Pro").length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText("Pro Plus").length
   ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders prices", () => {
   render(<PricingPage />)
-  expect(screen.getAllByText("$1.99").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("$4.99").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("$14.99").length).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText(/\$1\.99/i).length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText(/\$4\.99/i).length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText(/\$14\.99/i).length
+  ).toBeGreaterThanOrEqual(1)
 })
 
-test("renders Buy Now buttons as links to dashboard plan page", () => {
+test("renders Buy buttons as links to dashboard plan page", () => {
   render(<PricingPage />)
-  const buyLinks = screen.getAllByRole("link", { name: /Buy Now/i })
+  const buyLinks = screen.getAllByRole("link", { name: /Buy/i })
   expect(buyLinks.length).toBeGreaterThanOrEqual(3)
   expect(buyLinks[0]).toHaveAttribute("href", "/dashboard/plans")
+})
+
+test("renders free trial callout", () => {
+  render(<PricingPage />)
+  expect(
+    screen.getByText(/Free trial included/i)
+  ).toBeInTheDocument()
 })
 
 test("renders feature comparison table", () => {
   render(<PricingPage />)
   expect(
-    screen.getAllByText("Plant Layout (MMS, Inverter, LA)").length
+    screen.getAllByText("KMZ boundary input").length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("Energy Yield Analysis").length
+    screen.getAllByText("Energy yield analysis").length
   ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders top-up note", () => {
   render(<PricingPage />)
   expect(
-    screen.getAllByText(/Need more calculations/i).length
-  ).toBeGreaterThanOrEqual(1)
-  expect(screen.queryByText(/Phase 2/i)).not.toBeInTheDocument()
-})
-
-test("renders sub-heading text", () => {
-  render(<PricingPage />)
-  expect(
-    screen.getAllByText(
-      /Pay once\. Use as many times as your plan allows\./i
-    ).length
+    screen.getAllByText(/Top-ups/i).length
   ).toBeGreaterThanOrEqual(1)
 })

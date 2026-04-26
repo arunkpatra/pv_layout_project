@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
-import { Copy, Download } from "lucide-react"
+import { Copy, Download, Eye, EyeOff } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -37,6 +37,7 @@ const MVP_API_URL =
 export default function DashboardPage() {
   const { getToken } = useAuth()
   const [copied, setCopied] = useState(false)
+  const [keyRevealed, setKeyRevealed] = useState(false)
 
   const {
     data: entData,
@@ -59,12 +60,24 @@ export default function DashboardPage() {
     0,
   )
 
-  const activeCount = activeEntitlements.length
+  const calculationsPerformed = usageData?.pagination.total ?? 0
 
   const licenseKey = entData?.licenseKey ?? null
-  const maskedKey = licenseKey ? `${licenseKey.slice(0, 8)}...` : null
+  const maskedKey = licenseKey
+    ? `${licenseKey.slice(0, 8)}${"⦁".repeat(12)}`
+    : null
 
   const hasActiveEntitlement = activeEntitlements.length > 0
+
+  // Determine the highest tier plan
+  const TIER_ORDER = ["pv-layout-pro-plus", "pv-layout-pro", "pv-layout-basic"]
+  const highestTierSlug = TIER_ORDER.find((slug) =>
+    activeEntitlements.some((e) => e.product === slug),
+  )
+  const highestTierName = activeEntitlements.find(
+    (e) => e.product === highestTierSlug,
+  )?.productName
+  const isFree = activeEntitlements.length > 0 && !highestTierSlug
 
   async function handleCopyKey() {
     if (!licenseKey) return
@@ -101,7 +114,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-bold tracking-[-0.02em] text-foreground">
           Dashboard
         </h1>
         <p className="mt-1 text-muted-foreground">
@@ -109,12 +122,71 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* License Key Banner */}
+      {entLoading ? (
+        <Skeleton className="h-12 w-full rounded-lg" />
+      ) : licenseKey ? (
+        <div className="flex items-center justify-between rounded-lg bg-primary px-5 py-3 text-primary-foreground">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground/70">
+              License Key
+            </span>
+            <span className="font-mono text-sm">
+              {keyRevealed ? licenseKey : maskedKey}
+            </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setKeyRevealed(!keyRevealed)}
+                    className="text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                    aria-label={keyRevealed ? "Hide license key" : "Show license key"}
+                  >
+                    {keyRevealed ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {keyRevealed ? "Hide key" : "Show key"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyKey}
+                    className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? "Copied!" : "Copy"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Copy license key to clipboard
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-3 text-center text-sm text-muted-foreground">
+          Purchase a plan to get your license key.
+        </div>
+      )}
+
       {/* Row 1 — Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Remaining Calculations */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Remaining Calculations
             </CardTitle>
           </CardHeader>
@@ -124,89 +196,113 @@ export default function DashboardPage() {
             ) : entError ? (
               <span className="text-2xl font-bold text-foreground">—</span>
             ) : (
-              <span
-                data-testid="remaining-calculations-value"
-                className="text-4xl font-bold text-foreground"
-              >
-                {remainingCalculations}
-              </span>
+              <div>
+                <span
+                  data-testid="remaining-calculations-value"
+                  className="text-4xl font-bold text-foreground"
+                >
+                  {remainingCalculations}
+                </span>
+                {remainingCalculations === 0 && (
+                  <Button
+                    asChild
+                    size="sm"
+                    className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
+                  >
+                    <Link href="/dashboard/plans">Buy Calculations</Link>
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Active Entitlements */}
+        {/* Calculations Performed */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Entitlements
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+              Calculations Performed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {entLoading ? (
+            {usageLoading ? (
               <Skeleton className="h-8 w-24" />
-            ) : entError ? (
+            ) : usageError ? (
               <span className="text-2xl font-bold text-foreground">—</span>
             ) : (
               <span
-                data-testid="active-entitlements-value"
+                data-testid="calculations-performed-value"
                 className="text-4xl font-bold text-foreground"
               >
-                {activeCount}
+                {calculationsPerformed}
               </span>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Row 2 — License key + Download */}
+      {/* Row 2 — Plan + Download */}
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* License Key */}
+        {/* Your Plan */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Your License Key
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+              Your Plan
             </CardTitle>
           </CardHeader>
           <CardContent>
             {entLoading ? (
-              <Skeleton className="h-8 w-48" />
-            ) : maskedKey ? (
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-base text-foreground">
-                  {maskedKey}
+              <Skeleton className="h-8 w-32" />
+            ) : entError ? (
+              <span className="text-2xl font-bold text-foreground">—</span>
+            ) : highestTierName ? (
+              <span className="text-2xl font-bold text-foreground">
+                {highestTierName}
+              </span>
+            ) : isFree ? (
+              <div>
+                <span className="text-2xl font-bold text-foreground">
+                  Free
                 </span>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  All Pro Plus features included.
+                </p>
                 <Button
-                  variant="outline"
+                  asChild
                   size="sm"
-                  onClick={handleCopyKey}
-                  className="gap-1.5"
+                  className="mt-3 bg-accent text-accent-foreground hover:!bg-accent/90"
                 >
-                  <Copy className="h-3.5 w-3.5" />
-                  {copied ? "Copied!" : "Copy"}
+                  <Link href="/dashboard/plans">Purchase Plan</Link>
                 </Button>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Purchase a plan to get your license key.
+                No active plan.{" "}
+                <Link
+                  href="/dashboard/plans"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Buy a plan →
+                </Link>
               </p>
             )}
           </CardContent>
         </Card>
 
         {/* Download */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Download SolarLayout
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             {entLoading ? (
               <Skeleton className="h-9 w-32" />
             ) : hasActiveEntitlement ? (
               <Button
                 onClick={handleDownload}
-                className="gap-2"
+                className="gap-2 bg-accent text-accent-foreground hover:!bg-accent/90"
               >
                 <Download className="h-4 w-4" />
                 Download
@@ -236,7 +332,7 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               Recent Activity
             </CardTitle>
             <Link
@@ -267,9 +363,9 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Feature</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Feature</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Product</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

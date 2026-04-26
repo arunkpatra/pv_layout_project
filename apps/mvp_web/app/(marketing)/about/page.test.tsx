@@ -7,7 +7,7 @@ test("renders page heading", () => {
   render(<AboutPage />)
   const headings = screen.getAllByRole("heading", {
     level: 1,
-    name: /Built by Solar Industry Veterans/i,
+    name: /Built by solar industry veterans/i,
   })
   expect(headings.length).toBeGreaterThanOrEqual(1)
 })
@@ -15,18 +15,20 @@ test("renders page heading", () => {
 test("renders body text", () => {
   render(<AboutPage />)
   expect(
-    screen.getAllByText(/deep roots in the solar and renewable energy/i).length
+    screen.getAllByText(/deep roots in the solar and renewable energy/i)
+      .length
   ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders mission statement", () => {
   render(<AboutPage />)
-  const missionHeadings = screen.getAllByRole("heading", {
-    level: 2,
-    name: /Our Mission/i,
+  const whyHeadings = screen.getAllByRole("heading", {
+    level: 3,
+    name: /Why we built this/i,
   })
-  expect(missionHeadings.length).toBeGreaterThanOrEqual(1)
+  expect(whyHeadings.length).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText(/powerful, automated layout design solutions/i).length
+    screen.getAllByText(/powerful, automated layout design solutions/i)
+      .length
   ).toBeGreaterThanOrEqual(1)
 })

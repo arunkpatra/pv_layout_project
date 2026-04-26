@@ -13,7 +13,7 @@ const STRIPE_PRICE_IDS = {
 const products = [
   {
     slug: "pv-layout-free",
-    name: "PV Layout Free",
+    name: "Free",
     description: "5 free layout calculations on signup — all Pro Plus features included",
     priceAmount: 0,
     calculations: 5,
@@ -30,7 +30,7 @@ const products = [
   },
   {
     slug: "pv-layout-basic",
-    name: "PV Layout Basic",
+    name: "Basic",
     description: "5 layout calculations per purchase",
     priceAmount: 199,
     calculations: 5,
@@ -43,7 +43,7 @@ const products = [
   },
   {
     slug: "pv-layout-pro",
-    name: "PV Layout Pro",
+    name: "Pro",
     description: "10 layout calculations per purchase",
     priceAmount: 499,
     calculations: 10,
@@ -58,7 +58,7 @@ const products = [
   },
   {
     slug: "pv-layout-pro-plus",
-    name: "PV Layout Pro Plus",
+    name: "Pro Plus",
     description: "50 layout and yield calculations per purchase",
     priceAmount: 1499,
     calculations: 50,

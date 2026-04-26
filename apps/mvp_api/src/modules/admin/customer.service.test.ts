@@ -47,7 +47,7 @@ const mockUserFindUnique = mock(async () => ({
       usedCalculations: 3,
       purchasedAt: new Date("2026-01-15"),
       deactivatedAt: null,
-      product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+      product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
     },
     {
       id: "ent2",
@@ -56,7 +56,7 @@ const mockUserFindUnique = mock(async () => ({
       usedCalculations: 5,
       purchasedAt: new Date("2026-02-01"),
       deactivatedAt: null,
-      product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+      product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
     },
     {
       id: "ent3",
@@ -65,7 +65,7 @@ const mockUserFindUnique = mock(async () => ({
       usedCalculations: 0,
       purchasedAt: new Date("2026-03-01"),
       deactivatedAt: new Date("2026-03-10"),
-      product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+      product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
     },
   ],
 }))
@@ -158,7 +158,7 @@ describe("getCustomer", () => {
           usedCalculations: 3,
           purchasedAt: new Date("2026-01-15"),
           deactivatedAt: null,
-          product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+          product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
         },
         {
           id: "ent2",
@@ -167,7 +167,7 @@ describe("getCustomer", () => {
           usedCalculations: 5,
           purchasedAt: new Date("2026-02-01"),
           deactivatedAt: null,
-          product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+          product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
         },
         {
           id: "ent3",
@@ -176,7 +176,7 @@ describe("getCustomer", () => {
           usedCalculations: 0,
           purchasedAt: new Date("2026-03-01"),
           deactivatedAt: new Date("2026-03-10"),
-          product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+          product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
         },
       ],
     }))

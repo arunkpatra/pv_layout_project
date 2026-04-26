@@ -1,253 +1,221 @@
-import { Check, X } from "lucide-react"
+import { Fragment } from "react"
 import Link from "next/link"
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@renewable-energy/ui/components/card"
 import { Button } from "@renewable-energy/ui/components/button"
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@renewable-energy/ui/components/table"
 
-interface PricingTier {
-  name: string
-  price: string
-  purchaseModel: string
-  calculations: string
-  slug: string
-  highlighted?: boolean
-  isFree?: boolean
-}
+type Feature = { name: string; basic: boolean; pro: boolean; proPlus: boolean }
+type Group = { label: string; features: Feature[] }
 
-const tiers: PricingTier[] = [
+const groups: Group[] = [
   {
-    name: "PV Layout Free",
-    price: "Free",
-    purchaseModel: "On signup",
-    calculations: "5 Layout",
-    slug: "pv-layout-free",
-    isFree: true,
+    label: "Layout",
+    features: [
+      { name: "KMZ boundary input", basic: true, pro: true, proPlus: true },
+      { name: "MMS table placement", basic: true, pro: true, proPlus: true },
+      {
+        name: "Inverter & lightning arrester placement",
+        basic: true,
+        pro: true,
+        proPlus: true,
+      },
+      {
+        name: "Obstruction exclusion",
+        basic: true,
+        pro: true,
+        proPlus: true,
+      },
+      {
+        name: "String & central inverter topology",
+        basic: true,
+        pro: true,
+        proPlus: true,
+      },
+    ],
   },
   {
-    name: "PV Layout Basic",
-    price: "$1.99",
-    purchaseModel: "One-time",
-    calculations: "5 Layout",
-    slug: "pv-layout-basic",
+    label: "Cabling",
+    features: [
+      {
+        name: "AC & DC cable routing",
+        basic: false,
+        pro: true,
+        proPlus: true,
+      },
+      {
+        name: "Cable quantity measurements",
+        basic: false,
+        pro: true,
+        proPlus: true,
+      },
+      {
+        name: "ICR building placement",
+        basic: false,
+        pro: true,
+        proPlus: true,
+      },
+    ],
   },
   {
-    name: "PV Layout Pro",
-    price: "$4.99",
-    purchaseModel: "One-time",
-    calculations: "10 Layout",
-    slug: "pv-layout-pro",
-    highlighted: true,
+    label: "Yield",
+    features: [
+      {
+        name: "Energy yield analysis",
+        basic: false,
+        pro: false,
+        proPlus: true,
+      },
+      {
+        name: "P50 / P75 / P90 exceedance",
+        basic: false,
+        pro: false,
+        proPlus: true,
+      },
+      {
+        name: "Plant generation estimates",
+        basic: false,
+        pro: false,
+        proPlus: true,
+      },
+    ],
   },
   {
-    name: "PV Layout Pro Plus",
-    price: "$14.99",
-    purchaseModel: "One-time",
-    calculations: "50 Layout + Yield",
-    slug: "pv-layout-pro-plus",
+    label: "Export",
+    features: [
+      { name: "KMZ export", basic: true, pro: true, proPlus: true },
+      {
+        name: "DXF export (AutoCAD)",
+        basic: true,
+        pro: true,
+        proPlus: true,
+      },
+      { name: "PDF report", basic: false, pro: true, proPlus: true },
+    ],
+  },
+  {
+    label: "Account",
+    features: [
+      {
+        name: "Top-up at same rate",
+        basic: true,
+        pro: true,
+        proPlus: true,
+      },
+      {
+        name: "Email-tied entitlement",
+        basic: true,
+        pro: true,
+        proPlus: true,
+      },
+    ],
   },
 ]
-
-interface FeatureRow {
-  feature: string
-  free: boolean
-  basic: boolean
-  pro: boolean
-  proPlus: boolean
-}
-
-const features: FeatureRow[] = [
-  {
-    feature: "Plant Layout (MMS, Inverter, LA)",
-    free: true,
-    basic: true,
-    pro: true,
-    proPlus: true,
-  },
-  {
-    feature: "Obstruction Exclusion",
-    free: true,
-    basic: true,
-    pro: true,
-    proPlus: true,
-  },
-  {
-    feature: "AC & DC Cable Routing",
-    free: true,
-    basic: false,
-    pro: true,
-    proPlus: true,
-  },
-  {
-    feature: "Cable Quantity Measurements",
-    free: true,
-    basic: false,
-    pro: true,
-    proPlus: true,
-  },
-  {
-    feature: "Energy Yield Analysis",
-    free: true,
-    basic: false,
-    pro: false,
-    proPlus: true,
-  },
-  {
-    feature: "Plant Generation Estimates",
-    free: true,
-    basic: false,
-    pro: false,
-    proPlus: true,
-  },
-  {
-    feature: "Top-up Available",
-    free: false,
-    basic: true,
-    pro: true,
-    proPlus: true,
-  },
-]
-
-function FeatureIcon({ included }: { included: boolean }) {
-  return included ? (
-    <Check className="mx-auto h-5 w-5 text-green-600" />
-  ) : (
-    <X className="mx-auto h-5 w-5 text-muted-foreground/40" />
-  )
-}
 
 export function PricingCards() {
   return (
-    <div className="space-y-12">
-      {/* Card grid */}
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-        {tiers.map((tier) => (
-          <Card
-            key={tier.name}
-            className={`flex flex-col text-center ${tier.highlighted ? "border-accent ring-2 ring-accent/20" : ""}`}
-          >
-            <CardHeader>
-              {tier.isFree && (
-                <span className="mb-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
-                  Free on signup
-                </span>
-              )}
-              <CardTitle className="text-xl">{tier.name}</CardTitle>
-              <div className="mt-2">
-                <span className="text-4xl font-bold text-foreground">
-                  {tier.price}
-                </span>
+    <div>
+      <table
+        className="w-full overflow-hidden rounded-[var(--radius)] border border-border bg-card"
+        style={{ borderCollapse: "separate", borderSpacing: 0 }}
+      >
+        <thead>
+          <tr>
+            <th className="w-[46%] border-b border-border bg-[#FBFCFD] px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Feature
+            </th>
+            <th className="w-[18%] border-b border-border bg-[#FBFCFD] px-[18px] py-3.5 text-center">
+              <div className="text-[15px] font-semibold text-foreground">
+                Basic
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {tier.purchaseModel} &middot; {tier.calculations}
-              </p>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col justify-end">
-              {tier.isFree ? (
-                <Button asChild className="w-full">
-                  <Link href="/sign-up">Get Started Free</Link>
-                </Button>
-              ) : (
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/dashboard/plans">
-                    Buy Now
-                  </Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Feature comparison table */}
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-2/6">Feature</TableHead>
-              <TableHead className="text-center">Free</TableHead>
-              <TableHead className="text-center">Basic</TableHead>
-              <TableHead className="text-center">Pro</TableHead>
-              <TableHead className="text-center">Pro Plus</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Price</TableCell>
-              {tiers.map((tier) => (
-                <TableCell
-                  key={tier.slug}
-                  className={`text-center${tier.isFree ? " text-green-700 font-semibold" : ""}`}
+              <span className="font-mono text-[13px] font-medium text-primary">
+                $1.99 &middot; 5 calcs
+              </span>
+            </th>
+            <th className="w-[18%] border-b border-border bg-[#FBFCFD] px-[18px] py-3.5 text-center">
+              <div className="text-[15px] font-semibold text-foreground">
+                Pro
+              </div>
+              <span className="font-mono text-[13px] font-medium text-primary">
+                $4.99 &middot; 10 calcs
+              </span>
+            </th>
+            <th className="w-[18%] border-b border-border bg-[#FBFCFD] px-[18px] py-3.5 text-center">
+              <div className="text-[15px] font-semibold text-foreground">
+                Pro Plus
+              </div>
+              <span className="font-mono text-[13px] font-medium text-primary">
+                $14.99 &middot; 50 calcs
+              </span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((group) => (
+            <Fragment key={group.label}>
+              <tr>
+                <td
+                  colSpan={4}
+                  className="bg-[#F4F8F6] px-[18px] py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-primary"
                 >
-                  {tier.price}
-                </TableCell>
+                  {group.label}
+                </td>
+              </tr>
+              {group.features.map((feature) => (
+                <tr key={feature.name}>
+                  <td className="border-b border-border px-[18px] py-3.5 text-sm">
+                    {feature.name}
+                  </td>
+                  <td
+                    className={`border-b border-border px-[18px] py-3.5 text-center text-sm ${feature.basic ? "font-semibold text-green-600" : "text-[#9CA3AF]"}`}
+                  >
+                    {feature.basic ? "✓" : "—"}
+                  </td>
+                  <td
+                    className={`border-b border-border px-[18px] py-3.5 text-center text-sm ${feature.pro ? "font-semibold text-green-600" : "text-[#9CA3AF]"}`}
+                  >
+                    {feature.pro ? "✓" : "—"}
+                  </td>
+                  <td
+                    className={`border-b border-border px-[18px] py-3.5 text-center text-sm ${feature.proPlus ? "font-semibold text-green-600" : "text-[#9CA3AF]"}`}
+                  >
+                    {feature.proPlus ? "✓" : "—"}
+                  </td>
+                </tr>
               ))}
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Purchase Model</TableCell>
-              {tiers.map((tier) => (
-                <TableCell
-                  key={tier.slug}
-                  className={`text-center${tier.isFree ? " text-muted-foreground text-sm" : ""}`}
-                >
-                  {tier.purchaseModel}
-                </TableCell>
-              ))}
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Calculations Included</TableCell>
-              {tiers.map((tier) => (
-                <TableCell key={tier.slug} className="text-center">
-                  {tier.calculations}
-                </TableCell>
-              ))}
-            </TableRow>
-            {features.map((row) => (
-              <TableRow key={row.feature}>
-                <TableCell className="font-medium">{row.feature}</TableCell>
-                <TableCell>
-                  <FeatureIcon included={row.free} />
-                </TableCell>
-                <TableCell>
-                  <FeatureIcon included={row.basic} />
-                </TableCell>
-                <TableCell>
-                  <FeatureIcon included={row.pro} />
-                </TableCell>
-                <TableCell>
-                  <FeatureIcon included={row.proPlus} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </Fragment>
+          ))}
+          <tr>
+            <td className="px-[18px] py-3.5" />
+            <td className="px-[18px] py-3.5 text-center">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full justify-center"
+              >
+                <Link href="/dashboard/plans">Buy Basic</Link>
+              </Button>
+            </td>
+            <td className="px-[18px] py-3.5 text-center">
+              <Button asChild className="w-full justify-center">
+                <Link href="/dashboard/plans">Buy Pro</Link>
+              </Button>
+            </td>
+            <td className="px-[18px] py-3.5 text-center">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full justify-center"
+              >
+                <Link href="/dashboard/plans">Buy Pro Plus</Link>
+              </Button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-      {/* Free tier callout */}
-      <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center dark:border-green-900 dark:bg-green-950/20">
-        <p className="text-muted-foreground">
-          <strong className="text-foreground">New to SolarLayout?</strong>{" "}
-          Sign up free and get 5 full-featured calculations — no credit card required.
-        </p>
-      </div>
-
-      {/* Top-up note */}
-      <div className="rounded-lg border border-border bg-card p-6 text-center">
-        <p className="text-muted-foreground">
-          <strong className="text-foreground">Need more calculations?</strong>{" "}
-          Top up anytime at the same rate.
-        </p>
+      <div className="mt-8 rounded-[var(--radius)] border border-border bg-card p-6 text-left text-[15px] text-[#374151]">
+        <strong className="text-foreground">Top-ups.</strong> Purchase
+        additional calculation packs at any time at the same rate as your
+        original plan. Calculations from multiple top-ups are pooled across
+        the same email-tied entitlement.
       </div>
     </div>
   )

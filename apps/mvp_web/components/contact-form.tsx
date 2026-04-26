@@ -2,10 +2,8 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { ArrowRight } from "lucide-react"
 import { Button } from "@renewable-energy/ui/components/button"
-import { Input } from "@renewable-energy/ui/components/input"
-import { Textarea } from "@renewable-energy/ui/components/textarea"
-import { Label } from "@renewable-energy/ui/components/label"
 
 const API_URL =
   process.env.NEXT_PUBLIC_MVP_API_URL ?? "http://localhost:3003"
@@ -47,7 +45,8 @@ export function ContactForm() {
 
       if (!res.ok || !json.success) {
         const errorMessage =
-          json.error?.message ?? "Failed to send message. Please try again."
+          json.error?.message ??
+          "Failed to send message. Please try again."
         toast.error(errorMessage)
         return
       }
@@ -67,72 +66,100 @@ export function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="contact-name">
-          Full Name <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="contact-name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          placeholder="Enter your full name"
-          required
-          disabled={submitting}
-        />
-      </div>
+    <div className="rounded-[var(--radius)] border border-border bg-card p-7">
+      <h3 className="mb-1.5 text-lg font-semibold">
+        Send us a message
+      </h3>
+      <p className="mb-[22px] text-sm text-muted-foreground">
+        All fields marked with an asterisk are required.
+      </p>
 
-      <div className="space-y-2">
-        <Label htmlFor="contact-email">
-          Email Address <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="contact-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@company.com"
-          required
-          disabled={submitting}
-        />
-      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-medium">
+            Full name
+            <span className="ml-0.5 text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            disabled={submitting}
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Enter your full name"
+            className="rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-[3px] focus:ring-primary/[0.12]"
+          />
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="contact-subject">
-          Subject <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="contact-subject"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="What is this regarding?"
-          required
-          disabled={submitting}
-        />
-      </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-medium">
+            Work email
+            <span className="ml-0.5 text-destructive">*</span>
+          </label>
+          <input
+            type="email"
+            required
+            disabled={submitting}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            className="rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-[3px] focus:ring-primary/[0.12]"
+          />
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="contact-message">
-          Message <span className="text-destructive">*</span>
-        </Label>
-        <Textarea
-          id="contact-message"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Tell us more..."
-          rows={5}
-          required
-          disabled={submitting}
-        />
-      </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-medium">
+            Subject
+            <span className="ml-0.5 text-destructive">*</span>
+          </label>
+          <select
+            required
+            disabled={submitting}
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-[3px] focus:ring-primary/[0.12]"
+          >
+            <option value="">Select…</option>
+            <option>Sales enquiry</option>
+            <option>Technical question</option>
+            <option>Partnership</option>
+            <option>Press / media</option>
+            <option>Other</option>
+          </select>
+        </div>
 
-      <Button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-      >
-        {submitting ? "Sending\u2026" : "Send Message"}
-      </Button>
-    </form>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-medium">
+            Message
+            <span className="ml-0.5 text-destructive">*</span>
+          </label>
+          <textarea
+            required
+            disabled={submitting}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Tell us more..."
+            rows={5}
+            className="rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-[3px] focus:ring-primary/[0.12]"
+          />
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <span className="font-mono text-[12.5px] text-muted-foreground">
+            solarlayout.in &middot; v1
+          </span>
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            {submitting ? "Sending\u2026" : "Send message"}
+            {!submitting && (
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
   )
 }

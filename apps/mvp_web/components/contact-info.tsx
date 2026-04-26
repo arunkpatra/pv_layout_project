@@ -1,89 +1,76 @@
-import { Mail, MapPin, LinkedinIcon, YoutubeIcon } from "lucide-react"
+import Link from "next/link"
 
-const contactDetails = [
+const contactItems = [
   {
-    icon: Mail,
     label: "Email",
-    value: "support@solarlayout.in",
-    href: "mailto:support@solarlayout.in",
+    value: (
+      <a
+        href="mailto:support@solarlayout.in"
+        className="text-primary underline underline-offset-[3px]"
+      >
+        support@solarlayout.in
+      </a>
+    ),
   },
+  { label: "Location", value: "Bangalore, Karnataka, India" },
   {
-    icon: MapPin,
-    label: "Location",
-    value: "Bangalore, India",
-    href: null,
-  },
-]
-
-const socialLinks = [
-  {
-    icon: LinkedinIcon,
     label: "LinkedIn",
-    href: "https://linkedin.com",
+    value: (
+      <a
+        href="https://linkedin.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline underline-offset-[3px]"
+      >
+        linkedin.com/company/solarlayout
+      </a>
+    ),
   },
   {
-    icon: YoutubeIcon,
     label: "YouTube",
-    href: "https://youtube.com",
+    value: (
+      <a
+        href="https://youtube.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline underline-offset-[3px]"
+      >
+        youtube.com/@solarlayout
+      </a>
+    ),
+  },
+  {
+    label: "Grievance officer",
+    value: (
+      <>
+        As required under the IT Act 2000 and DPDP Act 2023, the
+        contact for data grievances is published in the{" "}
+        <Link
+          href="/privacy"
+          className="text-primary underline underline-offset-[3px]"
+        >
+          Privacy Policy
+        </Link>
+        .
+      </>
+    ),
   },
 ]
 
 export function ContactInfo() {
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-foreground">
-        Get in Touch
-      </h2>
-
-      <div className="space-y-4">
-        {contactDetails.map((detail) => (
-          <div
-            key={detail.label}
-            className="flex items-start gap-3"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <detail.icon className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {detail.label}
-              </p>
-              {detail.href ? (
-                <a
-                  href={detail.href}
-                  className="text-sm text-muted-foreground transition-colors hover:text-primary"
-                >
-                  {detail.value}
-                </a>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {detail.value}
-                </p>
-              )}
-            </div>
+    <div>
+      {contactItems.map((item, i) => (
+        <div
+          key={item.label}
+          className={`py-[18px] ${i < contactItems.length - 1 ? "border-b border-border" : ""}`}
+        >
+          <div className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            {item.label}
           </div>
-        ))}
-      </div>
-
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-foreground">
-          Follow Us
-        </h3>
-        <div className="flex gap-3">
-          {socialLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={link.label}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted"
-            >
-              <link.icon className="h-5 w-5 text-muted-foreground" />
-            </a>
-          ))}
+          <div className="text-[15px]">{item.value}</div>
         </div>
-      </div>
+      ))}
     </div>
   )
 }

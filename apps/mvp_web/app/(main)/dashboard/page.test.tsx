@@ -66,7 +66,7 @@ const twoActiveEntitlements = [
   {
     id: "ent-1",
     product: "pv-layout-pro",
-    productName: "PV Layout Pro",
+    productName: "Pro",
     totalCalculations: 10,
     usedCalculations: 0,
     remainingCalculations: 30,
@@ -77,7 +77,7 @@ const twoActiveEntitlements = [
   {
     id: "ent-2",
     product: "pv-layout-basic",
-    productName: "PV Layout Basic",
+    productName: "Basic",
     totalCalculations: 5,
     usedCalculations: 0,
     remainingCalculations: 20,
@@ -90,7 +90,7 @@ const twoActiveEntitlements = [
 const sampleUsageRecords = [
   {
     featureKey: "pv_layout",
-    productName: "PV Layout Pro",
+    productName: "Pro",
     createdAt: "2024-03-15T10:00:00Z",
   },
 ]
@@ -116,7 +116,7 @@ describe("Dashboard home page", () => {
       expect(screen.getByText("Remaining Calculations")).toBeInTheDocument()
     })
 
-    it("renders Active Entitlements card title", () => {
+    it("renders Calculations Performed card title", () => {
       mockUseEntitlements.mockReturnValue({
         data: { entitlements: [], licenseKey: null },
         isLoading: false,
@@ -128,7 +128,7 @@ describe("Dashboard home page", () => {
         isError: false,
       })
       render(<DashboardPage />)
-      expect(screen.getByText("Active Entitlements")).toBeInTheDocument()
+      expect(screen.getByText("Calculations Performed")).toBeInTheDocument()
     })
 
     it("shows correct remaining calculations sum across active entitlements", () => {
@@ -147,19 +147,19 @@ describe("Dashboard home page", () => {
       expect(screen.getByTestId("remaining-calculations-value")).toHaveTextContent("50")
     })
 
-    it("shows correct active entitlements count", () => {
+    it("shows correct calculations performed count from usage total", () => {
       mockUseEntitlements.mockReturnValue({
         data: { entitlements: twoActiveEntitlements, licenseKey: "abc-123-key" },
         isLoading: false,
         isError: false,
       })
       mockUseUserUsage.mockReturnValue({
-        data: { data: [], pagination: { page: 1, pageSize: 5, total: 0, totalPages: 0 } },
+        data: { data: [], pagination: { page: 1, pageSize: 5, total: 7, totalPages: 1 } },
         isLoading: false,
         isError: false,
       })
       render(<DashboardPage />)
-      expect(screen.getByTestId("active-entitlements-value")).toHaveTextContent("2")
+      expect(screen.getByTestId("calculations-performed-value")).toHaveTextContent("7")
     })
   })
 
@@ -180,7 +180,7 @@ describe("Dashboard home page", () => {
       })
       render(<DashboardPage />)
       // first 8 chars of "ABCD1234-EFGH5678" = "ABCD1234"
-      expect(screen.getByText("ABCD1234...")).toBeInTheDocument()
+      expect(screen.getByText(/ABCD1234⦁+/)).toBeInTheDocument()
     })
 
     it("shows purchase prompt when no license key", () => {
@@ -235,7 +235,7 @@ describe("Dashboard home page", () => {
       })
       render(<DashboardPage />)
       expect(screen.getByText("pv_layout")).toBeInTheDocument()
-      expect(screen.getByText("PV Layout Pro")).toBeInTheDocument()
+      expect(screen.getAllByText("Pro").length).toBeGreaterThanOrEqual(1)
       // Date rendered via toLocaleDateString — check at least one cell exists
       const dateCells = screen.getAllByRole("cell")
       expect(dateCells.length).toBeGreaterThan(0)

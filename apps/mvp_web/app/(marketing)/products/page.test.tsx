@@ -30,39 +30,38 @@ test("renders page heading", () => {
   ).toBeInTheDocument()
 })
 
-test("renders all three plan cards", () => {
-  render(<ProductsPage />)
-  expect(screen.getAllByText("PV Layout Basic").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
-  expect(
-    screen.getAllByText("PV Layout Pro Plus").length
-  ).toBeGreaterThanOrEqual(1)
-})
-
-test("renders prices", () => {
-  render(<ProductsPage />)
-  expect(screen.getAllByText("$1.99").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("$4.99").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("$14.99").length).toBeGreaterThanOrEqual(1)
-})
-
-test("renders single download button", () => {
+test("renders download button", () => {
   render(<ProductsPage />)
   const downloadButtons = screen.getAllByRole("button", {
     name: /Download/i,
   })
-  expect(downloadButtons).toHaveLength(1)
+  expect(downloadButtons.length).toBeGreaterThanOrEqual(1)
 })
 
-test("renders Buy Now links for each plan", () => {
-  render(<ProductsPage />)
-  const buyLinks = screen.getAllByRole("link", { name: /Buy Now/i })
-  expect(buyLinks.length).toBe(3)
-})
-
-test("renders free trial callout", () => {
+test("renders sample output section", () => {
   render(<ProductsPage />)
   expect(
-    screen.getByText(/Free trial included/i)
+    screen.getByText(/What you get for a 47 MWp plant/i)
+  ).toBeInTheDocument()
+})
+
+test("renders deliverables section with three file formats", () => {
+  render(<ProductsPage />)
+  expect(screen.getByText(".kmz")).toBeInTheDocument()
+  expect(screen.getByText(".dxf")).toBeInTheDocument()
+  expect(screen.getByText(".pdf")).toBeInTheDocument()
+})
+
+test("renders standards section", () => {
+  render(<ProductsPage />)
+  expect(
+    screen.getByText(/Built for the Indian solar market/i)
+  ).toBeInTheDocument()
+})
+
+test("renders bottom CTA", () => {
+  render(<ProductsPage />)
+  expect(
+    screen.getByText(/Try it free/i)
   ).toBeInTheDocument()
 })

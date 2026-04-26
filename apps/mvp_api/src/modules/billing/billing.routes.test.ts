@@ -89,7 +89,7 @@ const mockEntitlementFindMany = mock(async () => [
     usedCalculations: 3,
     purchasedAt: new Date("2026-04-22"),
     deactivatedAt: null,
-    product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+    product: { slug: "pv-layout-pro", name: "Pro" },
   },
 ])
 const mockLicenseKeyFindFirst = mock(async () => ({
@@ -99,7 +99,7 @@ const mockUsageRecordFindMany = mock(async () => [
   {
     featureKey: "pv-layout",
     createdAt: new Date("2026-04-22T10:00:00Z"),
-    product: { name: "PV Layout Pro" },
+    product: { name: "Pro" },
   },
 ])
 const mockUsageRecordCount = mock(async () => 1)
@@ -365,7 +365,7 @@ describe("GET /billing/entitlements", () => {
         usedCalculations: 5,
         purchasedAt: new Date("2026-04-22"),
         deactivatedAt: null,
-        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+        product: { slug: "pv-layout-pro", name: "Pro" },
       },
     ])
     mockLicenseKeyFindFirst.mockImplementation(async () => null as never)
@@ -392,7 +392,7 @@ describe("GET /billing/entitlements", () => {
         usedCalculations: 3,
         purchasedAt: new Date("2026-04-22"),
         deactivatedAt: null,
-        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+        product: { slug: "pv-layout-pro", name: "Pro" },
       },
     ])
     const app = makeApp()
@@ -417,7 +417,7 @@ describe("GET /billing/entitlements", () => {
         usedCalculations: 3,
         purchasedAt: new Date("2026-04-22"),
         deactivatedAt: null,
-        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+        product: { slug: "pv-layout-pro", name: "Pro" },
       },
       {
         id: "ent_exhausted",
@@ -425,7 +425,7 @@ describe("GET /billing/entitlements", () => {
         usedCalculations: 5,
         purchasedAt: new Date("2026-03-01"),
         deactivatedAt: null,
-        product: { slug: "pv-layout-basic", name: "PV Layout Basic" },
+        product: { slug: "pv-layout-basic", name: "Basic" },
       },
       {
         id: "ent_deactivated",
@@ -433,7 +433,7 @@ describe("GET /billing/entitlements", () => {
         usedCalculations: 0,
         purchasedAt: new Date("2026-02-01"),
         deactivatedAt: new Date("2026-03-15"),
-        product: { slug: "pv-layout-pro", name: "PV Layout Pro" },
+        product: { slug: "pv-layout-pro", name: "Pro" },
       },
     ] as never)
     const app = makeApp()
@@ -468,7 +468,7 @@ describe("GET /billing/entitlements", () => {
         usedCalculations: 5,
         purchasedAt: new Date("2026-03-01"),
         deactivatedAt: new Date("2026-03-15"),
-        product: { slug: "pv-layout-basic", name: "PV Layout Basic" },
+        product: { slug: "pv-layout-basic", name: "Basic" },
       },
     ] as never)
     mockLicenseKeyFindFirst.mockImplementation(async () => null as never)
@@ -501,7 +501,7 @@ describe("GET /billing/usage", () => {
       {
         featureKey: "pv-layout",
         createdAt: new Date("2026-04-22T10:00:00Z"),
-        product: { name: "PV Layout Pro" },
+        product: { name: "Pro" },
       },
     ])
     mockUsageRecordCount.mockImplementation(async () => 1)
@@ -524,7 +524,7 @@ describe("GET /billing/usage", () => {
     expect(body.success).toBe(true)
     expect(body.data.data).toHaveLength(1)
     expect(body.data.data[0]!.featureKey).toBe("pv-layout")
-    expect(body.data.data[0]!.productName).toBe("PV Layout Pro")
+    expect(body.data.data[0]!.productName).toBe("Pro")
     expect(body.data.data[0]!.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(body.data.pagination.page).toBe(1)
     expect(body.data.pagination.total).toBe(1)

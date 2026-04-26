@@ -43,7 +43,7 @@ export function UsagePageInner() {
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-bold tracking-[-0.02em] text-foreground">
           Usage History
         </h1>
         {!isLoading && !isError && (
@@ -55,7 +55,7 @@ export function UsagePageInner() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Calculation history</CardTitle>
+          <CardTitle className="font-mono text-[11px] uppercase tracking-[0.08em]">Calculation History</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {isError ? (
@@ -67,9 +67,9 @@ export function UsagePageInner() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Feature</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Feature</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Product</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -99,9 +99,9 @@ export function UsagePageInner() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Feature</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Feature</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Product</TableHead>
+                    <TableHead className="font-mono text-[11px] uppercase tracking-[0.08em]">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

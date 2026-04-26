@@ -40,29 +40,33 @@ test("renders Explore Products CTA", () => {
 
 test("renders Features Overview section with all three plans", () => {
   render(<HomePage />)
-  expect(screen.getAllByText("PV Layout Basic").length).toBeGreaterThanOrEqual(1)
-  expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("PV Layout Pro Plus").length
+    screen.getAllByText(/PV Layout · Basic/i).length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText(/PV Layout · Pro$/i).length
+  ).toBeGreaterThanOrEqual(1)
+  expect(
+    screen.getAllByText(/PV Layout · Pro Plus/i).length
   ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders How It Works summary steps", () => {
   render(<HomePage />)
-  const upload = screen.getAllByText("Upload KMZ")
+  const upload = screen.getAllByText("Import boundary")
   expect(upload.length).toBeGreaterThanOrEqual(1)
-  const params = screen.getAllByText("Enter Parameters")
+  const params = screen.getAllByText("Configure parameters")
   expect(params.length).toBeGreaterThanOrEqual(1)
-  const generate = screen.getAllByText("Generate Layout")
+  const generate = screen.getAllByText("Generate layout")
   expect(generate.length).toBeGreaterThanOrEqual(1)
-  const exportRes = screen.getAllByText("Export Results")
+  const exportRes = screen.getAllByText("Export deliverables")
   expect(exportRes.length).toBeGreaterThanOrEqual(1)
 })
 
 test("renders System Requirements section", () => {
   render(<HomePage />)
-  const sysReq = screen.getAllByText("System Requirements")
+  const sysReq = screen.getAllByText(/System requirements/i)
   expect(sysReq.length).toBeGreaterThanOrEqual(1)
-  const windows = screen.getAllByText("Windows 10 or higher")
+  const windows = screen.getAllByText(/Windows 10.*or higher/i)
   expect(windows.length).toBeGreaterThanOrEqual(1)
 })

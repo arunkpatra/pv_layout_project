@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { MoreHorizontal, Ban, Pencil } from "lucide-react"
 import {
   useAdminCustomer,
   useUpdateEntitlementStatus,
@@ -18,6 +19,12 @@ import {
 import { Badge } from "@renewable-energy/ui/components/badge"
 import { Button } from "@renewable-energy/ui/components/button"
 import { Skeleton } from "@renewable-energy/ui/components/skeleton"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@renewable-energy/ui/components/dropdown-menu"
 
 function formatCurrency(usd: number) {
   return new Intl.NumberFormat("en-US", {
@@ -64,28 +71,42 @@ function EntitlementActions({
   const router = useRouter()
   const { mutate, isPending } = useUpdateEntitlementStatus()
 
-  if (entitlement.state === "EXHAUSTED") return null
-
   const isActive = entitlement.state === "ACTIVE"
 
   return (
-    <Button
-      size="sm"
-      variant={isActive ? "outline" : "default"}
-      disabled={isPending}
-      onClick={() =>
-        mutate(
-          {
-            entitlementId: entitlement.id,
-            status: isActive ? "INACTIVE" : "ACTIVE",
-            customerId,
-          },
-          { onSuccess: () => router.refresh() },
-        )
-      }
-    >
-      {isActive ? "Deactivate" : "Reactivate"}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="sr-only">Actions</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem disabled>
+          <Pencil className="mr-2 h-4 w-4" />
+          Edit Plan
+        </DropdownMenuItem>
+        {entitlement.state !== "EXHAUSTED" && (
+          <DropdownMenuItem
+            disabled={isPending}
+            onClick={() =>
+              mutate(
+                {
+                  entitlementId: entitlement.id,
+                  status: isActive ? "INACTIVE" : "ACTIVE",
+                  customerId,
+                },
+                { onSuccess: () => router.refresh() },
+              )
+            }
+            className={isActive ? "text-destructive focus:text-destructive" : ""}
+          >
+            <Ban className="mr-2 h-4 w-4" />
+            {isActive ? "Deactivate" : "Reactivate"}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -157,7 +178,7 @@ export function CustomerDetailClient({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">
-            Entitlements
+            Plans
           </h2>
           <div className="flex gap-1">
             <Button
@@ -186,7 +207,7 @@ export function CustomerDetailClient({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
+                  <TableHead>Plan</TableHead>
                   <TableHead>Purchased</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Used</TableHead>

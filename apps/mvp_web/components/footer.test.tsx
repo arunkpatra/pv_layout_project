@@ -27,7 +27,7 @@ test("renders SolarLayout brand name", () => {
 test("renders tagline", () => {
   render(<Footer />)
   const taglines = screen.getAllByText(
-    "Design Smarter. Deploy Faster. Power the Future."
+    /Utility-scale PV layout, cabling, and yield/i
   )
   expect(taglines.length).toBeGreaterThanOrEqual(1)
 })
@@ -48,6 +48,6 @@ test("renders contact email", () => {
 
 test("renders location", () => {
   render(<Footer />)
-  const locations = screen.getAllByText("Bangalore, India")
+  const locations = screen.getAllByText(/Bangalore, India/i)
   expect(locations.length).toBeGreaterThanOrEqual(1)
 })

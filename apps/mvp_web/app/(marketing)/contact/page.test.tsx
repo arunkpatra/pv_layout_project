@@ -28,7 +28,7 @@ test("renders page heading", () => {
   expect(
     screen.getByRole("heading", {
       level: 1,
-      name: /Contact Us/i,
+      name: /Contact us/i,
     })
   ).toBeInTheDocument()
 })
@@ -39,7 +39,7 @@ test("renders contact info", () => {
     screen.getAllByText("support@solarlayout.in").length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText("Bangalore, India").length
+    screen.getAllByText("Bangalore, Karnataka, India").length
   ).toBeGreaterThanOrEqual(1)
 })
 

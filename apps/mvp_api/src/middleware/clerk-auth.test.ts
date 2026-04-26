@@ -45,7 +45,7 @@ const mockUserUpsert = mock(async () => ({
 const mockProductFindFirst = mock(async () => ({
   id: "prod_free",
   slug: "pv-layout-free",
-  name: "PV Layout Free",
+  name: "Free",
   calculations: 5,
   isFree: true,
   active: true,
@@ -114,7 +114,7 @@ describe("clerkAuth middleware", () => {
     mockProductFindFirst.mockImplementation(async () => ({
       id: "prod_free",
       slug: "pv-layout-free",
-      name: "PV Layout Free",
+      name: "Free",
       calculations: 5,
       isFree: true,
       active: true,
