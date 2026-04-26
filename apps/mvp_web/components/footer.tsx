@@ -11,14 +11,11 @@ const companyLinks = [
   { href: "/about", label: "About" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
-  { href: "#", label: "Careers" },
 ]
 
 const legalLinks = [
   { href: "/terms", label: "Terms & Conditions" },
   { href: "/privacy", label: "Privacy Policy" },
-  { href: "#", label: "Cookie Policy" },
-  { href: "#", label: "DPDP grievance" },
 ]
 
 function LinkColumn({
