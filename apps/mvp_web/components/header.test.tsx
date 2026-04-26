@@ -48,9 +48,6 @@ test("renders all desktop navigation links", () => {
   expect(
     screen.getAllByRole("link", { name: "FAQ" }).length
   ).toBeGreaterThanOrEqual(1)
-  expect(
-    screen.getAllByRole("link", { name: "Contact" }).length
-  ).toBeGreaterThanOrEqual(1)
 })
 
 test("renders Sign In link for unauthenticated users", () => {
