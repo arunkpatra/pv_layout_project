@@ -16,7 +16,7 @@ export function ScreenshotsSection() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
         <div className="lg:row-span-2">
           <WindowFrame
-            title="SolarLayout — Project: Karnataka_47MW_phase1.slpx"
+            title="SolarLayout — Project: Karnataka_47MW_phase1.kmz"
             caption="Layout canvas — table grid, inverters, exclusions"
             captionMeta="View · Layout/2D"
             className="h-full"
