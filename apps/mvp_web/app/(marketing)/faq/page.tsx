@@ -1,24 +1,25 @@
 import type { Metadata } from "next"
+import { PageHeader } from "@/components/page-header"
+import { SectionBand } from "@/components/section-band"
 import { FaqAccordion } from "@/components/faq-accordion"
 
 export const metadata: Metadata = {
   title: "FAQ",
   description:
-    "Frequently asked questions about SolarLayout PV design solutions — software, downloads, pricing, entitlements, and support.",
+    "Frequently asked questions about SolarLayout PV design solutions.",
 }
 
 export default function FaqPage() {
   return (
-    <div className="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          Frequently Asked Questions
-        </h1>
-
-        <div className="mt-10">
-          <FaqAccordion />
-        </div>
-      </div>
-    </div>
+    <>
+      <PageHeader
+        breadcrumb={["SolarLayout", "FAQ"]}
+        title="Frequently asked questions."
+        description="If you do not see your question answered below, contact us at support@solarlayout.in."
+      />
+      <SectionBand>
+        <FaqAccordion />
+      </SectionBand>
+    </>
   )
 }
