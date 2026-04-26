@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import Link from "next/link"
 import { Button } from "@renewable-energy/ui/components/button"
 
@@ -148,8 +149,8 @@ export function PricingCards() {
         </thead>
         <tbody>
           {groups.map((group) => (
-            <>
-              <tr key={`group-${group.label}`}>
+            <Fragment key={group.label}>
+              <tr>
                 <td
                   colSpan={4}
                   className="bg-[#F4F8F6] px-[18px] py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-primary"
@@ -179,7 +180,7 @@ export function PricingCards() {
                   </td>
                 </tr>
               ))}
-            </>
+            </Fragment>
           ))}
           <tr>
             <td className="px-[18px] py-3.5" />
