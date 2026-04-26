@@ -30,7 +30,7 @@ const mockEntitlementFindMany = mock(async () => [
     usedCalculations: 3,
     purchasedAt: new Date(),
     product: {
-      name: "PV Layout Pro",
+      name: "Pro",
       displayOrder: 2,
       features: [
         { featureKey: "plant_layout", label: "Plant Layout" },
@@ -44,7 +44,7 @@ const mockUsageRecordFindMany = mock(async () => [
   {
     featureKey: "plant_layout",
     createdAt: new Date("2026-04-22T10:00:00Z"),
-    product: { name: "PV Layout Pro" },
+    product: { name: "Pro" },
   },
 ])
 
@@ -77,7 +77,7 @@ describe("GET /entitlements", () => {
         usedCalculations: 3,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Pro",
+          name: "Pro",
           displayOrder: 2,
           features: [
             { featureKey: "plant_layout", label: "Plant Layout" },
@@ -124,7 +124,7 @@ describe("GET /entitlements", () => {
     expect(body.data.user.name).toBe("Test User")
     expect(body.data.user.email).toBe("test@example.com")
     expect(body.data.plans).toHaveLength(1)
-    expect(body.data.plans[0]!.planName).toBe("PV Layout Pro")
+    expect(body.data.plans[0]!.planName).toBe("Pro")
     expect(body.data.plans[0]!.features).toContain("Plant Layout")
     expect(body.data.plans[0]!.features).toContain("Cable Routing")
     expect(body.data.plans[0]!.totalCalculations).toBe(10)
@@ -142,7 +142,7 @@ describe("GET /entitlements", () => {
         usedCalculations: 5,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Basic",
+          name: "Basic",
           displayOrder: 1,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
@@ -188,7 +188,7 @@ describe("GET /entitlements", () => {
         usedCalculations: 2,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Basic",
+          name: "Basic",
           displayOrder: 1,
           features: [{ featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" }],
         },
@@ -204,7 +204,7 @@ describe("GET /entitlements", () => {
         plans: { planName: string; features: string[]; remainingCalculations: number }[]
       }
     }
-    expect(body.data.plans[0]!.planName).toBe("PV Layout Basic")
+    expect(body.data.plans[0]!.planName).toBe("Basic")
     expect(body.data.plans[0]!.features).toContain("Plant Layout (MMS, Inverter, LA)")
     expect(body.data.plans[0]!.remainingCalculations).toBe(3)
   })
@@ -219,7 +219,7 @@ describe("GET /entitlements", () => {
         usedCalculations: 1,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Basic",
+          name: "Basic",
           displayOrder: 1,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
@@ -232,7 +232,7 @@ describe("GET /entitlements", () => {
         usedCalculations: 2,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Pro",
+          name: "Pro",
           displayOrder: 2,
           features: [
             { featureKey: "plant_layout", label: "Plant Layout" },
@@ -266,11 +266,11 @@ describe("GET /entitlements", () => {
     expect(body.data.totalCalculations).toBe(13)
     expect(body.data.remainingCalculations).toBe(10)
     expect(body.data.plans).toHaveLength(2)
-    expect(body.data.plans[0]!.planName).toBe("PV Layout Basic")
+    expect(body.data.plans[0]!.planName).toBe("Basic")
     expect(body.data.plans[0]!.totalCalculations).toBe(3)
     expect(body.data.plans[0]!.usedCalculations).toBe(1)
     expect(body.data.plans[0]!.remainingCalculations).toBe(2)
-    expect(body.data.plans[1]!.planName).toBe("PV Layout Pro")
+    expect(body.data.plans[1]!.planName).toBe("Pro")
     expect(body.data.plans[1]!.totalCalculations).toBe(10)
     expect(body.data.plans[1]!.usedCalculations).toBe(2)
     expect(body.data.plans[1]!.remainingCalculations).toBe(8)
@@ -303,7 +303,7 @@ describe("GET /usage/history", () => {
     expect(body.success).toBe(true)
     expect(body.data.records).toHaveLength(1)
     expect(body.data.records[0]!.featureKey).toBe("plant_layout")
-    expect(body.data.records[0]!.productName).toBe("PV Layout Pro")
+    expect(body.data.records[0]!.productName).toBe("Pro")
     expect(body.data.records[0]!.createdAt).toBe("2026-04-22T10:00:00.000Z")
   })
 

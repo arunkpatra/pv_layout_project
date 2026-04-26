@@ -47,7 +47,7 @@ const mockEntitlementFindMany = mock(async () => [
     usedCalculations: 2,
     purchasedAt: new Date(),
     product: {
-      name: "PV Layout Basic",
+      name: "Basic",
       displayOrder: 1,
       features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
     },
@@ -127,7 +127,7 @@ describe("POST /usage/report", () => {
         usedCalculations: 2,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Basic",
+          name: "Basic",
           displayOrder: 1,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
@@ -202,7 +202,7 @@ describe("POST /usage/report", () => {
         usedCalculations: 5,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Basic",
+          name: "Basic",
           displayOrder: 1,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
@@ -282,7 +282,7 @@ describe("POST /usage/report", () => {
         usedCalculations: 1,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Basic",
+          name: "Basic",
           displayOrder: 1,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
@@ -295,7 +295,7 @@ describe("POST /usage/report", () => {
         usedCalculations: 0,
         purchasedAt: new Date(),
         product: {
-          name: "PV Layout Pro",
+          name: "Pro",
           displayOrder: 2,
           features: [
             { featureKey: "plant_layout", label: "Plant Layout" },

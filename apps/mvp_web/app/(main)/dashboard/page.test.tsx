@@ -66,7 +66,7 @@ const twoActiveEntitlements = [
   {
     id: "ent-1",
     product: "pv-layout-pro",
-    productName: "PV Layout Pro",
+    productName: "Pro",
     totalCalculations: 10,
     usedCalculations: 0,
     remainingCalculations: 30,
@@ -77,7 +77,7 @@ const twoActiveEntitlements = [
   {
     id: "ent-2",
     product: "pv-layout-basic",
-    productName: "PV Layout Basic",
+    productName: "Basic",
     totalCalculations: 5,
     usedCalculations: 0,
     remainingCalculations: 20,
@@ -90,7 +90,7 @@ const twoActiveEntitlements = [
 const sampleUsageRecords = [
   {
     featureKey: "pv_layout",
-    productName: "PV Layout Pro",
+    productName: "Pro",
     createdAt: "2024-03-15T10:00:00Z",
   },
 ]
@@ -235,7 +235,7 @@ describe("Dashboard home page", () => {
       })
       render(<DashboardPage />)
       expect(screen.getByText("pv_layout")).toBeInTheDocument()
-      expect(screen.getAllByText("PV Layout Pro").length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText("Pro").length).toBeGreaterThanOrEqual(1)
       // Date rendered via toLocaleDateString — check at least one cell exists
       const dateCells = screen.getAllByRole("cell")
       expect(dateCells.length).toBeGreaterThan(0)

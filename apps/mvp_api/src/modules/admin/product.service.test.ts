@@ -4,7 +4,7 @@ const mockProductFindMany = mock(async () => [
   {
     id: "prod1",
     slug: "pv-layout-pro",
-    name: "PV Layout Pro",
+    name: "Pro",
     priceAmount: 4999,
     priceCurrency: "usd",
     calculations: 10,
@@ -20,7 +20,7 @@ const mockProductCount = mock(async () => 1)
 const mockProductFindUnique = mock(async () => ({
   id: "prod1",
   slug: "pv-layout-pro",
-  name: "PV Layout Pro",
+  name: "Pro",
   priceAmount: 4999,
   priceCurrency: "usd",
   calculations: 10,
@@ -65,7 +65,7 @@ describe("listProducts", () => {
       {
         id: "prod1",
         slug: "pv-layout-pro",
-        name: "PV Layout Pro",
+        name: "Pro",
         priceAmount: 4999,
         priceCurrency: "usd",
         calculations: 10,
@@ -121,7 +121,7 @@ describe("getProduct", () => {
     mockProductFindUnique.mockImplementation(async () => ({
       id: "prod1",
       slug: "pv-layout-pro",
-      name: "PV Layout Pro",
+      name: "Pro",
       priceAmount: 4999,
       priceCurrency: "usd",
       calculations: 10,
@@ -157,7 +157,7 @@ describe("getProductSales", () => {
     mockProductFindUnique.mockImplementation(async () => ({
       id: "prod1",
       slug: "pv-layout-pro",
-      name: "PV Layout Pro",
+      name: "Pro",
       priceAmount: 4999,
       priceCurrency: "usd",
       calculations: 10,

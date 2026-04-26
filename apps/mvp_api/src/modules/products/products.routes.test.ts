@@ -8,7 +8,7 @@ import {
 const mockFindMany = mock(async () => [
   {
     slug: "pv-layout-basic",
-    name: "PV Layout Basic",
+    name: "Basic",
     description: "5 layout calculations per purchase",
     priceAmount: 199,
     priceCurrency: "usd",
@@ -43,7 +43,7 @@ describe("GET /products", () => {
     mockFindMany.mockImplementation(async () => [
       {
         slug: "pv-layout-basic",
-        name: "PV Layout Basic",
+        name: "Basic",
         description: "5 layout calculations per purchase",
         priceAmount: 199,
         priceCurrency: "usd",

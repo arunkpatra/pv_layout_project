@@ -61,7 +61,7 @@ const mockUserFindUnique = mock(async () => ({
       usedCalculations: 3,
       purchasedAt: new Date("2026-01-15"),
       deactivatedAt: null,
-      product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+      product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
     },
   ],
 }))
@@ -148,7 +148,7 @@ beforeEach(() => {
         usedCalculations: 3,
         purchasedAt: new Date("2026-01-15"),
         deactivatedAt: null,
-        product: { id: "prod1", name: "PV Layout Pro", slug: "pv-layout-pro" },
+        product: { id: "prod1", name: "Pro", slug: "pv-layout-pro" },
       },
     ],
   }))

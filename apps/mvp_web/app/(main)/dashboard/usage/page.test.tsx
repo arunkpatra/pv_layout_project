@@ -27,12 +27,12 @@ import { UsagePageInner } from "./usage-inner"
 const sampleRecords = [
   {
     featureKey: "pv_layout",
-    productName: "PV Layout Pro",
+    productName: "Pro",
     createdAt: "2024-03-15T10:00:00Z",
   },
   {
     featureKey: "string_sizing",
-    productName: "PV Layout Basic",
+    productName: "Basic",
     createdAt: "2024-02-10T08:00:00Z",
   },
 ]
@@ -82,9 +82,9 @@ describe("Usage page", () => {
     })
     render(<UsagePageInner />)
     expect(screen.getByText("pv_layout")).toBeInTheDocument()
-    expect(screen.getByText("PV Layout Pro")).toBeInTheDocument()
+    expect(screen.getByText("Pro")).toBeInTheDocument()
     expect(screen.getByText("string_sizing")).toBeInTheDocument()
-    expect(screen.getByText("PV Layout Basic")).toBeInTheDocument()
+    expect(screen.getByText("Basic")).toBeInTheDocument()
     // Dates rendered via toLocaleDateString — at least the cells appear
     const cells = screen.getAllByRole("cell")
     expect(cells.length).toBeGreaterThan(0)
