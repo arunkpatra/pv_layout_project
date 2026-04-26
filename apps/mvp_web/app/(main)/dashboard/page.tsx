@@ -199,7 +199,7 @@ export default function DashboardPage() {
               <div>
                 <span
                   data-testid="remaining-calculations-value"
-                  className="text-4xl font-bold text-foreground"
+                  className="block text-4xl font-bold text-foreground"
                 >
                   {remainingCalculations}
                 </span>
