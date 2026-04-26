@@ -101,11 +101,8 @@ export function ProductsPageClient() {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => router.push(`/plans/${product.slug}`)}
                 >
-                  <TableCell>
-                    <p className="font-medium text-foreground">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {product.slug}
-                    </p>
+                  <TableCell className="font-medium text-foreground">
+                    {product.name}
                   </TableCell>
                   <TableCell>
                     {product.isFree
