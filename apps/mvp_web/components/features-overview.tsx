@@ -53,7 +53,7 @@ export function FeaturesOverview() {
     <SectionBand>
       <SectionHead
         eyebrow="01 / Products"
-        title="Three plans, one application."
+        title="Choose the right plan for your project."
         description="Pick the depth of automation your project stage needs. Calculations are pooled per purchase."
         ctaHref="/products"
         ctaLabel="All products →"
