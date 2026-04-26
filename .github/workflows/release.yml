@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      id-token: write
       contents: write
 
     steps:
@@ -50,17 +49,7 @@ jobs:
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xhc3NpYy13YXNwLTU1LmNsZXJrLmFjY291bnRzLmRldiQ
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Download desktop app from S3
-        run: |
-          aws s3 cp s3://solarlayout-prod-downloads/downloads/pv_layout.zip ./pv_layout.zip
-
-      - name: Create GitHub Release with desktop app
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ github.ref_name }}
@@ -72,5 +61,4 @@ jobs:
           gh release create "$TAG_NAME" \
             --generate-notes \
             --title "$TAG_NAME" \
-            $PRERELEASE_FLAG \
-            ./pv_layout.zip
+            $PRERELEASE_FLAG
