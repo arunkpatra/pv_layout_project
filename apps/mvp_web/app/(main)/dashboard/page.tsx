@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
-import { Copy, Download } from "lucide-react"
+import { Copy, Download, Eye, EyeOff } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -37,6 +37,7 @@ const MVP_API_URL =
 export default function DashboardPage() {
   const { getToken } = useAuth()
   const [copied, setCopied] = useState(false)
+  const [keyRevealed, setKeyRevealed] = useState(false)
 
   const {
     data: entData,
@@ -128,7 +129,21 @@ export default function DashboardPage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground/70">
               License Key
             </span>
-            <span className="font-mono text-sm">{maskedKey}</span>
+            <span className="font-mono text-sm">
+              {keyRevealed ? licenseKey : maskedKey}
+            </span>
+            <button
+              type="button"
+              onClick={() => setKeyRevealed(!keyRevealed)}
+              className="text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+              aria-label={keyRevealed ? "Hide license key" : "Show license key"}
+            >
+              {keyRevealed ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
           </div>
           <Button
             variant="outline"
