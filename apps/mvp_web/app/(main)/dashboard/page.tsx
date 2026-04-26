@@ -122,58 +122,62 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* License Key Banner */}
+      {/* License Key Card */}
       {entLoading ? (
-        <Skeleton className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-28 w-full rounded-lg" />
       ) : licenseKey ? (
-        <div className="flex items-center justify-between rounded-lg bg-primary px-5 py-3 text-primary-foreground">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground/70">
-              License Key
-            </span>
-            <span className="font-mono text-sm">
+        <div className="rounded-lg bg-accent px-6 py-5 text-[#1C1C1C]">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em]">
+            Your License Key
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-xl font-bold tracking-wide">
               {keyRevealed ? licenseKey : maskedKey}
             </span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setKeyRevealed(!keyRevealed)}
-                    className="text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                    aria-label={keyRevealed ? "Hide license key" : "Show license key"}
-                  >
-                    {keyRevealed ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {keyRevealed ? "Hide key" : "Show key"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyKey}
-                    className="gap-1.5 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    {copied ? "Copied!" : "Copy"}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Copy license key to clipboard
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <div className="flex items-center gap-1.5">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setKeyRevealed(!keyRevealed)}
+                      className="rounded-md border border-[#1C1C1C]/20 p-1.5 transition-colors hover:bg-[#1C1C1C]/10"
+                      aria-label={keyRevealed ? "Hide license key" : "Show license key"}
+                    >
+                      {keyRevealed ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {keyRevealed ? "Hide key" : "Show key"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={handleCopyKey}
+                      className="gap-1.5 bg-[#1C1C1C] text-white hover:bg-[#1C1C1C]/90"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      {copied ? "Copied!" : "Copy"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Copy license key to clipboard
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
+          <p className="mt-2 text-xs text-[#1C1C1C]/60">
+            Use this key in the desktop application to activate your plan.
+          </p>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-3 text-center text-sm text-muted-foreground">
