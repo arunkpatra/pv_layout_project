@@ -85,7 +85,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="ml-auto md:hidden"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
