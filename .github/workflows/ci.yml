@@ -36,9 +36,9 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: "0.6.x"
+          version: "latest"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
