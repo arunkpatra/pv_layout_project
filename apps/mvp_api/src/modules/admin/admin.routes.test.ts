@@ -267,6 +267,36 @@ describe("GET /admin/users/search", () => {
     )
   })
 
+  it("allows OPS user to search users by email (200)", async () => {
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_ops",
+      clerkId: "ck_admin",
+      email: "ops@test.com",
+      name: "Ops User",
+      stripeCustomerId: null,
+      roles: ["OPS"],
+      status: "ACTIVE",
+    }))
+    mockUserFindMany.mockImplementation(
+      async () =>
+        [
+          { id: "u1", email: "alice@example.com", name: "Alice" },
+        ] as unknown as Awaited<ReturnType<typeof mockUserFindMany>>,
+    )
+
+    const res = await makeApp().request("/admin/users/search?email=alice", {
+      headers: { Authorization: "Bearer token" },
+    })
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { users: unknown[] }
+    }
+    expect(body.success).toBe(true)
+    expect(body.data.users).toHaveLength(1)
+  })
+
   it("returns 401 without auth", async () => {
     const res = await makeApp().request("/admin/users/search?email=ali")
     expect(res.status).toBe(401)

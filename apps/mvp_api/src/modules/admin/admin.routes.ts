@@ -31,7 +31,20 @@ const StatusSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
 })
 
-// All admin routes require ADMIN role
+// Search route is accessible to ADMIN and OPS — registered before the
+// ADMIN-only umbrella middleware so OPS requests are not rejected early.
+adminRoutes.get(
+  "/admin/users/search",
+  clerkAuth,
+  requireRole("ADMIN", "OPS"),
+  async (c) => {
+    const email = c.req.query("email") ?? ""
+    const users = await searchUsersByEmail(email)
+    return c.json({ success: true, data: { users } })
+  },
+)
+
+// All remaining /admin/* routes require ADMIN role
 adminRoutes.use("/admin/*", clerkAuth, requireRole("ADMIN"))
 
 adminRoutes.get("/admin/users", async (c) => {
@@ -45,12 +58,6 @@ adminRoutes.get("/admin/users", async (c) => {
     pageSize: isNaN(pageSize) ? 20 : pageSize,
   })
   return c.json(ok(result))
-})
-
-adminRoutes.get("/admin/users/search", async (c) => {
-  const email = c.req.query("email") ?? ""
-  const users = await searchUsersByEmail(email)
-  return c.json({ success: true, data: { users } })
 })
 
 adminRoutes.get("/admin/users/:id", async (c) => {

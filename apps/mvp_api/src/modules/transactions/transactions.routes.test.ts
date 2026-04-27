@@ -194,8 +194,34 @@ describe("POST /admin/transactions", () => {
     expect(res.status).toBe(401)
   })
 
-  it("rejects 403 for non-admin authenticated user", async () => {
-    // Override findFirst to return a user without ADMIN role
+  it("rejects 403 for non-admin/non-ops authenticated user", async () => {
+    // Override findFirst to return a user with no privileged role
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_plain",
+      clerkId: "ck_admin",
+      email: "plain@test.com",
+      name: "Plain User",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }))
+
+    const res = await makeApp().request("/admin/transactions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer token",
+      },
+      body: JSON.stringify({
+        userId: "usr_alice",
+        productSlug: "pv-layout-pro",
+        paymentMethod: "CASH",
+      }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("allows OPS user to create a manual transaction (200)", async () => {
     mockUserFindFirst.mockImplementation(async () => ({
       id: "usr_ops",
       clerkId: "ck_admin",
@@ -215,10 +241,17 @@ describe("POST /admin/transactions", () => {
       body: JSON.stringify({
         userId: "usr_alice",
         productSlug: "pv-layout-pro",
-        paymentMethod: "CASH",
+        paymentMethod: "UPI",
+        externalReference: "UPI-ops-test",
       }),
     })
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { transactionId: string; entitlementId: string }
+    }
+    expect(body.success).toBe(true)
+    expect(body.data.transactionId).toBe("txn_new")
   })
 })
 
@@ -275,7 +308,25 @@ describe("GET /admin/transactions", () => {
     expect(res.status).toBe(401)
   })
 
-  it("rejects 403 for non-admin", async () => {
+  it("rejects 403 for non-admin/non-ops user", async () => {
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_plain",
+      clerkId: "ck_admin",
+      email: "plain@test.com",
+      name: "Plain User",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }))
+
+    const res = await makeApp().request("/admin/transactions", {
+      method: "GET",
+      headers: { Authorization: "Bearer token" },
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("allows OPS user to list transactions (200)", async () => {
     mockUserFindFirst.mockImplementation(async () => ({
       id: "usr_ops",
       clerkId: "ck_admin",
@@ -290,7 +341,12 @@ describe("GET /admin/transactions", () => {
       method: "GET",
       headers: { Authorization: "Bearer token" },
     })
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { transactions: unknown[]; pagination: unknown }
+    }
+    expect(body.success).toBe(true)
   })
 })
 

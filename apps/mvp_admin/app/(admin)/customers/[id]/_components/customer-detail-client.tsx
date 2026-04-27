@@ -44,6 +44,13 @@ function formatCurrency(usd: number) {
   }).format(usd)
 }
 
+function formatUsdCents(cents: number) {
+  return (cents / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  })
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
     year: "numeric",
@@ -327,7 +334,7 @@ export function CustomerDetailClient({
                       {t.productSlug}
                     </TableCell>
                     <TableCell>
-                      {formatCurrency(t.amount)}
+                      {formatUsdCents(t.amount)}
                     </TableCell>
                     <TableCell>
                       <Badge

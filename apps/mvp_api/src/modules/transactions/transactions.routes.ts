@@ -12,9 +12,17 @@ import { ValidationError } from "../../lib/errors.js"
 
 export const transactionsRoutes = new Hono<MvpHonoEnv>()
 
-// All /admin/transactions* routes require authentication + ADMIN role
-transactionsRoutes.use("/admin/transactions/*", clerkAuth, requireRole("ADMIN"))
-transactionsRoutes.use("/admin/transactions", clerkAuth, requireRole("ADMIN"))
+// All /admin/transactions* routes require authentication + ADMIN or OPS role
+transactionsRoutes.use(
+  "/admin/transactions/*",
+  clerkAuth,
+  requireRole("ADMIN", "OPS"),
+)
+transactionsRoutes.use(
+  "/admin/transactions",
+  clerkAuth,
+  requireRole("ADMIN", "OPS"),
+)
 
 transactionsRoutes.post("/admin/transactions", async (c) => {
   const parsed = createManualTransactionBody.safeParse(await c.req.json())
