@@ -1,5 +1,5 @@
 import { describe, expect, it, mock, beforeEach } from "bun:test"
-import { createManualTransaction } from "./transactions.service.js"
+import { createManualTransaction, listTransactions, getTransaction } from "./transactions.service.js"
 
 // Mock createEntitlementAndTransaction so we can isolate transactions.service logic
 const createEntitlementAndTransactionMock = mock(async () => ({
@@ -158,5 +158,129 @@ describe("createManualTransaction", () => {
       expect.anything(),
       expect.objectContaining({ purchasedAt: past }),
     )
+  })
+})
+
+describe("listTransactions", () => {
+  it("returns paginated, filtered, sorted by purchasedAt desc", async () => {
+    const findManyMock = mock(async () => [
+      {
+        id: "txn_1",
+        userId: "usr_a",
+        productId: "prod_pro",
+        source: "STRIPE",
+        status: "COMPLETED",
+        amount: 499,
+        currency: "usd",
+        purchasedAt: new Date("2026-04-25T10:00:00Z"),
+        createdAt: new Date(),
+        paymentMethod: null,
+        externalReference: null,
+        notes: null,
+        createdByUserId: null,
+        checkoutSessionId: "cs_1",
+        user: { email: "alice@example.com", name: "Alice" },
+        product: { slug: "pv-layout-pro", name: "Pro" },
+        createdByUser: null,
+      },
+    ])
+    const countMock = mock(async () => 1)
+    ;(dbMock as any).transaction = { findMany: findManyMock, count: countMock }
+
+    const result = await listTransactions({ source: "ALL", page: 1, pageSize: 20 })
+
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { purchasedAt: "desc" },
+        take: 20,
+        skip: 0,
+      }),
+    )
+    expect(result.transactions[0]).toMatchObject({
+      id: "txn_1",
+      source: "STRIPE",
+      userEmail: "alice@example.com",
+      productSlug: "pv-layout-pro",
+    })
+    expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 1, totalPages: 1 })
+  })
+
+  it("filters by source when source != ALL", async () => {
+    const findManyMock = mock(async () => [])
+    const countMock = mock(async () => 0)
+    ;(dbMock as any).transaction = { findMany: findManyMock, count: countMock }
+
+    await listTransactions({ source: "MANUAL", page: 1, pageSize: 20 })
+
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ source: "MANUAL" }),
+      }),
+    )
+  })
+
+  it("filters by email substring (insensitive) and date range", async () => {
+    const findManyMock = mock(async () => [])
+    const countMock = mock(async () => 0)
+    ;(dbMock as any).transaction = { findMany: findManyMock, count: countMock }
+
+    await listTransactions({
+      source: "ALL",
+      email: "alice",
+      from: "2026-04-01T00:00:00Z",
+      to: "2026-04-30T23:59:59Z",
+      page: 1,
+      pageSize: 20,
+    })
+
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          user: { email: { contains: "alice", mode: "insensitive" } },
+          purchasedAt: {
+            gte: new Date("2026-04-01T00:00:00Z"),
+            lte: new Date("2026-04-30T23:59:59Z"),
+          },
+        }),
+      }),
+    )
+  })
+})
+
+describe("getTransaction", () => {
+  it("returns the transaction with user/product/createdBy joined", async () => {
+    const findUniqueMock = mock(async () => ({
+      id: "txn_1",
+      userId: "usr_a",
+      productId: "prod_pro",
+      source: "MANUAL",
+      status: "COMPLETED",
+      amount: 499,
+      currency: "usd",
+      purchasedAt: new Date("2026-04-25T10:00:00Z"),
+      createdAt: new Date(),
+      paymentMethod: "UPI",
+      externalReference: "UPI-1",
+      notes: "n",
+      createdByUserId: "usr_admin",
+      checkoutSessionId: null,
+      user: { email: "alice@example.com", name: "Alice" },
+      product: { slug: "pv-layout-pro", name: "Pro" },
+      createdByUser: { email: "admin@example.com" },
+    }))
+    ;(dbMock as any).transaction = { findUnique: findUniqueMock }
+
+    const result = await getTransaction("txn_1")
+    expect(result).toMatchObject({
+      id: "txn_1",
+      source: "MANUAL",
+      paymentMethod: "UPI",
+      createdByEmail: "admin@example.com",
+    })
+  })
+
+  it("throws 404 when not found", async () => {
+    ;(dbMock as any).transaction = { findUnique: mock(async () => null) }
+    await expect(getTransaction("missing")).rejects.toMatchObject({ statusCode: 404 })
   })
 })

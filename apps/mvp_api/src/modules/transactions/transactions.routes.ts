@@ -2,8 +2,12 @@ import { Hono } from "hono"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 import { clerkAuth } from "../../middleware/clerk-auth.js"
 import { requireRole } from "../../middleware/rbac.js"
-import { createManualTransaction } from "./transactions.service.js"
-import { createManualTransactionBody } from "./types.js"
+import {
+  createManualTransaction,
+  listTransactions,
+  getTransaction,
+} from "./transactions.service.js"
+import { createManualTransactionBody, transactionFiltersQuery } from "./types.js"
 import { ValidationError } from "../../lib/errors.js"
 
 export const transactionsRoutes = new Hono<MvpHonoEnv>()
@@ -34,4 +38,19 @@ transactionsRoutes.post("/admin/transactions", async (c) => {
   return c.json({ success: true, data: result })
 })
 
-// GET routes will be added in Task 19
+transactionsRoutes.get("/admin/transactions", async (c) => {
+  const parseResult = transactionFiltersQuery.safeParse(
+    Object.fromEntries(new URL(c.req.url).searchParams),
+  )
+  if (!parseResult.success) {
+    throw new ValidationError(parseResult.error.format())
+  }
+  const result = await listTransactions(parseResult.data)
+  return c.json({ success: true, data: result })
+})
+
+transactionsRoutes.get("/admin/transactions/:id", async (c) => {
+  const id = c.req.param("id")
+  const result = await getTransaction(id)
+  return c.json({ success: true, data: result })
+})
