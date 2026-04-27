@@ -183,6 +183,7 @@ export function TransactionsPageClient() {
                 <TableHead>Method</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead>Recorded by</TableHead>
+                <TableHead className="w-16 text-right" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -242,6 +243,14 @@ export function TransactionsPageClient() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {tx.source === "STRIPE" ? "—" : (tx.createdByEmail ?? "—")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/transactions/${tx.id}`}
+                      className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      View
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
