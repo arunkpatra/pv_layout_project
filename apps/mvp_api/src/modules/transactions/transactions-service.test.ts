@@ -1,5 +1,5 @@
-import { describe, expect, it, mock, beforeAll, beforeEach } from "bun:test"
-import type { createManualTransaction as CreateManualTransactionFn } from "./transactions.service.js"
+import { describe, expect, it, mock, beforeEach } from "bun:test"
+import { createManualTransaction } from "./transactions.service.js"
 
 // Mock createEntitlementAndTransaction so we can isolate transactions.service logic
 const createEntitlementAndTransactionMock = mock(async () => ({
@@ -16,29 +16,6 @@ const dbMock = {
   $transaction: mock(async (cb: (tx: unknown) => Promise<unknown>) => cb({} as unknown)),
 }
 mock.module("../../lib/db.js", () => ({ db: dbMock }))
-
-// ─── Leakage guard ────────────────────────────────────────────────────────────
-// Bun shares the module registry across files in a single run.
-// transactions.routes.test.ts calls mock.module("./transactions.service.js",
-// stub) and — because Bun evaluates files sequentially in the same process —
-// that stub persists when this file is loaded next (alphabetically).
-//
-// A static import below would be hoisted *before* any mock.module call in
-// this file runs, so it would bind to the stub, not the real implementation.
-//
-// Fix: load the real implementation lazily from a query-suffixed path that
-// bypasses the mock registry (Bun treats "…service.ts?isolated=1" as a
-// distinct cache key from "…service.js"), then stash it into `svc` during
-// beforeAll — which runs after all mock.module registrations above are active.
-// The fresh load of the real source picks up the db/billing mocks registered
-// above because those are keyed on their canonical absolute paths.
-// ─────────────────────────────────────────────────────────────────────────────
-let svc: { createManualTransaction: typeof CreateManualTransactionFn }
-
-beforeAll(async () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  svc = (await import(`${import.meta.dir}/transactions.service.ts?isolated=1` as any)) as typeof svc
-})
 
 beforeEach(() => {
   createEntitlementAndTransactionMock.mockClear()
@@ -59,7 +36,7 @@ describe("createManualTransaction", () => {
       calculations: 10,
     })
 
-    const result = await svc.createManualTransaction({
+    const result = await createManualTransaction({
       userId: "usr_alice",
       productSlug: "pv-layout-pro",
       paymentMethod: "UPI",
@@ -89,7 +66,7 @@ describe("createManualTransaction", () => {
     dbMock.user.findUnique.mockResolvedValueOnce(null)
 
     await expect(
-      svc.createManualTransaction({
+      createManualTransaction({
         userId: "usr_missing",
         productSlug: "pv-layout-pro",
         paymentMethod: "CASH",
@@ -103,7 +80,7 @@ describe("createManualTransaction", () => {
     dbMock.product.findUnique.mockResolvedValueOnce(null)
 
     await expect(
-      svc.createManualTransaction({
+      createManualTransaction({
         userId: "usr_alice",
         productSlug: "missing",
         paymentMethod: "CASH",
@@ -120,7 +97,7 @@ describe("createManualTransaction", () => {
     })
 
     await expect(
-      svc.createManualTransaction({
+      createManualTransaction({
         userId: "usr_alice", productSlug: "pv-layout-pro",
         paymentMethod: "CASH", createdByUserId: "usr_admin",
       }),
@@ -135,7 +112,7 @@ describe("createManualTransaction", () => {
     })
 
     await expect(
-      svc.createManualTransaction({
+      createManualTransaction({
         userId: "usr_alice", productSlug: "pv-layout-free",
         paymentMethod: "CASH", createdByUserId: "usr_admin",
       }),
@@ -152,7 +129,7 @@ describe("createManualTransaction", () => {
       priceAmount: 1499, calculations: 50,
     })
 
-    await svc.createManualTransaction({
+    await createManualTransaction({
       userId: "usr_a", productSlug: "pv-layout-pro-plus",
       paymentMethod: "BANK_TRANSFER", createdByUserId: "usr_admin",
     })
@@ -171,7 +148,7 @@ describe("createManualTransaction", () => {
     })
     const past = new Date("2026-04-20T12:00:00Z")
 
-    await svc.createManualTransaction({
+    await createManualTransaction({
       userId: "usr_a", productSlug: "pv-layout-pro",
       paymentMethod: "CASH", createdByUserId: "usr_admin",
       purchasedAt: past,
