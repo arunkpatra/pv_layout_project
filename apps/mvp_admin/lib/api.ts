@@ -75,7 +75,11 @@ export type ProductListItem = {
   active: boolean
   isFree: boolean
   totalRevenueUsd: number
+  revenueStripe: number
+  revenueManual: number
   purchaseCount: number
+  purchasesStripe: number
+  purchasesManual: number
   activeEntitlementCount: number
 }
 
@@ -96,42 +100,63 @@ export type ProductSalesResponse = {
 }
 
 export type DashboardSummary = {
-  totalRevenueUsd: number
+  totalRevenue: number
+  totalRevenueStripe: number
+  totalRevenueManual: number
   totalCustomers: number
   totalPurchases: number
+  totalPurchasesStripe: number
+  totalPurchasesManual: number
   totalCalculations: number
 }
 
-export type RevenueTrendPoint = {
+export type DashboardTrendPoint = {
   period: string
-  revenueUsd: number
+  revenue: number
+  revenueStripe: number
+  revenueManual: number
+  purchases: number
+  purchasesStripe: number
+  purchasesManual: number
+  customers: number
+  calculations: number
 }
 
-export type CustomerTrendPoint = {
-  period: string
-  count: number
-}
-
-export type PurchaseTrendPoint = {
-  period: string
-  count: number
-}
-
-export type CalculationTrendPoint = {
-  period: string
-  count: number
-}
-
-export type DashboardTrends = {
-  granularity: "daily" | "weekly" | "monthly"
-  revenue: RevenueTrendPoint[]
-  customers: CustomerTrendPoint[]
-  purchases: PurchaseTrendPoint[]
-  calculations: CalculationTrendPoint[]
-}
+export type DashboardTrends = DashboardTrendPoint[]
 
 export type ProductsSummary = {
   totalRevenueUsd: number
   totalPurchases: number
   activeEntitlements: number
+}
+
+export type PaymentMethod =
+  | "CASH"
+  | "BANK_TRANSFER"
+  | "UPI"
+  | "CHEQUE"
+  | "OTHER"
+
+export type TransactionSource = "STRIPE" | "MANUAL" | "FREE_AUTO"
+
+export type TransactionListItem = {
+  id: string
+  userId: string
+  userEmail: string
+  userName: string | null
+  productId: string
+  productSlug: string
+  productName: string
+  source: TransactionSource
+  status: string
+  amount: number
+  currency: string
+  purchasedAt: string
+  createdAt: string
+  paymentMethod: PaymentMethod | null
+  externalReference: string | null
+  notes: string | null
+  createdByUserId: string | null
+  createdByEmail: string | null
+  checkoutSessionId: string | null
 }

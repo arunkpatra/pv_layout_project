@@ -133,8 +133,12 @@ mock.module("../../lib/db.js", () => ({
     },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
-        entitlement: { create: mock(async () => ({})) },
-        licenseKey: { create: mock(async () => ({})) },
+        transaction: { create: mock(async () => ({ id: "txn_test1" })) },
+        entitlement: { create: mock(async () => ({ id: "ent_test1" })) },
+        licenseKey: {
+          create: mock(async () => ({})),
+          findFirst: mock(async () => null),
+        },
         checkoutSession: { update: mock(async () => ({})) },
       }),
   },

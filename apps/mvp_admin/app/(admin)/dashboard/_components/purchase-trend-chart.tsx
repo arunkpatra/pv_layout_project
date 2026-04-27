@@ -9,16 +9,16 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@renewable-energy/ui/components/chart"
-import type { PurchaseTrendPoint } from "@/lib/api"
+import type { DashboardTrendPoint } from "@/lib/api"
 
 const chartConfig = {
-  count: {
+  purchases: {
     label: "Purchases",
     color: "var(--chart-3)",
   },
 } satisfies ChartConfig
 
-export function PurchaseTrendChart({ data }: { data: PurchaseTrendPoint[] }) {
+export function PurchaseTrendChart({ data }: { data: DashboardTrendPoint[] }) {
   return (
     <ChartContainer config={chartConfig} className="h-48 w-full">
       <ComposedChart data={data}>
@@ -41,8 +41,8 @@ export function PurchaseTrendChart({ data }: { data: PurchaseTrendPoint[] }) {
         <ChartLegend content={<ChartLegendContent />} />
         <Bar
           yAxisId="purchases"
-          dataKey="count"
-          fill="var(--color-count)"
+          dataKey="purchases"
+          fill="var(--color-purchases)"
           radius={[2, 2, 0, 0]}
         />
       </ComposedChart>

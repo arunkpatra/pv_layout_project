@@ -70,9 +70,16 @@ export function DashboardClient({
             {summaryLoading ? (
               <Skeleton className="mt-1 h-8 w-24" />
             ) : (
-              <p className="mt-1 text-2xl font-semibold">
-                {formatCurrency(summary?.totalRevenueUsd ?? 0)}
-              </p>
+              <>
+                <p className="mt-1 text-2xl font-semibold">
+                  {formatCurrency((summary?.totalRevenue ?? 0) / 100)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Stripe {formatCurrency((summary?.totalRevenueStripe ?? 0) / 100)}{" "}
+                  · Manual{" "}
+                  {formatCurrency((summary?.totalRevenueManual ?? 0) / 100)}
+                </p>
+              </>
             )}
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
@@ -90,9 +97,15 @@ export function DashboardClient({
             {summaryLoading ? (
               <Skeleton className="mt-1 h-8 w-16" />
             ) : (
-              <p className="mt-1 text-2xl font-semibold">
-                {summary?.totalPurchases ?? 0}
-              </p>
+              <>
+                <p className="mt-1 text-2xl font-semibold">
+                  {summary?.totalPurchases ?? 0}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Stripe {summary?.totalPurchasesStripe ?? 0} · Manual{" "}
+                  {summary?.totalPurchasesManual ?? 0}
+                </p>
+              </>
             )}
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
@@ -153,25 +166,25 @@ export function DashboardClient({
             <h2 className="text-sm font-semibold text-foreground">
               Revenue over time
             </h2>
-            <RevenueTrendChart data={trends?.revenue ?? []} />
+            <RevenueTrendChart data={trends ?? []} />
           </div>
           <div className="rounded-lg border border-border bg-card p-6 space-y-2">
             <h2 className="text-sm font-semibold text-foreground">
               New customers per period
             </h2>
-            <CustomerTrendChart data={trends?.customers ?? []} />
+            <CustomerTrendChart data={trends ?? []} />
           </div>
           <div className="rounded-lg border border-border bg-card p-6 space-y-2">
             <h2 className="text-sm font-semibold text-foreground">
               Purchases per period
             </h2>
-            <PurchaseTrendChart data={trends?.purchases ?? []} />
+            <PurchaseTrendChart data={trends ?? []} />
           </div>
           <div className="rounded-lg border border-border bg-card p-6 space-y-2">
             <h2 className="text-sm font-semibold text-foreground">
               Calculations per period
             </h2>
-            <CalculationTrendChart data={trends?.calculations ?? []} />
+            <CalculationTrendChart data={trends ?? []} />
           </div>
         </div>
       )}

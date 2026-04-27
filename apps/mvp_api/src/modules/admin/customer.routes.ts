@@ -8,6 +8,7 @@ import {
   getCustomer,
   updateEntitlementStatus,
   updateEntitlementUsed,
+  listCustomerTransactions,
 } from "./customer.service.js"
 import { ok } from "../../lib/response.js"
 import { ValidationError } from "../../lib/errors.js"
@@ -32,6 +33,13 @@ customerRoutes.get("/admin/customers", async (c) => {
   )
   const result = await listCustomers({ page, pageSize })
   return c.json(ok(result))
+})
+
+customerRoutes.get("/admin/customers/:id/transactions", async (c) => {
+  const id = c.req.param("id")
+  const limit = Number(c.req.query("limit") ?? "10")
+  const transactions = await listCustomerTransactions(id, limit)
+  return c.json(ok({ transactions }))
 })
 
 customerRoutes.get("/admin/customers/:id", async (c) => {

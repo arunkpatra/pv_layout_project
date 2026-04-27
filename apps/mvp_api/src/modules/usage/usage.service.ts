@@ -19,8 +19,9 @@ export async function reportUsage(
   }
 
   // 2. Select pool: cheapest-first (lowest displayOrder) with remaining > 0 and matching feature
+  // deactivatedAt: null enforces the kill switch — deactivated entitlements are never consumed
   const entitlements = await db.entitlement.findMany({
-    where: { userId },
+    where: { userId, deactivatedAt: null },
     include: {
       product: {
         include: { features: true },
@@ -54,6 +55,7 @@ export async function reportUsage(
       SET "usedCalculations" = "usedCalculations" + 1
       WHERE id = ${pool.id}
         AND "usedCalculations" < "totalCalculations"
+        AND "deactivatedAt" IS NULL
     `
 
     if (rowsUpdated === 0) {

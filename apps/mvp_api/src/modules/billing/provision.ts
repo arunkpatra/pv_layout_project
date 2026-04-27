@@ -1,5 +1,5 @@
 import { db } from "../../lib/db.js"
-import crypto from "node:crypto"
+import { createEntitlementAndTransaction } from "./create-entitlement-and-transaction.js"
 
 /**
  * Provision an entitlement and (optionally) a license key for a completed checkout session.
@@ -22,7 +22,6 @@ export async function provisionEntitlement(
     return { provisioned: false }
   }
 
-  // Idempotency guard
   if (session.processedAt) {
     return { provisioned: false }
   }
@@ -36,39 +35,21 @@ export async function provisionEntitlement(
     return { provisioned: false }
   }
 
-  // Check if user already has a license key
-  const existingKey = await db.licenseKey.findFirst({
-    where: { userId: session.userId },
-  })
+  const amount = purchase?.amountTotal ?? product.priceAmount
 
-  // Single transaction: create entitlement + license key + mark processed
   await db.$transaction(async (tx) => {
-    await tx.entitlement.create({
-      data: {
-        userId: session.userId,
-        productId: product.id,
-        totalCalculations: product.calculations,
-      },
+    await createEntitlementAndTransaction(tx, {
+      userId: session.userId,
+      productId: product.id,
+      amount,
+      source: "STRIPE",
+      checkoutSessionId: session.id,
+      totalCalculations: product.calculations,
     })
-
-    if (!existingKey) {
-      const key = `sl_live_${crypto.randomBytes(24).toString("base64url")}`
-      await tx.licenseKey.create({
-        data: {
-          userId: session.userId,
-          key,
-        },
-      })
-    }
 
     await tx.checkoutSession.update({
       where: { id: session.id },
-      data: {
-        processedAt: new Date(),
-        ...(purchase !== undefined
-          ? { amountTotal: purchase.amountTotal, currency: purchase.currency }
-          : {}),
-      },
+      data: { processedAt: new Date() },
     })
   })
 

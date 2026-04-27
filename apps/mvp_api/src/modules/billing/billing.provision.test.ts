@@ -12,15 +12,21 @@ const mockProductFindUnique = mock(async () => ({
   id: "prod1",
   slug: "pv-layout-pro",
   calculations: 100,
+  priceAmount: 4999,
 }))
-const mockLicenseKeyFindFirst = mock(async () => null)
-const mockTxEntitlementCreate = mock(async () => ({}))
+const mockTxTransactionCreate = mock(async () => ({ id: "txn1" }))
+const mockTxEntitlementCreate = mock(async () => ({ id: "ent1" }))
+const mockTxLicenseKeyFindFirst = mock(async () => null)
 const mockTxLicenseKeyCreate = mock(async () => ({}))
 const mockTxCheckoutSessionUpdate = mock(async () => ({}))
 
 const mockTx = {
+  transaction: { create: mockTxTransactionCreate },
   entitlement: { create: mockTxEntitlementCreate },
-  licenseKey: { create: mockTxLicenseKeyCreate },
+  licenseKey: {
+    findFirst: mockTxLicenseKeyFindFirst,
+    create: mockTxLicenseKeyCreate,
+  },
   checkoutSession: { update: mockTxCheckoutSessionUpdate },
 }
 
@@ -28,7 +34,6 @@ mock.module("../../lib/db.js", () => ({
   db: {
     checkoutSession: { findUnique: mockCheckoutSessionFindUnique },
     product: { findUnique: mockProductFindUnique },
-    licenseKey: { findFirst: mockLicenseKeyFindFirst },
     $transaction: async (fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx),
   },
 }))
@@ -49,12 +54,16 @@ describe("provisionEntitlement", () => {
       id: "prod1",
       slug: "pv-layout-pro",
       calculations: 100,
+      priceAmount: 4999,
     }))
-    mockLicenseKeyFindFirst.mockImplementation(async () => null)
+    mockTxTransactionCreate.mockReset()
     mockTxEntitlementCreate.mockReset()
+    mockTxLicenseKeyFindFirst.mockReset()
     mockTxLicenseKeyCreate.mockReset()
     mockTxCheckoutSessionUpdate.mockReset()
-    mockTxEntitlementCreate.mockImplementation(async () => ({}))
+    mockTxTransactionCreate.mockImplementation(async () => ({ id: "txn1" }))
+    mockTxEntitlementCreate.mockImplementation(async () => ({ id: "ent1" }))
+    mockTxLicenseKeyFindFirst.mockImplementation(async () => null)
     mockTxLicenseKeyCreate.mockImplementation(async () => ({}))
     mockTxCheckoutSessionUpdate.mockImplementation(async () => ({}))
   })
@@ -62,26 +71,63 @@ describe("provisionEntitlement", () => {
   it("returns provisioned: true for valid session", async () => {
     const result = await provisionEntitlement("cs_test_123")
     expect(result.provisioned).toBe(true)
+    expect(mockTxTransactionCreate).toHaveBeenCalledTimes(1)
+    expect(mockTxTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr1",
+          productId: "prod1",
+          source: "STRIPE",
+          amount: 4999,
+          currency: "usd",
+          checkoutSessionId: "cs1",
+          paymentMethod: null,
+          createdByUserId: null,
+        }),
+      }),
+    )
     expect(mockTxEntitlementCreate).toHaveBeenCalledTimes(1)
   })
 
-  it("writes amountTotal and currency when purchase arg provided", async () => {
+  it("uses purchase.amountTotal when purchase arg provided", async () => {
     await provisionEntitlement("cs_test_123", {
-      amountTotal: 4999,
+      amountTotal: 9999,
       currency: "usd",
     })
+    expect(mockTxTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr1",
+          productId: "prod1",
+          source: "STRIPE",
+          amount: 9999,
+          currency: "usd",
+          checkoutSessionId: "cs1",
+          paymentMethod: null,
+          createdByUserId: null,
+        }),
+      }),
+    )
     const calls = mockTxCheckoutSessionUpdate.mock.calls as unknown as {
       data: Record<string, unknown>
     }[][]
     expect(calls.length).toBe(1)
     const arg = calls[0]![0]!
-    expect(arg.data.amountTotal).toBe(4999)
-    expect(arg.data.currency).toBe("usd")
     expect(arg.data.processedAt).toBeInstanceOf(Date)
+    expect("amountTotal" in arg.data).toBe(false)
+    expect("currency" in arg.data).toBe(false)
   })
 
-  it("omits amountTotal from update when no purchase arg", async () => {
+  it("falls back to product.priceAmount when no purchase arg", async () => {
     await provisionEntitlement("cs_test_123")
+    expect(mockTxTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          amount: 4999,
+          source: "STRIPE",
+        }),
+      }),
+    )
     const calls = mockTxCheckoutSessionUpdate.mock.calls as unknown as {
       data: Record<string, unknown>
     }[][]

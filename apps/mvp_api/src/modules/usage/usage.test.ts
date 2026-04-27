@@ -38,7 +38,7 @@ const mockProductFeatureFindFirst = mock(async () => ({
   productId: "prod_basic",
 }))
 
-const mockEntitlementFindMany = mock(async () => [
+const mockEntitlementFindMany = mock(async (..._args: unknown[]) => [
   {
     id: "ent_basic",
     userId: "usr_test1",
@@ -318,5 +318,251 @@ describe("POST /usage/report", () => {
       { data: { productId: string } },
     ]
     expect(createCall?.[0]?.data?.productId).toBe("prod_basic")
+  })
+})
+
+describe("reportUsage — kill switch enforcement", () => {
+  beforeEach(() => {
+    mockLicenseKeyFindFirst.mockReset()
+    mockLicenseKeyFindFirst.mockImplementation(async () => ({
+      id: "lk_test1",
+      key: "sl_live_testkey",
+      userId: "usr_test1",
+      createdAt: new Date(),
+      revokedAt: null,
+      user: mockUser,
+    }))
+    mockProductFeatureFindFirst.mockReset()
+    mockProductFeatureFindFirst.mockImplementation(async () => ({
+      id: "pf_test1",
+      featureKey: "plant_layout",
+      label: "Plant Layout",
+      productId: "prod_basic",
+    }))
+    mockEntitlementFindMany.mockReset()
+    mockExecuteRaw.mockReset()
+    mockExecuteRaw.mockImplementation(async () => 1)
+    mockUsageRecordCreate.mockReset()
+    mockUsageRecordCreate.mockImplementation(async () => ({}))
+    mockTransaction.mockReset()
+    mockTransaction.mockImplementation(
+      async (
+        fn: (tx: {
+          $executeRaw: typeof mockExecuteRaw
+          usageRecord: { create: typeof mockUsageRecordCreate }
+        }) => Promise<void>,
+      ) => {
+        return fn({
+          $executeRaw: mockExecuteRaw,
+          usageRecord: { create: mockUsageRecordCreate },
+        })
+      },
+    )
+  })
+
+  it("rejects with 402 when the only entitlement is deactivated", async () => {
+    // Mock contract: if WHERE clause omits deactivatedAt: null, return the
+    // deactivated entitlement (pre-fix behavior); otherwise return [] (post-fix).
+    // Pre-fix, the service consumes the deactivated entitlement and returns 200
+    // (usedCalculations 3 < totalCalculations 10), so the 402 expectation fails
+    // without the fix. We verify deactivatedAt: null is added to the WHERE clause.
+    mockEntitlementFindMany.mockImplementation(
+      async (..._args: unknown[]) => {
+        const args = _args[0] as { where: Record<string, unknown> }
+        // Post-fix: query MUST include deactivatedAt: null in the where clause
+        if (!("deactivatedAt" in args.where) || args.where.deactivatedAt !== null) {
+          // Pre-fix behaviour: no filter, so return the deactivated entitlement
+          // (which causes the test to fail because 402 won't be thrown)
+          return [
+            {
+              id: "ent_deactivated",
+              userId: "usr_test1",
+              productId: "prod_basic",
+              totalCalculations: 10,
+              usedCalculations: 3,
+              deactivatedAt: new Date(),
+              purchasedAt: new Date(),
+              product: {
+                name: "Basic",
+                displayOrder: 1,
+                features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+              },
+            },
+          ]
+        }
+        // Post-fix: deactivatedAt: null filter applied — deactivated row excluded
+        return []
+      },
+    )
+
+    const app = makeApp()
+    const res = await app.request("/usage/report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({ feature: "plant_layout" }),
+    })
+    expect(res.status).toBe(402)
+    const body = (await res.json()) as {
+      success: boolean
+      error: { code: string }
+    }
+    expect(body.error.code).toBe("PAYMENT_REQUIRED")
+
+    // Assert the DB call filtered deactivatedAt
+    const findManyCall = mockEntitlementFindMany.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(findManyCall?.[0]?.where).toMatchObject({
+      userId: "usr_test1",
+      deactivatedAt: null,
+    })
+  })
+
+  it("consumes only the active entitlement when stacked with a deactivated one", async () => {
+    // Post-fix: query includes deactivatedAt: null, so only active entitlement
+    // is returned. Pre-fix: deactivated entitlement with lower displayOrder
+    // would be returned first and incorrectly selected.
+    mockEntitlementFindMany.mockImplementation(
+      async (..._args: unknown[]) => {
+        const args = _args[0] as { where: Record<string, unknown> }
+        if (!("deactivatedAt" in args.where) || args.where.deactivatedAt !== null) {
+          // Pre-fix: return deactivated (lower displayOrder) + active entitlement
+          return [
+            {
+              id: "ent_deactivated",
+              userId: "usr_test1",
+              productId: "prod_basic",
+              totalCalculations: 10,
+              usedCalculations: 0,
+              deactivatedAt: new Date(),
+              purchasedAt: new Date(),
+              product: {
+                name: "Basic",
+                displayOrder: 1,
+                features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+              },
+            },
+            {
+              id: "ent_active",
+              userId: "usr_test1",
+              productId: "prod_pro",
+              totalCalculations: 10,
+              usedCalculations: 3,
+              deactivatedAt: null,
+              purchasedAt: new Date(),
+              product: {
+                name: "Pro",
+                displayOrder: 2,
+                features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+              },
+            },
+          ]
+        }
+        // Post-fix: deactivatedAt: null filter — only active entitlement returned
+        return [
+          {
+            id: "ent_active",
+            userId: "usr_test1",
+            productId: "prod_pro",
+            totalCalculations: 10,
+            usedCalculations: 3,
+            deactivatedAt: null,
+            purchasedAt: new Date(),
+            product: {
+              name: "Pro",
+              displayOrder: 2,
+              features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+            },
+          },
+        ]
+      },
+    )
+
+    const app = makeApp()
+    const res = await app.request("/usage/report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({ feature: "plant_layout" }),
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { recorded: boolean; remainingCalculations: number }
+    }
+    expect(body.success).toBe(true)
+    expect(body.data.recorded).toBe(true)
+
+    // The usage record must be created against the active entitlement's product
+    const createCall = mockUsageRecordCreate.mock.calls[0] as unknown as [
+      { data: { productId: string } },
+    ]
+    expect(createCall?.[0]?.data?.productId).toBe("prod_pro")
+
+    // Assert the DB call filtered deactivatedAt
+    const findManyCall = mockEntitlementFindMany.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(findManyCall?.[0]?.where).toMatchObject({
+      userId: "usr_test1",
+      deactivatedAt: null,
+    })
+  })
+
+  it("returns 409 when entitlement is deactivated between selection and atomic UPDATE", async () => {
+    // Simulate the race condition: entitlement was active during selection
+    // (findMany returned it), but deactivated before the atomic UPDATE.
+    // The WHERE clause filters it out, so UPDATE returns 0 rows affected.
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_1",
+        userId: "usr_test1",
+        productId: "prod_pro",
+        totalCalculations: 10,
+        usedCalculations: 3,
+        deactivatedAt: null,
+        purchasedAt: new Date(),
+        product: {
+          name: "Pro",
+          displayOrder: 1,
+          features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+        },
+      },
+    ])
+    mockExecuteRaw.mockImplementation(async () => 0)
+    mockTransaction.mockImplementation(
+      async (
+        fn: (tx: {
+          $executeRaw: typeof mockExecuteRaw
+          usageRecord: { create: typeof mockUsageRecordCreate }
+        }) => Promise<void>,
+      ) => {
+        return fn({
+          $executeRaw: mockExecuteRaw,
+          usageRecord: { create: mockUsageRecordCreate },
+        })
+      },
+    )
+
+    const app = makeApp()
+    const res = await app.request("/usage/report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({ feature: "plant_layout" }),
+    })
+    expect(res.status).toBe(409)
+    const body = (await res.json()) as {
+      success: boolean
+      error: { code: string }
+    }
+    expect(body.error.code).toBe("CONFLICT")
   })
 })

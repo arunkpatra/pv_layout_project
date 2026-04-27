@@ -15,4 +15,5 @@ export const ID_PREFIXES: Record<string, string> = {
   Entitlement: "ent",
   CheckoutSession: "cs",
   UsageRecord: "ur",
+  Transaction: "txn",
 }

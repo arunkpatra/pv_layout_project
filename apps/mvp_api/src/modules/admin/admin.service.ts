@@ -186,3 +186,13 @@ export async function updateUserStatus(params: {
 
   await db.user.update({ where: { id: userId }, data: { status } })
 }
+
+export async function searchUsersByEmail(query: string, limit = 20) {
+  if (!query || query.length < 2) return []
+  return db.user.findMany({
+    where: { email: { contains: query, mode: "insensitive" } },
+    take: limit,
+    orderBy: { email: "asc" },
+    select: { id: true, email: true, name: true },
+  })
+}

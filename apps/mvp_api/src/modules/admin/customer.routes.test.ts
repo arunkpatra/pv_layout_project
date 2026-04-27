@@ -39,9 +39,6 @@ const mockUserFindMany = mock(async () => [
     roles: [],
     status: "ACTIVE",
     createdAt: new Date("2026-01-01"),
-    checkoutSessions: [{ amountTotal: 4999 }],
-    entitlements: [{ deactivatedAt: null }],
-    _count: { usageRecords: 3 },
   },
 ])
 const mockUserCount = mock(async () => 1)
@@ -52,7 +49,6 @@ const mockUserFindUnique = mock(async () => ({
   roles: [],
   status: "ACTIVE",
   createdAt: new Date("2026-01-01"),
-  checkoutSessions: [{ amountTotal: 4999 }],
   entitlements: [
     {
       id: "ent1",
@@ -78,6 +74,33 @@ const mockEntitlementUpdate = mock(async () => ({
   id: "ent1",
   deactivatedAt: new Date() as Date | null,
 }))
+const mockEntitlementFindMany = mock(async () => [
+  { userId: "usr1", deactivatedAt: null },
+])
+const mockTransactionGroupBy = mock(async () => [
+  { userId: "usr1", _sum: { amount: 4999 } },
+])
+const mockTransactionAggregate = mock(async () => ({
+  _sum: { amount: 4999 },
+}))
+const mockTransactionFindMany = mock(async (..._args: unknown[]) => [
+  {
+    id: "txn1",
+    productId: "prod1",
+    source: "MANUAL",
+    status: "COMPLETED",
+    amount: 4999,
+    currency: "usd",
+    purchasedAt: new Date("2026-02-01"),
+    paymentMethod: "CASH",
+    externalReference: null,
+    product: { slug: "pv-layout-pro", name: "Pro" },
+    createdByUser: { email: "ops@test.com" },
+  },
+])
+const mockUsageRecordGroupBy = mock(async () => [
+  { userId: "usr1", _count: { id: 3 } },
+])
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -90,6 +113,15 @@ mock.module("../../lib/db.js", () => ({
     entitlement: {
       findUnique: mockEntitlementFindUnique,
       update: mockEntitlementUpdate,
+      findMany: mockEntitlementFindMany,
+    },
+    transaction: {
+      groupBy: mockTransactionGroupBy,
+      aggregate: mockTransactionAggregate,
+      findMany: mockTransactionFindMany,
+    },
+    usageRecord: {
+      groupBy: mockUsageRecordGroupBy,
     },
     $transaction: async () => {},
   },
@@ -124,9 +156,6 @@ beforeEach(() => {
       roles: [],
       status: "ACTIVE",
       createdAt: new Date("2026-01-01"),
-      checkoutSessions: [{ amountTotal: 4999 }],
-      entitlements: [{ deactivatedAt: null }],
-      _count: { usageRecords: 3 },
     },
   ])
   mockUserCount.mockReset()
@@ -139,7 +168,6 @@ beforeEach(() => {
     roles: [],
     status: "ACTIVE",
     createdAt: new Date("2026-01-01"),
-    checkoutSessions: [{ amountTotal: 4999 }],
     entitlements: [
       {
         id: "ent1",
@@ -167,6 +195,38 @@ beforeEach(() => {
     id: "ent1",
     deactivatedAt: new Date(),
   }))
+  mockEntitlementFindMany.mockReset()
+  mockEntitlementFindMany.mockImplementation(async () => [
+    { userId: "usr1", deactivatedAt: null },
+  ])
+  mockTransactionGroupBy.mockReset()
+  mockTransactionGroupBy.mockImplementation(async () => [
+    { userId: "usr1", _sum: { amount: 4999 } },
+  ])
+  mockTransactionAggregate.mockReset()
+  mockTransactionAggregate.mockImplementation(async () => ({
+    _sum: { amount: 4999 },
+  }))
+  mockTransactionFindMany.mockReset()
+  mockTransactionFindMany.mockImplementation(async () => [
+    {
+      id: "txn1",
+      productId: "prod1",
+      source: "MANUAL",
+      status: "COMPLETED",
+      amount: 4999,
+      currency: "usd",
+      purchasedAt: new Date("2026-02-01"),
+      paymentMethod: "CASH",
+      externalReference: null,
+      product: { slug: "pv-layout-pro", name: "Pro" },
+      createdByUser: { email: "ops@test.com" },
+    },
+  ])
+  mockUsageRecordGroupBy.mockReset()
+  mockUsageRecordGroupBy.mockImplementation(async () => [
+    { userId: "usr1", _count: { id: 3 } },
+  ])
 })
 
 describe("GET /admin/customers", () => {
@@ -265,6 +325,67 @@ describe("Role enforcement", () => {
     const res = await makeApp().request("/admin/customers", {
       headers: { Authorization: "Bearer token" },
     })
+    expect(res.status).toBe(403)
+  })
+})
+
+describe("GET /admin/customers/:id/transactions", () => {
+  it("returns 200 with transactions array and calls service with correct userId", async () => {
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions",
+      { headers: { Authorization: "Bearer token" } },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { transactions: unknown[] }
+    }
+    expect(body.success).toBe(true)
+    expect(Array.isArray(body.data.transactions)).toBe(true)
+    expect(body.data.transactions).toHaveLength(1)
+    // verify the service was called with the right userId (findMany where clause)
+    expect(mockTransactionFindMany).toHaveBeenCalledTimes(1)
+    const callArgs = mockTransactionFindMany.mock.calls[0]?.[0] as {
+      where: { userId: string }
+      take: number
+    } | undefined
+    expect(callArgs?.where.userId).toBe("usr1")
+    expect(callArgs?.take).toBe(10)
+  })
+
+  it("returns 200 with limit from query param", async () => {
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions?limit=5",
+      { headers: { Authorization: "Bearer token" } },
+    )
+    expect(res.status).toBe(200)
+    const callArgs = mockTransactionFindMany.mock.calls[0]?.[0] as {
+      take: number
+    } | undefined
+    expect(callArgs?.take).toBe(5)
+  })
+
+  it("returns 401 without auth", async () => {
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions",
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 403 without ADMIN or OPS role", async () => {
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_plain",
+      clerkId: "ck_ops",
+      email: "plain@test.com",
+      name: "Plain",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }))
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions",
+      { headers: { Authorization: "Bearer token" } },
+    )
     expect(res.status).toBe(403)
   })
 })
