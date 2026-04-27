@@ -156,7 +156,8 @@ describe("getProduct", () => {
 
   it("throws 404 when product not found", async () => {
     mockProductFindUnique.mockImplementation(async () => null as never)
-    await expect(getProduct("nonexistent")).rejects.toMatchObject({ statusCode: 404 })
+    const promise = getProduct("nonexistent")
+    await expect(promise).rejects.toMatchObject({ statusCode: 404 })
   })
 
   it("returns zero split fields when no transactions", async () => {
@@ -238,9 +239,8 @@ describe("getProductSales", () => {
 
   it("throws 404 when product not found", async () => {
     mockProductFindUnique.mockImplementation(async () => null as never)
-    await expect(
-      getProductSales("nonexistent", "monthly"),
-    ).rejects.toMatchObject({ statusCode: 404 })
+    const promise: Promise<unknown> = getProductSales("nonexistent", "monthly")
+    await expect(promise).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 
