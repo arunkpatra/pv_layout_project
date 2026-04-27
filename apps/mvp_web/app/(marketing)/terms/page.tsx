@@ -133,10 +133,10 @@ export default function TermsPage() {
         <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
           If you have questions about these terms, please contact us at{" "}
           <a
-            href="mailto:legal@solarlayout.in"
+            href="mailto:support@solarlayout.in"
             className="text-primary underline underline-offset-4 hover:text-primary/80"
           >
-            legal@solarlayout.in
+            support@solarlayout.in
           </a>
           .
         </p>

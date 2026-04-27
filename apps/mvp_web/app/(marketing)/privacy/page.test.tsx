@@ -14,9 +14,9 @@ test("renders page heading", () => {
 
 test("renders DPDP Act 2023 reference", () => {
   render(<PrivacyPage />)
-  expect(
-    screen.getAllByText(/DPDP Act.*2023/i).length
-  ).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText(/DPDP Act.*2023/i).length).toBeGreaterThanOrEqual(
+    1
+  )
 })
 
 test("renders Grievance Officer section", () => {
@@ -30,7 +30,7 @@ test("renders Grievance Officer section", () => {
     screen.getAllByText(/Data Protection Officer/i).length
   ).toBeGreaterThanOrEqual(1)
   expect(
-    screen.getAllByText(/privacy@solarlayout\.in/i).length
+    screen.getAllByText(/support@solarlayout\.in/i).length
   ).toBeGreaterThanOrEqual(1)
 })
 
@@ -54,8 +54,7 @@ test("renders all key sections", () => {
   ]
   for (const pattern of expectedSections) {
     expect(
-      screen.getAllByRole("heading", { level: 2, name: pattern })
-        .length
+      screen.getAllByRole("heading", { level: 2, name: pattern }).length
     ).toBeGreaterThanOrEqual(1)
   }
 })
