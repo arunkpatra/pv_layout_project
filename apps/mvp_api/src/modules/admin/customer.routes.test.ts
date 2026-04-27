@@ -39,9 +39,6 @@ const mockUserFindMany = mock(async () => [
     roles: [],
     status: "ACTIVE",
     createdAt: new Date("2026-01-01"),
-    checkoutSessions: [{ amountTotal: 4999 }],
-    entitlements: [{ deactivatedAt: null }],
-    _count: { usageRecords: 3 },
   },
 ])
 const mockUserCount = mock(async () => 1)
@@ -52,7 +49,6 @@ const mockUserFindUnique = mock(async () => ({
   roles: [],
   status: "ACTIVE",
   createdAt: new Date("2026-01-01"),
-  checkoutSessions: [{ amountTotal: 4999 }],
   entitlements: [
     {
       id: "ent1",
@@ -78,6 +74,15 @@ const mockEntitlementUpdate = mock(async () => ({
   id: "ent1",
   deactivatedAt: new Date() as Date | null,
 }))
+const mockEntitlementFindMany = mock(async () => [
+  { userId: "usr1", deactivatedAt: null },
+])
+const mockTransactionGroupBy = mock(async () => [
+  { userId: "usr1", _sum: { amount: 4999 } },
+])
+const mockTransactionAggregate = mock(async () => ({
+  _sum: { amount: 4999 },
+}))
 const mockTransactionFindMany = mock(async (..._args: unknown[]) => [
   {
     id: "txn1",
@@ -93,6 +98,9 @@ const mockTransactionFindMany = mock(async (..._args: unknown[]) => [
     createdByUser: { email: "ops@test.com" },
   },
 ])
+const mockUsageRecordGroupBy = mock(async () => [
+  { userId: "usr1", _count: { id: 3 } },
+])
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -105,9 +113,15 @@ mock.module("../../lib/db.js", () => ({
     entitlement: {
       findUnique: mockEntitlementFindUnique,
       update: mockEntitlementUpdate,
+      findMany: mockEntitlementFindMany,
     },
     transaction: {
+      groupBy: mockTransactionGroupBy,
+      aggregate: mockTransactionAggregate,
       findMany: mockTransactionFindMany,
+    },
+    usageRecord: {
+      groupBy: mockUsageRecordGroupBy,
     },
     $transaction: async () => {},
   },
@@ -142,9 +156,6 @@ beforeEach(() => {
       roles: [],
       status: "ACTIVE",
       createdAt: new Date("2026-01-01"),
-      checkoutSessions: [{ amountTotal: 4999 }],
-      entitlements: [{ deactivatedAt: null }],
-      _count: { usageRecords: 3 },
     },
   ])
   mockUserCount.mockReset()
@@ -157,7 +168,6 @@ beforeEach(() => {
     roles: [],
     status: "ACTIVE",
     createdAt: new Date("2026-01-01"),
-    checkoutSessions: [{ amountTotal: 4999 }],
     entitlements: [
       {
         id: "ent1",
@@ -185,6 +195,18 @@ beforeEach(() => {
     id: "ent1",
     deactivatedAt: new Date(),
   }))
+  mockEntitlementFindMany.mockReset()
+  mockEntitlementFindMany.mockImplementation(async () => [
+    { userId: "usr1", deactivatedAt: null },
+  ])
+  mockTransactionGroupBy.mockReset()
+  mockTransactionGroupBy.mockImplementation(async () => [
+    { userId: "usr1", _sum: { amount: 4999 } },
+  ])
+  mockTransactionAggregate.mockReset()
+  mockTransactionAggregate.mockImplementation(async () => ({
+    _sum: { amount: 4999 },
+  }))
   mockTransactionFindMany.mockReset()
   mockTransactionFindMany.mockImplementation(async () => [
     {
@@ -200,6 +222,10 @@ beforeEach(() => {
       product: { slug: "pv-layout-pro", name: "Pro" },
       createdByUser: { email: "ops@test.com" },
     },
+  ])
+  mockUsageRecordGroupBy.mockReset()
+  mockUsageRecordGroupBy.mockImplementation(async () => [
+    { userId: "usr1", _count: { id: 3 } },
   ])
 })
 

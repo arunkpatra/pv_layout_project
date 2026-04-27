@@ -14,6 +14,27 @@ const mockEntitlementUpdate = mock(async () => ({
   deactivatedAt: new Date(),
 }))
 
+// Used by listCustomers to fetch entitlements for active-count computation
+const mockEntitlementFindMany = mock(async () => [
+  { userId: "usr1", deactivatedAt: null },
+  { userId: "usr1", deactivatedAt: new Date() },
+])
+
+// Used by listCustomers for per-user spend groupBy
+const mockTransactionGroupBy = mock(async () => [
+  { userId: "usr1", _sum: { amount: 4999 } },
+])
+
+// Used by getCustomer for single-customer aggregate
+const mockTransactionAggregate = mock(async () => ({
+  _sum: { amount: 4999 },
+}))
+
+// Used by listCustomers for usage record counts
+const mockUsageRecordGroupBy = mock(async () => [
+  { userId: "usr1", _count: { id: 7 } },
+])
+
 const mockUserFindMany = mock(async () => [
   {
     id: "usr1",
@@ -22,12 +43,6 @@ const mockUserFindMany = mock(async () => [
     roles: [],
     status: "ACTIVE",
     createdAt: new Date("2026-01-01"),
-    checkoutSessions: [{ amountTotal: 4999 }, { amountTotal: null }],
-    entitlements: [
-      { deactivatedAt: null },
-      { deactivatedAt: new Date() },
-    ],
-    _count: { usageRecords: 7 },
   },
 ])
 const mockUserCount = mock(async () => 1)
@@ -38,7 +53,6 @@ const mockUserFindUnique = mock(async () => ({
   roles: [],
   status: "ACTIVE",
   createdAt: new Date("2026-01-01"),
-  checkoutSessions: [{ amountTotal: 4999 }],
   entitlements: [
     {
       id: "ent1",
@@ -80,6 +94,14 @@ mock.module("../../lib/db.js", () => ({
     entitlement: {
       findUnique: mockEntitlementFindUnique,
       update: mockEntitlementUpdate,
+      findMany: mockEntitlementFindMany,
+    },
+    transaction: {
+      groupBy: mockTransactionGroupBy,
+      aggregate: mockTransactionAggregate,
+    },
+    usageRecord: {
+      groupBy: mockUsageRecordGroupBy,
     },
   },
 }))
@@ -97,16 +119,23 @@ describe("listCustomers", () => {
         roles: [],
         status: "ACTIVE",
         createdAt: new Date("2026-01-01"),
-        checkoutSessions: [{ amountTotal: 4999 }, { amountTotal: null }],
-        entitlements: [
-          { deactivatedAt: null },
-          { deactivatedAt: new Date() },
-        ],
-        _count: { usageRecords: 7 },
       },
     ])
     mockUserCount.mockReset()
     mockUserCount.mockImplementation(async () => 1)
+    mockTransactionGroupBy.mockReset()
+    mockTransactionGroupBy.mockImplementation(async () => [
+      { userId: "usr1", _sum: { amount: 4999 } },
+    ])
+    mockEntitlementFindMany.mockReset()
+    mockEntitlementFindMany.mockImplementation(async () => [
+      { userId: "usr1", deactivatedAt: null },
+      { userId: "usr1", deactivatedAt: new Date() },
+    ])
+    mockUsageRecordGroupBy.mockReset()
+    mockUsageRecordGroupBy.mockImplementation(async () => [
+      { userId: "usr1", _count: { id: 7 } },
+    ])
   })
 
   it("returns paginated list with computed spend and active entitlement count", async () => {
@@ -120,7 +149,39 @@ describe("listCustomers", () => {
     expect(result.pagination.total).toBe(1)
   })
 
-  it("treats null amountTotal as zero in spend sum", async () => {
+  it("totalSpend sums Transaction.amount for STRIPE+MANUAL only (excludes FREE_AUTO)", async () => {
+    const aggMock = mock(async () => [
+      { userId: "usr_alice", _sum: { amount: 1998 } },
+    ])
+    mockTransactionGroupBy.mockImplementation(aggMock)
+    mockUserFindMany.mockImplementation(async () => [
+      {
+        id: "usr_alice",
+        email: "alice@example.com",
+        name: "Alice",
+        roles: [],
+        status: "ACTIVE",
+        createdAt: new Date("2026-01-01"),
+      },
+    ])
+    mockEntitlementFindMany.mockImplementation(async () => [])
+    mockUsageRecordGroupBy.mockImplementation(async () => [])
+
+    const result = await listCustomers({ page: 1, pageSize: 20 })
+    expect(result.data[0]!.totalSpendUsd).toBeCloseTo(19.98)
+
+    expect(mockTransactionGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _sum: { amount: true },
+        where: expect.objectContaining({
+          source: { in: ["STRIPE", "MANUAL"] },
+        }),
+      }),
+    )
+  })
+
+  it("treats missing spend entry as zero", async () => {
+    mockTransactionGroupBy.mockImplementation(async () => [])
     mockUserFindMany.mockImplementation(async () => [
       {
         id: "usr2",
@@ -129,11 +190,11 @@ describe("listCustomers", () => {
         roles: [],
         status: "ACTIVE",
         createdAt: new Date("2026-01-01"),
-        checkoutSessions: [{ amountTotal: null }],
-        entitlements: [],
-        _count: { usageRecords: 0 },
       },
     ])
+    mockEntitlementFindMany.mockImplementation(async () => [])
+    mockUsageRecordGroupBy.mockImplementation(async () => [])
+
     const result = await listCustomers({ page: 1, pageSize: 20 })
     expect(result.data[0]!.totalSpendUsd).toBe(0)
   })
@@ -149,7 +210,6 @@ describe("getCustomer", () => {
       roles: [],
       status: "ACTIVE",
       createdAt: new Date("2026-01-01"),
-      checkoutSessions: [{ amountTotal: 4999 }],
       entitlements: [
         {
           id: "ent1",
@@ -180,6 +240,26 @@ describe("getCustomer", () => {
         },
       ],
     }))
+    mockTransactionAggregate.mockReset()
+    mockTransactionAggregate.mockImplementation(async () => ({
+      _sum: { amount: 4999 },
+    }))
+  })
+
+  it("totalSpend sums Transaction.amount for STRIPE+MANUAL only (excludes FREE_AUTO)", async () => {
+    mockTransactionAggregate.mockImplementation(async () => ({
+      _sum: { amount: 1998 },
+    }))
+    const result = await getCustomer("usr_alice", "all")
+    expect(result.totalSpendUsd).toBeCloseTo(19.98)
+    expect(mockTransactionAggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _sum: { amount: true },
+        where: expect.objectContaining({
+          source: { in: ["STRIPE", "MANUAL"] },
+        }),
+      }),
+    )
   })
 
   it("returns customer with entitlements and correct state", async () => {

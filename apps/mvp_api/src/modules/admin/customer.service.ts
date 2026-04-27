@@ -63,19 +63,55 @@ export async function listCustomers(params: {
   const { page, pageSize } = params
   const skip = (page - 1) * pageSize
 
-  const [users, total] = await Promise.all([
-    db.user.findMany({
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: pageSize,
-      include: {
-        checkoutSessions: { select: { amountTotal: true } },
-        entitlements: { select: { deactivatedAt: true } },
-        _count: { select: { usageRecords: true } },
-      },
-    }),
-    db.user.count(),
-  ])
+  const [users, total, spendRows, entitlementRows, usageCountRows] =
+    await Promise.all([
+      db.user.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          roles: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      db.user.count(),
+      db.transaction.groupBy({
+        by: ["userId"],
+        _sum: { amount: true },
+        where: { source: { in: ["STRIPE", "MANUAL"] } },
+      }),
+      db.entitlement.findMany({
+        select: { userId: true, deactivatedAt: true },
+      }),
+      db.usageRecord.groupBy({
+        by: ["userId"],
+        _count: { id: true },
+      }),
+    ])
+
+  const spendMap = new Map<string, number>()
+  for (const row of spendRows) {
+    spendMap.set(row.userId, row._sum.amount ?? 0)
+  }
+
+  const activeEntitlementMap = new Map<string, number>()
+  for (const e of entitlementRows) {
+    if (e.deactivatedAt === null) {
+      activeEntitlementMap.set(
+        e.userId,
+        (activeEntitlementMap.get(e.userId) ?? 0) + 1,
+      )
+    }
+  }
+
+  const calcMap = new Map<string, number>()
+  for (const row of usageCountRows) {
+    calcMap.set(row.userId, row._count.id)
+  }
 
   const data: CustomerListItem[] = users.map((u) => ({
     id: u.id,
@@ -84,15 +120,9 @@ export async function listCustomers(params: {
     roles: u.roles,
     status: u.status,
     createdAt: u.createdAt.toISOString(),
-    totalSpendUsd:
-      u.checkoutSessions.reduce(
-        (sum, s) => sum + (s.amountTotal ?? 0),
-        0,
-      ) / 100,
-    activeEntitlementCount: u.entitlements.filter(
-      (e) => e.deactivatedAt === null,
-    ).length,
-    totalCalculations: u._count.usageRecords,
+    totalSpendUsd: (spendMap.get(u.id) ?? 0) / 100,
+    activeEntitlementCount: activeEntitlementMap.get(u.id) ?? 0,
+    totalCalculations: calcMap.get(u.id) ?? 0,
   }))
 
   return {
@@ -110,23 +140,33 @@ export async function getCustomer(
   id: string,
   filter: "active" | "all" = "active",
 ): Promise<CustomerDetail> {
-  const user = await db.user.findUnique({
-    where: { id },
-    include: {
-      checkoutSessions: { select: { amountTotal: true } },
-      entitlements: {
-        where: filter === "active" ? { deactivatedAt: null } : {},
-        include: {
-          product: { select: { id: true, name: true, slug: true } },
+  const [user, spendAgg] = await Promise.all([
+    db.user.findUnique({
+      where: { id },
+      include: {
+        entitlements: {
+          where: filter === "active" ? { deactivatedAt: null } : {},
+          include: {
+            product: { select: { id: true, name: true, slug: true } },
+          },
+          orderBy: { purchasedAt: "desc" },
         },
-        orderBy: { purchasedAt: "desc" },
       },
-    },
-  })
+    }),
+    db.transaction.aggregate({
+      _sum: { amount: true },
+      where: {
+        userId: id,
+        source: { in: ["STRIPE", "MANUAL"] },
+      },
+    }),
+  ])
 
   if (!user) {
     throw new AppError("NOT_FOUND", `Customer ${id} not found`, 404)
   }
+
+  const totalSpend = spendAgg._sum.amount ?? 0
 
   const allEntitlements: EntitlementDetail[] = user.entitlements.map((e) => ({
     id: e.id,
@@ -155,11 +195,7 @@ export async function getCustomer(
     roles: user.roles,
     status: user.status,
     createdAt: user.createdAt.toISOString(),
-    totalSpendUsd:
-      user.checkoutSessions.reduce(
-        (sum, s) => sum + (s.amountTotal ?? 0),
-        0,
-      ) / 100,
+    totalSpendUsd: totalSpend / 100,
     entitlements,
   }
 }
