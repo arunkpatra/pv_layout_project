@@ -301,8 +301,13 @@ describe("getTransaction", () => {
   })
 
   it("throws 404 when not found", async () => {
-    ;(dbMock as any).transaction = { findUnique: mock(async () => null) }
-    const promise = getTransaction("missing")
+    ;(dbMock as { transaction?: unknown }).transaction = {
+      findUnique: mock(async () => null),
+    }
+    const promise: Promise<unknown> = getTransaction("missing")
+    // Bun's expect().rejects.toMatchObject() is typed as void in this position;
+    // the await is functionally required for the matcher to settle.
+    // eslint-disable-next-line @typescript-eslint/await-thenable
     await expect(promise).rejects.toMatchObject({ statusCode: 404 })
   })
 })
