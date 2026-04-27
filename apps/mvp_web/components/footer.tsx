@@ -85,7 +85,7 @@ export function Footer() {
             </p>
             <div className="flex gap-2.5">
               <a
-                href="https://linkedin.com"
+                href="https://www.linkedin.com/company/solarlayout"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="LinkedIn"
@@ -101,7 +101,7 @@ export function Footer() {
                 </svg>
               </a>
               <a
-                href="https://youtube.com"
+                href="https://www.youtube.com/@SolarLayout"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="YouTube"
