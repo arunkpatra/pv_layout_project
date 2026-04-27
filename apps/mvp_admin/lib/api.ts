@@ -121,3 +121,34 @@ export type ProductsSummary = {
   totalPurchases: number
   activeEntitlements: number
 }
+
+export type PaymentMethod =
+  | "CASH"
+  | "BANK_TRANSFER"
+  | "UPI"
+  | "CHEQUE"
+  | "OTHER"
+
+export type TransactionSource = "STRIPE" | "MANUAL" | "FREE_AUTO"
+
+export type TransactionListItem = {
+  id: string
+  userId: string
+  userEmail: string
+  userName: string | null
+  productId: string
+  productSlug: string
+  productName: string
+  source: TransactionSource
+  status: string
+  amount: number
+  currency: string
+  purchasedAt: string
+  createdAt: string
+  paymentMethod: PaymentMethod | null
+  externalReference: string | null
+  notes: string | null
+  createdByUserId: string | null
+  createdByEmail: string | null
+  checkoutSessionId: string | null
+}
