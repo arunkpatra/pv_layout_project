@@ -33,7 +33,7 @@ const mockUserFindFirst = mock(async () => ({
   roles: [],
   status: "ACTIVE",
 }))
-const mockUserUpsert = mock(async () => ({
+const mockUserCreate = mock(async () => ({
   id: "usr_new",
   clerkId: "user_abc",
   email: "test@example.com",
@@ -69,7 +69,7 @@ mock.module("../lib/db.js", () => ({
   db: {
     user: {
       findFirst: mockUserFindFirst,
-      upsert: mockUserUpsert,
+      create: mockUserCreate,
     },
     product: {
       findFirst: mockProductFindFirst,
@@ -105,8 +105,8 @@ describe("clerkAuth middleware", () => {
       roles: [],
       status: "ACTIVE",
     }))
-    mockUserUpsert.mockReset()
-    mockUserUpsert.mockImplementation(async () => ({
+    mockUserCreate.mockReset()
+    mockUserCreate.mockImplementation(async () => ({
       id: "usr_new",
       clerkId: "user_abc",
       email: "test@example.com",
@@ -191,7 +191,7 @@ describe("clerkAuth middleware", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as { ok: boolean; userId: string }
     expect(body.userId).toBe("usr_new")
-    expect(mockUserUpsert).toHaveBeenCalled()
+    expect(mockUserCreate).toHaveBeenCalled()
     expect(mockProductFindFirst).toHaveBeenCalledWith({
       where: { isFree: true },
     })
@@ -299,5 +299,69 @@ describe("clerkAuth middleware", () => {
     expect(mockTransactionCreate).not.toHaveBeenCalled()
     expect(mockEntitlementCreate).not.toHaveBeenCalled()
     expect(mockLicenseKeyCreate).not.toHaveBeenCalled()
+  })
+
+  it("does NOT double-provision when two concurrent first-auths race (P2002 catch)", async () => {
+    // Simulate two concurrent first-auth requests for the same clerkId.
+    //
+    // Request A (race winner): findFirst → null, create → succeeds → provisions.
+    // Request B (race loser):  findFirst → null, create → throws P2002,
+    //                           second findFirst → returns existing user → skips provisioning.
+
+    const existingUser = {
+      id: "usr_new",
+      clerkId: "user_abc",
+      email: "test@example.com",
+      name: "Test User",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }
+
+    // findFirst: first two calls return null (both requests see no user),
+    // third call (race-loser's fallback fetch) returns the existing user.
+    let findFirstCallCount = 0
+    mockUserFindFirst.mockImplementation(async () => {
+      findFirstCallCount++
+      if (findFirstCallCount <= 2) return null as never
+      return existingUser
+    })
+
+    // create: first call succeeds (race winner), second call throws P2002.
+    let createCallCount = 0
+    mockUserCreate.mockImplementation(async () => {
+      createCallCount++
+      if (createCallCount === 1) return existingUser
+      const err = new Error("Unique constraint violation") as Error & {
+        code: string
+      }
+      err.code = "P2002"
+      throw err
+    })
+
+    const app = makeApp()
+
+    // Fire both requests "concurrently" (Promise.all simulates parallel in-flight).
+    const [resA, resB] = await Promise.all([
+      app.request("/protected", {
+        method: "GET",
+        headers: { Authorization: "Bearer valid-token" },
+      }),
+      app.request("/protected", {
+        method: "GET",
+        headers: { Authorization: "Bearer valid-token" },
+      }),
+    ])
+
+    // Both requests must succeed (200).
+    expect(resA.status).toBe(200)
+    expect(resB.status).toBe(200)
+
+    // $transaction (and therefore provisioning) must have been called exactly ONCE —
+    // only the race winner (first create) should have provisioned.
+    expect(mockTransaction).toHaveBeenCalledTimes(1)
+    expect(mockTransactionCreate).toHaveBeenCalledTimes(1)
+    expect(mockEntitlementCreate).toHaveBeenCalledTimes(1)
+    expect(mockLicenseKeyCreate).toHaveBeenCalledTimes(1)
   })
 })
