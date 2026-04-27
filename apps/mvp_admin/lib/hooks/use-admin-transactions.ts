@@ -138,6 +138,12 @@ export function useCreateManualTransaction() {
       void queryClient.invalidateQueries({
         queryKey: ["admin-dashboard"],
       })
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-customer-transactions"],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["admin-products"],
+      })
     },
   })
 }

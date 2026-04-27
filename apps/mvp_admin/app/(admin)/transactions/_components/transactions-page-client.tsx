@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAdminTransactions } from "@/lib/hooks/use-admin-transactions"
@@ -61,6 +62,15 @@ export function TransactionsPageClient() {
     (searchParams.get("source") as TransactionSource | "ALL" | null) ?? "ALL"
   const email = searchParams.get("email") ?? ""
 
+  // Local controlled state for the email input; debounced before hitting URL
+  const [emailInput, setEmailInput] = useState(email)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync emailInput when the URL param changes externally (e.g. back/forward)
+  useEffect(() => {
+    setEmailInput(email)
+  }, [email])
+
   const { data, isLoading, isError, error } = useAdminTransactions(
     { source: source === "ALL" ? "ALL" : source, email: email || undefined },
     page,
@@ -80,18 +90,25 @@ export function TransactionsPageClient() {
   }
 
   function handleSourceChange(value: string) {
-    router.push(buildUrl({ source: value === "ALL" ? "" : value, page: "1" }))
+    router.replace(
+      buildUrl({ source: value === "ALL" ? "" : value, page: "1" }),
+    )
   }
 
-  function handleEmailChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const next = new URLSearchParams(searchParams.toString())
-    if (e.target.value) {
-      next.set("email", e.target.value)
-    } else {
-      next.delete("email")
-    }
-    next.set("page", "1")
-    router.push(`/transactions?${next.toString()}`)
+  function handleEmailInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setEmailInput(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const next = new URLSearchParams(searchParams.toString())
+      if (value.trim()) {
+        next.set("email", value.trim())
+      } else {
+        next.delete("email")
+      }
+      next.set("page", "1")
+      router.replace(`/transactions?${next.toString()}`)
+    }, 300)
   }
 
   if (isLoading) {
@@ -138,8 +155,8 @@ export function TransactionsPageClient() {
           <Input
             className="w-56"
             placeholder="Filter by email"
-            defaultValue={email}
-            onChange={handleEmailChange}
+            value={emailInput}
+            onChange={handleEmailInputChange}
           />
         </div>
 
