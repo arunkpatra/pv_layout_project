@@ -511,4 +511,56 @@ describe("reportUsage — kill switch enforcement", () => {
       deactivatedAt: null,
     })
   })
+
+  it("returns 409 when entitlement is deactivated between selection and atomic UPDATE", async () => {
+    // Simulate the race condition: entitlement was active during selection
+    // (findMany returned it), but deactivated before the atomic UPDATE.
+    // The WHERE clause filters it out, so UPDATE returns 0 rows affected.
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        id: "ent_1",
+        userId: "usr_test1",
+        productId: "prod_pro",
+        totalCalculations: 10,
+        usedCalculations: 3,
+        deactivatedAt: null,
+        purchasedAt: new Date(),
+        product: {
+          name: "Pro",
+          displayOrder: 1,
+          features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+        },
+      },
+    ])
+    mockExecuteRaw.mockImplementation(async () => 0)
+    mockTransaction.mockImplementation(
+      async (
+        fn: (tx: {
+          $executeRaw: typeof mockExecuteRaw
+          usageRecord: { create: typeof mockUsageRecordCreate }
+        }) => Promise<void>,
+      ) => {
+        return fn({
+          $executeRaw: mockExecuteRaw,
+          usageRecord: { create: mockUsageRecordCreate },
+        })
+      },
+    )
+
+    const app = makeApp()
+    const res = await app.request("/usage/report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({ feature: "plant_layout" }),
+    })
+    expect(res.status).toBe(409)
+    const body = (await res.json()) as {
+      success: boolean
+      error: { code: string }
+    }
+    expect(body.error.code).toBe("CONFLICT")
+  })
 })
