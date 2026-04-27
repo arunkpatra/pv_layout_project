@@ -9,6 +9,7 @@ import {
   createAdminUser,
   updateUserRoles,
   updateUserStatus,
+  searchUsersByEmail,
 } from "./admin.service.js"
 import { ok } from "../../lib/response.js"
 import { ValidationError } from "../../lib/errors.js"
@@ -44,6 +45,12 @@ adminRoutes.get("/admin/users", async (c) => {
     pageSize: isNaN(pageSize) ? 20 : pageSize,
   })
   return c.json(ok(result))
+})
+
+adminRoutes.get("/admin/users/search", async (c) => {
+  const email = c.req.query("email") ?? ""
+  const users = await searchUsersByEmail(email)
+  return c.json({ success: true, data: { users } })
 })
 
 adminRoutes.get("/admin/users/:id", async (c) => {

@@ -235,6 +235,41 @@ describe("PATCH /admin/users/:id/status", () => {
   })
 })
 
+describe("GET /admin/users/search", () => {
+  it("returns up to 20 matches by email prefix", async () => {
+    mockUserFindMany.mockImplementation(async () => [
+      { id: "u1", email: "alice@example.com", name: "Alice" },
+      { id: "u2", email: "alice2@example.com", name: "Alice Two" },
+      { id: "u3", email: "alex@example.com", name: "Alex" },
+    ])
+
+    const res = await makeApp().request("/admin/users/search?email=ali", {
+      headers: { Authorization: "Bearer token" },
+    })
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { users: unknown[] }
+    }
+    expect(body.success).toBe(true)
+    expect(body.data.users).toHaveLength(3)
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          email: { contains: "ali", mode: "insensitive" },
+        }),
+        take: 20,
+      }),
+    )
+  })
+
+  it("returns 401 without auth", async () => {
+    const res = await makeApp().request("/admin/users/search?email=ali")
+    expect(res.status).toBe(401)
+  })
+})
+
 describe("Role enforcement", () => {
   it("returns 403 when user has OPS role on admin routes", async () => {
     // Build a mini-app that sets OPS user directly (no clerk-auth mock needed)
