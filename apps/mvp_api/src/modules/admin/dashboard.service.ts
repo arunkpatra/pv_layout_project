@@ -7,9 +7,13 @@ import {
 } from "./sales-utils.js"
 
 export type DashboardSummary = {
-  totalRevenueUsd: number
-  totalCustomers: number
+  totalRevenue: number
+  totalRevenueStripe: number
+  totalRevenueManual: number
   totalPurchases: number
+  totalPurchasesStripe: number
+  totalPurchasesManual: number
+  totalCustomers: number
   totalCalculations: number
 }
 
@@ -42,21 +46,35 @@ export type DashboardTrends = {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [revenueAgg, totalCustomers, totalPurchases, totalCalculations] =
+  const [paid, stripe, manual, totalCustomers, totalCalculations] =
     await Promise.all([
-      db.checkoutSession.aggregate({
-        _sum: { amountTotal: true },
-        where: { processedAt: { not: null } },
+      db.transaction.aggregate({
+        _sum: { amount: true },
+        _count: true,
+        where: { source: { in: ["STRIPE", "MANUAL"] } },
+      }),
+      db.transaction.aggregate({
+        _sum: { amount: true },
+        _count: true,
+        where: { source: "STRIPE" },
+      }),
+      db.transaction.aggregate({
+        _sum: { amount: true },
+        _count: true,
+        where: { source: "MANUAL" },
       }),
       db.user.count(),
-      db.checkoutSession.count({ where: { processedAt: { not: null } } }),
       db.usageRecord.count(),
     ])
 
   return {
-    totalRevenueUsd: ((revenueAgg._sum.amountTotal ?? 0) as number) / 100,
+    totalRevenue: (paid._sum.amount ?? 0) as number,
+    totalRevenueStripe: (stripe._sum.amount ?? 0) as number,
+    totalRevenueManual: (manual._sum.amount ?? 0) as number,
+    totalPurchases: paid._count,
+    totalPurchasesStripe: stripe._count,
+    totalPurchasesManual: manual._count,
     totalCustomers,
-    totalPurchases,
     totalCalculations,
   }
 }
@@ -67,10 +85,13 @@ export async function getDashboardTrends(
   const now = new Date()
   const cutoff = getCutoff(granularity, now)
 
-  const [sessions, users, usageRecords] = await Promise.all([
-    db.checkoutSession.findMany({
-      where: { processedAt: { not: null, gte: cutoff } },
-      select: { amountTotal: true, processedAt: true },
+  const [transactions, users, usageRecords] = await Promise.all([
+    db.transaction.findMany({
+      where: {
+        source: { in: ["STRIPE", "MANUAL"] },
+        purchasedAt: { gte: cutoff },
+      },
+      select: { amount: true, purchasedAt: true },
     }),
     db.user.findMany({
       where: { createdAt: { gte: cutoff } },
@@ -86,11 +107,11 @@ export async function getDashboardTrends(
 
   const revenueMap = new Map<string, number>(periods.map((p) => [p, 0]))
   const purchaseMap = new Map<string, number>(periods.map((p) => [p, 0]))
-  for (const s of sessions) {
-    const period = getPeriod(granularity, s.processedAt!)
+  for (const s of transactions) {
+    const period = getPeriod(granularity, s.purchasedAt)
     const prevRev = revenueMap.get(period)
     if (prevRev !== undefined) {
-      revenueMap.set(period, prevRev + (s.amountTotal ?? 0) / 100)
+      revenueMap.set(period, prevRev + s.amount / 100)
     }
     const prevPur = purchaseMap.get(period)
     if (prevPur !== undefined) {

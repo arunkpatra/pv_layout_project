@@ -28,23 +28,28 @@ const mockUserFindFirst = mock(async () => ({
   status: "ACTIVE",
 }))
 
-const mockCheckoutSessionAggregate = mock(async () => ({
-  _sum: { amountTotal: 4999 },
+const mockTransactionAggregate = mock(async () => ({
+  _sum: { amount: 4999 },
+  _count: 1,
 }))
 const mockUserCount = mock(async () => 2)
-const mockCheckoutSessionCount = mock(async () => 1)
 const mockUsageRecordCount = mock(async () => 1)
-const mockCheckoutSessionFindMany = mock(async () => [])
+const mockTransactionFindMany = mock(
+  async () => [] as Array<{ amount: number; purchasedAt: Date }>,
+)
 const mockUserFindMany = mock(async () => [])
 const mockUsageRecordFindMany = mock(async () => [])
 
 mock.module("../../lib/db.js", () => ({
   db: {
-    user: { findFirst: mockUserFindFirst, count: mockUserCount, findMany: mockUserFindMany },
-    checkoutSession: {
-      aggregate: mockCheckoutSessionAggregate,
-      count: mockCheckoutSessionCount,
-      findMany: mockCheckoutSessionFindMany,
+    user: {
+      findFirst: mockUserFindFirst,
+      count: mockUserCount,
+      findMany: mockUserFindMany,
+    },
+    transaction: {
+      aggregate: mockTransactionAggregate,
+      findMany: mockTransactionFindMany,
     },
     usageRecord: { count: mockUsageRecordCount, findMany: mockUsageRecordFindMany },
   },
@@ -70,18 +75,17 @@ beforeEach(() => {
     roles: ["OPS"],
     status: "ACTIVE",
   }))
-  mockCheckoutSessionAggregate.mockReset()
-  mockCheckoutSessionAggregate.mockImplementation(async () => ({
-    _sum: { amountTotal: 4999 },
+  mockTransactionAggregate.mockReset()
+  mockTransactionAggregate.mockImplementation(async () => ({
+    _sum: { amount: 4999 },
+    _count: 1,
   }))
   mockUserCount.mockReset()
   mockUserCount.mockImplementation(async () => 2)
-  mockCheckoutSessionCount.mockReset()
-  mockCheckoutSessionCount.mockImplementation(async () => 1)
   mockUsageRecordCount.mockReset()
   mockUsageRecordCount.mockImplementation(async () => 1)
-  mockCheckoutSessionFindMany.mockReset()
-  mockCheckoutSessionFindMany.mockImplementation(async () => [])
+  mockTransactionFindMany.mockReset()
+  mockTransactionFindMany.mockImplementation(async () => [])
   mockUserFindMany.mockReset()
   mockUserFindMany.mockImplementation(async () => [])
   mockUsageRecordFindMany.mockReset()
@@ -97,16 +101,24 @@ describe("GET /admin/dashboard/summary", () => {
     const body = (await res.json()) as {
       success: boolean
       data: {
-        totalRevenueUsd: number
-        totalCustomers: number
+        totalRevenue: number
+        totalRevenueStripe: number
+        totalRevenueManual: number
         totalPurchases: number
+        totalPurchasesStripe: number
+        totalPurchasesManual: number
+        totalCustomers: number
         totalCalculations: number
       }
     }
     expect(body.success).toBe(true)
-    expect(typeof body.data.totalRevenueUsd).toBe("number")
-    expect(typeof body.data.totalCustomers).toBe("number")
+    expect(typeof body.data.totalRevenue).toBe("number")
+    expect(typeof body.data.totalRevenueStripe).toBe("number")
+    expect(typeof body.data.totalRevenueManual).toBe("number")
     expect(typeof body.data.totalPurchases).toBe("number")
+    expect(typeof body.data.totalPurchasesStripe).toBe("number")
+    expect(typeof body.data.totalPurchasesManual).toBe("number")
+    expect(typeof body.data.totalCustomers).toBe("number")
     expect(typeof body.data.totalCalculations).toBe("number")
   })
 
@@ -124,7 +136,13 @@ describe("GET /admin/dashboard/trends", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       success: boolean
-      data: { granularity: string; revenue: unknown[]; customers: unknown[]; purchases: unknown[]; calculations: unknown[] }
+      data: {
+        granularity: string
+        revenue: unknown[]
+        customers: unknown[]
+        purchases: unknown[]
+        calculations: unknown[]
+      }
     }
     expect(body.data.granularity).toBe("monthly")
     expect(body.data.revenue).toHaveLength(12)
