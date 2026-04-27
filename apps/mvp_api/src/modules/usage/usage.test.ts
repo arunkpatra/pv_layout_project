@@ -38,7 +38,7 @@ const mockProductFeatureFindFirst = mock(async () => ({
   productId: "prod_basic",
 }))
 
-const mockEntitlementFindMany = mock(async () => [
+const mockEntitlementFindMany = mock(async (..._args: unknown[]) => [
   {
     id: "ent_basic",
     userId: "usr_test1",
@@ -367,7 +367,8 @@ describe("reportUsage — kill switch enforcement", () => {
     // (usedCalculations 3 < totalCalculations 10), so the 402 expectation fails
     // without the fix. We verify deactivatedAt: null is added to the WHERE clause.
     mockEntitlementFindMany.mockImplementation(
-      async (args: { where: Record<string, unknown> }) => {
+      async (..._args: unknown[]) => {
+        const args = _args[0] as { where: Record<string, unknown> }
         // Post-fix: query MUST include deactivatedAt: null in the where clause
         if (!("deactivatedAt" in args.where) || args.where.deactivatedAt !== null) {
           // Pre-fix behaviour: no filter, so return the deactivated entitlement
@@ -425,7 +426,8 @@ describe("reportUsage — kill switch enforcement", () => {
     // is returned. Pre-fix: deactivated entitlement with lower displayOrder
     // would be returned first and incorrectly selected.
     mockEntitlementFindMany.mockImplementation(
-      async (args: { where: Record<string, unknown> }) => {
+      async (..._args: unknown[]) => {
+        const args = _args[0] as { where: Record<string, unknown> }
         if (!("deactivatedAt" in args.where) || args.where.deactivatedAt !== null) {
           // Pre-fix: return deactivated (lower displayOrder) + active entitlement
           return [

@@ -1,5 +1,5 @@
-import type { Prisma } from "@renewable-energy/mvp-db"
 import crypto from "node:crypto"
+import { db } from "../../lib/db.js"
 
 export interface SharedProvisionParams {
   userId: string
@@ -16,11 +16,18 @@ export interface SharedProvisionParams {
 }
 
 /**
+ * The transaction client type as provided by db.$transaction when the Prisma
+ * client has extensions applied (semantic-id, strict-id). This is wider than
+ * Prisma.TransactionClient and is the correct type for extended-client tx callbacks.
+ */
+export type ExtendedTx = Parameters<Parameters<typeof db.$transaction>[0]>[0]
+
+/**
  * Creates a Transaction + Entitlement and (if missing) a LicenseKey for the user.
  * Caller must wrap in db.$transaction; pass `tx` as the first argument.
  */
 export async function createEntitlementAndTransaction(
-  tx: Prisma.TransactionClient,
+  tx: ExtendedTx,
   params: SharedProvisionParams,
 ): Promise<{ transactionId: string; entitlementId: string }> {
   const transaction = await tx.transaction.create({
