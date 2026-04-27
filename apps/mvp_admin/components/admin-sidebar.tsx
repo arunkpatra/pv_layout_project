@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +13,6 @@ import {
   Settings,
   LogOut,
   ChevronsUpDown,
-  ShieldCheck,
 } from "lucide-react"
 import { useUser, useClerk } from "@clerk/nextjs"
 import {
@@ -141,6 +142,12 @@ export function AdminSidebar({
 }: React.ComponentProps<typeof Sidebar> & { role: "ADMIN" | "OPS" }) {
   const { isLoaded, user } = useUser()
   const pathname = usePathname()
+  const { resolvedTheme } = useTheme()
+
+  const logoSrc =
+    resolvedTheme === "dark"
+      ? "/images/logo/solar_layout_logo_dark.svg"
+      : "/images/logo/solar_layout_logo_light.svg"
   const navItems = role === "ADMIN" ? [...BASE_NAV, ...ADMIN_NAV] : BASE_NAV
 
   const clerkUser = {
@@ -156,9 +163,13 @@ export function AdminSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <ShieldCheck className="size-4" />
-                </div>
+                <Image
+                  src={logoSrc}
+                  alt="SolarLayout"
+                  width={32}
+                  height={32}
+                  className="size-8 rounded-lg"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">SolarLayout</span>
                   <span className="truncate text-xs">Admin</span>
