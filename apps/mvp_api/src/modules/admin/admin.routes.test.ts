@@ -237,11 +237,14 @@ describe("PATCH /admin/users/:id/status", () => {
 
 describe("GET /admin/users/search", () => {
   it("returns up to 20 matches by email prefix", async () => {
-    mockUserFindMany.mockImplementation(async () => [
-      { id: "u1", email: "alice@example.com", name: "Alice" },
-      { id: "u2", email: "alice2@example.com", name: "Alice Two" },
-      { id: "u3", email: "alex@example.com", name: "Alex" },
-    ])
+    mockUserFindMany.mockImplementation(
+      async () =>
+        [
+          { id: "u1", email: "alice@example.com", name: "Alice" },
+          { id: "u2", email: "alice2@example.com", name: "Alice Two" },
+          { id: "u3", email: "alex@example.com", name: "Alex" },
+        ] as unknown as Awaited<ReturnType<typeof mockUserFindMany>>,
+    )
 
     const res = await makeApp().request("/admin/users/search?email=ali", {
       headers: { Authorization: "Bearer token" },

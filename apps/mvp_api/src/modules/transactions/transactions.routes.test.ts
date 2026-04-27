@@ -10,7 +10,7 @@ const createManualTransactionMock = mock(async () => ({
   entitlementId: "ent_new",
 }))
 const listTransactionsMock = mock(async () => ({
-  transactions: [],
+  transactions: [] as unknown[],
   pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
 }))
 const getTransactionMock = mock(async (_id: string) => ({

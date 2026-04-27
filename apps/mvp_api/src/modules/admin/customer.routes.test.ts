@@ -78,7 +78,7 @@ const mockEntitlementUpdate = mock(async () => ({
   id: "ent1",
   deactivatedAt: new Date() as Date | null,
 }))
-const mockTransactionFindMany = mock(async () => [
+const mockTransactionFindMany = mock(async (..._args: unknown[]) => [
   {
     id: "txn1",
     productId: "prod1",
@@ -319,12 +319,12 @@ describe("GET /admin/customers/:id/transactions", () => {
     expect(body.data.transactions).toHaveLength(1)
     // verify the service was called with the right userId (findMany where clause)
     expect(mockTransactionFindMany).toHaveBeenCalledTimes(1)
-    const callArgs = mockTransactionFindMany.mock.calls[0][0] as {
+    const callArgs = mockTransactionFindMany.mock.calls[0]?.[0] as {
       where: { userId: string }
       take: number
-    }
-    expect(callArgs.where.userId).toBe("usr1")
-    expect(callArgs.take).toBe(10)
+    } | undefined
+    expect(callArgs?.where.userId).toBe("usr1")
+    expect(callArgs?.take).toBe(10)
   })
 
   it("returns 200 with limit from query param", async () => {
@@ -333,10 +333,10 @@ describe("GET /admin/customers/:id/transactions", () => {
       { headers: { Authorization: "Bearer token" } },
     )
     expect(res.status).toBe(200)
-    const callArgs = mockTransactionFindMany.mock.calls[0][0] as {
+    const callArgs = mockTransactionFindMany.mock.calls[0]?.[0] as {
       take: number
-    }
-    expect(callArgs.take).toBe(5)
+    } | undefined
+    expect(callArgs?.take).toBe(5)
   })
 
   it("returns 401 without auth", async () => {
