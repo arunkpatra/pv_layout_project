@@ -102,33 +102,19 @@ export type DashboardSummary = {
   totalCalculations: number
 }
 
-export type RevenueTrendPoint = {
+export type DashboardTrendPoint = {
   period: string
-  revenueUsd: number
+  revenue: number
+  revenueStripe: number
+  revenueManual: number
+  purchases: number
+  purchasesStripe: number
+  purchasesManual: number
+  customers: number
+  calculations: number
 }
 
-export type CustomerTrendPoint = {
-  period: string
-  count: number
-}
-
-export type PurchaseTrendPoint = {
-  period: string
-  count: number
-}
-
-export type CalculationTrendPoint = {
-  period: string
-  count: number
-}
-
-export type DashboardTrends = {
-  granularity: "daily" | "weekly" | "monthly"
-  revenue: RevenueTrendPoint[]
-  customers: CustomerTrendPoint[]
-  purchases: PurchaseTrendPoint[]
-  calculations: CalculationTrendPoint[]
-}
+export type DashboardTrends = DashboardTrendPoint[]
 
 export type ProductsSummary = {
   totalRevenueUsd: number

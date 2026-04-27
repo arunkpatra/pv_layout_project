@@ -4,6 +4,7 @@ import {
   MVP_API_URL,
   type DashboardSummary,
   type DashboardTrends,
+  type DashboardTrendPoint,
 } from "../api"
 
 export function useAdminDashboardSummary() {
@@ -42,7 +43,7 @@ export function useAdminDashboardTrends(
         throw new Error(`Failed to fetch dashboard trends: ${res.status}`)
       const body = (await res.json()) as {
         success: boolean
-        data: DashboardTrends
+        data: DashboardTrendPoint[]
       }
       return body.data
     },

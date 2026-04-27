@@ -9,7 +9,7 @@ const mockUserCount = mock(async () => 3)
 const mockUsageRecordCount = mock(async () => 1)
 const mockTransactionFindMany = mock(
   async () =>
-    [] as Array<{ amount: number; purchasedAt: Date }>,
+    [] as Array<{ amount: number; purchasedAt: Date; source: string }>,
 )
 const mockUserFindMany = mock(async () => [] as Array<{ createdAt: Date }>)
 const mockUsageRecordFindMany = mock(
@@ -120,49 +120,44 @@ describe("getDashboardTrends", () => {
     mockUsageRecordFindMany.mockImplementation(async () => [])
   })
 
-  it("returns monthly trends with 12 periods for all four series, zeros when no data", async () => {
+  it("returns monthly trends with 12 periods, zeros when no data", async () => {
     mockTransactionFindMany.mockImplementation(async () => [])
     mockUserFindMany.mockImplementation(async () => [])
     const result = await getDashboardTrends("monthly")
-    expect(result.granularity).toBe("monthly")
-    expect(result.revenue).toHaveLength(12)
-    expect(result.customers).toHaveLength(12)
-    expect(result.purchases).toHaveLength(12)
-    expect(result.calculations).toHaveLength(12)
-    for (const r of result.revenue) expect(r.revenueUsd).toBe(0)
-    for (const c of result.customers) expect(c.count).toBe(0)
-    for (const p of result.purchases) expect(p.count).toBe(0)
-    for (const c of result.calculations) expect(c.count).toBe(0)
+    expect(result).toHaveLength(12)
+    for (const p of result) {
+      expect(p.revenue).toBe(0)
+      expect(p.revenueStripe).toBe(0)
+      expect(p.revenueManual).toBe(0)
+      expect(p.purchases).toBe(0)
+      expect(p.purchasesStripe).toBe(0)
+      expect(p.purchasesManual).toBe(0)
+      expect(p.customers).toBe(0)
+      expect(p.calculations).toBe(0)
+    }
   })
 
   it("returns daily trends with 30 periods", async () => {
     mockTransactionFindMany.mockImplementation(async () => [])
     mockUserFindMany.mockImplementation(async () => [])
     const result = await getDashboardTrends("daily")
-    expect(result.revenue).toHaveLength(30)
-    expect(result.customers).toHaveLength(30)
-    expect(result.purchases).toHaveLength(30)
-    expect(result.calculations).toHaveLength(30)
+    expect(result).toHaveLength(30)
   })
 
   it("returns weekly trends with 12 periods", async () => {
     mockTransactionFindMany.mockImplementation(async () => [])
     mockUserFindMany.mockImplementation(async () => [])
     const result = await getDashboardTrends("weekly")
-    expect(result.granularity).toBe("weekly")
-    expect(result.revenue).toHaveLength(12)
-    expect(result.customers).toHaveLength(12)
-    expect(result.purchases).toHaveLength(12)
-    expect(result.calculations).toHaveLength(12)
-    for (const r of result.revenue) expect(r.revenueUsd).toBe(0)
+    expect(result).toHaveLength(12)
+    for (const p of result) expect(p.revenue).toBe(0)
   })
 
   it("aggregates revenue, customers, purchases and calculations into correct period buckets", async () => {
     const now = new Date()
     const currentMonth = now.toISOString().slice(0, 7)
     mockTransactionFindMany.mockImplementation(async () => [
-      { amount: 4999, purchasedAt: new Date(now) },
-      { amount: 9999, purchasedAt: new Date(now) },
+      { amount: 4999, purchasedAt: new Date(now), source: "STRIPE" },
+      { amount: 9999, purchasedAt: new Date(now), source: "STRIPE" },
     ])
     mockUserFindMany.mockImplementation(async () => [
       { createdAt: new Date(now) },
@@ -174,15 +169,55 @@ describe("getDashboardTrends", () => {
       { createdAt: new Date(now) },
     ])
     const result = await getDashboardTrends("monthly")
-    const revPeriod = result.revenue.find((r) => r.period === currentMonth)!
-    expect(revPeriod.revenueUsd).toBeCloseTo(149.98)
-    const custPeriod = result.customers.find((c) => c.period === currentMonth)!
-    expect(custPeriod.count).toBe(3)
-    const purPeriod = result.purchases.find((p) => p.period === currentMonth)!
-    expect(purPeriod.count).toBe(2)
-    const calcPeriod = result.calculations.find(
-      (c) => c.period === currentMonth,
-    )!
-    expect(calcPeriod.count).toBe(2)
+    const bucket = result.find((p) => p.period === currentMonth)!
+    expect(bucket.revenue).toBeCloseTo(149.98)
+    expect(bucket.customers).toBe(3)
+    expect(bucket.purchases).toBe(2)
+    expect(bucket.calculations).toBe(2)
+  })
+
+  it("getDashboardTrends includes Stripe/Manual split per period", async () => {
+    mockTransactionFindMany.mockImplementation(async () => [
+      {
+        purchasedAt: new Date("2026-04-26T10:00:00Z"),
+        source: "STRIPE",
+        amount: 499,
+      },
+      {
+        purchasedAt: new Date("2026-04-26T11:00:00Z"),
+        source: "MANUAL",
+        amount: 499,
+      },
+      {
+        purchasedAt: new Date("2026-04-27T09:00:00Z"),
+        source: "STRIPE",
+        amount: 1499,
+      },
+    ])
+    mockUserFindMany.mockImplementation(async () => [])
+
+    const result = await getDashboardTrends("daily")
+
+    const apr26 = result.find(
+      (p: { period: string }) => p.period === "2026-04-26",
+    )
+    expect(apr26).toMatchObject({
+      revenue: 998 / 100,
+      revenueStripe: 499 / 100,
+      revenueManual: 499 / 100,
+      purchases: 2,
+      purchasesStripe: 1,
+      purchasesManual: 1,
+    })
+
+    const apr27 = result.find(
+      (p: { period: string }) => p.period === "2026-04-27",
+    )
+    expect(apr27).toMatchObject({
+      revenueStripe: 1499 / 100,
+      revenueManual: 0,
+      purchasesStripe: 1,
+      purchasesManual: 0,
+    })
   })
 })

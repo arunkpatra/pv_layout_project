@@ -35,7 +35,8 @@ const mockTransactionAggregate = mock(async () => ({
 const mockUserCount = mock(async () => 2)
 const mockUsageRecordCount = mock(async () => 1)
 const mockTransactionFindMany = mock(
-  async () => [] as Array<{ amount: number; purchasedAt: Date }>,
+  async () =>
+    [] as Array<{ amount: number; purchasedAt: Date; source: string }>,
 )
 const mockUserFindMany = mock(async () => [])
 const mockUsageRecordFindMany = mock(async () => [])
@@ -136,19 +137,30 @@ describe("GET /admin/dashboard/trends", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       success: boolean
-      data: {
-        granularity: string
-        revenue: unknown[]
-        customers: unknown[]
-        purchases: unknown[]
-        calculations: unknown[]
-      }
+      data: Array<{
+        period: string
+        revenue: number
+        revenueStripe: number
+        revenueManual: number
+        purchases: number
+        purchasesStripe: number
+        purchasesManual: number
+        customers: number
+        calculations: number
+      }>
     }
-    expect(body.data.granularity).toBe("monthly")
-    expect(body.data.revenue).toHaveLength(12)
-    expect(body.data.customers).toHaveLength(12)
-    expect(body.data.purchases).toHaveLength(12)
-    expect(body.data.calculations).toHaveLength(12)
+    expect(Array.isArray(body.data)).toBe(true)
+    expect(body.data).toHaveLength(12)
+    const first = body.data[0]!
+    expect(typeof first.period).toBe("string")
+    expect(typeof first.revenue).toBe("number")
+    expect(typeof first.revenueStripe).toBe("number")
+    expect(typeof first.revenueManual).toBe("number")
+    expect(typeof first.purchases).toBe("number")
+    expect(typeof first.purchasesStripe).toBe("number")
+    expect(typeof first.purchasesManual).toBe("number")
+    expect(typeof first.customers).toBe("number")
+    expect(typeof first.calculations).toBe("number")
   })
 
   it("returns daily trends when granularity=daily", async () => {
@@ -159,9 +171,9 @@ describe("GET /admin/dashboard/trends", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       success: boolean
-      data: { granularity: string; revenue: unknown[] }
+      data: Array<{ period: string; revenue: number }>
     }
-    expect(body.data.granularity).toBe("daily")
-    expect(body.data.revenue).toHaveLength(30)
+    expect(Array.isArray(body.data)).toBe(true)
+    expect(body.data).toHaveLength(30)
   })
 })

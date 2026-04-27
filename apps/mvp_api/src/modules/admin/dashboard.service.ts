@@ -17,32 +17,16 @@ export type DashboardSummary = {
   totalCalculations: number
 }
 
-export type RevenueTrendPoint = {
+export type DashboardTrendPoint = {
   period: string
-  revenueUsd: number
-}
-
-export type CustomerTrendPoint = {
-  period: string
-  count: number
-}
-
-export type PurchaseTrendPoint = {
-  period: string
-  count: number
-}
-
-export type CalculationTrendPoint = {
-  period: string
-  count: number
-}
-
-export type DashboardTrends = {
-  granularity: Granularity
-  revenue: RevenueTrendPoint[]
-  customers: CustomerTrendPoint[]
-  purchases: PurchaseTrendPoint[]
-  calculations: CalculationTrendPoint[]
+  revenue: number
+  revenueStripe: number
+  revenueManual: number
+  purchases: number
+  purchasesStripe: number
+  purchasesManual: number
+  customers: number
+  calculations: number
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
@@ -81,7 +65,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 
 export async function getDashboardTrends(
   granularity: Granularity,
-): Promise<DashboardTrends> {
+): Promise<DashboardTrendPoint[]> {
   const now = new Date()
   const cutoff = getCutoff(granularity, now)
 
@@ -91,7 +75,7 @@ export async function getDashboardTrends(
         source: { in: ["STRIPE", "MANUAL"] },
         purchasedAt: { gte: cutoff },
       },
-      select: { amount: true, purchasedAt: true },
+      select: { amount: true, purchasedAt: true, source: true },
     }),
     db.user.findMany({
       where: { createdAt: { gte: cutoff } },
@@ -105,43 +89,60 @@ export async function getDashboardTrends(
 
   const periods = generatePeriods(granularity, now)
 
-  const revenueMap = new Map<string, number>(periods.map((p) => [p, 0]))
-  const purchaseMap = new Map<string, number>(periods.map((p) => [p, 0]))
-  for (const s of transactions) {
-    const period = getPeriod(granularity, s.purchasedAt)
-    const prevRev = revenueMap.get(period)
-    if (prevRev !== undefined) {
-      revenueMap.set(period, prevRev + s.amount / 100)
-    }
-    const prevPur = purchaseMap.get(period)
-    if (prevPur !== undefined) {
-      purchaseMap.set(period, prevPur + 1)
+  type Bucket = {
+    revenue: number
+    revenueStripe: number
+    revenueManual: number
+    purchases: number
+    purchasesStripe: number
+    purchasesManual: number
+    customers: number
+    calculations: number
+  }
+
+  const buckets = new Map<string, Bucket>(
+    periods.map((p) => [
+      p,
+      {
+        revenue: 0,
+        revenueStripe: 0,
+        revenueManual: 0,
+        purchases: 0,
+        purchasesStripe: 0,
+        purchasesManual: 0,
+        customers: 0,
+        calculations: 0,
+      },
+    ]),
+  )
+
+  for (const row of transactions) {
+    const key = getPeriod(granularity, row.purchasedAt)
+    const b = buckets.get(key)
+    if (b === undefined) continue
+    const amountUsd = row.amount / 100
+    b.revenue += amountUsd
+    b.purchases += 1
+    if (row.source === "STRIPE") {
+      b.revenueStripe += amountUsd
+      b.purchasesStripe += 1
+    } else if (row.source === "MANUAL") {
+      b.revenueManual += amountUsd
+      b.purchasesManual += 1
     }
   }
 
-  const customerMap = new Map<string, number>(periods.map((p) => [p, 0]))
   for (const u of users) {
-    const period = getPeriod(granularity, u.createdAt)
-    const prev = customerMap.get(period)
-    if (prev !== undefined) {
-      customerMap.set(period, prev + 1)
-    }
+    const key = getPeriod(granularity, u.createdAt)
+    const b = buckets.get(key)
+    if (b !== undefined) b.customers += 1
   }
 
-  const calculationMap = new Map<string, number>(periods.map((p) => [p, 0]))
   for (const r of usageRecords) {
-    const period = getPeriod(granularity, r.createdAt)
-    const prev = calculationMap.get(period)
-    if (prev !== undefined) {
-      calculationMap.set(period, prev + 1)
-    }
+    const key = getPeriod(granularity, r.createdAt)
+    const b = buckets.get(key)
+    if (b !== undefined) b.calculations += 1
   }
 
-  return {
-    granularity,
-    revenue: periods.map((p) => ({ period: p, revenueUsd: revenueMap.get(p)! })),
-    customers: periods.map((p) => ({ period: p, count: customerMap.get(p)! })),
-    purchases: periods.map((p) => ({ period: p, count: purchaseMap.get(p)! })),
-    calculations: periods.map((p) => ({ period: p, count: calculationMap.get(p)! })),
-  }
+  return periods.map((p) => ({ period: p, ...buckets.get(p)! }))
 }
