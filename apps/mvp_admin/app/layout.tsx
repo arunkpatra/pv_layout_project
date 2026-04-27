@@ -16,6 +16,28 @@ export const metadata: Metadata = {
     template: "%s | SolarLayout Admin",
   },
   description: "Internal admin and ops dashboard for SolarLayout.",
+  icons: {
+    icon: [
+      {
+        url: "/images/solar_layout_favicon_light.png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/images/solar_layout_favicon_dark.png",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        url: "/favicon.ico",
+        // Fallback for browsers that don't support media queries
+      },
+    ],
+    apple: [
+      {
+        url: "/images/solar_layout_favicon_light.png",
+        // Apple devices will use this
+      },
+    ],
+  },
 }
 
 export default function RootLayout({
