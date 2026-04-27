@@ -1,27 +1,37 @@
 import { describe, expect, it, mock, beforeEach } from "bun:test"
 import { createManualTransaction, listTransactions, getTransaction } from "./transactions.service.js"
 
-// Mock createEntitlementAndTransaction so we can isolate transactions.service logic
-const createEntitlementAndTransactionMock = mock(async () => ({
-  transactionId: "txn_new",
-  entitlementId: "ent_new",
-}))
-mock.module("../billing/create-entitlement-and-transaction.js", () => ({
-  createEntitlementAndTransaction: createEntitlementAndTransactionMock,
-}))
+// mockTx — the object the real helper (createEntitlementAndTransaction) will use.
+// db.$transaction passes this to the callback so the helper runs for real.
+const mockTxTransactionCreate = mock(async () => ({ id: "txn_new" }))
+const mockTxEntitlementCreate = mock(async () => ({ id: "ent_new" }))
+const mockTxLicenseKeyFindFirst = mock(async () => null)
+const mockTxLicenseKeyCreate = mock(async () => ({}))
+
+const mockTx = {
+  transaction: { create: mockTxTransactionCreate },
+  entitlement: { create: mockTxEntitlementCreate },
+  licenseKey: {
+    findFirst: mockTxLicenseKeyFindFirst,
+    create: mockTxLicenseKeyCreate,
+  },
+}
 
 const dbMock = {
   user: { findUnique: mock(async () => null as unknown) },
   product: { findUnique: mock(async () => null as unknown) },
-  $transaction: mock(async (cb: (tx: unknown) => Promise<unknown>) => cb({} as unknown)),
+  $transaction: mock(async (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
 }
 mock.module("../../lib/db.js", () => ({ db: dbMock }))
 
 beforeEach(() => {
-  createEntitlementAndTransactionMock.mockClear()
   dbMock.user.findUnique.mockReset()
   dbMock.product.findUnique.mockReset()
-  dbMock.$transaction.mockReset().mockImplementation(async (cb) => cb({} as unknown))
+  dbMock.$transaction.mockReset().mockImplementation(async (cb) => cb(mockTx))
+  mockTxTransactionCreate.mockReset().mockImplementation(async () => ({ id: "txn_new" }))
+  mockTxEntitlementCreate.mockReset().mockImplementation(async () => ({ id: "ent_new" }))
+  mockTxLicenseKeyFindFirst.mockReset().mockImplementation(async () => null)
+  mockTxLicenseKeyCreate.mockReset().mockImplementation(async () => ({}))
 })
 
 describe("createManualTransaction", () => {
@@ -45,18 +55,26 @@ describe("createManualTransaction", () => {
       createdByUserId: "usr_admin",
     })
 
-    expect(createEntitlementAndTransactionMock).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(mockTxTransactionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: "usr_alice",
-        productId: "prod_pro",
-        amount: 499,
-        source: "MANUAL",
-        paymentMethod: "UPI",
-        externalReference: "UPI-8472",
-        notes: "Mumbai meetup",
-        createdByUserId: "usr_admin",
-        totalCalculations: 10,
+        data: expect.objectContaining({
+          userId: "usr_alice",
+          productId: "prod_pro",
+          amount: 499,
+          source: "MANUAL",
+          paymentMethod: "UPI",
+          externalReference: "UPI-8472",
+          notes: "Mumbai meetup",
+          createdByUserId: "usr_admin",
+        }),
+      }),
+    )
+    expect(mockTxEntitlementCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          transactionId: "txn_new",
+          totalCalculations: 10,
+        }),
       }),
     )
     expect(result).toEqual({ transactionId: "txn_new", entitlementId: "ent_new" })
@@ -134,9 +152,15 @@ describe("createManualTransaction", () => {
       paymentMethod: "BANK_TRANSFER", createdByUserId: "usr_admin",
     })
 
-    expect(createEntitlementAndTransactionMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ amount: 1499, totalCalculations: 50 }),
+    expect(mockTxTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ amount: 1499 }),
+      }),
+    )
+    expect(mockTxEntitlementCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ totalCalculations: 50 }),
+      }),
     )
   })
 
@@ -154,9 +178,10 @@ describe("createManualTransaction", () => {
       purchasedAt: past,
     })
 
-    expect(createEntitlementAndTransactionMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ purchasedAt: past }),
+    expect(mockTxTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ purchasedAt: past }),
+      }),
     )
   })
 })
