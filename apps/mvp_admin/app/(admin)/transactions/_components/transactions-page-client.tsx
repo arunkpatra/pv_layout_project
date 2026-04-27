@@ -245,12 +245,9 @@ export function TransactionsPageClient() {
                     {tx.source === "STRIPE" ? "—" : (tx.createdByEmail ?? "—")}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link
-                      href={`/transactions/${tx.id}`}
-                      className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      View
-                    </Link>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/transactions/${tx.id}`}>View</Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
