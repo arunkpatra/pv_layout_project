@@ -209,6 +209,31 @@ export async function updateEntitlementUsed(params: {
   })
 }
 
+export async function listCustomerTransactions(userId: string, limit = 10) {
+  const rows = await db.transaction.findMany({
+    where: { userId },
+    include: {
+      product: { select: { slug: true, name: true } },
+      createdByUser: { select: { email: true } },
+    },
+    orderBy: { purchasedAt: "desc" },
+    take: limit,
+  })
+  return rows.map((row) => ({
+    id: row.id,
+    productSlug: row.product.slug,
+    productName: row.product.name,
+    source: row.source,
+    status: row.status,
+    amount: row.amount,
+    currency: row.currency,
+    purchasedAt: row.purchasedAt.toISOString(),
+    paymentMethod: row.paymentMethod ?? null,
+    externalReference: row.externalReference ?? null,
+    createdByEmail: row.createdByUser?.email ?? null,
+  }))
+}
+
 export async function updateEntitlementStatus(params: {
   entitlementId: string
   status: "ACTIVE" | "INACTIVE"

@@ -78,6 +78,21 @@ const mockEntitlementUpdate = mock(async () => ({
   id: "ent1",
   deactivatedAt: new Date() as Date | null,
 }))
+const mockTransactionFindMany = mock(async () => [
+  {
+    id: "txn1",
+    productId: "prod1",
+    source: "MANUAL",
+    status: "COMPLETED",
+    amount: 4999,
+    currency: "usd",
+    purchasedAt: new Date("2026-02-01"),
+    paymentMethod: "CASH",
+    externalReference: null,
+    product: { slug: "pv-layout-pro", name: "Pro" },
+    createdByUser: { email: "ops@test.com" },
+  },
+])
 
 mock.module("../../lib/db.js", () => ({
   db: {
@@ -90,6 +105,9 @@ mock.module("../../lib/db.js", () => ({
     entitlement: {
       findUnique: mockEntitlementFindUnique,
       update: mockEntitlementUpdate,
+    },
+    transaction: {
+      findMany: mockTransactionFindMany,
     },
     $transaction: async () => {},
   },
@@ -167,6 +185,22 @@ beforeEach(() => {
     id: "ent1",
     deactivatedAt: new Date(),
   }))
+  mockTransactionFindMany.mockReset()
+  mockTransactionFindMany.mockImplementation(async () => [
+    {
+      id: "txn1",
+      productId: "prod1",
+      source: "MANUAL",
+      status: "COMPLETED",
+      amount: 4999,
+      currency: "usd",
+      purchasedAt: new Date("2026-02-01"),
+      paymentMethod: "CASH",
+      externalReference: null,
+      product: { slug: "pv-layout-pro", name: "Pro" },
+      createdByUser: { email: "ops@test.com" },
+    },
+  ])
 })
 
 describe("GET /admin/customers", () => {
@@ -265,6 +299,67 @@ describe("Role enforcement", () => {
     const res = await makeApp().request("/admin/customers", {
       headers: { Authorization: "Bearer token" },
     })
+    expect(res.status).toBe(403)
+  })
+})
+
+describe("GET /admin/customers/:id/transactions", () => {
+  it("returns 200 with transactions array and calls service with correct userId", async () => {
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions",
+      { headers: { Authorization: "Bearer token" } },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      success: boolean
+      data: { transactions: unknown[] }
+    }
+    expect(body.success).toBe(true)
+    expect(Array.isArray(body.data.transactions)).toBe(true)
+    expect(body.data.transactions).toHaveLength(1)
+    // verify the service was called with the right userId (findMany where clause)
+    expect(mockTransactionFindMany).toHaveBeenCalledTimes(1)
+    const callArgs = mockTransactionFindMany.mock.calls[0][0] as {
+      where: { userId: string }
+      take: number
+    }
+    expect(callArgs.where.userId).toBe("usr1")
+    expect(callArgs.take).toBe(10)
+  })
+
+  it("returns 200 with limit from query param", async () => {
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions?limit=5",
+      { headers: { Authorization: "Bearer token" } },
+    )
+    expect(res.status).toBe(200)
+    const callArgs = mockTransactionFindMany.mock.calls[0][0] as {
+      take: number
+    }
+    expect(callArgs.take).toBe(5)
+  })
+
+  it("returns 401 without auth", async () => {
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions",
+    )
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 403 without ADMIN or OPS role", async () => {
+    mockUserFindFirst.mockImplementation(async () => ({
+      id: "usr_plain",
+      clerkId: "ck_ops",
+      email: "plain@test.com",
+      name: "Plain",
+      stripeCustomerId: null,
+      roles: [],
+      status: "ACTIVE",
+    }))
+    const res = await makeApp().request(
+      "/admin/customers/usr1/transactions",
+      { headers: { Authorization: "Bearer token" } },
+    )
     expect(res.status).toBe(403)
   })
 })
