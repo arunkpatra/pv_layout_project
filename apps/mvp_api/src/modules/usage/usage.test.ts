@@ -361,10 +361,11 @@ describe("reportUsage — kill switch enforcement", () => {
   })
 
   it("rejects with 402 when the only entitlement is deactivated", async () => {
-    // Post-fix: findMany returns [] because deactivatedAt: null filter excludes
-    // the deactivated entitlement. Pre-fix: query has no deactivatedAt filter,
-    // so the mock must return [] to simulate what the fix enforces via the DB.
-    // We verify the WHERE clause includes deactivatedAt: null via the call args.
+    // Mock contract: if WHERE clause omits deactivatedAt: null, return the
+    // deactivated entitlement (pre-fix behavior); otherwise return [] (post-fix).
+    // Pre-fix, the service consumes the deactivated entitlement and returns 200
+    // (usedCalculations 3 < totalCalculations 10), so the 402 expectation fails
+    // without the fix. We verify deactivatedAt: null is added to the WHERE clause.
     mockEntitlementFindMany.mockImplementation(
       async (args: { where: Record<string, unknown> }) => {
         // Post-fix: query MUST include deactivatedAt: null in the where clause
