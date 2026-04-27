@@ -9,6 +9,7 @@ import {
   useUpdateEntitlementStatus,
   useUpdateEntitlementUsed,
 } from "@/lib/hooks/use-admin-customers"
+import { useCustomerTransactions } from "@/lib/hooks/use-admin-transactions"
 import type { EntitlementDetail } from "@/lib/api"
 import {
   Table,
@@ -229,6 +230,7 @@ export function CustomerDetailClient({
   filter: "active" | "all"
 }) {
   const { data, isLoading, error } = useAdminCustomer(customerId, filter)
+  const { data: transactions } = useCustomerTransactions(customerId, 10)
 
   if (isLoading) {
     return (
@@ -282,6 +284,73 @@ export function CustomerDetailClient({
               {formatCurrency(data.totalSpendUsd)} total spend
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Transactions section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">
+            Transactions (most recent 10)
+          </h2>
+          <Link
+            href={`/transactions?email=${encodeURIComponent(data.email)}`}
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          {!transactions || transactions.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              No transactions yet.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Method</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(t.purchasedAt)}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {t.productSlug}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(t.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          t.source === "STRIPE"
+                            ? "default"
+                            : t.source === "MANUAL"
+                              ? "secondary"
+                              : "outline"
+                        }
+                        className="text-xs"
+                      >
+                        {t.source}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {t.paymentMethod ?? "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </div>
       </div>
 
