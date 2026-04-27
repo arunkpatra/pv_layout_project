@@ -83,28 +83,26 @@ describe("createManualTransaction", () => {
   it("rejects with 404 when user does not exist", async () => {
     dbMock.user.findUnique.mockResolvedValueOnce(null)
 
-    await expect(
-      createManualTransaction({
-        userId: "usr_missing",
-        productSlug: "pv-layout-pro",
-        paymentMethod: "CASH",
-        createdByUserId: "usr_admin",
-      }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 })
+    const promise = createManualTransaction({
+      userId: "usr_missing",
+      productSlug: "pv-layout-pro",
+      paymentMethod: "CASH",
+      createdByUserId: "usr_admin",
+    })
+    await expect(promise).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 })
   })
 
   it("rejects with 400 when product does not exist", async () => {
     dbMock.user.findUnique.mockResolvedValueOnce({ id: "usr_alice", email: "alice@example.com" })
     dbMock.product.findUnique.mockResolvedValueOnce(null)
 
-    await expect(
-      createManualTransaction({
-        userId: "usr_alice",
-        productSlug: "missing",
-        paymentMethod: "CASH",
-        createdByUserId: "usr_admin",
-      }),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR", statusCode: 400 })
+    const promise = createManualTransaction({
+      userId: "usr_alice",
+      productSlug: "missing",
+      paymentMethod: "CASH",
+      createdByUserId: "usr_admin",
+    })
+    await expect(promise).rejects.toMatchObject({ code: "VALIDATION_ERROR", statusCode: 400 })
   })
 
   it("rejects with 400 when product is inactive", async () => {
@@ -114,12 +112,11 @@ describe("createManualTransaction", () => {
       priceAmount: 499, calculations: 10,
     })
 
-    await expect(
-      createManualTransaction({
-        userId: "usr_alice", productSlug: "pv-layout-pro",
-        paymentMethod: "CASH", createdByUserId: "usr_admin",
-      }),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR", statusCode: 400 })
+    const promise = createManualTransaction({
+      userId: "usr_alice", productSlug: "pv-layout-pro",
+      paymentMethod: "CASH", createdByUserId: "usr_admin",
+    })
+    await expect(promise).rejects.toMatchObject({ code: "VALIDATION_ERROR", statusCode: 400 })
   })
 
   it("rejects with 400 (FREE_PRODUCT_NOT_PURCHASABLE) when product is free", async () => {
@@ -129,12 +126,11 @@ describe("createManualTransaction", () => {
       priceAmount: 0, calculations: 5,
     })
 
-    await expect(
-      createManualTransaction({
-        userId: "usr_alice", productSlug: "pv-layout-free",
-        paymentMethod: "CASH", createdByUserId: "usr_admin",
-      }),
-    ).rejects.toMatchObject({
+    const promise = createManualTransaction({
+      userId: "usr_alice", productSlug: "pv-layout-free",
+      paymentMethod: "CASH", createdByUserId: "usr_admin",
+    })
+    await expect(promise).rejects.toMatchObject({
       code: "FREE_PRODUCT_NOT_PURCHASABLE",
       statusCode: 400,
     })
@@ -306,6 +302,7 @@ describe("getTransaction", () => {
 
   it("throws 404 when not found", async () => {
     ;(dbMock as any).transaction = { findUnique: mock(async () => null) }
-    await expect(getTransaction("missing")).rejects.toMatchObject({ statusCode: 404 })
+    const promise = getTransaction("missing")
+    await expect(promise).rejects.toMatchObject({ statusCode: 404 })
   })
 })
