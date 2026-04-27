@@ -57,13 +57,13 @@ const mockProductFindUnique = mock(async () => ({
   isFree: false,
   entitlements: [{ deactivatedAt: null }],
 }))
-const mockCheckoutSessionFindMany = mock(async () => [
-  { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date() },
+const mockTransactionFindMany = mock(async () => [
+  { productId: "prod1", amount: 4999, source: "STRIPE", purchasedAt: new Date() },
 ])
-const mockCheckoutSessionAggregate = mock(async () => ({
-  _sum: { amountTotal: 4999 },
+const mockTransactionAggregate = mock(async () => ({
+  _sum: { amount: 4999 },
+  _count: 1,
 }))
-const mockCheckoutSessionCount = mock(async () => 1)
 const mockEntitlementCount = mock(async () => 1)
 
 mock.module("../../lib/db.js", () => ({
@@ -74,10 +74,9 @@ mock.module("../../lib/db.js", () => ({
       count: mockProductCount,
       findUnique: mockProductFindUnique,
     },
-    checkoutSession: {
-      findMany: mockCheckoutSessionFindMany,
-      aggregate: mockCheckoutSessionAggregate,
-      count: mockCheckoutSessionCount,
+    transaction: {
+      findMany: mockTransactionFindMany,
+      aggregate: mockTransactionAggregate,
     },
     entitlement: { count: mockEntitlementCount },
   },
@@ -131,16 +130,15 @@ beforeEach(() => {
     isFree: false,
     entitlements: [{ deactivatedAt: null }],
   }))
-  mockCheckoutSessionFindMany.mockReset()
-  mockCheckoutSessionFindMany.mockImplementation(async () => [
-    { productSlug: "pv-layout-pro", amountTotal: 4999, processedAt: new Date() },
+  mockTransactionFindMany.mockReset()
+  mockTransactionFindMany.mockImplementation(async () => [
+    { productId: "prod1", amount: 4999, source: "STRIPE", purchasedAt: new Date() },
   ])
-  mockCheckoutSessionAggregate.mockReset()
-  mockCheckoutSessionAggregate.mockImplementation(async () => ({
-    _sum: { amountTotal: 4999 },
+  mockTransactionAggregate.mockReset()
+  mockTransactionAggregate.mockImplementation(async () => ({
+    _sum: { amount: 4999 },
+    _count: 1,
   }))
-  mockCheckoutSessionCount.mockReset()
-  mockCheckoutSessionCount.mockImplementation(async () => 1)
   mockEntitlementCount.mockReset()
   mockEntitlementCount.mockImplementation(async () => 1)
 })
@@ -162,17 +160,30 @@ describe("GET /admin/products", () => {
 })
 
 describe("GET /admin/products/:slug", () => {
-  it("returns 200 with product detail", async () => {
+  it("returns 200 with product detail including split fields", async () => {
     const res = await makeApp().request("/admin/products/pv-layout-pro", {
       headers: { Authorization: "Bearer token" },
     })
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       success: boolean
-      data: { slug: string; totalRevenueUsd: number }
+      data: {
+        slug: string
+        totalRevenueUsd: number
+        revenueStripe: number
+        revenueManual: number
+        purchaseCount: number
+        purchasesStripe: number
+        purchasesManual: number
+      }
     }
     expect(body.data.slug).toBe("pv-layout-pro")
     expect(body.data.totalRevenueUsd).toBeCloseTo(49.99)
+    expect(body.data.revenueStripe).toBeCloseTo(49.99)
+    expect(body.data.revenueManual).toBe(0)
+    expect(body.data.purchaseCount).toBe(1)
+    expect(body.data.purchasesStripe).toBe(1)
+    expect(body.data.purchasesManual).toBe(0)
   })
 
   it("returns 404 when product not found", async () => {
@@ -186,6 +197,7 @@ describe("GET /admin/products/:slug", () => {
 
 describe("GET /admin/products/:slug/sales", () => {
   it("returns 200 with monthly sales data by default", async () => {
+    mockTransactionFindMany.mockImplementation(async () => [])
     const res = await makeApp().request("/admin/products/pv-layout-pro/sales", {
       headers: { Authorization: "Bearer token" },
     })
@@ -199,6 +211,7 @@ describe("GET /admin/products/:slug/sales", () => {
   })
 
   it("returns daily data when granularity=daily", async () => {
+    mockTransactionFindMany.mockImplementation(async () => [])
     const res = await makeApp().request(
       "/admin/products/pv-layout-pro/sales?granularity=daily",
       { headers: { Authorization: "Bearer token" } },
@@ -241,7 +254,7 @@ describe("Role enforcement", () => {
 })
 
 describe("GET /admin/products/summary", () => {
-  it("returns 200 with summary shape for OPS role", async () => {
+  it("returns 200 with summary shape including split fields for OPS role", async () => {
     const res = await makeApp().request("/admin/products/summary", {
       headers: { Authorization: "Bearer token" },
     })
@@ -250,14 +263,21 @@ describe("GET /admin/products/summary", () => {
       success: boolean
       data: {
         totalRevenueUsd: number
+        revenueStripe: number
+        revenueManual: number
         totalPurchases: number
+        purchasesStripe: number
+        purchasesManual: number
         activeEntitlements: number
       }
     }
     expect(body.success).toBe(true)
     expect(typeof body.data.totalRevenueUsd).toBe("number")
-    expect(body.data.totalRevenueUsd).toBeCloseTo(49.99)
+    expect(typeof body.data.revenueStripe).toBe("number")
+    expect(typeof body.data.revenueManual).toBe("number")
     expect(typeof body.data.totalPurchases).toBe("number")
+    expect(typeof body.data.purchasesStripe).toBe("number")
+    expect(typeof body.data.purchasesManual).toBe("number")
     expect(typeof body.data.activeEntitlements).toBe("number")
   })
 
