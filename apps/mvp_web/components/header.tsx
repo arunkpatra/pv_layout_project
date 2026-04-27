@@ -43,7 +43,7 @@ export function Header() {
             alt="SolarLayout"
             width={28}
             height={28}
-            className="h-7 w-7"
+            className="h-7 w-7 place-items-center rounded-md"
           />
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
             SolarLayout

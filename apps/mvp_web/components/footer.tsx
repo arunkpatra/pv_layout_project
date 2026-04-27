@@ -1,4 +1,8 @@
+"use client"
+
 import Link from "next/link"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 
 const productLinks = [
   { href: "/products", label: "Products" },
@@ -47,6 +51,13 @@ function LinkColumn({
 }
 
 export function Footer() {
+  const { resolvedTheme } = useTheme()
+
+  const logoSrc =
+    resolvedTheme === "dark"
+      ? "/images/logo/solar_layout_logo_light.svg"
+      : "/images/logo/solar_layout_logo_dark.svg"
+
   return (
     <footer className="border-t border-[#1F2A30] bg-[#0F1418]">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -55,6 +66,13 @@ export function Footer() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+                <Image
+                  src={logoSrc}
+                  alt="SolarLayout"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 place-items-center rounded-md"
+                />
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
