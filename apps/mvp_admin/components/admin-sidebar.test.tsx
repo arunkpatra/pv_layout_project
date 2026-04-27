@@ -113,4 +113,12 @@ describe("AdminSidebar", () => {
     render(<AdminSidebar role="OPS" />)
     expect(screen.getByText("OPS")).toBeInTheDocument()
   })
+
+  it("shows Transactions nav item for both ADMIN and OPS", () => {
+    for (const role of ["ADMIN", "OPS"] as const) {
+      const { unmount } = render(<AdminSidebar role={role} />)
+      expect(screen.getByText("Transactions")).toBeInTheDocument()
+      unmount()
+    }
+  })
 })
