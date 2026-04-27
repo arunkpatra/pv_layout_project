@@ -50,9 +50,14 @@ const mockProductFindFirst = mock(async () => ({
   isFree: true,
   active: true,
 }))
+const mockTransactionCreate = mock(async () => ({
+  id: "txn_free_auto",
+  source: "FREE_AUTO",
+}))
 const mockEntitlementCreate = mock(async () => ({ id: "ent_free" }))
 const mockLicenseKeyCreate = mock(async () => ({ id: "lk_free" }))
 const mockTx = {
+  transaction: { create: mockTransactionCreate },
   entitlement: { create: mockEntitlementCreate },
   licenseKey: { create: mockLicenseKeyCreate },
 }
@@ -118,6 +123,11 @@ describe("clerkAuth middleware", () => {
       calculations: 5,
       isFree: true,
       active: true,
+    }))
+    mockTransactionCreate.mockReset()
+    mockTransactionCreate.mockImplementation(async () => ({
+      id: "txn_free_auto",
+      source: "FREE_AUTO",
     }))
     mockEntitlementCreate.mockReset()
     mockEntitlementCreate.mockImplementation(async () => ({ id: "ent_free" }))
@@ -186,13 +196,29 @@ describe("clerkAuth middleware", () => {
       where: { isFree: true },
     })
     expect(mockTransaction).toHaveBeenCalled()
-    expect(mockEntitlementCreate).toHaveBeenCalledWith({
-      data: {
-        userId: "usr_new",
-        productId: "prod_free",
-        totalCalculations: 5,
-      },
-    })
+    expect(mockTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr_new",
+          productId: "prod_free",
+          source: "FREE_AUTO",
+          amount: 0,
+          currency: "usd",
+          paymentMethod: null,
+          createdByUserId: null,
+        }),
+      }),
+    )
+    expect(mockEntitlementCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr_new",
+          productId: "prod_free",
+          transactionId: "txn_free_auto",
+          totalCalculations: 5,
+        }),
+      }),
+    )
     expect(mockLicenseKeyCreate).toHaveBeenCalled()
   })
 
@@ -214,5 +240,64 @@ describe("clerkAuth middleware", () => {
     // Auth still succeeds — provisioning failure is non-fatal
     expect(res.status).toBe(200)
     expect(mockTransaction).not.toHaveBeenCalled()
+  })
+
+  it("creates a FREE_AUTO Transaction linked to the free Entitlement on first auth", async () => {
+    mockUserFindFirst.mockImplementation(async () => null as never)
+    const app = makeApp()
+    const res = await app.request("/protected", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(res.status).toBe(200)
+
+    expect(mockTransactionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr_new",
+          productId: "prod_free",
+          source: "FREE_AUTO",
+          amount: 0,
+          currency: "usd",
+          paymentMethod: null,
+          externalReference: null,
+          notes: "Auto-granted free tier on signup",
+          createdByUserId: null,
+          checkoutSessionId: null,
+        }),
+      }),
+    )
+
+    expect(mockEntitlementCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr_new",
+          productId: "prod_free",
+          transactionId: "txn_free_auto",
+          totalCalculations: 5,
+        }),
+      }),
+    )
+
+    expect(mockLicenseKeyCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "usr_new",
+          key: expect.stringMatching(/^sl_live_/),
+        }),
+      }),
+    )
+  })
+
+  it("does NOT create another Transaction or Entitlement on subsequent auth (user already exists)", async () => {
+    // mockUserFindFirst returns an existing user (default beforeEach behavior)
+    const app = makeApp()
+    await app.request("/protected", {
+      method: "GET",
+      headers: { Authorization: "Bearer valid-token" },
+    })
+    expect(mockTransactionCreate).not.toHaveBeenCalled()
+    expect(mockEntitlementCreate).not.toHaveBeenCalled()
+    expect(mockLicenseKeyCreate).not.toHaveBeenCalled()
   })
 })

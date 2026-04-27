@@ -76,10 +76,25 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
       if (freeProduct) {
         const licenseKey = `sl_live_${crypto.randomBytes(24).toString("base64url")}`
         await db.$transaction(async (tx) => {
+          const transaction = await tx.transaction.create({
+            data: {
+              userId: user!.id,
+              productId: freeProduct.id,
+              source: "FREE_AUTO",
+              amount: 0,
+              currency: "usd",
+              paymentMethod: null,
+              externalReference: null,
+              notes: "Auto-granted free tier on signup",
+              createdByUserId: null,
+              checkoutSessionId: null,
+            },
+          })
           await tx.entitlement.create({
             data: {
               userId: user!.id,
               productId: freeProduct.id,
+              transactionId: transaction.id,
               totalCalculations: freeProduct.calculations,
             },
           })
