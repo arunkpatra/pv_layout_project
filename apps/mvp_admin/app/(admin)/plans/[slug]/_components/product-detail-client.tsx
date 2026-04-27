@@ -95,10 +95,17 @@ export function ProductDetailClient({
             <p className="mt-1 text-xl font-semibold">
               {formatCurrency(product.totalRevenueUsd)}
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Stripe {formatCurrency(product.revenueStripe)} · Manual{" "}
+              {formatCurrency(product.revenueManual)}
+            </p>
           </div>
           <div className="rounded-lg border border-border bg-muted/30 p-4">
             <p className="text-xs text-muted-foreground">Total Purchases</p>
             <p className="mt-1 text-xl font-semibold">{product.purchaseCount}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Stripe {product.purchasesStripe} · Manual {product.purchasesManual}
+            </p>
           </div>
           <div className="rounded-lg border border-border bg-muted/30 p-4">
             <p className="text-xs text-muted-foreground">Active Entitlements</p>

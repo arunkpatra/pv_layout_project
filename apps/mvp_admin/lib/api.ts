@@ -75,7 +75,11 @@ export type ProductListItem = {
   active: boolean
   isFree: boolean
   totalRevenueUsd: number
+  revenueStripe: number
+  revenueManual: number
   purchaseCount: number
+  purchasesStripe: number
+  purchasesManual: number
   activeEntitlementCount: number
 }
 
@@ -96,9 +100,13 @@ export type ProductSalesResponse = {
 }
 
 export type DashboardSummary = {
-  totalRevenueUsd: number
+  totalRevenue: number
+  totalRevenueStripe: number
+  totalRevenueManual: number
   totalCustomers: number
   totalPurchases: number
+  totalPurchasesStripe: number
+  totalPurchasesManual: number
   totalCalculations: number
 }
 
