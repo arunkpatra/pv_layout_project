@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Sun, Menu, Download } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Menu, Download } from "lucide-react"
 import { SignedIn, SignedOut } from "@clerk/nextjs"
 import { Button } from "@renewable-energy/ui/components/button"
 import {
@@ -24,15 +26,25 @@ const navLinks = [
 export function Header() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const { resolvedTheme } = useTheme()
+
+  const logoSrc =
+    resolvedTheme === "dark"
+      ? "/images/logo/solar_layout_logo_dark.svg"
+      : "/images/logo/solar_layout_logo_light.svg"
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-[1.4]">
       <div className="mx-auto flex max-w-[1200px] items-center gap-8 px-6 py-3.5">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-primary">
-            <Sun className="h-4 w-4 text-white" />
-          </span>
+          <Image
+            src={logoSrc}
+            alt="SolarLayout"
+            width={28}
+            height={28}
+            className="h-7 w-7"
+          />
           <span className="text-[15px] font-semibold tracking-tight text-foreground">
             SolarLayout
           </span>
@@ -90,9 +102,13 @@ export function Header() {
           </SheetTrigger>
           <SheetContent side="right" className="w-72">
             <div className="flex items-center gap-2.5 pt-2 pb-6">
-              <span className="grid h-7 w-7 place-items-center rounded-md bg-primary">
-                <Sun className="h-4 w-4 text-white" />
-              </span>
+              <Image
+                src={logoSrc}
+                alt="SolarLayout"
+                width={28}
+                height={28}
+                className="h-7 w-7"
+              />
               <span className="text-[15px] font-semibold tracking-tight text-foreground">
                 SolarLayout
               </span>
