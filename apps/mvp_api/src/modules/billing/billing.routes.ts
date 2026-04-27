@@ -75,6 +75,9 @@ billingRoutes.post("/billing/checkout", async (c) => {
     metadata: { userId: user.id, product: product.slug },
     billing_address_collection: "required",
     phone_number_collection: { enabled: true },
+    payment_intent_data: {
+      receipt_email: user.email,
+    },
     success_url: `${baseUrl}/dashboard/plans?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/dashboard/plans`,
   })
