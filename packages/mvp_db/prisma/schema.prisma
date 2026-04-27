@@ -40,10 +40,12 @@ model User {
   status           String            @default("ACTIVE")
   stripeCustomerId String?           @unique
   createdAt        DateTime          @default(now())
-  licenseKeys      LicenseKey[]
-  entitlements     Entitlement[]
-  checkoutSessions CheckoutSession[]
-  usageRecords     UsageRecord[]
+  licenseKeys           LicenseKey[]
+  entitlements          Entitlement[]
+  checkoutSessions      CheckoutSession[]
+  usageRecords          UsageRecord[]
+  transactions          Transaction[]    @relation("TransactionUser")
+  transactionsRecorded  Transaction[]    @relation("TransactionCreatedBy")
 
   @@map("users")
 }
@@ -75,6 +77,7 @@ model Product {
   features      ProductFeature[]
   entitlements  Entitlement[]
   usageRecords  UsageRecord[]
+  transactions  Transaction[]
   createdAt     DateTime         @default(now())
 
   @@map("products")
@@ -92,31 +95,32 @@ model ProductFeature {
 }
 
 model Entitlement {
-  id                String    @id @default("")
+  id                String      @id @default("")
   userId            String
-  user              User      @relation(fields: [userId], references: [id])
+  user              User        @relation(fields: [userId], references: [id])
   productId         String
-  product           Product   @relation(fields: [productId], references: [id])
+  product           Product     @relation(fields: [productId], references: [id])
+  transactionId     String
+  transaction       Transaction @relation(fields: [transactionId], references: [id])
   totalCalculations Int
-  usedCalculations  Int       @default(0)
-  purchasedAt       DateTime  @default(now())
+  usedCalculations  Int         @default(0)
+  purchasedAt       DateTime    @default(now())
   deactivatedAt     DateTime?
 
   @@map("entitlements")
 }
 
 model CheckoutSession {
-  id                       String    @id @default("")
+  id                       String       @id @default("")
   userId                   String
-  user                     User      @relation(fields: [userId], references: [id])
+  user                     User         @relation(fields: [userId], references: [id])
   productSlug              String
-  stripeCheckoutSessionId  String    @unique
+  stripeCheckoutSessionId  String       @unique
   stripeCheckoutSessionUrl String
   status                   String?
-  amountTotal              Int?
-  currency                 String?
   processedAt              DateTime?
-  createdAt                DateTime  @default(now())
+  createdAt                DateTime     @default(now())
+  transaction              Transaction?
 
   @@map("checkout_sessions")
 }
@@ -134,4 +138,31 @@ model UsageRecord {
   createdAt    DateTime   @default(now())
 
   @@map("usage_records")
+}
+
+model Transaction {
+  id                  String           @id @default("")
+  userId              String
+  user                User             @relation("TransactionUser", fields: [userId], references: [id])
+  productId           String
+  product             Product          @relation(fields: [productId], references: [id])
+  source              String                                              // "STRIPE" | "MANUAL" | "FREE_AUTO"
+  status              String           @default("COMPLETED")
+  amount              Int                                                 // USD cents
+  currency            String           @default("usd")
+  purchasedAt         DateTime         @default(now())
+  createdAt           DateTime         @default(now())
+  paymentMethod       String?                                             // "CASH" | "BANK_TRANSFER" | "UPI" | "CHEQUE" | "OTHER"; nullable
+  externalReference   String?
+  notes               String?
+  createdByUserId     String?
+  createdByUser       User?            @relation("TransactionCreatedBy", fields: [createdByUserId], references: [id])
+  checkoutSessionId   String?          @unique
+  checkoutSession     CheckoutSession? @relation(fields: [checkoutSessionId], references: [id])
+  entitlements        Entitlement[]
+
+  @@index([userId, purchasedAt(sort: Desc)])
+  @@index([source])
+  @@index([purchasedAt])
+  @@map("transactions")
 }
