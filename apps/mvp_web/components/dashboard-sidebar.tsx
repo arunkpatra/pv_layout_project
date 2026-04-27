@@ -2,13 +2,14 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 import {
   LayoutDashboard,
   CreditCard,
   BarChart3,
   LogOut,
   ChevronsUpDown,
-  Sun,
 } from "lucide-react"
 import { useUser, useClerk } from "@clerk/nextjs"
 import {
@@ -119,6 +120,12 @@ export function DashboardSidebar(
   props: React.ComponentProps<typeof Sidebar>,
 ) {
   const { isLoaded, user } = useUser()
+  const { resolvedTheme } = useTheme()
+
+  const logoSrc =
+    resolvedTheme === "dark"
+      ? "/images/logo/solar_layout_logo_dark.svg"
+      : "/images/logo/solar_layout_logo_light.svg"
 
   const clerkUser = {
     name: user?.fullName ?? user?.username ?? "User",
@@ -133,9 +140,13 @@ export function DashboardSidebar(
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Sun className="size-4" />
-                </div>
+                <Image
+                  src={logoSrc}
+                  alt="SolarLayout"
+                  width={32}
+                  height={32}
+                  className="size-8 rounded-lg"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">SolarLayout</span>
                   <span className="truncate text-xs">Dashboard</span>
