@@ -1,4 +1,5 @@
 import { describe, expect, it, mock, beforeAll, beforeEach } from "bun:test"
+import type { createManualTransaction as CreateManualTransactionFn } from "./transactions.service.js"
 
 // Mock createEntitlementAndTransaction so we can isolate transactions.service logic
 const createEntitlementAndTransactionMock = mock(async () => ({
@@ -32,7 +33,7 @@ mock.module("../../lib/db.js", () => ({ db: dbMock }))
 // The fresh load of the real source picks up the db/billing mocks registered
 // above because those are keyed on their canonical absolute paths.
 // ─────────────────────────────────────────────────────────────────────────────
-let svc: { createManualTransaction: typeof import("./transactions.service.js")["createManualTransaction"] }
+let svc: { createManualTransaction: typeof CreateManualTransactionFn }
 
 beforeAll(async () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
