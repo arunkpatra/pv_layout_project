@@ -14,9 +14,9 @@
 |---|---|
 | Plan version | 0.2 |
 | Created | 2026-04-29 |
-| Last updated | 2026-04-29 (v0.2 — bidirectional alignment reframe) |
-| Status | Active — pre-P0 |
-| Active spike | (none yet — first is P0 below) |
+| Last updated | 2026-04-29 (P0 closed 🟢) |
+| Status | Active — P0 closed; P1 next |
+| Active spike | P0 🟢 closed 2026-04-29 (gate memo: [`docs/gates/p00.md`](../gates/p00.md)); P1 (sync skill + inventory) is next |
 | Last sync run | (none — sync skill lands in P1) |
 | Baseline branch | `baseline-v1-20260429` on `/Users/arunkpatra/codebase/PVlayout_Advance` (the authority — captures track HEAD) |
 | Baseline HEAD at last capture | `397aa2a` (resolved 2026-04-29; recorded in each `numeric-baseline.json`'s `legacy_sha_at_capture`) |
