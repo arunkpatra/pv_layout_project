@@ -171,8 +171,8 @@ Read the user-style entries in this repo's auto-memory (`MEMORY.md` and the entr
 
 If you need to understand what the desktop app is asking the backend for, look at `/Users/arunkpatra/codebase/pv_layout_project`:
 
-- `docs/post-parity/PLAN.md` — desktop-side plan; Phase 1 rows depend on this initiative's V2 surface.
-- `docs/post-parity/PLAN-backend.md` — earlier draft of this plan (now superseded by `docs/initiatives/post-parity-v2-backend-plan.md` in this repo); read for additional rationale on row design.
+- `/Users/arunkpatra/codebase/pv_layout_project/docs/PLAN.md` — desktop-side plan; Phase 1 rows depend on this initiative's V2 surface. (Promoted from `docs/post-parity/PLAN.md` after this kickoff was written.)
+- `/Users/arunkpatra/codebase/pv_layout_project/docs/post-parity/PLAN-backend.md` — earlier draft of the backend plan (now superseded by `docs/initiatives/post-parity-v2-backend-plan.md` in this repo); read for additional rationale on row design.
 
 ## Stop after step 1
 

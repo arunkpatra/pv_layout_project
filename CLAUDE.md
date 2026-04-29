@@ -18,14 +18,15 @@ A ground-up rewrite of the **SolarLayout** desktop product — a native desktop 
 
 ### Read these before touching code or planning work
 1. **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — stack, component boundaries, runtime flows, module mapping, security model, design system §12.
-2. **[docs/PLAN.md](./docs/PLAN.md)** — the active backlog. Mission: catch the new app up to legacy `baseline-v1-20260429`. Tiered process per row (T1 / T2 / T3). Pick top `todo`, do it, flip to `done`.
+2. **[docs/PLAN.md](./docs/PLAN.md)** — the active backlog. **Mission (post-parity, 2026-04-29 onward):** ship the desktop app for PVLayout — project + run primitives, multi-tab UI, V2 backend integration, full legacy GUI capability coverage, Claude-Desktop quality bar. The earlier parity-sweep mission ("catch the new app up to legacy `baseline-v1-20260429`") closed 12/12 done on 2026-04-29 and is archived at [docs/historical/PLAN-parity-v1.md](./docs/historical/PLAN-parity-v1.md). Tiered process per row (T1 / T2 / T3). Pick top `todo`, do it, flip to `done`.
 
 ### Working agreements
 - **Backlog-driven.** Work proceeds row-by-row through [docs/PLAN.md](./docs/PLAN.md). Pick the top `todo` row; do it; flip to `done`. No spike-execution protocol, no per-row gate memo.
-- **Tiered process per row.** T1 = port + sidecar pytest. T2 = T1 + numeric parity test against the legacy baseline. T3 = T2 + a short discovery memo capturing solar-domain decisions (Prasanta reviews accumulated memos in a single pass at end-of-port; no per-row Prasanta gate). The row's tier is non-negotiable for that row; don't lighten or heavyen it on the fly.
-- **No new features during the parity push.** If a request comes in that isn't in PLAN.md or required by an in-PLAN row's acceptance, it waits until the table is fully `done`.
-- **Functional parity is the contract.** A feature that behaves one way in legacy at `baseline-v1-20260429` must behave identically here unless explicitly documented as a divergence (e.g., S11.5 Pattern V).
-- **Design bar is explicit and non-negotiable** for code that lands in the new-app UI surface — see §12 of `ARCHITECTURE.md` and `DESIGN_FOUNDATIONS.md`. "It works" is not done. "It matches the quality bar" is done. (Most parity rows touch `pvlayout_core/` only and don't trigger this bar.)
+- **Tiered process per row (post-parity).** T1 = build + test. T2 = T1 + integration test (typically across desktop ↔ sidecar ↔ V2 backend). T3 = T1 + a short decision memo at `docs/post-parity/findings/YYYY-MM-DD-NNN-<slug>.md`. The row's tier is non-negotiable for that row; don't lighten or heavyen it on the fly. (The parity-era T1/T2/T3 model — port + parity-test + solar-domain memo — applied through 2026-04-29 and is preserved in the archived parity table.)
+- **No out-of-plan features.** If a request comes in that isn't in PLAN.md or required by an in-PLAN row's acceptance, it waits until the table is fully `done` or the row is explicitly added.
+- **V2 backend is a hard dependency for most desktop rows.** The active backend plan lives in the `renewable_energy` repo at `docs/initiatives/post-parity-v2-backend-plan.md` (branch `post-parity-v2-backend`), executed in a separate Claude Code session. This repo's [docs/post-parity/PLAN-backend.md](./docs/post-parity/PLAN-backend.md) is the superseded scoping draft — read for additional rationale only.
+- **Functional parity is the floor, not the ceiling.** Per Prasanta's 2026-04-29 directive: whatever a user could do in the legacy PyQt5 app, the new app must support. UI/UX architecture is unconstrained — original quality bar (Claude Desktop chrome / Linear density / Figma canvas-inspector / semantic tokens / light-first with dark as preview) holds.
+- **Design bar is explicit and non-negotiable** for code that lands in the new-app UI surface — see §12 of `ARCHITECTURE.md` and `DESIGN_FOUNDATIONS.md`. "It works" is not done. "It matches the quality bar" is done.
 
 ### Local execution, global awareness
 

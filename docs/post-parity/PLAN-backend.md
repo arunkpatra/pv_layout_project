@@ -1,11 +1,17 @@
-# renewable_energy — Post-Parity Backend Plan (V2)
+# renewable_energy — Post-Parity Backend Plan (V2) — SUPERSEDED
+
+> **⚠️ SUPERSEDED 2026-04-29** — this draft was the scoping seed for the V2 backend plan. The **active backend plan** now lives in the `renewable_energy` repo at [`docs/initiatives/post-parity-v2-backend-plan.md`](file:///Users/arunkpatra/codebase/renewable_energy/docs/initiatives/post-parity-v2-backend-plan.md), executed in a dedicated Claude Code session on branch `post-parity-v2-backend`. That version has been revised with the audit-flagged corrections (AWS S3 not Vercel Blob, extend `createEntitlementAndTransaction` not parallel path, "prepaid packs" terminology, etc.).
+>
+> This file is preserved as scoping-history only. Do not act on row numbers below — they may have shifted in the active plan. For desktop-side rows that consume this V2 surface, see [`docs/PLAN.md`](../PLAN.md).
+
+---
+
+# renewable_energy — Post-Parity Backend Plan (V2) [scoping draft]
 
 **Repo:** `/Users/arunkpatra/codebase/renewable_energy` (separate repo from this one).
 **Mission:** ship V2 of the SolarLayout backend to support the new desktop app — project + run primitives, blob storage, idempotent usage reporting, project quotas. V1 frozen; no backwards compatibility shim.
-**Last updated:** 2026-04-29
-**Status:** 0 / TBD done.
-
-> **For the Claude Code session that picks this up:** this file lives in the *desktop* repo (`pv_layout_project`) because that's where the post-parity scoping happened. Copy it to `renewable_energy/docs/PLAN.md` (after archiving the existing PLAN.md if any to `docs/historical/`). The decisions below are locked — do not relitigate them in the backend session.
+**Last updated:** 2026-04-29 (superseded same day by the active plan in renewable_energy)
+**Status:** Superseded.
 
 ---
 
@@ -113,7 +119,7 @@ These don't block scoping. They're inputs to B1's seed values; placeholder value
 
 - [`docs/post-parity/discovery/2026-04-29-001-legacy-app-capability-audit.md`](./discovery/2026-04-29-001-legacy-app-capability-audit.md) — capability inventory of legacy PyQt5 app.
 - [`docs/post-parity/discovery/2026-04-29-002-backend-api-contract-audit.md`](./discovery/2026-04-29-002-backend-api-contract-audit.md) — current V1 backend contract + risks.
-- This repo's [`docs/post-parity/PLAN.md`](./PLAN.md) — desktop-side post-parity plan that consumes this V2 surface.
+- This repo's [`docs/PLAN.md`](../PLAN.md) — desktop-side post-parity plan that consumes this V2 surface.
 
 ---
 
