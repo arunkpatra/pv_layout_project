@@ -877,6 +877,330 @@ def _route_length(route: List[Tuple[float, float]]) -> float:
 
 
 # ---------------------------------------------------------------------------
+# DC cable bundling — ported from legacy baseline-v1-20260429 (P0 parity port)
+# Source: PVlayout_Advance/core/string_inverter_manager.py:460
+# Adaptations:
+#   1. Threads route_poly through to _route_ac_cable (preserves Pattern V).
+#   2. Uses dc_per_string_allowance_m (S11.5 parameterisation) instead of
+#      legacy's hard-coded 10.0 in the per-table fallback path. The +5.0
+#      collector / trunk allowances stay as literals (not parameterised
+#      this round).
+#   3. Captures _last_route_quality on each routed CableRun (S11.5 tagging).
+# ---------------------------------------------------------------------------
+
+def _bundle_dc_cables(
+    groups: list,
+    placed_inverters: list,
+    gap_ys: List[float],
+    col_xs: List[float],
+    usable,
+    strings_per_table: int,
+    dc_per_string_allowance_m: float,
+    route_poly=None,
+) -> Tuple[List[CableRun], float]:
+    """
+    Bundle DC cable runs by row within each inverter cluster.
+
+    For each cluster:
+      - Group tables by row Y (1 m rounding tolerance).
+      - When >=2 tables share a row AND a straight horizontal path is clear
+        of obstacles, emit ONE horizontal collector cable spanning all table
+        centres in that row, then ONE trunk cable from the inverter to the
+        junction (the table centre in that row nearest the inverter).
+      - When the horizontal path is blocked by an obstacle, or there is only
+        one table in the row, fall back to routing that table directly to
+        the inverter (original per-table behaviour).
+
+    This reduces the drawn cable count from N_tables to ~ 2 x N_rows, which
+    dramatically de-clutters the layout while keeping every table
+    electrically connected. The trunk length is multiplied by the number of
+    tables in the row so that the reported total conductor length remains
+    accurate.
+    """
+    dc_cables: List[CableRun] = []
+    total_dc = 0.0
+    cable_idx = 0
+
+    for inv_idx, group in enumerate(groups):
+        inv = placed_inverters[inv_idx]
+        i_cx = inv.x + INV_EW / 2
+        i_cy = inv.y + INV_NS / 2
+
+        # Group tables in this cluster by row (1 m tolerance on centre Y)
+        row_dict: Dict[int, list] = {}
+        for t in group:
+            ry = int(round(t.y + t.height / 2))
+            row_dict.setdefault(ry, []).append(t)
+
+        for _ry, row_tables in sorted(row_dict.items()):
+            row_y = sum(t.y + t.height / 2 for t in row_tables) / len(row_tables)
+            sorted_tbls = sorted(row_tables, key=lambda t: t.x + t.width / 2)
+            tx_list = [t.x + t.width / 2 for t in sorted_tbls]
+            n_tbls = len(sorted_tbls)
+
+            # Junction X: table centre in this row nearest the inverter
+            junction_x = min(tx_list, key=lambda x: abs(x - i_cx))
+            junction_pt = (junction_x, row_y)
+
+            if n_tbls >= 2:
+                left_x, right_x = tx_list[0], tx_list[-1]
+                h_route = [(left_x, row_y), (right_x, row_y)]
+                h_clear = (usable is None) or _path_ok(h_route, usable)
+
+                if h_clear:
+                    # Horizontal collector
+                    cable_idx += 1
+                    h_len = (right_x - left_x + 5.0) * strings_per_table
+                    total_dc += h_len
+                    dc_cables.append(CableRun(
+                        start_utm=(left_x, row_y), end_utm=(right_x, row_y),
+                        route_utm=h_route,
+                        index=cable_idx, cable_type="dc",
+                        length_m=round(h_len, 1),
+                        route_quality="ok",  # straight horizontal, validated
+                    ))
+
+                    # Trunk: inverter -> row junction
+                    trunk_route = _route_ac_cable(
+                        (i_cx, i_cy), junction_pt, gap_ys, col_xs, usable,
+                        route_poly=route_poly,
+                    )
+                    trunk_q = _last_route_quality
+                    trunk_len = (_route_length(trunk_route) + 5.0) * n_tbls
+                    total_dc += trunk_len
+                    cable_idx += 1
+                    dc_cables.append(CableRun(
+                        start_utm=(i_cx, i_cy), end_utm=junction_pt,
+                        route_utm=trunk_route,
+                        index=cable_idx, cable_type="dc",
+                        length_m=round(trunk_len, 1),
+                        route_quality=trunk_q,
+                    ))
+
+                else:
+                    # Obstacle blocks the horizontal collector -> route each
+                    # table individually (same as the original behaviour)
+                    for t in sorted_tbls:
+                        t_cx = t.x + t.width / 2
+                        route = _route_ac_cable(
+                            (t_cx, row_y), (i_cx, i_cy), gap_ys, col_xs, usable,
+                            route_poly=route_poly,
+                        )
+                        route_q = _last_route_quality
+                        clen = (_route_length(route) + dc_per_string_allowance_m) * strings_per_table
+                        total_dc += clen
+                        cable_idx += 1
+                        dc_cables.append(CableRun(
+                            start_utm=(t_cx, row_y), end_utm=(i_cx, i_cy),
+                            route_utm=route,
+                            index=cable_idx, cable_type="dc",
+                            length_m=round(clen, 1),
+                            route_quality=route_q,
+                        ))
+
+            else:
+                # Single table in this row -> route directly to inverter
+                t = sorted_tbls[0]
+                t_cx = t.x + t.width / 2
+                route = _route_ac_cable(
+                    (t_cx, row_y), (i_cx, i_cy), gap_ys, col_xs, usable,
+                    route_poly=route_poly,
+                )
+                route_q = _last_route_quality
+                clen = (_route_length(route) + dc_per_string_allowance_m) * strings_per_table
+                total_dc += clen
+                cable_idx += 1
+                dc_cables.append(CableRun(
+                    start_utm=(t_cx, row_y), end_utm=(i_cx, i_cy),
+                    route_utm=route,
+                    index=cable_idx, cable_type="dc",
+                    length_m=round(clen, 1),
+                    route_quality=route_q,
+                ))
+
+    return dc_cables, total_dc
+
+
+# ---------------------------------------------------------------------------
+# MST-based AC cable routing — ported from legacy baseline-v1-20260429
+# ---------------------------------------------------------------------------
+
+def _build_mst_edges(pts: List[Tuple[float, float]]) -> List[Tuple[int, int]]:
+    """
+    Prim's Minimum Spanning Tree over *pts* using Manhattan distance.
+    Node 0 is the root (ICR centre).
+    Returns a list of (parent_idx, child_idx) directed edges.
+
+    Ported verbatim from PVlayout_Advance/core/string_inverter_manager.py:588.
+    No adaptations needed - pure graph algorithm, no _route_ac_cable calls.
+    """
+    n = len(pts)
+    if n <= 1:
+        return []
+    in_tree = [False] * n
+    key      = [float('inf')] * n
+    parent   = [-1] * n
+    key[0]   = 0.0
+    edges: List[Tuple[int, int]] = []
+
+    for _ in range(n):
+        # Node with smallest key not yet in tree
+        u = min((i for i in range(n) if not in_tree[i]), key=lambda i: key[i])
+        in_tree[u] = True
+        if parent[u] != -1:
+            edges.append((parent[u], u))
+        ux, uy = pts[u]
+        for v in range(n):
+            if not in_tree[v]:
+                d = abs(pts[v][0] - ux) + abs(pts[v][1] - uy)
+                if d < key[v]:
+                    key[v] = d
+                    parent[v] = u
+
+    return edges
+
+
+def _route_ac_mst(
+    icr_groups: Dict[int, list],
+    icr_centers: List[Tuple[float, float]],
+    gap_ys: List[float],
+    col_xs: List[float],
+    usable,
+    ac_cable_factor: float,
+    ac_termination_allowance_m: float,
+    route_poly=None,
+) -> Tuple[List[CableRun], float]:
+    """
+    MST-based AC (or SMB->inverter DC) cable routing.
+
+    For each ICR group, a Minimum Spanning Tree is built over the set
+    {ICR centre} U {inverter centres} using Manhattan distance as the
+    edge weight. Each MST edge becomes one CableRun.
+
+    Benefits over direct inverter->ICR routing:
+      - Nearby inverters share a common cable segment (tree trunk) instead
+        of running N parallel wires to the same ICR.
+      - Total conductor length is reduced (MST property).
+      - Fewer visually distinct routes on the map.
+
+    Ported from PVlayout_Advance/core/string_inverter_manager.py:649.
+    Adaptations:
+      1. ac_termination_allowance_m parameterised (legacy hard-coded 4.0).
+      2. route_poly threaded to _route_ac_cable (S11.5 Pattern V).
+      3. _last_route_quality captured on each CableRun.
+    """
+    ac_cables: List[CableRun] = []
+    total_ac  = 0.0
+    cable_idx = 0
+
+    for icr_idx, inv_group in icr_groups.items():
+        if not inv_group:
+            continue
+        icr_pt = icr_centers[icr_idx]
+
+        if len(inv_group) == 1:
+            # Single inverter - direct route to ICR (no MST needed)
+            inv = inv_group[0]
+            i_cx = inv.x + INV_EW / 2
+            i_cy = inv.y + INV_NS / 2
+            route = _route_ac_cable(
+                (i_cx, i_cy), icr_pt, gap_ys, col_xs, usable,
+                route_poly=route_poly,
+            )
+            route_q = _last_route_quality
+            path_len = _route_length(route)
+            clen     = (path_len + ac_termination_allowance_m) * ac_cable_factor
+            total_ac += clen
+            cable_idx += 1
+            ac_cables.append(CableRun(
+                start_utm=(i_cx, i_cy), end_utm=icr_pt,
+                route_utm=route,
+                index=cable_idx, cable_type="ac",
+                length_m=round(clen, 1),
+                route_quality=route_q,
+            ))
+            continue
+
+        # Build MST: node 0 = ICR, nodes 1..N = inverters
+        inv_pts  = [(inv.x + INV_EW / 2, inv.y + INV_NS / 2) for inv in inv_group]
+        all_pts  = [icr_pt] + inv_pts
+        mst_edges = _build_mst_edges(all_pts)
+
+        for u_idx, v_idx in mst_edges:
+            p_u = all_pts[u_idx]
+            p_v = all_pts[v_idx]
+            route = _route_ac_cable(
+                p_u, p_v, gap_ys, col_xs, usable,
+                route_poly=route_poly,
+            )
+            route_q  = _last_route_quality
+            path_len = _route_length(route)
+            clen     = (path_len + ac_termination_allowance_m) * ac_cable_factor
+            total_ac += clen
+            cable_idx += 1
+            ac_cables.append(CableRun(
+                start_utm=p_u, end_utm=p_v,
+                route_utm=route,
+                index=cable_idx, cable_type="ac",
+                length_m=round(clen, 1),
+                route_quality=route_q,
+            ))
+
+    return ac_cables, total_ac
+
+
+def _calc_individual_ac_total(
+    icr_groups: Dict[int, list],
+    icr_centers: List[Tuple[float, float]],
+    gap_ys: List[float],
+    col_xs: List[float],
+    usable,
+    ac_cable_factor: float,
+    ac_termination_allowance_m: float,
+    route_poly=None,
+) -> Tuple[float, Dict[int, float], Dict[int, float]]:
+    """
+    Compute total AC cable quantity as the SUM of individual routed lengths
+    from every inverter (string mode) or SMB (central mode) to its assigned
+    ICR.
+
+    Each device gets its own dedicated cable run - no MST trunk sharing.
+    This gives the correct bill-of-materials quantity to order.
+
+    Ported from PVlayout_Advance/core/string_inverter_manager.py:620.
+    Adaptations:
+      1. ac_termination_allowance_m parameterised (legacy hard-coded 4.0).
+      2. route_poly threaded to _route_ac_cable (S11.5 Pattern V).
+      3. Returns per-inverter and per-ICR subtotals (S11.5 ac_cable_m_per_*
+         additions). Legacy returned only the scalar total.
+    """
+    total = 0.0
+    per_inv: Dict[int, float] = {}
+    per_icr: Dict[int, float] = {}
+
+    for icr_idx, inv_group in icr_groups.items():
+        if not inv_group:
+            continue
+        icr_pt = icr_centers[icr_idx]
+        icr_subtotal = 0.0
+        for inv in inv_group:
+            i_cx = inv.x + INV_EW / 2
+            i_cy = inv.y + INV_NS / 2
+            route    = _route_ac_cable(
+                (i_cx, i_cy), icr_pt, gap_ys, col_xs, usable,
+                route_poly=route_poly,
+            )
+            path_len = _route_length(route)
+            clen     = (path_len + ac_termination_allowance_m) * ac_cable_factor
+            total   += clen
+            icr_subtotal += clen
+            per_inv[inv.index] = round(clen, 1)
+        per_icr[icr_idx] = round(icr_subtotal, 1)
+
+    return total, per_inv, per_icr
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
