@@ -1332,34 +1332,20 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     dc_per_string_allowance_m = params.dc_per_string_allowance_m
     ac_termination_allowance_m = params.ac_termination_allowance_m
 
-    dc_cables: List[CableRun] = []
-    total_dc = 0.0
+    # ---- DC cable runs — row-bundled (table → inverter), legacy parity ---
+    # Uses _bundle_dc_cables(): one horizontal collector per row per cluster
+    # + one trunk per row to the inverter. Per legacy baseline-v1-20260429.
+    # S11.5 additions preserved: route_poly threaded to _route_ac_cable so
+    # Pattern V remains available; allowance parameterised; route_quality tagged.
     if _PATTERN_STATS_ENABLED:
         _reset_pattern_stats()
-    for t in tables:
-        inv = tbl_to_inv.get(id(t))
-        if inv is None:
-            continue
-        t_cx = t.x + t.width  / 2
-        t_cy = t.y + t.height / 2
-        i_cx = inv.x + INV_EW / 2
-        i_cy = inv.y + INV_NS / 2
-        if _PATTERN_STATS_ENABLED:
-            _before = _path_ok_count
-        route     = _route_ac_cable((t_cx, t_cy), (i_cx, i_cy), gap_ys, col_xs, usable, route_poly=route_poly)
-        route_q   = _last_route_quality
-        if _PATTERN_STATS_ENABLED:
-            _path_ok_per_cable.append(_path_ok_count - _before)
-        path_len  = _route_length(route)
-        cable_len = (path_len + dc_per_string_allowance_m) * strings_per_table
-        total_dc += cable_len
-        dc_cables.append(CableRun(
-            start_utm=(t_cx, t_cy), end_utm=(i_cx, i_cy),
-            route_utm=route,
-            index=len(dc_cables) + 1, cable_type="dc",
-            length_m=round(cable_len, 1),
-            route_quality=route_q,
-        ))
+    dc_cables, total_dc = _bundle_dc_cables(
+        groups, placed_inverters,
+        gap_ys, col_xs, usable,
+        strings_per_table,
+        dc_per_string_allowance_m,
+        route_poly=route_poly,
+    )
     result.dc_cable_runs    = dc_cables
     result.total_dc_cable_m = round(total_dc, 1)
     if _PATTERN_STATS_ENABLED:
@@ -1392,44 +1378,35 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     # AC cable, so no multiplier is needed.
     ac_cable_factor = 2.0 if params.design_mode == DesignMode.CENTRAL_INVERTER else 1.0
 
-    ac_cables: List[CableRun] = []
-    total_ac = 0.0
-    # S11.5 (Phase E): per-inverter and per-ICR AC subtotals for EPC BOMs.
-    # Keys: inverter index (1-based PlacedStringInverter.index) / ICR array
-    # position (0-based, matches result.placed_icrs index).
-    ac_m_per_inverter: Dict[int, float] = {}
-    ac_m_per_icr: Dict[int, float] = {}
+    # ---- AC/DC cable runs — MST-based visual + individual-routed quantity ----
+    # Visual routes (ac_cable_runs): MST so nearby inverters share trunks.
+    # Quantity (total_ac_cable_m): sum of individual routes per inverter →ICR.
+    # Per legacy baseline-v1-20260429 (split visual vs quantity).
     if _PATTERN_STATS_ENABLED:
         _reset_pattern_stats()
-    for icr_idx, inv_group in icr_groups.items():
-        icr_pt = icr_centers[icr_idx]
-        icr_subtotal = 0.0
-        for inv in inv_group:
-            i_cx = inv.x + INV_EW / 2
-            i_cy = inv.y + INV_NS / 2
-            if _PATTERN_STATS_ENABLED:
-                _before = _path_ok_count
-            route     = _route_ac_cable((i_cx, i_cy), icr_pt, gap_ys, col_xs, usable, route_poly=route_poly)
-            route_q   = _last_route_quality
-            if _PATTERN_STATS_ENABLED:
-                _path_ok_per_cable.append(_path_ok_count - _before)
-            path_len  = _route_length(route)
-            cable_len = (path_len + ac_termination_allowance_m) * ac_cable_factor
-            total_ac += cable_len
-            icr_subtotal += cable_len
-            ac_m_per_inverter[inv.index] = round(cable_len, 1)
-            ac_cables.append(CableRun(
-                start_utm=(i_cx, i_cy), end_utm=icr_pt,
-                route_utm=route,
-                index=len(ac_cables) + 1, cable_type="ac",
-                length_m=round(cable_len, 1),
-                route_quality=route_q,
-            ))
-        ac_m_per_icr[icr_idx] = round(icr_subtotal, 1)
 
-    result.ac_cable_runs    = ac_cables
+    # Visual: MST tree, each edge a CableRun.
+    ac_cables, _mst_total = _route_ac_mst(
+        icr_groups, icr_centers,
+        gap_ys, col_xs, usable,
+        ac_cable_factor,
+        ac_termination_allowance_m,
+        route_poly=route_poly,
+    )
+    result.ac_cable_runs = ac_cables
+
+    # Quantity: every inverter individually routed; sum gives BOM length.
+    # Returns per-ICR / per-inverter subtotals (S11.5 Phase E).
+    total_ac, ac_m_per_inverter, ac_m_per_icr = _calc_individual_ac_total(
+        icr_groups, icr_centers,
+        gap_ys, col_xs, usable,
+        ac_cable_factor,
+        ac_termination_allowance_m,
+        route_poly=route_poly,
+    )
     result.total_ac_cable_m = round(total_ac, 1)
     result.ac_cable_m_per_inverter = ac_m_per_inverter
     result.ac_cable_m_per_icr = ac_m_per_icr
+
     if _PATTERN_STATS_ENABLED:
         _emit_pattern_stats("AC", len(ac_cables))

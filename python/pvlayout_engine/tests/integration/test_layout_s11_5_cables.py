@@ -46,11 +46,16 @@ KMZ_PATH = (
 
 # Pre-S11.5 headless baseline (captured 2026-04-24, spec §1.3).
 # Acceptance bands are ±1 % per spec §6.2 / §7.2.
+# DC cable count + total updated in P0 Task 6 when per-cable DC loop was
+# replaced by _bundle_dc_cables() (row collectors + trunks per legacy
+# baseline-v1-20260429). AC total is unchanged; per-inverter count still 62.
 EXPECTED_INVERTERS = 62
 EXPECTED_TABLES_POST_LA = 611
 EXPECTED_LAS = 22
 EXPECTED_CAPACITY_KWP = 19_845.28  # post-LA (LA-placement reduced 715 tables to 611)
-EXPECTED_DC_TOTAL_M = 39_536.2
+# P0 Task 6 baseline: bundled DC routing (604 runs, not 611 per-table).
+EXPECTED_DC_CABLE_RUNS = 604
+EXPECTED_DC_TOTAL_M = 37_380.3
 # Post-Pattern-V baseline. Pre-V this was 14,474.8 m, but those numbers
 # included the outside-polygon detour portions of 15 boundary-violating
 # Pattern F routes. Pattern V reroutes those 15 cables inside the plant
@@ -131,8 +136,10 @@ def test_cables_on_phaseboundary2(client: TestClient) -> None:
         r["total_capacity_kwp"], EXPECTED_CAPACITY_KWP
     )
 
-    # ---- Cable count invariants (1 DC per table, 1 AC per inverter) ----
-    assert len(r["dc_cable_runs"]) == EXPECTED_TABLES_POST_LA
+    # ---- Cable count invariants ----
+    # DC: bundled row collectors + trunks (P0 parity); not 1-per-table.
+    # AC: MST visual runs; 1 edge per inverter (star topology on phaseboundary2).
+    assert len(r["dc_cable_runs"]) == EXPECTED_DC_CABLE_RUNS
     assert len(r["ac_cable_runs"]) == EXPECTED_INVERTERS
 
     # ---- Cable total deltas within ±1 % ----
