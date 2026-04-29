@@ -1,4 +1,5 @@
 import { adminPrisma } from "../src/index.js"
+import { products } from "../src/seed-data/products.js"
 
 const STRIPE_PRICE_IDS = {
   "pv-layout-basic":
@@ -9,71 +10,6 @@ const STRIPE_PRICE_IDS = {
     process.env.STRIPE_PRICE_PRO_PLUS ?? "price_placeholder_pro_plus",
   "pv-layout-free": "price_free_tier",   // sentinel — never used in Stripe
 }
-
-const products = [
-  {
-    slug: "pv-layout-free",
-    name: "Free",
-    description: "5 free layout calculations on signup — all Pro Plus features included",
-    priceAmount: 0,
-    calculations: 5,
-    displayOrder: 0,
-    isFree: true,
-    features: [
-      { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
-      { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
-      { featureKey: "cable_routing", label: "AC & DC Cable Routing" },
-      { featureKey: "cable_measurements", label: "Cable Quantity Measurements" },
-      { featureKey: "energy_yield", label: "Energy Yield Analysis" },
-      { featureKey: "generation_estimates", label: "Plant Generation Estimates" },
-    ],
-  },
-  {
-    slug: "pv-layout-basic",
-    name: "Basic",
-    description: "5 layout calculations per purchase",
-    priceAmount: 199,
-    calculations: 5,
-    displayOrder: 1,
-    isFree: false,
-    features: [
-      { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
-      { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
-    ],
-  },
-  {
-    slug: "pv-layout-pro",
-    name: "Pro",
-    description: "10 layout calculations per purchase",
-    priceAmount: 499,
-    calculations: 10,
-    displayOrder: 2,
-    isFree: false,
-    features: [
-      { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
-      { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
-      { featureKey: "cable_routing", label: "AC & DC Cable Routing" },
-      { featureKey: "cable_measurements", label: "Cable Quantity Measurements" },
-    ],
-  },
-  {
-    slug: "pv-layout-pro-plus",
-    name: "Pro Plus",
-    description: "50 layout and yield calculations per purchase",
-    priceAmount: 1499,
-    calculations: 50,
-    displayOrder: 3,
-    isFree: false,
-    features: [
-      { featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" },
-      { featureKey: "obstruction_exclusion", label: "Obstruction Exclusion" },
-      { featureKey: "cable_routing", label: "AC & DC Cable Routing" },
-      { featureKey: "cable_measurements", label: "Cable Quantity Measurements" },
-      { featureKey: "energy_yield", label: "Energy Yield Analysis" },
-      { featureKey: "generation_estimates", label: "Plant Generation Estimates" },
-    ],
-  },
-]
 
 async function seed() {
   console.log("Seeding products...")
@@ -89,6 +25,7 @@ async function seed() {
         description: product.description,
         priceAmount: product.priceAmount,
         calculations: product.calculations,
+        projectQuota: product.projectQuota,
         stripePriceId: stripePriceId,
         displayOrder: product.displayOrder,
         isFree: product.isFree,
@@ -100,6 +37,7 @@ async function seed() {
         description: product.description,
         priceAmount: product.priceAmount,
         calculations: product.calculations,
+        projectQuota: product.projectQuota,
         stripePriceId: stripePriceId,
         displayOrder: product.displayOrder,
         isFree: product.isFree,

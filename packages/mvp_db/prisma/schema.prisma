@@ -70,6 +70,7 @@ model Product {
   priceAmount   Int
   priceCurrency String           @default("usd")
   calculations  Int
+  projectQuota  Int              @default(0)
   stripePriceId String           @unique
   displayOrder  Int              @default(0)
   active        Boolean          @default(true)
