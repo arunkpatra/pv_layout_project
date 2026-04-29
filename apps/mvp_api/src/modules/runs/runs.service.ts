@@ -1,6 +1,13 @@
 import { db } from "../../lib/db.js"
-import { NotFoundError } from "../../lib/errors.js"
+import { env } from "../../env.js"
+import { AppError, NotFoundError } from "../../lib/errors.js"
+import { getPresignedUploadUrl } from "../../lib/s3.js"
 import type { RunSummary } from "../projects/projects.service.js"
+import {
+  debitInTx,
+  findFeaturePool,
+} from "../usage/usage.service.js"
+import { RUN_RESULT_SPEC } from "../blobs/blobs.service.js"
 
 /**
  * List runs in a project. Verifies the project exists and belongs to the
@@ -42,4 +49,231 @@ export async function listRunsForProject(
     billedFeatureKey: r.billedFeatureKey,
     createdAt: r.createdAt.toISOString(),
   }))
+}
+
+const UPLOAD_URL_TTL_SECONDS = 900 // 15 min
+
+export interface CreateRunInput {
+  name: string
+  params: unknown
+  inputsSnapshot: unknown
+  billedFeatureKey: string
+  idempotencyKey: string
+}
+
+export interface RunWire {
+  id: string
+  projectId: string
+  name: string
+  params: unknown
+  inputsSnapshot: unknown
+  billedFeatureKey: string
+  usageRecordId: string
+  createdAt: string
+  deletedAt: string | null
+}
+
+export interface RunUploadDescriptor {
+  uploadUrl: string
+  blobUrl: string
+  expiresAt: string
+  type: "layout" | "energy"
+}
+
+export interface CreateRunResult {
+  run: RunWire
+  upload: RunUploadDescriptor
+}
+
+/**
+ * Map billedFeatureKey to the primary upload type returned alongside
+ * the new Run. Layout-class features → layout.json; energy-class
+ * features → energy.json. The desktop can call B7 separately for any
+ * additional uploads (DXF/PDF/KMZ exports).
+ */
+function uploadTypeFor(featureKey: string): "layout" | "energy" {
+  return featureKey === "energy_yield" ||
+    featureKey === "generation_estimates"
+    ? "energy"
+    : "layout"
+}
+
+interface RawRun {
+  id: string
+  projectId: string
+  name: string
+  params: unknown
+  inputsSnapshot: unknown
+  billedFeatureKey: string
+  usageRecordId: string
+  createdAt: Date
+  deletedAt: Date | null
+}
+
+function toRunWire(run: RawRun): RunWire {
+  return {
+    id: run.id,
+    projectId: run.projectId,
+    name: run.name,
+    params: run.params,
+    inputsSnapshot: run.inputsSnapshot,
+    billedFeatureKey: run.billedFeatureKey,
+    usageRecordId: run.usageRecordId,
+    createdAt: run.createdAt.toISOString(),
+    deletedAt: run.deletedAt?.toISOString() ?? null,
+  }
+}
+
+async function buildUploadDescriptor(
+  userId: string,
+  projectId: string,
+  runId: string,
+  featureKey: string,
+): Promise<RunUploadDescriptor> {
+  const type = uploadTypeFor(featureKey)
+  const spec = RUN_RESULT_SPEC[type]
+  const key = `projects/${userId}/${projectId}/runs/${runId}/${spec.filename}`
+  const bucket = env.MVP_S3_PROJECTS_BUCKET ?? "<unset>"
+  const uploadUrl = await getPresignedUploadUrl(
+    key,
+    spec.contentType,
+    UPLOAD_URL_TTL_SECONDS,
+    // No contentLength here — at create-time the desktop hasn't run the
+    // solver yet so size is unknown. B7 enforces caps when the desktop
+    // wants stricter signing.
+  )
+  if (!uploadUrl) {
+    throw new AppError(
+      "S3_NOT_CONFIGURED",
+      "Could not generate upload URL",
+      503,
+    )
+  }
+  return {
+    uploadUrl,
+    blobUrl: `s3://${bucket}/${key}`,
+    expiresAt: new Date(
+      Date.now() + UPLOAD_URL_TTL_SECONDS * 1000,
+    ).toISOString(),
+    type,
+  }
+}
+
+/**
+ * Create a Run for the project, atomically debiting one calc and
+ * persisting the (UsageRecord, Run) pair in a single transaction.
+ *
+ * Idempotency: if a UsageRecord with `(userId, idempotencyKey)`
+ * already exists AND has a Run linked to it, return that Run with a
+ * fresh upload URL — no new debit. The unique index from B2 makes
+ * concurrent retries race-safe; the loser catches P2002 and falls
+ * through to the same lookup.
+ *
+ * 404 NotFoundError on miss (project doesn't exist, soft-deleted, or
+ * not owned by the caller). 402 if no entitlement covers the feature.
+ * 400 if the feature key is unknown. 409 if the entitlement was
+ * deactivated between selection and the atomic decrement.
+ */
+export async function createRunForProject(
+  userId: string,
+  licenseKeyId: string,
+  projectId: string,
+  input: CreateRunInput,
+): Promise<CreateRunResult> {
+  // 1. Project ownership (404 cross-user-leakage-free)
+  const project = await db.project.findFirst({
+    where: { id: projectId, userId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!project) {
+    throw new NotFoundError("Project", projectId)
+  }
+
+  // 2. Idempotency pre-lookup — if this key already created a Run for
+  //    this user, return that Run with a freshly-signed upload URL.
+  const existing = await db.usageRecord.findFirst({
+    where: { userId, idempotencyKey: input.idempotencyKey },
+    include: { run: true },
+  })
+  if (existing?.run) {
+    const upload = await buildUploadDescriptor(
+      userId,
+      existing.run.projectId,
+      existing.run.id,
+      existing.run.billedFeatureKey,
+    )
+    return { run: toRunWire(existing.run), upload }
+  }
+
+  // 3. Resolve pool + validate feature (throws 400 / 402)
+  const { pool } = await findFeaturePool(userId, input.billedFeatureKey)
+
+  // 4. Atomic tx: debit + UsageRecord + Run, all-or-nothing
+  let createdRun: RawRun
+  try {
+    createdRun = await db.$transaction(async (tx) => {
+      const txClient = tx as unknown as Parameters<typeof debitInTx>[0] & {
+        run: {
+          create: (args: {
+            data: {
+              projectId: string
+              name: string
+              params: unknown
+              inputsSnapshot: unknown
+              billedFeatureKey: string
+              usageRecordId: string
+            }
+          }) => Promise<RawRun>
+        }
+      }
+      const ur = await debitInTx(
+        txClient,
+        pool,
+        userId,
+        licenseKeyId,
+        input.billedFeatureKey,
+        input.idempotencyKey,
+      )
+      return await txClient.run.create({
+        data: {
+          projectId,
+          name: input.name,
+          params: input.params,
+          inputsSnapshot: input.inputsSnapshot,
+          billedFeatureKey: input.billedFeatureKey,
+          usageRecordId: ur.id,
+        },
+      })
+    })
+  } catch (e) {
+    // Concurrent retry race — the loser's UsageRecord insert hits P2002
+    // on the (userId, idempotencyKey) unique. Re-look-up the now-existing
+    // record and return its Run.
+    if ((e as { code?: string }).code === "P2002") {
+      const recovered = await db.usageRecord.findFirst({
+        where: { userId, idempotencyKey: input.idempotencyKey },
+        include: { run: true },
+      })
+      if (recovered?.run) {
+        const upload = await buildUploadDescriptor(
+          userId,
+          recovered.run.projectId,
+          recovered.run.id,
+          recovered.run.billedFeatureKey,
+        )
+        return { run: toRunWire(recovered.run), upload }
+      }
+    }
+    throw e
+  }
+
+  // 5. Sign upload URL for the result file (layout.json or energy.json
+  //    depending on billedFeatureKey)
+  const upload = await buildUploadDescriptor(
+    userId,
+    createdRun.projectId,
+    createdRun.id,
+    createdRun.billedFeatureKey,
+  )
+  return { run: toRunWire(createdRun), upload }
 }

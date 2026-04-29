@@ -1,13 +1,31 @@
 import { db } from "../../lib/db.js"
 import { AppError } from "../../lib/errors.js"
 
-export async function reportUsage(
+/** Pool entitlement + the full sorted-by-displayOrder list (used for
+ *  remaining-calc math without a second DB round-trip). */
+export interface FeaturePool {
+  pool: {
+    id: string
+    productId: string
+    totalCalculations: number
+    usedCalculations: number
+  }
+  entitlements: Array<{
+    totalCalculations: number
+    usedCalculations: number
+  }>
+}
+
+/**
+ * Validate feature key + pick the cheapest non-exhausted entitlement
+ * that covers it. Shared between B9 (reportUsage) and B16
+ * (createRunForProject) so both paths agree exactly on which pool gets
+ * billed.
+ */
+export async function findFeaturePool(
   userId: string,
-  licenseKeyId: string,
   featureKey: string,
-  idempotencyKey?: string,
-): Promise<{ recorded: boolean; remainingCalculations: number }> {
-  // 1. Validate feature key exists in any product
+): Promise<FeaturePool> {
   const featureExists = await db.productFeature.findFirst({
     where: { featureKey },
   })
@@ -19,8 +37,9 @@ export async function reportUsage(
     )
   }
 
-  // 2. Select pool: cheapest-first (lowest displayOrder) with remaining > 0 and matching feature
-  // deactivatedAt: null enforces the kill switch — deactivated entitlements are never consumed
+  // Cheapest-first (lowest displayOrder), filtered to active entitlements.
+  // deactivatedAt: null enforces the kill switch — deactivated entitlements
+  // are never consumed.
   const entitlements = await db.entitlement.findMany({
     where: { userId, deactivatedAt: null },
     include: {
@@ -45,44 +64,107 @@ export async function reportUsage(
     )
   }
 
-  // 3. Atomic decrement: guard against concurrent race conditions
-  await db.$transaction(async (tx) => {
-    const rowsUpdated = await (
-      tx as unknown as {
-        $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<number>
-      }
-    ).$executeRaw`
-      UPDATE entitlements
-      SET "usedCalculations" = "usedCalculations" + 1
-      WHERE id = ${pool.id}
-        AND "usedCalculations" < "totalCalculations"
-        AND "deactivatedAt" IS NULL
-    `
+  return { pool, entitlements }
+}
 
-    if (rowsUpdated === 0) {
-      throw new AppError(
-        "CONFLICT",
-        "Calculation already in progress — retry",
-        409,
-      )
-    }
-
-    await tx.usageRecord.create({
+/** Loose tx client interface — narrows to the surface debitInTx needs.
+ *  Keeps the helper agnostic of the full Prisma client shape. */
+interface DebitTxClient {
+  $executeRaw: (
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<number>
+  usageRecord: {
+    create: (args: {
       data: {
-        userId,
-        licenseKeyId,
-        productId: pool.productId,
-        featureKey,
-        ...(idempotencyKey ? { idempotencyKey } : {}),
-      },
-    })
+        userId: string
+        licenseKeyId: string
+        productId: string
+        featureKey: string
+        idempotencyKey?: string
+      }
+    }) => Promise<{ id: string }>
+  }
+}
+
+/**
+ * Atomically debit one calc from `pool` and write a UsageRecord — must
+ * run inside an active `db.$transaction`. The UPDATE guards against
+ * concurrent decrement races; the UsageRecord insert with
+ * idempotencyKey lets B9/B16 catch P2002 from a concurrent retry.
+ *
+ * Throws 409 CONFLICT if the entitlement was deactivated or exhausted
+ * between selection (findFeaturePool) and this UPDATE.
+ */
+export async function debitInTx(
+  tx: DebitTxClient,
+  pool: { id: string; productId: string },
+  userId: string,
+  licenseKeyId: string,
+  featureKey: string,
+  idempotencyKey?: string,
+): Promise<{ id: string }> {
+  const rowsUpdated = await tx.$executeRaw`
+    UPDATE entitlements
+    SET "usedCalculations" = "usedCalculations" + 1
+    WHERE id = ${pool.id}
+      AND "usedCalculations" < "totalCalculations"
+      AND "deactivatedAt" IS NULL
+  `
+
+  if (rowsUpdated === 0) {
+    throw new AppError(
+      "CONFLICT",
+      "Calculation already in progress — retry",
+      409,
+    )
+  }
+
+  return await tx.usageRecord.create({
+    data: {
+      userId,
+      licenseKeyId,
+      productId: pool.productId,
+      featureKey,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+    },
+  })
+}
+
+export async function reportUsage(
+  userId: string,
+  licenseKeyId: string,
+  featureKey: string,
+  idempotencyKey?: string,
+): Promise<{ recorded: boolean; remainingCalculations: number }> {
+  const { pool, entitlements } = await findFeaturePool(userId, featureKey)
+
+  await db.$transaction(async (tx) => {
+    await debitInTx(
+      tx as unknown as DebitTxClient,
+      pool,
+      userId,
+      licenseKeyId,
+      featureKey,
+      idempotencyKey,
+    )
   })
 
-  // 4. Compute remaining from already-loaded entitlements, subtracting the one just consumed.
-  // Avoids a second DB round-trip that could race with concurrent decrements.
-  const totalCalculations = entitlements.reduce((sum, e) => sum + e.totalCalculations, 0)
-  const usedCalculations = entitlements.reduce((sum, e) => sum + e.usedCalculations, 0)
-  const remainingCalculations = Math.max(0, totalCalculations - usedCalculations - 1)
+  // Compute remaining from already-loaded entitlements, subtracting the
+  // one just consumed. Avoids a second DB round-trip that could race
+  // with concurrent decrements.
+  const totalCalculations = entitlements.reduce(
+    (sum, e) => sum + e.totalCalculations,
+    0,
+  )
+  const usedCalculations = entitlements.reduce(
+    (sum, e) => sum + e.usedCalculations,
+    0,
+  )
+  const remainingCalculations = Math.max(
+    0,
+    totalCalculations - usedCalculations - 1,
+  )
   return { recorded: true, remainingCalculations }
 }
 
