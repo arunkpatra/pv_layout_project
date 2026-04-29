@@ -97,8 +97,13 @@ def _run_legacy_pipeline(kmz_path: Path):
     )
     t_layout = time.perf_counter() - t0
 
+    # Filter out boundaries with no usable polygon (e.g., layout-engine
+    # error paths emit empty LayoutResult with usable_polygon=None).
+    # Returning only valid results keeps the contract with _aggregate_results
+    # explicit — error-path LayoutResults don't pollute the totals.
     t_la = 0.0
     t_cables = 0.0
+    valid_results = []
     for r in results:
         if r.usable_polygon is None:
             continue
@@ -111,13 +116,15 @@ def _run_legacy_pipeline(kmz_path: Path):
         place_string_inverters(r, params)
         t_cables += time.perf_counter() - t0
 
+        valid_results.append(r)
+
     timings = {
         "parse_s": round(t_parse, 3),
         "layout_s": round(t_layout, 3),
         "la_s": round(t_la, 3),
         "cables_s": round(t_cables, 3),
     }
-    return results, timings
+    return valid_results, timings
 
 
 def _serialize_cable(cr) -> Dict[str, Any]:
