@@ -6,6 +6,7 @@ import { AppError } from "../../lib/errors.js"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 import {
   createRunForProject,
+  getRunDetail,
   listRunsForProject,
 } from "./runs.service.js"
 
@@ -20,6 +21,16 @@ runsRoutes.get("/v2/projects/:id/runs", async (c) => {
   const user = c.get("user")
   const runs = await listRunsForProject(user.id, c.req.param("id"))
   return c.json(ok(runs))
+})
+
+runsRoutes.get("/v2/projects/:id/runs/:runId", async (c) => {
+  const user = c.get("user")
+  const detail = await getRunDetail(
+    user.id,
+    c.req.param("id"),
+    c.req.param("runId"),
+  )
+  return c.json(ok(detail))
 })
 
 const CreateRunSchema = z.object({

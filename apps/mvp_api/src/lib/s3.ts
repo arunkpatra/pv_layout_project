@@ -32,14 +32,16 @@ export async function getPresignedDownloadUrl(
   key: string,
   filename: string,
   expiresIn = 3600,
+  bucket?: string,
 ): Promise<string | null> {
   const client = getS3()
-  if (!client || !env.MVP_S3_DOWNLOADS_BUCKET) return null
+  const targetBucket = bucket ?? env.MVP_S3_DOWNLOADS_BUCKET
+  if (!client || !targetBucket) return null
 
   return getSignedUrl(
     client,
     new GetObjectCommand({
-      Bucket: env.MVP_S3_DOWNLOADS_BUCKET,
+      Bucket: targetBucket,
       Key: key,
       ResponseContentDisposition: `attachment; filename="${filename}"`,
     }),

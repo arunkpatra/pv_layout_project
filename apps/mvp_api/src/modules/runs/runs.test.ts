@@ -57,6 +57,26 @@ const mockRunFindMany = mock(
   async (..._args: unknown[]): Promise<MockRun[]> => [],
 )
 
+interface MockRunDetail {
+  id: string
+  projectId: string
+  name: string
+  params: unknown
+  inputsSnapshot: unknown
+  layoutResultBlobUrl: string | null
+  energyResultBlobUrl: string | null
+  exportsBlobUrls: unknown
+  billedFeatureKey: string
+  usageRecordId: string
+  createdAt: Date
+  deletedAt: Date | null
+  project: { userId: string }
+}
+
+const mockRunDetailFindFirst = mock(
+  async (..._args: unknown[]): Promise<MockRunDetail | null> => null,
+)
+
 const mockUsageRecordFindFirst = mock(
   async (..._args: unknown[]): Promise<{
     id: string
@@ -162,8 +182,17 @@ const mockGetPresignedUploadUrl = mock(
     "https://s3.example.com/signed-put?sig=run-result",
 )
 
+const mockGetPresignedDownloadUrl = mock(
+  async (
+    key: string,
+    _filename: string,
+    _expiresIn?: number,
+    _bucket?: string,
+  ): Promise<string | null> => `https://s3.example.com/signed-get?key=${key}`,
+)
+
 mock.module("../../lib/s3.js", () => ({
-  getPresignedDownloadUrl: async () => null,
+  getPresignedDownloadUrl: mockGetPresignedDownloadUrl,
   getPresignedUploadUrl: mockGetPresignedUploadUrl,
 }))
 
@@ -181,7 +210,11 @@ mock.module("../../lib/db.js", () => ({
   db: {
     licenseKey: { findFirst: async () => mockLicenseKey },
     project: { findFirst: mockProjectFindFirst },
-    run: { findMany: mockRunFindMany, create: mockRunCreate },
+    run: {
+      findMany: mockRunFindMany,
+      findFirst: mockRunDetailFindFirst,
+      create: mockRunCreate,
+    },
     usageRecord: {
       findFirst: mockUsageRecordFindFirst,
       create: mockUsageRecordCreate,
@@ -600,5 +633,150 @@ describe("POST /v2/projects/:id/runs", () => {
       idempotencyKey: "idem-create-run-1",
     })
     expect(call?.[0]?.include?.run).toBe(true)
+  })
+})
+
+// ─── B17 — GET /v2/projects/:id/runs/:runId ──────────────────────────────────
+
+interface RunDetailWire {
+  id: string
+  projectId: string
+  name: string
+  params: unknown
+  inputsSnapshot: unknown
+  layoutResultBlobUrl: string | null
+  energyResultBlobUrl: string | null
+  exportsBlobUrls: unknown[]
+  billedFeatureKey: string
+  usageRecordId: string
+  createdAt: string
+  deletedAt: string | null
+}
+
+const getRun = (projectId: string, runId: string) =>
+  makeApp().request(`/v2/projects/${projectId}/runs/${runId}`, {
+    headers: { Authorization: "Bearer sl_live_testkey" },
+  })
+
+const baseRun: MockRunDetail = {
+  id: "run_x",
+  projectId: "prj_x",
+  name: "Run X",
+  params: { rows: 4, cols: 4 },
+  inputsSnapshot: { kmzSha256: "0".repeat(64) },
+  layoutResultBlobUrl: null,
+  energyResultBlobUrl: null,
+  exportsBlobUrls: [],
+  billedFeatureKey: "plant_layout",
+  usageRecordId: "ur_x",
+  createdAt: new Date("2026-04-15T12:00:00Z"),
+  deletedAt: null,
+  project: { userId: "usr_test1" },
+}
+
+describe("GET /v2/projects/:id/runs/:runId", () => {
+  beforeEach(() => {
+    mockRunDetailFindFirst.mockReset()
+    mockRunDetailFindFirst.mockImplementation(async () => ({ ...baseRun }))
+    mockGetPresignedDownloadUrl.mockClear()
+    mockGetPresignedDownloadUrl.mockImplementation(
+      async (key: string) => `https://s3.example.com/signed-get?key=${key}`,
+    )
+  })
+
+  it("returns 200 + full Run row with layout URL signed (layout-class feature)", async () => {
+    const res = await getRun("prj_x", "run_x")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.id).toBe("run_x")
+    expect(body.data.projectId).toBe("prj_x")
+    expect(body.data.name).toBe("Run X")
+    expect(body.data.params).toEqual({ rows: 4, cols: 4 })
+    expect(body.data.inputsSnapshot).toEqual({ kmzSha256: "0".repeat(64) })
+    expect(body.data.billedFeatureKey).toBe("plant_layout")
+    expect(body.data.usageRecordId).toBe("ur_x")
+    expect(body.data.createdAt).toBe(baseRun.createdAt.toISOString())
+    expect(body.data.deletedAt).toBeNull()
+    // Layout URL signed against the conventional key path
+    expect(body.data.layoutResultBlobUrl).toContain(
+      "/runs/run_x/layout.json",
+    )
+    // Energy URL null for layout-class feature
+    expect(body.data.energyResultBlobUrl).toBeNull()
+    // exportsBlobUrls is [] for v1
+    expect(body.data.exportsBlobUrls).toEqual([])
+  })
+
+  it("energy-class feature: BOTH layoutResultBlobUrl AND energyResultBlobUrl set", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => ({
+      ...baseRun,
+      billedFeatureKey: "energy_yield",
+    }))
+    const res = await getRun("prj_x", "run_x")
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.layoutResultBlobUrl).toContain(
+      "/runs/run_x/layout.json",
+    )
+    expect(body.data.energyResultBlobUrl).toContain(
+      "/runs/run_x/energy.json",
+    )
+  })
+
+  it("generation_estimates also gets both layout + energy URLs", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => ({
+      ...baseRun,
+      billedFeatureKey: "generation_estimates",
+    }))
+    const res = await getRun("prj_x", "run_x")
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.layoutResultBlobUrl).not.toBeNull()
+    expect(body.data.energyResultBlobUrl).not.toBeNull()
+  })
+
+  it("signs against the projects bucket (4th arg = MVP_S3_PROJECTS_BUCKET)", async () => {
+    await getRun("prj_x", "run_x")
+    const call = mockGetPresignedDownloadUrl.mock.calls[0]
+    // Args: (key, filename, expiresIn?, bucket?)
+    expect(call?.[3]).toBe("solarlayout-test-projects")
+  })
+
+  it("returns 404 when the run doesn't exist", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await getRun("prj_x", "run_nope")
+    expect(res.status).toBe(404)
+    expect(mockGetPresignedDownloadUrl).not.toHaveBeenCalled()
+  })
+
+  it("returns 404 when the run belongs to another user (where filter excludes)", async () => {
+    // The where filter joins through project.userId, so a different user's
+    // run produces null from findFirst.
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await getRun("prj_x", "run_other")
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when the run is soft-deleted", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await getRun("prj_x", "run_deleted")
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when the parent project is soft-deleted (cascade-aware where filter)", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await getRun("prj_deleted", "run_x")
+    expect(res.status).toBe(404)
+  })
+
+  it("scopes the lookup with where: { id, projectId, deletedAt: null, project: { userId, deletedAt: null } }", async () => {
+    await getRun("prj_x", "run_x")
+    const call = mockRunDetailFindFirst.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      id: "run_x",
+      projectId: "prj_x",
+      deletedAt: null,
+      project: { userId: "usr_test1", deletedAt: null },
+    })
   })
 })

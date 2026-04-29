@@ -1,7 +1,10 @@
 import { db } from "../../lib/db.js"
 import { env } from "../../env.js"
 import { AppError, NotFoundError } from "../../lib/errors.js"
-import { getPresignedUploadUrl } from "../../lib/s3.js"
+import {
+  getPresignedDownloadUrl,
+  getPresignedUploadUrl,
+} from "../../lib/s3.js"
 import type { RunSummary } from "../projects/projects.service.js"
 import {
   debitInTx,
@@ -276,4 +279,84 @@ export async function createRunForProject(
     createdRun.billedFeatureKey,
   )
   return { run: toRunWire(createdRun), upload }
+}
+
+const READ_URL_TTL_SECONDS = 3600 // 1 hour
+
+function isEnergyClass(featureKey: string): boolean {
+  return (
+    featureKey === "energy_yield" || featureKey === "generation_estimates"
+  )
+}
+
+export interface RunDetailWire extends RunWire {
+  /** Presigned GET URL for layout.json. Always set (every run produces
+   *  a layout). May 404 on read if the desktop hasn't uploaded yet. */
+  layoutResultBlobUrl: string | null
+  /** Presigned GET URL for energy.json. Set only for energy-class
+   *  features (energy_yield, generation_estimates); null otherwise. */
+  energyResultBlobUrl: string | null
+  /** v1 always returns []. Future: list of {type, url} for any
+   *  exports the desktop has registered (no register-export endpoint
+   *  yet — desktop calls B7 directly for export uploads). */
+  exportsBlobUrls: unknown[]
+}
+
+/**
+ * Full Run details for the desktop. Returns the Run row + presigned
+ * GET URLs for the result blobs (layout.json always; energy.json only
+ * for energy-class features). URLs are signed at request time against
+ * the conventional key path, so they're always valid for 1 hour even
+ * if the desktop never explicitly registered the upload.
+ *
+ * 404 NotFoundError if: run doesn't exist, soft-deleted, parent project
+ * is soft-deleted, or run belongs to another user (joined through
+ * Run.project.userId).
+ */
+export async function getRunDetail(
+  userId: string,
+  projectId: string,
+  runId: string,
+): Promise<RunDetailWire> {
+  const run = await db.run.findFirst({
+    where: {
+      id: runId,
+      projectId,
+      deletedAt: null,
+      project: { userId, deletedAt: null },
+    },
+  })
+  if (!run) {
+    throw new NotFoundError("Run", runId)
+  }
+
+  const bucket = env.MVP_S3_PROJECTS_BUCKET
+  const layoutKey = `projects/${userId}/${projectId}/runs/${runId}/layout.json`
+  const energyKey = `projects/${userId}/${projectId}/runs/${runId}/energy.json`
+
+  const layoutResultBlobUrl = bucket
+    ? await getPresignedDownloadUrl(
+        layoutKey,
+        "layout.json",
+        READ_URL_TTL_SECONDS,
+        bucket,
+      )
+    : null
+  const energyResultBlobUrl = isEnergyClass(run.billedFeatureKey)
+    ? bucket
+      ? await getPresignedDownloadUrl(
+          energyKey,
+          "energy.json",
+          READ_URL_TTL_SECONDS,
+          bucket,
+        )
+      : null
+    : null
+
+  return {
+    ...toRunWire(run as RawRun),
+    layoutResultBlobUrl,
+    energyResultBlobUrl,
+    exportsBlobUrls: [],
+  }
 }
