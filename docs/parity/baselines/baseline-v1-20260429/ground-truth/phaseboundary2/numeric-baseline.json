@@ -1,7 +1,8 @@
 {
   "plant": "phaseboundary2",
   "baseline": "baseline-v1-20260429",
-  "captured_at": "2026-04-29T14:44:17+0530",
+  "legacy_sha_at_capture": "397aa2ab460d8f773376f51b393407e5be67dca0",
+  "captured_at": "2026-04-29T15:28:43+0530",
   "legacy_repo": "/Users/arunkpatra/codebase/PVlayout_Advance",
   "params_summary": {
     "enable_cable_calc": true,
@@ -15,7 +16,7 @@
     "parse_s": 0.001,
     "layout_s": 0.04,
     "la_s": 0.012,
-    "cables_s": 0.426
+    "cables_s": 0.423
   },
   "counts": {
     "placed_tables": 611,

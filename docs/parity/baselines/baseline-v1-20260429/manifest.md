@@ -1,9 +1,12 @@
 # Baseline: baseline-v1-20260429
 
-**Legacy commit:** `9362083` (`feat: SAT energy fix, GHI file format hint, cable/DXF/edition improvements`)
-**Legacy branch:** `baseline-v1-20260429` on `/Users/arunkpatra/codebase/PVlayout_Advance`
-**Captured:** 2026-04-29 (see `captured_at` in each `numeric-baseline.json`)
-**Captured by:** `python/pvlayout_engine/scripts/parity/capture_legacy_baseline.py` (run in P0 Task 2)
+**Authority:** legacy branch `baseline-v1-20260429` on `/Users/arunkpatra/codebase/PVlayout_Advance`. The branch is the source of truth; SHA snapshots are taken at each capture for audit trail.
+
+**HEAD SHA at last capture:** `397aa2ab460d8f773376f51b393407e5be67dca0` (resolved 2026-04-29; recorded in each `numeric-baseline.json` under `legacy_sha_at_capture`).
+
+**Cable-functions origin:** commit `9362083` (`feat: SAT energy fix, GHI file format hint, cable/DXF/edition improvements`, 2026-04-25) within this branch's history. This is when `_bundle_dc_cables`, `_route_ac_mst`, `_build_mst_edges`, `_calc_individual_ac_total` were introduced into legacy.
+
+**Captured by:** `python/pvlayout_engine/scripts/parity/capture_legacy_baseline.py` (P0 Task 2).
 
 ## Plants captured
 
@@ -26,9 +29,9 @@
 | `total_ac_cable_m` | 12,974.5 |
 
 DC cable structure breakdown (from JSON inspection):
-- 135 horizontal collectors (rows where bundling succeeded, the collector cable spans the row)
+- 135 horizontal collectors (rows where bundling succeeded; the collector cable spans the row)
 - 210 vertical-only cables (likely trunks from collector to inverter)
-- 259 mixed (per-table fallback when horizontal collector path was blocked, plus other paths)
+- 259 mixed (per-table fallback when horizontal-collector path was blocked, plus other paths)
 
 The `_bundle_dc_cables` function IS firing as designed — the 135 horizontal collectors prove it. The remaining cables are per-table fallbacks where the horizontal-collector path failed `_path_ok` (probably blocked by polygon geometry).
 
@@ -53,17 +56,11 @@ These are the same defaults the GUI input panel ships with — what a customer r
 
 Capture on `complex-plant-layout.kmz` was attempted on 2026-04-29 and killed after >20 min wall-clock without completing. Likely cause: the plant is much larger and has multiple distinct plots, and legacy at this baseline lacks the S11.5 search-space caps — so the per-cable AC quantity routing in `_calc_individual_ac_total` runs N inverter routes through uncapped Pattern A4 (49² candidates) and Pattern B (113² candidates) per cable, which compounds badly on large plants.
 
-Workaround options for future:
-1. Patch legacy temporarily with the S11.5 caps before capturing — measurable change but requires a one-off legacy commit.
-2. Add a runtime timeout to the capture script and ship partial results.
-3. Use a smaller third reference plant.
-4. Wait for Tasks 5/6 to port bundling/MST into the new project, then capture from the new project's pipeline (legacy's bundling is what makes new app's path fast); but this defeats the purpose of capturing LEGACY ground truth.
-
-P0 proceeds with `phaseboundary2` only as the parity gate. `complex-plant-layout` is tracked as a separate issue outside P0 scope.
+P0 proceeds with `phaseboundary2` only. `complex-plant-layout` is tracked as a separate issue outside P0 scope — to be revisited once Tasks 5/6 land bundling/MST in the new project (which dramatically reduces cable count and may make legacy capture tractable too if the legacy MST path runs faster than its per-cable individual quantity calculation).
 
 ## Visual + export ground truth
 
-P0 Task 3 captures legacy GUI screenshots + KMZ/PDF/DXF exports. **Not yet captured.** When complete, artifacts will land at:
+P0 Task 3 captures legacy GUI screenshots + KMZ/PDF/DXF exports. **Not yet captured (Arun's manual task).** When complete, artifacts will land at:
 
 - `ground-truth/phaseboundary2/screenshots/legacy-cables-on.png`
 - `ground-truth/phaseboundary2/screenshots/legacy-cables-off.png`
@@ -79,13 +76,13 @@ See `docs/parity/PLAN.md` §4. Summary:
 - `total_dc_cable_m` / `total_ac_cable_m`: ±0.1 m
 - Per-cable polylines: ±0.001 m
 
-These will fail until Tasks 5/6 of P0 land (the bundled DC + MST AC port). They may STILL fail after Tasks 5/6 because commit `9362083` changed many other files (`la_manager.py` 248 lines, `layout_engine.py` 38 lines, `models/project.py` 31 lines, plus 11 new files) — see "Wider drift than expected" below.
+These will fail until Tasks 5/6 of P0 land (the bundled DC + MST AC port). They may STILL fail after Tasks 5/6 because of broader drift between the vendored core and current baseline — see `docs/parity/BACKLOG.md`.
 
-## Wider drift than expected
+## Wider drift beyond P0
 
-Discovered during P0 Task 2 capture: commit `9362083` is much wider than just cable functions. Total: **+4,668 / -493** lines across 21 files. This means the new project's vendored `pvlayout_core/` (commit `8b352b7`) is missing far more than the four cable functions — including LA placement changes, layout engine tweaks, model additions, and 11 entirely new modules.
+P0 ports four cable functions. The cumulative drift between the new project's vendored core and this baseline is **much wider** — it includes LA placement changes, layout-engine adjustments, KMZ-parser water-body autodetection, energy-model upgrades, two new modules (`satellite_water_detector.py`, `tracker_layout_engine.py`), and more. See [`docs/parity/BACKLOG.md`](../../BACKLOG.md) for the full enumeration.
 
-Implication: P0's planned Tasks 5/6 (port cable functions) close the cable-routing parity gap but **may not close the broader drift**. The parity test may stay RED on counts (la count, table count) even after Tasks 5/6 land. This is a re-scoping concern for the team — flagged for Arun + Prasanta discussion before P0 close.
+P0 stays narrow (per Q7 + Prasanta's "systematic, eventual" framing). Subsequent parity-spikes (P2 onward) work through BACKLOG entries; P1 sync skill produces draft discovery memos for each.
 
 ## Re-capture procedure
 
@@ -99,3 +96,5 @@ uv run python scripts/parity/capture_legacy_baseline.py \
     --baseline baseline-v1-20260429 \
     --out-root /Users/arunkpatra/codebase/pv_layout_project/docs/parity/baselines
 ```
+
+The script resolves the legacy HEAD SHA automatically and records it in `numeric-baseline.json`. If the SHA differs from `397aa2a`, that's a re-baseline event — note the new SHA in this manifest, regenerate any dependent test fixtures, and re-run parity tests.

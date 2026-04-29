@@ -1,7 +1,7 @@
 # Finding 003 — `CableRun.route_quality` field
 
 **Date:** 2026-04-29
-**Sync run:** new project commit `6fd3c6e` vs legacy `baseline-v1-20260429` (`9362083`)
+**Sync run:** new project commit `6fd3c6e` vs legacy branch `baseline-v1-20260429` (HEAD `397aa2a` at capture)
 **Status:** triaged
 **For:** Prasanta (solar-domain authority); discussion via Arun's daily comms.
 

@@ -2,7 +2,7 @@
 
 **Status:** active (draft v0.2, 2026-04-29)
 **Owners:** Arun Patra (software-engineering authority; full repo access); Prasanta Patra (co-founder; solar-engineering authority; VP Engineering); Claude (agentic, Anthropic Claude Code)
-**Baseline:** legacy branch `baseline-v1-20260429` / commit `9362083` (re-baselined per parity-spike close)
+**Baseline:** legacy branch `baseline-v1-20260429` is the authority; current HEAD `397aa2a` (resolved 2026-04-29 capture). Re-baseline at parity-spike close. Cable functions originate in commit `9362083` within this branch's history.
 **Goal:** achieve enough parity to retire `PVlayout_Advance` and ship `pv_layout_project` as the single product
 **Anchor:** read this file at the start of any session that touches parity work. Linked from `CLAUDE.md` §2.
 
@@ -18,8 +18,10 @@
 | Status | Active — pre-P0 |
 | Active spike | (none yet — first is P0 below) |
 | Last sync run | (none — sync skill lands in P1) |
-| Baseline branch | `baseline-v1-20260429` on `/Users/arunkpatra/codebase/PVlayout_Advance` |
-| Baseline commit | `9362083` (2026-04-25) |
+| Baseline branch | `baseline-v1-20260429` on `/Users/arunkpatra/codebase/PVlayout_Advance` (the authority — captures track HEAD) |
+| Baseline HEAD at last capture | `397aa2a` (resolved 2026-04-29; recorded in each `numeric-baseline.json`'s `legacy_sha_at_capture`) |
+| Cable-functions origin | commit `9362083` (2026-04-25) within this branch's history — when `_bundle_dc_cables` / `_route_ac_mst` etc. were introduced |
+| Cumulative drift | see [`docs/parity/BACKLOG.md`](./BACKLOG.md) — drift between vendor (`pv_layout_project@8b352b7` ≈ legacy `43f27d9`) and current baseline HEAD |
 | Reference plants | `phaseboundary2.kmz`, `complex-plant-layout.kmz` (both at `python/pvlayout_engine/tests/golden/kmz/`) + synthetic targeted set (built in P1) |
 | Pace | aggressive (Q7 = A); ~4–6 weeks total; pause all non-parity forward work |
 | Approach | B (quick-win port → sync skill + inventory → close findings → visual + `route_quality` → retirement-readiness → sunset) |
@@ -75,7 +77,7 @@ From the 2026-04-29 brainstorming interview (8 questions + visual fingerprint ad
 | # | Topic | Locked answer |
 |---|---|---|
 | 1 | **Parity scope** | Tiered, with bidirectional alignment. `pvlayout_core/` defaults to legacy (algorithms, data shapes, function inventory) **unless an explicit discovery in the new project argues otherwise** (e.g., S11.5 Pattern V fixed a real boundary-violation bug). New-project discoveries are first-class — captured as discovery memos for Prasanta's joint evaluation, not silent divergence. UI/UX and rendering presentation stay the new project's call. Numeric outputs must match unless an explicit divergence is documented. |
-| 2 | **Legacy baseline** | Branch `baseline-v1-20260429` / commit `9362083`. Re-baseline at the close of each parity-spike. |
+| 2 | **Legacy baseline** | Branch `baseline-v1-20260429` is the authority; HEAD SHA recorded at each capture (currently `397aa2a` as of 2026-04-29). Re-baseline at the close of each parity-spike. Cumulative drift between vendor era and baseline HEAD tracked in `docs/parity/BACKLOG.md`. |
 | 3 | **Reference plants** | Real: `phaseboundary2.kmz` + `complex-plant-layout.kmz`. Synthetic: targeted KMZs built in P1 to force specific patterns deterministically. |
 | 4 | **Verification artifacts** | Tiered. Synthetics → numeric + pattern-distribution only (run in pytest). Real plants → numeric + serialized geometry as committed JSON fixtures (automated diff) + one-time-per-baseline screenshot/KMZ/PDF/DXF capture as static evidence + visual side-by-side screenshots required at gate close. |
 | — | **Tolerances** | Counts: exact. Pattern distribution: exact. `total_dc_cable_m` / `total_ac_cable_m`: ±0.1 m. Per-cable `length_m`: ±0.1 m. Per-cable `route_utm` polyline coordinates: ±0.001 m. |
@@ -383,8 +385,8 @@ Estimates are elapsed calendar days, mostly user verification + decision time gi
 
 ```json
 {
-  "last_baselined_legacy_commit": "9362083abc...",
   "last_baselined_legacy_branch": "baseline-v1-20260429",
+  "last_baselined_legacy_sha": "397aa2ab460d8f773376f51b393407e5be67dca0",
   "last_run_at": "2026-04-29T11:56:00+05:30",
   "vendored_into_commit": "8b352b7def..."
 }
@@ -468,8 +470,14 @@ What was actually done. Cross-reference to commit / spike / engineer reply.
 
 ### Memory entries (already in place)
 
-- `project_parity_baseline.md` — the baseline pointer (legacy branch + commit + reasoning).
+- `project_parity_baseline.md` — the baseline pointer (legacy branch + HEAD SHA + reasoning).
 - `user_working_style.md` — Rule 6 (agentic-coding pace; user time is the bottleneck).
+- `project_cofounder_partnership.md` — Arun + Prasanta partnership context; Prasanta's free-hand authorization on prioritization.
+- `reference_backend_repo.md` — pointer to the renewable_energy mvp_* backend (relevant only at P4 retirement-readiness).
+
+### Drift backlog
+
+[`docs/parity/BACKLOG.md`](./BACKLOG.md) — living document enumerating cumulative drift (`vendor..baseline`) beyond P0's narrow cable-functions scope. Populated by hand during P0; will be refined / expanded by P1 sync skill output.
 
 ### Spike-plan restructure (post-PLAN.md approval)
 
@@ -492,6 +500,8 @@ These edits are NOT part of this document; they're a downstream task tracked in 
 - **`/parity-sync` skill plugin location** — `.claude/skills/parity-sync/`? Or under an existing plugin namespace? Decide in P1 based on project skill-plugin conventions.
 - **Legacy commits arriving mid-spike** — proposed: ignore until current parity-spike closes; capture in next sync run. Alternative: pause current spike if the legacy commit invalidates in-progress work. Default to "ignore unless catastrophic."
 - ~~**Engineer messaging cadence**~~ — **resolved (v0.2):** no formal cadence. Arun discusses findings with Prasanta directly via their daily phone + WhatsApp comms. I produce technical memos as artifacts in `docs/parity/findings/`; Arun routes content as appropriate. No I-draft-you-send formality between co-founders.
+- ~~**Wider drift than expected**~~ — **resolved (v0.3, P0 Task 2):** legacy commit `9362083` (cable functions) is much wider than just cable code, AND additional legacy commits (water-body autodetection in `9c751b7`, DXF improvements in `fc1a5c5`, etc.) sit between vendor era and baseline HEAD `397aa2a`. Cumulative drift is tracked in [`docs/parity/BACKLOG.md`](./BACKLOG.md). P0 stays narrow per Q7 + Prasanta's "systematic, eventual" framing. P1 sync skill enumerates everything mechanically.
+- ~~**Baseline reference notation**~~ — **resolved (v0.3):** branch `baseline-v1-20260429` is the authority; resolved SHA-at-capture (currently `397aa2a`) is recorded in each `numeric-baseline.json`'s `legacy_sha_at_capture` field for audit trail. Documentation uses "branch X (HEAD `<sha>` at capture)" notation.
 - **CI integration of parity tests** — once geometry diff harness exists, should it run on every PR? Proposed yes from P1 onward; protects against regression. Cost: CI time. Decide if cost is real.
 - **Real-plant numeric baselines re-capture** — when we re-baseline at end of each parity-spike, do we re-capture full ground truth or only re-run the JSON fixture diff? Proposed: re-capture screenshots on every baseline; re-capture exports only when a parity-spike's changes touch export code paths.
 

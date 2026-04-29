@@ -23,10 +23,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List
+
+
+def _resolve_legacy_sha(legacy_repo: Path) -> str:
+    """Capture the resolved HEAD SHA of the legacy repo for audit trail.
+    Branch is the moving authority; SHA is the snapshot at capture time."""
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(legacy_repo), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+    except Exception as e:
+        return f"<unresolved: {e}>"
 
 
 def _bootstrap_legacy(legacy_repo: Path) -> None:
@@ -208,9 +221,12 @@ def main() -> int:
     # (PVLAYOUT_PATTERN_STATS is an S11.5 addition to the new project). Emit cable
     # counts only; pattern distribution will be captured in P1 once we have it on
     # both sides.
+    legacy_sha = _resolve_legacy_sha(args.legacy_repo)
+
     payload = {
         "plant": args.plant,
         "baseline": args.baseline,
+        "legacy_sha_at_capture": legacy_sha,
         "captured_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "legacy_repo": str(args.legacy_repo),
         "params_summary": {

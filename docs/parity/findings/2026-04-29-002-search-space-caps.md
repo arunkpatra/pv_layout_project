@@ -1,7 +1,7 @@
 # Finding 002 — Search-space caps in `_route_ac_cable` patterns A2–E
 
 **Date:** 2026-04-29
-**Sync run:** new project commit `9447788` vs legacy `baseline-v1-20260429` (`9362083`)
+**Sync run:** new project commit `9447788` vs legacy branch `baseline-v1-20260429` (HEAD `397aa2a` at capture)
 **Status:** triaged
 **For:** Prasanta (solar-domain authority); discussion via Arun's daily comms.
 
