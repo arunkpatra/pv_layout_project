@@ -107,6 +107,15 @@ def export_pdf(
     if isinstance(results, LayoutResult):
         results = [results]
 
+    # Strip water bodies, obstacles and failed/empty results so they never
+    # appear in any PDF summary or energy table — only real plant results shown.
+    results = [
+        r for r in results
+        if not getattr(r, "is_water", False)
+        and getattr(r, "utm_epsg", 0)
+        and r.placed_tables   # must have at least one placed table
+    ]
+
     with PdfPages(output_path) as pdf:
 
         # ---- Page 1: Layout plot ----------------------------------------
@@ -245,7 +254,7 @@ def _build_summary_figure(
 
     # Build column header list for this edition
     col_headers = ["Plant", "Area\n(acres)", "MMS-\nTables", "Modules",
-                   "Cap.\n(MWp)", "Tilt\n(°)", "Pitch\n(m)", "GCR", "ICR"]
+                   "Cap.\n(MWp)", "Tilt\n(°)", "Pitch\n(m)", "ICR"]
     if _is_ci:
         col_headers += ["SMBs", "SMB\n(kWp)", "C.Inv.", "C.Inv\n(kWp)"]
     else:
@@ -268,7 +277,6 @@ def _build_summary_figure(
             f"{r.total_capacity_mwp:.4f}",
             f"{r.tilt_angle_deg:.1f}{tilt_note}",
             f"{r.row_pitch_m:.2f}{pitch_note}",
-            f"{r.gcr_achieved:.3f}",
             f"{len(r.placed_icrs)}",
         ]
         if _is_ci:
@@ -301,7 +309,7 @@ def _build_summary_figure(
             f"{sum(len(r.placed_tables) for r in results):,}",
             f"{sum(r.total_modules for r in results):,}",
             f"{_tot_dc:.4f}",
-            "", "", "",
+            "", "",
             f"{sum(len(r.placed_icrs) for r in results)}",
         ]
         if _is_ci:

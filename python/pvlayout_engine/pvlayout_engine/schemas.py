@@ -495,6 +495,26 @@ class ExportDxfRequest(_Model):
     include_cables: bool = True
 
 
+class ExportPdfRequest(_Model):
+    """POST /export-pdf body — multi-result layout to PDF (summary pages).
+
+    Page 1 of legacy's PDF is the live matplotlib layout plot; the new
+    app has no server-side equivalent yet, so the sidecar PDF starts at
+    the Summary page (legacy's page 2). Pages 2-4 (Summary, Energy,
+    25-yr Forecast) are produced in full when energy_params is provided.
+    Energy/25-yr pages are skipped when energy_params is None.
+
+    `edition` is the lowercase string value of pvlayout_core.core.edition.Edition
+    ("basic" / "pro" / "pro_plus"); the route maps it back via Edition(...).
+    Per ADR-0005 + session.py:105, exports are ungated (no require_feature).
+    """
+
+    results: list[LayoutResult]
+    params: LayoutParameters
+    energy_params: EnergyParameters | None = None
+    edition: str = "pro_plus"
+
+
 # ---------------------------------------------------------------------------
 # Health + error payloads (sidecar-specific, no domain twin).
 # ---------------------------------------------------------------------------

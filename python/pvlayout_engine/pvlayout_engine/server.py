@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pvlayout_engine.config import SidecarConfig
 from pvlayout_engine.routes.dxf import router as dxf_router
 from pvlayout_engine.routes.layout import router as layout_router
+from pvlayout_engine.routes.pdf import router as pdf_router
 from pvlayout_engine.routes.session import router as session_router
 from pvlayout_engine.routes.water import router as water_router
 from pvlayout_engine.schemas import HealthResponse
@@ -115,6 +116,13 @@ def build_app(config: SidecarConfig) -> FastAPI:
     # /export-dxf — multi-result layout to DXF; token-gated. Per ADR-0005,
     # exports are ungated at the entitlements layer (no require_feature).
     authed.include_router(dxf_router)
+
+    # --- Export route (Row #11) ---------------------------------------------
+    # /export-pdf — multi-result layout to PDF (summary pages); token-gated.
+    # Page 1 (layout plot) is omitted — no server-side equivalent for legacy's
+    # PyQt5 figure yet. Per ADR-0005, exports are ungated at the entitlements
+    # layer.
+    authed.include_router(pdf_router)
 
     app.include_router(authed)
 
