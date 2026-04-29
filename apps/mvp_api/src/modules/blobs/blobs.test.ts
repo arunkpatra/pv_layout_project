@@ -43,9 +43,22 @@ mock.module("../../middleware/license-key-auth.js", () => ({
   },
 }))
 
+const mockOwnedRun = {
+  id: "run_test_owned",
+  projectId: "prj_test_owned",
+  name: "Owned Run",
+  deletedAt: null as Date | null,
+  project: { userId: mockUser.id },
+}
+
+const mockRunFindFirst = mock(
+  async (_args: unknown): Promise<typeof mockOwnedRun | null> => mockOwnedRun,
+)
+
 mock.module("../../lib/db.js", () => ({
   db: {
     licenseKey: { findFirst: async () => mockLicenseKey },
+    run: { findFirst: mockRunFindFirst },
   },
 }))
 
@@ -191,5 +204,174 @@ describe("POST /v2/blobs/kmz-upload-url", () => {
       body: "not json",
     })
     expect(res.status).toBe(400)
+  })
+})
+
+// ─── B7 — POST /v2/blobs/run-result-upload-url ───────────────────────────────
+
+const ONE_MB = 1024 * 1024
+const TWENTY_FIVE_MB = 25 * ONE_MB
+const TEN_MB = 10 * ONE_MB
+const HUNDRED_MB = 100 * ONE_MB
+
+interface RunResultBody {
+  type: "layout" | "energy" | "dxf" | "pdf" | "kmz"
+  projectId: string
+  runId: string
+  size: number
+}
+
+const runResultBody = (overrides: Partial<RunResultBody> = {}): string =>
+  JSON.stringify({
+    type: "layout",
+    projectId: "prj_test_owned",
+    runId: "run_test_owned",
+    size: ONE_MB,
+    ...overrides,
+  } satisfies RunResultBody)
+
+const postRunResult = (app: Hono<MvpHonoEnv>, body: string) =>
+  app.request("/v2/blobs/run-result-upload-url", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer sl_live_testkey",
+    },
+    body,
+  })
+
+describe("POST /v2/blobs/run-result-upload-url", () => {
+  beforeEach(() => {
+    mockGetPresignedUploadUrl.mockClear()
+    mockGetPresignedUploadUrl.mockImplementation(
+      async () => "https://s3.example.com/signed-put?sig=run",
+    )
+    mockRunFindFirst.mockClear()
+    mockRunFindFirst.mockImplementation(async () => mockOwnedRun)
+  })
+
+  it("happy path layout: keys at projects/<u>/<p>/runs/<r>/layout.json with application/json and 25MB cap", async () => {
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody({ type: "layout" }))
+    expect(res.status).toBe(200)
+    const json = (await res.json()) as {
+      success: boolean
+      data: { uploadUrl: string; blobUrl: string; expiresAt: string }
+    }
+    expect(json.data.uploadUrl).toBe("https://s3.example.com/signed-put?sig=run")
+    expect(json.data.blobUrl).toBe(
+      "s3://solarlayout-test-projects/projects/usr_test1/prj_test_owned/runs/run_test_owned/layout.json",
+    )
+    const call = mockGetPresignedUploadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_test_owned/runs/run_test_owned/layout.json",
+    )
+    expect(call?.[1]).toBe("application/json")
+    expect(call?.[3]).toBe(ONE_MB)
+  })
+
+  it("happy path energy: keys layout-equivalent for energy.json with 10MB cap", async () => {
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody({ type: "energy" }))
+    expect(res.status).toBe(200)
+    const call = mockGetPresignedUploadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_test_owned/runs/run_test_owned/energy.json",
+    )
+    expect(call?.[1]).toBe("application/json")
+  })
+
+  it("happy path dxf: keys under exports/run.dxf with application/dxf and 100MB cap", async () => {
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody({ type: "dxf" }))
+    expect(res.status).toBe(200)
+    const call = mockGetPresignedUploadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_test_owned/runs/run_test_owned/exports/run.dxf",
+    )
+    expect(call?.[1]).toBe("application/dxf")
+  })
+
+  it("happy path pdf: application/pdf, 50MB cap, exports/run.pdf", async () => {
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody({ type: "pdf" }))
+    expect(res.status).toBe(200)
+    const call = mockGetPresignedUploadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_test_owned/runs/run_test_owned/exports/run.pdf",
+    )
+    expect(call?.[1]).toBe("application/pdf")
+  })
+
+  it("happy path kmz: application/vnd.google-earth.kmz, 50MB cap, exports/run.kmz", async () => {
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody({ type: "kmz" }))
+    expect(res.status).toBe(200)
+    const call = mockGetPresignedUploadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_test_owned/runs/run_test_owned/exports/run.kmz",
+    )
+    expect(call?.[1]).toBe("application/vnd.google-earth.kmz")
+  })
+
+  it("returns 404 when the run does not belong to the caller (or does not exist)", async () => {
+    mockRunFindFirst.mockImplementationOnce(async () => null)
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody())
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 400 for an invalid type", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      JSON.stringify({
+        type: "garbage",
+        projectId: "prj_test_owned",
+        runId: "run_test_owned",
+        size: ONE_MB,
+      }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 400 when layout size > 25MB", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      runResultBody({ type: "layout", size: TWENTY_FIVE_MB + 1 }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 400 when energy size > 10MB", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      runResultBody({ type: "energy", size: TEN_MB + 1 }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it("accepts dxf at exactly 100MB", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      runResultBody({ type: "dxf", size: HUNDRED_MB }),
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it("returns 400 when size = 0", async () => {
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody({ size: 0 }))
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 503 when the S3 helper returns null", async () => {
+    mockGetPresignedUploadUrl.mockImplementationOnce(async () => null)
+    const app = makeApp()
+    const res = await postRunResult(app, runResultBody())
+    expect(res.status).toBe(503)
   })
 })
