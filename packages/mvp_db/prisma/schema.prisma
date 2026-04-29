@@ -46,6 +46,7 @@ model User {
   usageRecords          UsageRecord[]
   transactions          Transaction[]    @relation("TransactionUser")
   transactionsRecorded  Transaction[]    @relation("TransactionCreatedBy")
+  projects              Project[]
 
   @@map("users")
 }
@@ -169,4 +170,21 @@ model Transaction {
   @@index([source])
   @@index([purchasedAt])
   @@map("transactions")
+}
+
+model Project {
+  id         String    @id @default("")
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  name       String
+  kmzBlobUrl String
+  kmzSha256  String
+  edits      Json      @default("{}")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("projects")
 }
