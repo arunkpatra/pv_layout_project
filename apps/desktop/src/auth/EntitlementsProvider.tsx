@@ -7,15 +7,18 @@
  *   - <FeatureGate>      checks `availableFeatures` membership
  *   - useHasFeature()    same, as a hook
  *   - <TopBar>           reads `plans[0].planName` for the chip
+ *   - P10 / S4 (later)   read `projectQuota` / `projectsRemaining`
  *
- * The entitlements object is shaped per the mvp_api /entitlements contract
- * (see @solarlayout/entitlements-client).
+ * The entitlements object is shaped per the mvp_api /v2/entitlements
+ * contract (`EntitlementSummaryV2` — V1 EntitlementSummary + the project
+ * quota fields). Pre-V2 consumers reading only V1 fields continue to
+ * work unchanged via sub-type substitutability.
  */
 import { createContext, useContext, type ReactNode } from "react"
-import type { Entitlements } from "@solarlayout/entitlements-client"
+import type { EntitlementSummaryV2 } from "@solarlayout/entitlements-client"
 
 interface EntitlementsContextValue {
-  entitlements: Entitlements | null
+  entitlements: EntitlementSummaryV2 | null
   licenseKey: string | null
   /** Called from menu items / dialogs. Clears keyring and resets state. */
   onClearLicense: () => void

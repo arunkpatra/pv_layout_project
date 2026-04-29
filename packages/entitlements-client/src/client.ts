@@ -28,6 +28,12 @@ import {
   type Entitlements,
   type UsageReportResult,
 } from "./types"
+import {
+  entitlementSummaryV2ResponseSchema,
+  v2ErrorResponseSchema,
+  type EntitlementSummaryV2,
+  type V2ErrorCode,
+} from "./types-v2"
 
 /**
  * Minimal fetch-like signature — narrower than `typeof fetch` so a plain
@@ -51,27 +57,45 @@ export interface EntitlementsClientOptions {
 
 export interface EntitlementsClient {
   readonly baseUrl: string
+  /** V1 — `GET /entitlements`. Frozen for the legacy install. */
   getEntitlements(key: string): Promise<Entitlements>
+  /** V1 — `POST /usage/report`. Frozen for the legacy install. */
   reportUsage(key: string, feature: string): Promise<UsageReportResult>
+  /**
+   * V2 — `GET /v2/entitlements`. Returns the V1 EntitlementSummary shape
+   * plus `projectQuota`, `projectsActive`, `projectsRemaining`. Use this
+   * from any post-parity desktop code path; V1 stays for legacy.
+   */
+  getEntitlementsV2(key: string): Promise<EntitlementSummaryV2>
 }
 
 /**
  * Thrown for any non-2xx response or network failure.
  *
- *   status === 0   → network error / timeout / DNS / refused
+ *   status === 0   → network error / timeout / DNS / refused / schema mismatch
  *   status  4xx/5xx → API returned a non-success status
  *
- * `body` carries the parsed JSON error payload (shape permits
- * `{error: {message}}`) when the server returned one; `null` otherwise.
+ * `body` carries the parsed JSON error payload when the server returned one;
+ * `null` otherwise. For V2 responses (envelope `{success: false, error: {...}}`),
+ * `code` is populated with the typed V2 error code; V2-aware callers can
+ * branch on it for type-safe error mapping. V1-shape errors leave `code`
+ * undefined.
  */
 export class EntitlementsError extends Error {
   readonly status: number
   readonly body: unknown
-  constructor(status: number, message: string, body: unknown = null) {
+  readonly code?: V2ErrorCode
+  constructor(
+    status: number,
+    message: string,
+    body: unknown = null,
+    code?: V2ErrorCode
+  ) {
     super(message)
     this.name = "EntitlementsError"
     this.status = status
     this.body = body
+    this.code = code
   }
 }
 
@@ -124,9 +148,21 @@ export function createEntitlementsClient(
       } catch {
         // body may be empty / non-JSON — swallow
       }
-      const parsed = errorResponseSchema.safeParse(body)
-      const message = parsed.success
-        ? parsed.data.error.message
+      // Try V2 envelope first (`{success: false, error: {code, message}}`),
+      // fall back to V1's looser `{error: {message, code?}}`. V2 is strictly
+      // narrower; if it parses, we extract the typed code for callers.
+      const v2 = v2ErrorResponseSchema.safeParse(body)
+      if (v2.success) {
+        throw new EntitlementsError(
+          response.status,
+          v2.data.error.message,
+          body,
+          v2.data.error.code
+        )
+      }
+      const v1 = errorResponseSchema.safeParse(body)
+      const message = v1.success
+        ? v1.data.error.message
         : `HTTP ${response.status}`
       throw new EntitlementsError(response.status, message, body)
     }
@@ -161,6 +197,19 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `Usage-report response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async getEntitlementsV2(key) {
+      const raw = await request("/v2/entitlements", { method: "GET" }, key)
+      const parsed = entitlementSummaryV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `V2 entitlements response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

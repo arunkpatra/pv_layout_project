@@ -16,7 +16,7 @@ import {
   createEntitlementsClient,
   EntitlementsError,
   FEATURE_KEYS,
-  type Entitlements,
+  type EntitlementSummaryV2,
   type FeatureKey,
 } from "@solarlayout/entitlements-client"
 import {
@@ -50,14 +50,15 @@ const KEY_QUERY_KEY = "entitlements" as const
 
 /**
  * Preview entitlements — three tier-accurate variants mirroring the
- * renewable_energy seed (packages/mvp_db/prisma/seed-products.ts as of
- * 2026-04-24). Each variant's `availableFeatures` matches exactly what
- * the backend returns for a real user on that plan.
+ * renewable_energy seed (packages/mvp_db/prisma/seed-products.ts) and the
+ * 2026-04-29 V2 quota-per-tier decision (Free=3, Basic=5, Pro=10,
+ * Pro Plus=15, concurrent). Each variant's `availableFeatures` and project-
+ * quota fields match exactly what the V2 backend returns for a real user
+ * on that plan.
  *
  * Used in non-Tauri preview runs (vite dev / headless screenshot rig).
- * In Tauri dev/production, entitlements come from the real
- * api.solarlayout.in/entitlements endpoint via a user-entered license
- * key. See ADR-0005.
+ * In Tauri dev/production, entitlements come from `GET /v2/entitlements`
+ * via a user-entered license key. See ADR-0005.
  *
  * Picking between variants: the preview license key selects the tier.
  * `PREVIEW_LICENSE_KEY_BASIC` → Basic, etc. The legacy `PREVIEW_LICENSE_KEY`
@@ -68,8 +69,9 @@ const KEY_QUERY_KEY = "entitlements" as const
 function previewEntitlements(
   planName: string,
   features: readonly FeatureKey[],
-  planFeatureLabels: string[]
-): Entitlements {
+  planFeatureLabels: string[],
+  projectQuota: number
+): EntitlementSummaryV2 {
   return {
     user: { name: "Design Reviewer", email: "design@solarlayout.in" },
     plans: [
@@ -86,52 +88,63 @@ function previewEntitlements(
     totalCalculations: 100,
     usedCalculations: 5,
     remainingCalculations: 95,
+    projectQuota,
+    projectsActive: 0,
+    projectsRemaining: projectQuota,
   }
 }
 
-export const PREVIEW_ENTITLEMENTS_BASIC: Entitlements = previewEntitlements(
-  "PV Layout Basic",
-  [FEATURE_KEYS.PLANT_LAYOUT, FEATURE_KEYS.OBSTRUCTION_EXCLUSION],
-  ["Plant Layout (MMS, Inverter, LA)", "Obstruction Exclusion"]
-)
+export const PREVIEW_ENTITLEMENTS_BASIC: EntitlementSummaryV2 =
+  previewEntitlements(
+    "PV Layout Basic",
+    [FEATURE_KEYS.PLANT_LAYOUT, FEATURE_KEYS.OBSTRUCTION_EXCLUSION],
+    ["Plant Layout (MMS, Inverter, LA)", "Obstruction Exclusion"],
+    5
+  )
 
-export const PREVIEW_ENTITLEMENTS_PRO: Entitlements = previewEntitlements(
-  "PV Layout Pro",
-  [
-    FEATURE_KEYS.PLANT_LAYOUT,
-    FEATURE_KEYS.OBSTRUCTION_EXCLUSION,
-    FEATURE_KEYS.CABLE_ROUTING,
-    FEATURE_KEYS.CABLE_MEASUREMENTS,
-  ],
-  [
-    "Plant Layout (MMS, Inverter, LA)",
-    "Obstruction Exclusion",
-    "AC & DC Cable Routing",
-    "Cable Quantity Measurements",
-  ]
-)
+export const PREVIEW_ENTITLEMENTS_PRO: EntitlementSummaryV2 =
+  previewEntitlements(
+    "PV Layout Pro",
+    [
+      FEATURE_KEYS.PLANT_LAYOUT,
+      FEATURE_KEYS.OBSTRUCTION_EXCLUSION,
+      FEATURE_KEYS.CABLE_ROUTING,
+      FEATURE_KEYS.CABLE_MEASUREMENTS,
+    ],
+    [
+      "Plant Layout (MMS, Inverter, LA)",
+      "Obstruction Exclusion",
+      "AC & DC Cable Routing",
+      "Cable Quantity Measurements",
+    ],
+    10
+  )
 
-export const PREVIEW_ENTITLEMENTS_PRO_PLUS: Entitlements = previewEntitlements(
-  "PV Layout Pro Plus",
-  [
-    FEATURE_KEYS.PLANT_LAYOUT,
-    FEATURE_KEYS.OBSTRUCTION_EXCLUSION,
-    FEATURE_KEYS.CABLE_ROUTING,
-    FEATURE_KEYS.CABLE_MEASUREMENTS,
-    FEATURE_KEYS.ENERGY_YIELD,
-    FEATURE_KEYS.GENERATION_ESTIMATES,
-  ],
-  [
-    "Plant Layout (MMS, Inverter, LA)",
-    "Obstruction Exclusion",
-    "AC & DC Cable Routing",
-    "Cable Quantity Measurements",
-    "Energy Yield Analysis",
-    "Plant Generation Estimates",
-  ]
-)
+export const PREVIEW_ENTITLEMENTS_PRO_PLUS: EntitlementSummaryV2 =
+  previewEntitlements(
+    "PV Layout Pro Plus",
+    [
+      FEATURE_KEYS.PLANT_LAYOUT,
+      FEATURE_KEYS.OBSTRUCTION_EXCLUSION,
+      FEATURE_KEYS.CABLE_ROUTING,
+      FEATURE_KEYS.CABLE_MEASUREMENTS,
+      FEATURE_KEYS.ENERGY_YIELD,
+      FEATURE_KEYS.GENERATION_ESTIMATES,
+    ],
+    [
+      "Plant Layout (MMS, Inverter, LA)",
+      "Obstruction Exclusion",
+      "AC & DC Cable Routing",
+      "Cable Quantity Measurements",
+      "Energy Yield Analysis",
+      "Plant Generation Estimates",
+    ],
+    15
+  )
 
-function entitlementsForPreviewKey(key: string): Entitlements | null {
+function entitlementsForPreviewKey(
+  key: string
+): EntitlementSummaryV2 | null {
   switch (key) {
     case PREVIEW_LICENSE_KEY_BASIC:
       return PREVIEW_ENTITLEMENTS_BASIC
@@ -147,8 +160,8 @@ function entitlementsForPreviewKey(key: string): Entitlements | null {
 
 export function useEntitlementsQuery(
   licenseKey: string | null
-): UseQueryResult<Entitlements, EntitlementsError> {
-  return useQuery<Entitlements, EntitlementsError>({
+): UseQueryResult<EntitlementSummaryV2, EntitlementsError> {
+  return useQuery<EntitlementSummaryV2, EntitlementsError>({
     queryKey: [KEY_QUERY_KEY, licenseKey],
     queryFn: async () => {
       if (!licenseKey) {
@@ -157,7 +170,7 @@ export function useEntitlementsQuery(
       }
       const preview = entitlementsForPreviewKey(licenseKey)
       if (preview) return preview
-      return entitlementsClient.getEntitlements(licenseKey)
+      return entitlementsClient.getEntitlementsV2(licenseKey)
     },
     enabled: Boolean(licenseKey),
     retry: false, // Online-required: surface the failure, user clicks retry.
@@ -174,7 +187,7 @@ export function useEntitlementsQuery(
  * the push lands.
  */
 export function useSyncEntitlementsToSidecar(
-  entitlements: Entitlements | undefined,
+  entitlements: EntitlementSummaryV2 | undefined,
   sidecar: { host: string; port: number; token: string } | null
 ): void {
   useEffect(() => {

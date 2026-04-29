@@ -22,7 +22,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ReactNode } from "react"
 import { renderHook, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import type { Entitlements } from "@solarlayout/entitlements-client"
+import type {
+  Entitlements,
+  EntitlementSummaryV2,
+} from "@solarlayout/entitlements-client"
 
 // ---------------------------------------------------------------------------
 // Mock the entitlements client at the import boundary. Vitest hoists
@@ -39,6 +42,8 @@ const { mockClient } = vi.hoisted(() => ({
     getEntitlements:
       vi.fn<(key: string) => Promise<Entitlements>>(),
     reportUsage: vi.fn(),
+    getEntitlementsV2:
+      vi.fn<(key: string) => Promise<EntitlementSummaryV2>>(),
   },
 }))
 
@@ -87,6 +92,7 @@ function makeWrapper() {
 describe("useEntitlementsQuery", () => {
   beforeEach(() => {
     mockClient.getEntitlements.mockReset()
+    mockClient.getEntitlementsV2.mockReset()
   })
 
   it("is disabled (no fetch) when licenseKey is null", () => {
@@ -97,6 +103,7 @@ describe("useEntitlementsQuery", () => {
     expect(result.current.fetchStatus).toBe("idle")
     expect(result.current.data).toBeUndefined()
     expect(mockClient.getEntitlements).not.toHaveBeenCalled()
+    expect(mockClient.getEntitlementsV2).not.toHaveBeenCalled()
   })
 
   it("returns Basic preview entitlements for the basic preview key without hitting the network", async () => {
@@ -136,8 +143,8 @@ describe("useEntitlementsQuery", () => {
     expect(result.current.data).toEqual(PREVIEW_ENTITLEMENTS_PRO_PLUS)
   })
 
-  it("falls through to the real entitlements client for a non-preview key", async () => {
-    const real: Entitlements = {
+  it("falls through to the real V2 entitlements client for a non-preview key", async () => {
+    const real: EntitlementSummaryV2 = {
       user: { name: "Real User", email: "real@example.com" },
       plans: [
         {
@@ -153,22 +160,36 @@ describe("useEntitlementsQuery", () => {
       totalCalculations: 5,
       usedCalculations: 1,
       remainingCalculations: 4,
+      projectQuota: 5,
+      projectsActive: 0,
+      projectsRemaining: 5,
     }
-    mockClient.getEntitlements.mockResolvedValueOnce(real)
+    mockClient.getEntitlementsV2.mockResolvedValueOnce(real)
 
     const { result } = renderHook(
       () => useEntitlementsQuery("sl_live_realuserkey"),
       { wrapper: makeWrapper() }
     )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(mockClient.getEntitlements).toHaveBeenCalledWith("sl_live_realuserkey")
+    expect(mockClient.getEntitlementsV2).toHaveBeenCalledWith(
+      "sl_live_realuserkey"
+    )
+    // V1 path NOT touched — we're V2-only on the desktop now.
+    expect(mockClient.getEntitlements).not.toHaveBeenCalled()
     expect(result.current.data).toEqual(real)
   })
 
-  it("surfaces an error from the real client (e.g. 401 on bad key)", async () => {
-    const { EntitlementsError } = await import("@solarlayout/entitlements-client")
-    mockClient.getEntitlements.mockRejectedValueOnce(
-      new EntitlementsError(401, "License key not recognised.")
+  it("surfaces an error from the V2 client (e.g. 401 on bad key, with code)", async () => {
+    const { EntitlementsError } = await import(
+      "@solarlayout/entitlements-client"
+    )
+    mockClient.getEntitlementsV2.mockRejectedValueOnce(
+      new EntitlementsError(
+        401,
+        "License key not recognised.",
+        null,
+        "UNAUTHORIZED"
+      )
     )
 
     const { result } = renderHook(
@@ -177,6 +198,7 @@ describe("useEntitlementsQuery", () => {
     )
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(result.current.error?.status).toBe(401)
+    expect(result.current.error?.code).toBe("UNAUTHORIZED")
   })
 })
 

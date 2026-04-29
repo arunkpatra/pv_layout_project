@@ -37,3 +37,21 @@ export {
   isFeatureKey,
   type FeatureKey,
 } from "./feature-keys"
+
+// V2 wire types — mirror of renewable_energy/packages/shared/src/types/*.
+// Keep in lockstep with the backend.
+export {
+  v2ErrorCodes,
+  v2ErrorCodeSchema,
+  v2ErrorBodySchema,
+  v2ErrorResponseSchema,
+  v2SuccessResponseSchema,
+  projectQuotaStateSchema,
+  entitlementSummaryV2DataSchema,
+  entitlementSummaryV2ResponseSchema,
+  type V2ErrorCode,
+  type V2ErrorBody,
+  type V2ErrorResponse,
+  type ProjectQuotaState,
+  type EntitlementSummaryV2,
+} from "./types-v2"

@@ -23,12 +23,12 @@ import type { ReactNode } from "react"
 import { render, screen, renderHook } from "@testing-library/react"
 import {
   FEATURE_KEYS,
-  type Entitlements,
+  type EntitlementSummaryV2,
 } from "@solarlayout/entitlements-client"
 import { EntitlementsProvider } from "./EntitlementsProvider"
 import { FeatureGate, useHasFeature } from "./FeatureGate"
 
-function entitlementsWith(...features: string[]): Entitlements {
+function entitlementsWith(...features: string[]): EntitlementSummaryV2 {
   return {
     user: { name: "Test", email: "test@example.com" },
     plans: [
@@ -45,11 +45,14 @@ function entitlementsWith(...features: string[]): Entitlements {
     totalCalculations: 100,
     usedCalculations: 0,
     remainingCalculations: 100,
+    projectQuota: 3,
+    projectsActive: 0,
+    projectsRemaining: 3,
   }
 }
 
 function withProvider(
-  entitlements: Entitlements | null
+  entitlements: EntitlementSummaryV2 | null
 ): (props: { children: ReactNode }) => ReactNode {
   return function Wrapper({ children }) {
     return (

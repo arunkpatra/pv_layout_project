@@ -14,7 +14,7 @@ import {
   createSidecarClient,
   type SidecarClient,
 } from "@solarlayout/sidecar-client"
-import type { Entitlements } from "@solarlayout/entitlements-client"
+import type { EntitlementSummaryV2 } from "@solarlayout/entitlements-client"
 import {
   AppShell,
   Button,
@@ -673,7 +673,7 @@ export function App(): JSX.Element {
   }
 
   // 5) Ready — render the full shell with entitlements in context.
-  const entitlements = entQuery.data as Entitlements
+  const entitlements = entQuery.data as EntitlementSummaryV2
   const planName = entitlements.plans[0]?.planName ?? "Free"
 
   return (

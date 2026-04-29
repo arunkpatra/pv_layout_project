@@ -1,0 +1,275 @@
+/**
+ * Schema-validation tests for the V2 wire-shape mirrors. Confirms that
+ * (a) the V2 envelope shapes parse cleanly against representative fixtures,
+ * (b) the V2 error code union is exhaustive against the backend's commit,
+ * (c) EntitlementSummaryV2 remains a strict superset of V1 (the backend's
+ *     locked decision is that the V1 sub-shape is bit-stable inside V2).
+ *
+ * If any of these fails after a backend type bump, this file is the first
+ * place to look — drift between this mirror and the canonical source at
+ * `renewable_energy/packages/shared/src/types/api-v2.ts` is what these
+ * tests are watching for.
+ */
+import { describe, test, expect } from "bun:test"
+import {
+  v2ErrorCodes,
+  v2ErrorBodySchema,
+  v2ErrorResponseSchema,
+  v2SuccessResponseSchema,
+  projectQuotaStateSchema,
+  entitlementSummaryV2DataSchema,
+  entitlementSummaryV2ResponseSchema,
+  type EntitlementSummaryV2,
+  type V2ErrorCode,
+} from "./types-v2"
+import { entitlementsDataSchema } from "./types"
+import { z } from "zod"
+
+describe("V2 error codes", () => {
+  test("exhaustive union matches the backend's V2ErrorCode commit", () => {
+    // If the backend adds or removes a code, update this list in lockstep
+    // with the union in types-v2.ts. Keeping them anchored to the same
+    // canonical source ensures the desktop's exhaustive `switch` consumers
+    // stay safe. Compare as `string[]` to sidestep `.sort()` widening the
+    // tuple element type.
+    const actual: string[] = [...v2ErrorCodes].sort()
+    const expected: string[] = [
+      "CONFLICT",
+      "INTERNAL_SERVER_ERROR",
+      "NOT_FOUND",
+      "PAYMENT_REQUIRED",
+      "S3_NOT_CONFIGURED",
+      "UNAUTHORIZED",
+      "VALIDATION_ERROR",
+    ]
+    expect(actual).toEqual(expected)
+  })
+})
+
+describe("v2ErrorBodySchema", () => {
+  test("parses a minimal error body (code + message only)", () => {
+    const r = v2ErrorBodySchema.safeParse({
+      code: "UNAUTHORIZED",
+      message: "License key not recognised.",
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("parses an error body with details", () => {
+    const r = v2ErrorBodySchema.safeParse({
+      code: "VALIDATION_ERROR",
+      message: "kmzSize must be 1..52428800",
+      details: { field: "kmzSize", got: 99999999 },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects an unknown error code", () => {
+    const r = v2ErrorBodySchema.safeParse({
+      code: "NOT_A_REAL_CODE",
+      message: "hi",
+    })
+    expect(r.success).toBe(false)
+  })
+
+  test("rejects when message is missing", () => {
+    const r = v2ErrorBodySchema.safeParse({ code: "UNAUTHORIZED" })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("v2ErrorResponseSchema", () => {
+  test("parses a full error envelope", () => {
+    const r = v2ErrorResponseSchema.safeParse({
+      success: false,
+      error: { code: "PAYMENT_REQUIRED", message: "No remaining calcs" },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects success: true (that's the success envelope)", () => {
+    const r = v2ErrorResponseSchema.safeParse({
+      success: true,
+      error: { code: "UNAUTHORIZED", message: "x" },
+    })
+    expect(r.success).toBe(false)
+  })
+
+  test("rejects when the success flag is missing", () => {
+    const r = v2ErrorResponseSchema.safeParse({
+      error: { code: "UNAUTHORIZED", message: "x" },
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("v2SuccessResponseSchema factory", () => {
+  test("parses { success: true, data: T } for a given inner schema", () => {
+    const innerSchema = z.object({ foo: z.string() })
+    const schema = v2SuccessResponseSchema(innerSchema)
+    const r = schema.safeParse({ success: true, data: { foo: "bar" } })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when data is shape-wrong for the inner schema", () => {
+    const innerSchema = z.object({ foo: z.string() })
+    const schema = v2SuccessResponseSchema(innerSchema)
+    const r = schema.safeParse({ success: true, data: { foo: 42 } })
+    expect(r.success).toBe(false)
+  })
+
+  test("rejects { success: false } envelopes", () => {
+    const innerSchema = z.object({ foo: z.string() })
+    const schema = v2SuccessResponseSchema(innerSchema)
+    const r = schema.safeParse({
+      success: false,
+      error: { code: "UNAUTHORIZED", message: "x" },
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("projectQuotaStateSchema", () => {
+  test("parses Free tier (3 / 0 / 3)", () => {
+    expect(
+      projectQuotaStateSchema.safeParse({
+        projectQuota: 3,
+        projectsActive: 0,
+        projectsRemaining: 3,
+      }).success
+    ).toBe(true)
+  })
+
+  test("parses Pro tier at quota edge (10 / 10 / 0)", () => {
+    expect(
+      projectQuotaStateSchema.safeParse({
+        projectQuota: 10,
+        projectsActive: 10,
+        projectsRemaining: 0,
+      }).success
+    ).toBe(true)
+  })
+
+  test("parses deactivated/exhausted (0 / 0 / 0)", () => {
+    expect(
+      projectQuotaStateSchema.safeParse({
+        projectQuota: 0,
+        projectsActive: 0,
+        projectsRemaining: 0,
+      }).success
+    ).toBe(true)
+  })
+
+  test("rejects negative quota", () => {
+    expect(
+      projectQuotaStateSchema.safeParse({
+        projectQuota: -1,
+        projectsActive: 0,
+        projectsRemaining: 0,
+      }).success
+    ).toBe(false)
+  })
+})
+
+describe("entitlementSummaryV2DataSchema", () => {
+  // Reusable V2 fixture across these tests. Mirrors the FREE fixture from
+  // the backend's seed script.
+  const v2Fixture: EntitlementSummaryV2 = {
+    user: { name: "Test", email: "test@example.com" },
+    plans: [
+      {
+        planName: "Free",
+        features: [
+          "Plant Layout (MMS, Inverter, LA)",
+          "Obstruction Exclusion",
+          "AC & DC Cable Routing",
+          "Cable Quantity Measurements",
+          "Energy Yield Analysis",
+          "Plant Generation Estimates",
+        ],
+        totalCalculations: 5,
+        usedCalculations: 0,
+        remainingCalculations: 5,
+      },
+    ],
+    licensed: true,
+    availableFeatures: [
+      "plant_layout",
+      "obstruction_exclusion",
+      "cable_routing",
+      "cable_measurements",
+      "energy_yield",
+      "generation_estimates",
+    ],
+    totalCalculations: 5,
+    usedCalculations: 0,
+    remainingCalculations: 5,
+    projectQuota: 3,
+    projectsActive: 0,
+    projectsRemaining: 3,
+  }
+
+  test("parses a full V2 EntitlementSummary fixture", () => {
+    expect(entitlementSummaryV2DataSchema.safeParse(v2Fixture).success).toBe(
+      true
+    )
+  })
+
+  test("V2 data still parses against V1's entitlementsDataSchema (sub-type)", () => {
+    // Sub-type substitutability — V2 fields are extra; V1 schema ignores
+    // unknown keys and parses the V1 sub-shape successfully.
+    expect(entitlementsDataSchema.safeParse(v2Fixture).success).toBe(true)
+  })
+
+  test("rejects when V2 fields are missing", () => {
+    const v1Only: Record<string, unknown> = { ...v2Fixture }
+    delete v1Only.projectQuota
+    delete v1Only.projectsActive
+    delete v1Only.projectsRemaining
+    expect(entitlementSummaryV2DataSchema.safeParse(v1Only).success).toBe(false)
+  })
+})
+
+describe("entitlementSummaryV2ResponseSchema", () => {
+  test("parses a full success envelope", () => {
+    const r = entitlementSummaryV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        user: { name: "A", email: "a@b" },
+        plans: [],
+        licensed: false,
+        availableFeatures: [],
+        totalCalculations: 0,
+        usedCalculations: 0,
+        remainingCalculations: 0,
+        projectQuota: 0,
+        projectsActive: 0,
+        projectsRemaining: 0,
+      },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects an envelope missing the V2 fields inside data", () => {
+    const r = entitlementSummaryV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        user: { name: null, email: "a@b" },
+        plans: [],
+        licensed: true,
+        availableFeatures: [],
+        totalCalculations: 0,
+        usedCalculations: 0,
+        remainingCalculations: 0,
+        // missing V2 fields
+      },
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+// Compile-time anchor: a V2ErrorCode value is assignable to a string. If the
+// union ever changes shape unexpectedly (e.g. the backend ships a numeric
+// code), this assignment fails at typecheck.
+const _codeIsString: string = "UNAUTHORIZED" satisfies V2ErrorCode
+void _codeIsString
