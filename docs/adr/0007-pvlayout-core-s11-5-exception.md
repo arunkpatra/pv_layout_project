@@ -1,7 +1,9 @@
 # ADR 0007: Scoped §2 exception — pvlayout_core cable-calc correctness (S11.5)
 Date: 2026-04-24
 Spike: S11.5
-Status: accepted
+Status: superseded — see [`docs/PLAN.md`](../PLAN.md) (2026-04-29 plan reset)
+
+> **Superseded note (2026-04-29):** The CLAUDE.md §2 freeze rule that this ADR carved an exception to is no longer in force. The 2026-04-29 plan reset (`docs/PLAN.md`) authorizes ports into `pvlayout_core/` per row, governed by tiered process rather than ADR-per-exception. The S11.5 changes this ADR documented (Pattern V, search-space caps, `route_quality`, parameterised allowances, per-ICR/inverter subtotals, `PVLAYOUT_PATTERN_STATS` instrumentation) **remain in place and are correct** — they shipped in S11.5 and survived the P0 parity port. Body below kept verbatim for audit trail.
 
 ## Context
 
