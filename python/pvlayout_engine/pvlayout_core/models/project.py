@@ -8,6 +8,7 @@ from enum import Enum
 
 class DesignType(Enum):
     FIXED_TILT = "fixed_tilt"
+    SINGLE_AXIS_TRACKER = "single_axis_tracker"
 
 
 class Orientation(Enum):
@@ -92,6 +93,26 @@ class LayoutParameters:
     #                               row-end pigtails + termination slack).
     ac_termination_allowance_m: float = 4.0
     dc_per_string_allowance_m: float = 10.0
+
+    # ── Single Axis Tracker (SAT / HSAT) parameters ──────────────────────────
+    # Only used when design_type == DesignType.SINGLE_AXIS_TRACKER.
+    # The tracker rotation axis runs North–South; panels sweep East–West.
+    #
+    # Layout geometry:
+    #   tracker_width  (E-W aperture) = tracker_modules_across × module.width
+    #   tracker_ns_len (N-S length)   = tracker_modules_per_string × module.length
+    #   E-W pitch between tracker rows = tracker_width / tracker_gcr
+    #   N-S step inside a row          = tracker_ns_len + tracker_ns_gap_m
+    tracker_modules_across: int = 1               # modules side-by-side E-W (1, 2, 4 …)
+    tracker_strings_per_tracker: int = 2          # strings sharing one torque-tube unit
+    tracker_modules_per_string: int = 28          # modules per string along N-S axis
+    # "portrait"  (P): module long side runs E-W across the aperture
+    # "landscape" (L): module long side runs N-S along the torque tube
+    tracker_orientation: str = "portrait"
+    tracker_pitch_ew_m: float = 5.5               # E-W pitch between tracker rows (m)
+    tracker_ns_gap_m: float = 2.0                 # N-S service gap between tracker units (m)
+    tracker_max_angle_deg: float = 55.0           # maximum rotation angle ± (degrees)
+    tracker_height_m: float = 1.5                 # tracker column/hub height from ground (m)
 
 
 @dataclass
@@ -257,6 +278,10 @@ class EnergyParameters:
     site_tilt_deg: float = 20.0   # panel tilt from horizontal (degrees)
     site_azimuth_pvgis: float = 0.0  # 0=South for NH, 180=North for SH
 
+    # Single Axis Tracker flags — set automatically when design_type == SAT
+    is_sat: bool = False              # True → use HSAT tracking angle model
+    sat_max_angle_deg: float = 55.0   # tracker rotation limit ±degrees
+
     # Monthly irradiance (12 values — kWh/m²/month).
     # Populated from PVGIS API monthly response or aggregated from hourly file.
     # Empty list → monthly table not shown.
@@ -316,6 +341,7 @@ class EnergyResult:
 class LayoutResult:
     """Output of the layout engine."""
     boundary_name: str = ""
+    design_type: DesignType = DesignType.FIXED_TILT   # SAT vs fixed-tilt
     placed_tables: List[PlacedTable] = field(default_factory=list)
     placed_icrs: List[PlacedICR] = field(default_factory=list)
     placed_roads: List[PlacedRoad] = field(default_factory=list)
@@ -323,6 +349,9 @@ class LayoutResult:
     tables_pre_icr: List[PlacedTable] = field(default_factory=list)
     # Shapely usable polygon (post road-setback) — used to validate ICR drag position
     usable_polygon: Any = field(default=None, repr=False, compare=False)
+    # Shapely full boundary polygon (pre road-setback) — used for cable routing so
+    # cables may run inside the perimeter road band but not outside the plant fence.
+    boundary_polygon: Any = field(default=None, repr=False, compare=False)
     total_modules: int = 0
     total_capacity_kwp: float = 0.0
     total_capacity_mwp: float = 0.0
@@ -335,6 +364,8 @@ class LayoutResult:
     utm_epsg: int = 0
     boundary_wgs84: List[Tuple[float, float]] = field(default_factory=list)
     obstacle_polygons_wgs84: List[List[Tuple[float, float]]] = field(default_factory=list)
+    # Water-body obstacles (ponds, canals, reservoirs) — rendered in blue on the canvas
+    water_obstacle_polygons_wgs84: List[List[Tuple[float, float]]] = field(default_factory=list)
     # String inverter layout
     placed_string_inverters: List[PlacedStringInverter] = field(default_factory=list)
     dc_cable_runs: List[CableRun] = field(default_factory=list)
