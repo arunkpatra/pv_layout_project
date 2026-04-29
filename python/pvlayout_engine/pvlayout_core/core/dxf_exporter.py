@@ -2,15 +2,16 @@
 DXF exporter: writes all layout results to a single DXF file.
 
 Layers:
-  BOUNDARY    – plant boundary polygons (yellow)
-  OBSTACLES   – exclusion zones (red)
-  TABLES      – panel tables (blue)
-  ICR         – inverter control rooms (cyan)
+  BOUNDARY     – plant boundary polygons (yellow)
+  OBSTACLES    – exclusion zones (red)
+  TABLES       – panel tables (blue)
+  ICR          – inverter control rooms (cyan)
   OBSTRUCTIONS – user-drawn obstructions (green)
-  INVERTERS   – string inverters (lime)
-  DC_CABLES   – DC string cable routes (orange)
-  AC_CABLES   – AC cable routes (magenta)
-  ANNOTATIONS – labels and text
+  INVERTERS    – string inverters (lime)
+  DC_CABLES    – DC string cable routes (orange)  [only when include_cables=True]
+  AC_CABLES    – AC feeder cable routes (magenta) [only when include_cables=True]
+  LA           – lightning arrester symbols        [only when include_la=True]
+  ANNOTATIONS  – labels and text
 
 All coordinates are in UTM metres (same projection used by the layout engine).
 The boundary polygon is converted from WGS84 to UTM before drawing.
@@ -45,15 +46,25 @@ def export_dxf(
     results: List[LayoutResult],
     params: LayoutParameters,
     output_path: str,
+    include_la: bool = True,
+    include_cables: bool = True,
 ) -> None:
     """
     Write a DXF file containing all layout elements.
 
     Parameters
     ----------
-    results     : list of LayoutResult (one per boundary)
-    params      : LayoutParameters
-    output_path : file path for the output .dxf file
+    results         : list of LayoutResult (one per boundary)
+    params          : LayoutParameters
+    output_path     : file path for the output .dxf file
+    include_la      : if True, Lightning Arrester symbols and protection
+                      circles are written to the LA layer.  If False (LA
+                      toggle is OFF in the UI), the LA layer is not created
+                      and no LA elements are exported.
+    include_cables  : if True, DC and AC cable routes are written to
+                      DC_CABLES / AC_CABLES layers.  If False (cable display
+                      toggle is OFF in the UI), those layers are not created
+                      and no cable polylines are exported.
     """
     if isinstance(results, LayoutResult):
         results = [results]
@@ -64,17 +75,19 @@ def export_dxf(
 
     # ---- Create layers -------------------------------------------------------
     layer_defs = [
-        ("BOUNDARY",    COL_YELLOW),
-        ("OBSTACLES",   COL_RED),
-        ("TABLES",      COL_BLUE),
-        ("ICR",         COL_CYAN),
+        ("BOUNDARY",     COL_YELLOW),
+        ("OBSTACLES",    COL_RED),
+        ("TABLES",       COL_BLUE),
+        ("ICR",          COL_CYAN),
         ("OBSTRUCTIONS", COL_GREEN),
-        ("INVERTERS",   COL_LIME),
-        ("DC_CABLES",   COL_ORANGE),
-        ("AC_CABLES",   COL_MAGENTA),
-        ("LA",          COL_MAROON),
-        ("ANNOTATIONS", COL_WHITE),
+        ("INVERTERS",    COL_LIME),
+        ("ANNOTATIONS",  COL_WHITE),
     ]
+    if include_cables:
+        layer_defs.append(("DC_CABLES", COL_ORANGE))
+        layer_defs.append(("AC_CABLES", COL_MAGENTA))
+    if include_la:
+        layer_defs.append(("LA", COL_MAROON))
     for lname, lcol in layer_defs:
         doc.layers.new(lname, dxfattribs={"color": lcol})
 
@@ -157,56 +170,52 @@ def export_dxf(
                 align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER,
             )
 
-        # ---- DC cables -------------------------------------------------------
-        for cable in result.dc_cable_runs:
-            route = cable.route_utm if (cable.route_utm and len(cable.route_utm) >= 2) \
-                    else [cable.start_utm, cable.end_utm]
-            pts = _pts2d(route)
-            if len(pts) >= 2:
-                msp.add_lwpolyline(pts, close=False, dxfattribs={"layer": "DC_CABLES"})
+        # ---- Cable routes (only when cable display toggle is ON) -------------
+        if include_cables:
+            for cable in result.dc_cable_runs:
+                pts = cable.route_utm if cable.route_utm else [cable.start_utm, cable.end_utm]
+                pts2d = _pts2d(pts)
+                if len(pts2d) >= 2:
+                    msp.add_lwpolyline(
+                        pts2d, close=False,
+                        dxfattribs={"layer": "DC_CABLES", "lineweight": 13},
+                    )
+            for cable in result.ac_cable_runs:
+                pts = cable.route_utm if cable.route_utm else [cable.start_utm, cable.end_utm]
+                pts2d = _pts2d(pts)
+                if len(pts2d) >= 2:
+                    msp.add_lwpolyline(
+                        pts2d, close=False,
+                        dxfattribs={"layer": "AC_CABLES", "lineweight": 25},
+                    )
 
-        # ---- AC cables -------------------------------------------------------
-        # Deduplicate shared corridor segments before writing
-        seen: set = set()
-        for cable in result.ac_cable_runs:
-            route = cable.route_utm if (cable.route_utm and len(cable.route_utm) >= 2) \
-                    else []
-            if not route:
-                continue
-            for i in range(len(route) - 1):
-                p1 = (round(route[i][0], 1),   round(route[i][1], 1))
-                p2 = (round(route[i+1][0], 1), round(route[i+1][1], 1))
-                key = (min(p1, p2), max(p1, p2))
-                if key not in seen:
-                    seen.add(key)
-                    msp.add_line(p1, p2, dxfattribs={"layer": "AC_CABLES", "lineweight": 25})
-
-        # ---- Lightning Arresters -----------------------------------------------
-        import math
-        for la in result.placed_las:
-            # Rectangle footprint
-            la_pts = [
-                (la.x,             la.y),
-                (la.x + la.width,  la.y),
-                (la.x + la.width,  la.y + la.height),
-                (la.x,             la.y + la.height),
-            ]
-            msp.add_lwpolyline(la_pts, close=True,
-                               dxfattribs={"layer": "LA", "lineweight": 35})
-            la_cx = la.x + la.width / 2
-            la_cy = la.y + la.height / 2
-            # Protection circle
-            msp.add_circle(
-                (la_cx, la_cy), la.radius,
-                dxfattribs={"layer": "LA"},
-            )
-            # Label
-            msp.add_text(
-                f"LA-{la.index}",
-                dxfattribs={"layer": "ANNOTATIONS", "height": 5},
-            ).set_placement(
-                (la_cx, la_cy),
-                align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER,
-            )
+        # ---- Lightning Arresters (only when LA toggle is ON) ------------------
+        if include_la:
+            import math
+            for la in result.placed_las:
+                # Rectangle footprint
+                la_pts = [
+                    (la.x,             la.y),
+                    (la.x + la.width,  la.y),
+                    (la.x + la.width,  la.y + la.height),
+                    (la.x,             la.y + la.height),
+                ]
+                msp.add_lwpolyline(la_pts, close=True,
+                                   dxfattribs={"layer": "LA", "lineweight": 35})
+                la_cx = la.x + la.width / 2
+                la_cy = la.y + la.height / 2
+                # Protection circle
+                msp.add_circle(
+                    (la_cx, la_cy), la.radius,
+                    dxfattribs={"layer": "LA"},
+                )
+                # Label
+                msp.add_text(
+                    f"LA-{la.index}",
+                    dxfattribs={"layer": "ANNOTATIONS", "height": 5},
+                ).set_placement(
+                    (la_cx, la_cy),
+                    align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER,
+                )
 
     doc.saveas(output_path)

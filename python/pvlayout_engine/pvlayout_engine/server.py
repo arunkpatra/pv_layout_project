@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request,
 from fastapi.middleware.cors import CORSMiddleware
 
 from pvlayout_engine.config import SidecarConfig
+from pvlayout_engine.routes.dxf import router as dxf_router
 from pvlayout_engine.routes.layout import router as layout_router
 from pvlayout_engine.routes.session import router as session_router
 from pvlayout_engine.routes.water import router as water_router
@@ -109,6 +110,11 @@ def build_app(config: SidecarConfig) -> FastAPI:
     # --- Water-detection route (Row #5) -------------------------------------
     # /detect-water — sync; satellite tile fetch + classifier; token-gated.
     authed.include_router(water_router)
+
+    # --- Export route (Row #10) ---------------------------------------------
+    # /export-dxf — multi-result layout to DXF; token-gated. Per ADR-0005,
+    # exports are ungated at the entitlements layer (no require_feature).
+    authed.include_router(dxf_router)
 
     app.include_router(authed)
 

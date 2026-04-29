@@ -481,6 +481,20 @@ class RemoveRoadRequest(_Model):
     params: LayoutParameters
 
 
+class ExportDxfRequest(_Model):
+    """POST /export-dxf body — multi-result layout to AutoCAD DXF.
+
+    Per ADR-0005 + session.py:105, exports are ungated (no require_feature
+    dependency on the route). The two flags mirror legacy's UI toggles:
+    LA symbols visibility and cable-route display.
+    """
+
+    results: list[LayoutResult]
+    params: LayoutParameters
+    include_la: bool = True
+    include_cables: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Health + error payloads (sidecar-specific, no domain twin).
 # ---------------------------------------------------------------------------
