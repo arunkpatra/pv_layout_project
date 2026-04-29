@@ -77,3 +77,47 @@ export async function computeEntitlementSummary(user: {
     remainingCalculations,
   }
 }
+
+export interface EntitlementSummaryV2 extends EntitlementSummary {
+  /** Max projectQuota across active + non-exhausted entitlements. 0 if none. */
+  projectQuota: number
+  /** Count of the user's non-deleted Project rows. */
+  projectsActive: number
+  /** max(0, projectQuota - projectsActive). When 0, the desktop must
+   *  enter read-only mode for any over-quota project. */
+  projectsRemaining: number
+}
+
+/**
+ * V2 entitlement summary — strict superset of V1.
+ * V1 shape is preserved exactly (re-uses computeEntitlementSummary);
+ * V2 adds projectQuota + projectsActive + projectsRemaining for the
+ * desktop's per-tier project ceiling.
+ */
+export async function computeEntitlementSummaryV2(user: {
+  id: string
+  name: string | null
+  email: string
+}): Promise<EntitlementSummaryV2> {
+  const v1 = await computeEntitlementSummary(user)
+
+  const usable = await db.entitlement.findMany({
+    where: { userId: user.id, deactivatedAt: null },
+    select: {
+      totalCalculations: true,
+      usedCalculations: true,
+      product: { select: { projectQuota: true } },
+    },
+  })
+  const projectQuota = usable
+    .filter((e) => e.usedCalculations < e.totalCalculations)
+    .reduce((max, e) => Math.max(max, e.product.projectQuota), 0)
+
+  const projectsActive = await db.project.count({
+    where: { userId: user.id, deletedAt: null },
+  })
+
+  const projectsRemaining = Math.max(0, projectQuota - projectsActive)
+
+  return { ...v1, projectQuota, projectsActive, projectsRemaining }
+}

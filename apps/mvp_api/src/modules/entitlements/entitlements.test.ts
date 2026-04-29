@@ -32,6 +32,7 @@ const mockEntitlementFindMany = mock(async () => [
     product: {
       name: "Pro",
       displayOrder: 2,
+      projectQuota: 10,
       features: [
         { featureKey: "plant_layout", label: "Plant Layout" },
         { featureKey: "cable_routing", label: "Cable Routing" },
@@ -48,11 +49,14 @@ const mockUsageRecordFindMany = mock(async () => [
   },
 ])
 
+const mockProjectCount = mock(async () => 0)
+
 mock.module("../../lib/db.js", () => ({
   db: {
     licenseKey: { findFirst: mockLicenseKeyFindFirst },
     entitlement: { findMany: mockEntitlementFindMany },
     usageRecord: { findMany: mockUsageRecordFindMany },
+    project: { count: mockProjectCount },
   },
 }))
 
@@ -79,6 +83,7 @@ describe("GET /entitlements", () => {
         product: {
           name: "Pro",
           displayOrder: 2,
+          projectQuota: 10,
           features: [
             { featureKey: "plant_layout", label: "Plant Layout" },
             { featureKey: "cable_routing", label: "Cable Routing" },
@@ -144,6 +149,7 @@ describe("GET /entitlements", () => {
         product: {
           name: "Basic",
           displayOrder: 1,
+          projectQuota: 5,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
       },
@@ -191,6 +197,7 @@ describe("GET /entitlements", () => {
         product: {
           name: "Basic",
           displayOrder: 1,
+          projectQuota: 5,
           features: [{ featureKey: "plant_layout", label: "Plant Layout (MMS, Inverter, LA)" }],
         },
       },
@@ -222,6 +229,7 @@ describe("GET /entitlements", () => {
         product: {
           name: "Basic",
           displayOrder: 1,
+          projectQuota: 5,
           features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
         },
       },
@@ -235,6 +243,7 @@ describe("GET /entitlements", () => {
         product: {
           name: "Pro",
           displayOrder: 2,
+          projectQuota: 10,
           features: [
             { featureKey: "plant_layout", label: "Plant Layout" },
             { featureKey: "cable_routing", label: "Cable Routing" },
@@ -319,5 +328,202 @@ describe("GET /usage/history", () => {
       data: { records: unknown[] }
     }
     expect(body.data.records).toHaveLength(0)
+  })
+})
+
+// ─── B8 — GET /v2/entitlements ──────────────────────────────────────────────
+
+interface V2Body {
+  user: { name: string | null; email: string }
+  plans: unknown[]
+  licensed: boolean
+  availableFeatures: string[]
+  totalCalculations: number
+  usedCalculations: number
+  remainingCalculations: number
+  projectQuota: number
+  projectsActive: number
+  projectsRemaining: number
+}
+
+const FREE_ENT = {
+  id: "ent_free",
+  userId: "usr_test1",
+  productId: "prod_free",
+  totalCalculations: 5,
+  usedCalculations: 0,
+  purchasedAt: new Date(),
+  product: {
+    name: "Free",
+    displayOrder: 0,
+    projectQuota: 3,
+    features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+  },
+}
+
+const BASIC_ENT = {
+  id: "ent_basic",
+  userId: "usr_test1",
+  productId: "prod_basic",
+  totalCalculations: 5,
+  usedCalculations: 1,
+  purchasedAt: new Date(),
+  product: {
+    name: "Basic",
+    displayOrder: 1,
+    projectQuota: 5,
+    features: [{ featureKey: "plant_layout", label: "Plant Layout" }],
+  },
+}
+
+const PRO_ENT = {
+  id: "ent_pro",
+  userId: "usr_test1",
+  productId: "prod_pro",
+  totalCalculations: 10,
+  usedCalculations: 2,
+  purchasedAt: new Date(),
+  product: {
+    name: "Pro",
+    displayOrder: 2,
+    projectQuota: 10,
+    features: [
+      { featureKey: "plant_layout", label: "Plant Layout" },
+      { featureKey: "cable_routing", label: "Cable Routing" },
+    ],
+  },
+}
+
+const v2Get = (app: Hono<MvpHonoEnv>) =>
+  app.request("/v2/entitlements", {
+    headers: { Authorization: "Bearer sl_live_testkey" },
+  })
+
+describe("GET /v2/entitlements", () => {
+  beforeEach(() => {
+    mockProjectCount.mockReset()
+    mockProjectCount.mockImplementation(async () => 0)
+  })
+
+  it("free-only user → projectQuota = 3, projectsActive = 0, projectsRemaining = 3", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [FREE_ENT] as never)
+    const app = makeApp()
+    const res = await v2Get(app)
+    expect(res.status).toBe(200)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(3)
+    expect(body.projectsActive).toBe(0)
+    expect(body.projectsRemaining).toBe(3)
+  })
+
+  it("free + basic user → projectQuota = 5", async () => {
+    mockEntitlementFindMany.mockImplementation(
+      async () => [FREE_ENT, BASIC_ENT] as never,
+    )
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(5)
+  })
+
+  it("free + pro user → projectQuota = 10 (max wins)", async () => {
+    mockEntitlementFindMany.mockImplementation(
+      async () => [FREE_ENT, PRO_ENT] as never,
+    )
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(10)
+  })
+
+  it("exhausted Pro + active Free → projectQuota drops to 3 (lowest active+non-exhausted tier)", async () => {
+    const exhaustedPro = {
+      ...PRO_ENT,
+      usedCalculations: 10, // == total → exhausted
+    }
+    mockEntitlementFindMany.mockImplementation(
+      async () => [FREE_ENT, exhaustedPro] as never,
+    )
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(3)
+  })
+
+  it("deactivated-entitlement user (DB filters them out) → projectQuota = 0", async () => {
+    // DB query filters deactivatedAt:null at SQL layer. Mock just returns [].
+    mockEntitlementFindMany.mockImplementation(async () => [] as never)
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(0)
+    expect(body.projectsRemaining).toBe(0)
+  })
+
+  it("projectsActive = 2 against quota 5 → projectsRemaining = 3", async () => {
+    mockEntitlementFindMany.mockImplementation(
+      async () => [FREE_ENT, BASIC_ENT] as never,
+    )
+    mockProjectCount.mockImplementation(async () => 2)
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(5)
+    expect(body.projectsActive).toBe(2)
+    expect(body.projectsRemaining).toBe(3)
+  })
+
+  it("over-quota (projectsActive > projectQuota) → projectsRemaining = 0 (clamped)", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [FREE_ENT] as never)
+    mockProjectCount.mockImplementation(async () => 7) // > 3
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.projectQuota).toBe(3)
+    expect(body.projectsActive).toBe(7)
+    expect(body.projectsRemaining).toBe(0)
+  })
+
+  it("V2 also returns the V1 EntitlementSummary fields unchanged", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [PRO_ENT] as never)
+    mockProjectCount.mockImplementation(async () => 1)
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    // V1 fields
+    expect(body.licensed).toBe(true)
+    expect(body.availableFeatures).toContain("plant_layout")
+    expect(body.availableFeatures).toContain("cable_routing")
+    expect(body.totalCalculations).toBe(10)
+    expect(body.usedCalculations).toBe(2)
+    expect(body.remainingCalculations).toBe(8)
+    expect(body.user.email).toBe("test@example.com")
+    expect(body.plans).toHaveLength(1)
+    // V2 fields layered on top
+    expect(body.projectQuota).toBe(10)
+    expect(body.projectsActive).toBe(1)
+    expect(body.projectsRemaining).toBe(9)
+  })
+
+  it("returns 401 when Authorization is missing", async () => {
+    const app = makeApp()
+    const res = await app.request("/v2/entitlements")
+    expect(res.status).toBe(401)
+  })
+})
+
+describe("V1 GET /entitlements stability under B8", () => {
+  it("V1 response shape does NOT include projectQuota / projectsActive / projectsRemaining", async () => {
+    // Defensive: the V1 contract is bit-stable. Even if a future change
+    // accidentally extends the V1 service, this test catches it.
+    mockEntitlementFindMany.mockImplementation(async () => [PRO_ENT] as never)
+    const app = makeApp()
+    const res = await app.request("/entitlements", {
+      headers: { Authorization: "Bearer sl_live_testkey" },
+    })
+    const body = (await res.json()) as { data: Record<string, unknown> }
+    expect(body.data["projectQuota"]).toBeUndefined()
+    expect(body.data["projectsActive"]).toBeUndefined()
+    expect(body.data["projectsRemaining"]).toBeUndefined()
   })
 })
