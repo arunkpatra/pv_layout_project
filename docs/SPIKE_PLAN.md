@@ -1,3 +1,5 @@
+> **⚠ Parity sprint active 2026-04-29 → ETA ~2026-05-29.** See [`docs/parity/PLAN.md`](./parity/PLAN.md). Existing spike sequence is paused per Q7 of the brainstorming interview output; the parity-spike track P0–P5 takes precedence. S11 polish, S12, S13, S13.5, and S13.8 resume only if/when they fold into P4 retirement-readiness, or post-retirement.
+
 # SolarLayout Desktop — Spike Plan
 
 **Status:** Draft for review

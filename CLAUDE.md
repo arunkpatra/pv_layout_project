@@ -19,6 +19,7 @@ A ground-up rewrite of the **SolarLayout** desktop product — a native desktop 
 ### Read these before touching code or planning work
 1. **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — stack, component boundaries, runtime flows, module mapping, security model, design system §12.
 2. **[docs/SPIKE_PLAN.md](./docs/SPIKE_PLAN.md)** — the 17-spike project plan. We execute these sequentially with human gates between each.
+3. **[docs/parity/PLAN.md](./docs/parity/PLAN.md)** — **active parity sprint** (2026-04-29 → ~2026-05-29) bringing pvlayout_core to legacy `baseline-v1-20260429` parity, then retiring legacy. Spike sequence is paused; parity-spike track P0–P5 takes precedence per Q7 of the brainstorming interview output.
 
 ### Working agreements
 - **Spike-based development.** Work proceeds in named spikes (S0 → S15, with intervening sub-spikes inserted as needs surface — currently S5.5, S8.7, S8.8, S10.2, S10.5, S13.5, S13.6, S13.7, S15.5). Each spike has an explicit **Human Gate** defined in `SPIKE_PLAN.md`. Nothing else gets built until the current spike's gate passes.
