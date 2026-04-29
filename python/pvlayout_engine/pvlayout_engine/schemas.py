@@ -515,6 +515,18 @@ class ExportPdfRequest(_Model):
     edition: str = "pro_plus"
 
 
+class ExportKmzRequest(_Model):
+    """POST /export-kmz body — multi-result layout to KMZ.
+
+    Per ADR-0005 + session.py:105, exports are ungated (no require_feature
+    dependency on the route). No toggle flags — KMZ exporter renders all
+    layout elements unconditionally (matches legacy behavior).
+    """
+
+    results: list[LayoutResult]
+    params: LayoutParameters
+
+
 # ---------------------------------------------------------------------------
 # Health + error payloads (sidecar-specific, no domain twin).
 # ---------------------------------------------------------------------------

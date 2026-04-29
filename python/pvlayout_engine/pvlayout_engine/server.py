@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pvlayout_engine.config import SidecarConfig
 from pvlayout_engine.routes.dxf import router as dxf_router
+from pvlayout_engine.routes.kmz import router as kmz_router
 from pvlayout_engine.routes.layout import router as layout_router
 from pvlayout_engine.routes.pdf import router as pdf_router
 from pvlayout_engine.routes.session import router as session_router
@@ -123,6 +124,13 @@ def build_app(config: SidecarConfig) -> FastAPI:
     # PyQt5 figure yet. Per ADR-0005, exports are ungated at the entitlements
     # layer.
     authed.include_router(pdf_router)
+
+    # --- Export route (Row #12) ---------------------------------------------
+    # /export-kmz — multi-result layout to KMZ; token-gated. Per ADR-0005,
+    # exports are ungated at the entitlements layer (no require_feature).
+    # KMZ exporter has no toggle flags — renders all layout elements
+    # unconditionally.
+    authed.include_router(kmz_router)
 
     app.include_router(authed)
 
