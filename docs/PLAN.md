@@ -2,7 +2,7 @@
 
 **Mission:** ship the new SolarLayout desktop app for PVLayout — full functional coverage of legacy PyQt5 capabilities + project/run/multi-tab architecture + V2 backend integration. Match Claude-Desktop quality bar throughout.
 **Last updated:** 2026-04-29
-**Status:** 2 / TBD done.
+**Status:** 3 / TBD done.
 
 This file replaces the parity-era `docs/PLAN.md` (closed 12/12 done on 2026-04-29; archived at [docs/historical/PLAN-parity-v1.md](./historical/PLAN-parity-v1.md)).
 
@@ -53,7 +53,7 @@ Phase-grouped; within a phase, dependency-ordered. `Depends` column references r
 
 | # | Feature | Tier | Source / Notes | Depends | Acceptance | Status |
 |---|---|---|---|---|---|---|
-| S1 | Window chrome (Claude-Desktop-style header) | T1 | Tauri custom titlebar; centered title; right-side account/menu controls. Light + dark token-driven. | — | Visual match to reference screenshots at `reference_screenshots_for_UX_dsktop/`. | todo |
+| S1 | Window chrome (Claude-Desktop-style header) | T1 | Implementation pre-existed from parity-era: `packages/ui/src/compositions/TopBar.tsx` (wordmark + breadcrumb + chip + Cmd+K palette + ToolRail/Inspector toggles + account dropdown), with macOS overlay-titlebar inset (80px for traffic lights), `data-tauri-drag-region` on draggable surfaces, full token-driven theming. Tauri config (`tauri.conf.json`) sets `titleBarStyle: "Overlay"` + `hiddenTitle: true`. S1 row delivered the missing **test coverage**: `packages/ui/src/compositions/TopBar.test.tsx` (RTL, 14 cases — wordmark, breadcrumb, chip, palette, toggles, account dropdown contents + handlers, drag-region attribute). | — | Visual match to reference screenshots at `reference_screenshots_for_UX_dsktop/` (already verified during parity design review); all 14 component-contract tests green. | **done** |
 | S2 | Multi-tab top bar | T2 | Each tab = one project. New-tab button. Tab close (with unsaved-changes warning). Cmd-T / Cmd-W shortcuts. Single-project-per-tab enforcement (cannot open same project in two tabs). | F4 | Tabs scrollable; tab switch loads correct project state; single-tab-per-project enforced. | todo |
 | S3 | Recents view (default startup screen) | T2 | New-tab default content. Grid of recent projects (thumbnail + name + last-modified). Click → opens project. "+ New project" tile. Empty state for new users. | F5, B10 | Recents fetched from backend; click opens project in current tab; visual quality matches reference screenshots. | todo |
 | S4 | Account menu (license, sign-out, quota indicator) | T1 | Top-right menu. Shows masked license key, plan summary (calcs/projects remaining), sign-out button. Click "Buy more" → opens marketing site checkout in browser. | F2 | Menu visible; quota numbers accurate; sign-out clears keychain + reloads to F1 sign-in. | todo |
