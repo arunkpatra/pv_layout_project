@@ -92,9 +92,10 @@ def _aggregate(results):
             "ac_cable_runs": sum(len(r.ac_cable_runs) for r in results),
         },
         "totals": {
-            "total_capacity_kwp": round(
-                sum(r.total_capacity_kwp for r in results), 2
-            ),
+            # Only the totals the tests actually assert against. total_capacity_kwp
+            # was removed because no test reads it — keeping it in the aggregate
+            # would imply false coverage. Capacity drift is caught indirectly
+            # via placed_tables count (capacity = tables × strings × kwp/string).
             "total_dc_cable_m": round(
                 sum(r.total_dc_cable_m for r in results), 1
             ),
