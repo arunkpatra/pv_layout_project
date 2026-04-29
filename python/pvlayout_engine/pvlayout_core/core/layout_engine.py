@@ -23,6 +23,26 @@ from pvlayout_core.utils.geo_utils import get_utm_epsg, wgs84_to_utm
 TL_SETBACK_M = 15.0   # buffer each side of a line obstruction (TL, canal, etc.)
 
 
+def _make_valid_poly(p):
+    """Repair a self-intersecting Shapely polygon."""
+    if p.is_valid:
+        return p
+    try:
+        q = p.buffer(0)
+        if q.is_valid and not q.is_empty:
+            return q
+    except Exception:
+        pass
+    try:
+        from shapely.validation import make_valid as _mv
+        q = _mv(p)
+        if not q.is_empty:
+            return q
+    except Exception:
+        pass
+    return p.convex_hull
+
+
 def run_layout(
     boundary_wgs84: List[Tuple[float, float]],
     obstacles_wgs84: List[List[Tuple[float, float]]],
@@ -31,12 +51,15 @@ def run_layout(
     centroid_lon: float,
     boundary_name: str = "",
     line_obstructions_wgs84: List[List[Tuple[float, float]]] = None,
+    water_obstacles_wgs84: List[List[Tuple[float, float]]] = None,
 ) -> LayoutResult:
     """Run fixed-tilt layout for a single boundary polygon."""
     result = LayoutResult()
     result.boundary_name = boundary_name
     result.boundary_wgs84 = boundary_wgs84
-    result.obstacle_polygons_wgs84 = obstacles_wgs84
+    # Defensive copies match legacy semantics — the result owns its lists.
+    result.obstacle_polygons_wgs84 = list(obstacles_wgs84)
+    result.water_obstacle_polygons_wgs84 = list(water_obstacles_wgs84 or [])
 
     # ------------------------------------------------------------------
     # 1. UTM projection
@@ -64,15 +87,49 @@ def run_layout(
         )
 
     # ------------------------------------------------------------------
-    # 3. Subtract obstacles
+    # 3. Subtract solid obstacles
     # ------------------------------------------------------------------
     if obstacles_utm:
-        obs_polys = [Polygon(o) for o in obstacles_utm if len(o) >= 3]
-        obs_union = unary_union(obs_polys)
-        usable_poly = usable_poly.difference(obs_union)
+        obs_polys = []
+        for o in obstacles_utm:
+            if len(o) < 3:
+                continue
+            op = _make_valid_poly(Polygon(o))
+            if not op.is_empty:
+                obs_polys.append(op)
+        if obs_polys:
+            try:
+                usable_poly = usable_poly.difference(unary_union(obs_polys))
+            except Exception:
+                for op in obs_polys:
+                    try:
+                        usable_poly = usable_poly.difference(op)
+                    except Exception:
+                        pass
 
     if usable_poly.is_empty:
         raise ValueError("No usable area remains after subtracting obstacles.")
+
+    # ------------------------------------------------------------------
+    # 3a. Subtract water obstacles (ponds, canals, reservoirs)
+    # ------------------------------------------------------------------
+    if water_obstacles_wgs84:
+        w_polys = []
+        for wo in [wgs84_to_utm(w, epsg) for w in water_obstacles_wgs84]:
+            if len(wo) < 3:
+                continue
+            wp = _make_valid_poly(Polygon(wo))
+            if not wp.is_empty:
+                w_polys.append(wp)
+        if w_polys:
+            try:
+                usable_poly = usable_poly.difference(unary_union(w_polys))
+            except Exception:
+                for wp in w_polys:
+                    try:
+                        usable_poly = usable_poly.difference(wp)
+                    except Exception:
+                        pass
 
     # ------------------------------------------------------------------
     # 3b. Buffer line obstructions (TL, canals, roads) and subtract
@@ -191,6 +248,7 @@ def run_layout(
     result.placed_icrs        = icrs
     result.tables_pre_icr     = tables_pre_icr   # stored for ICR drag recompute
     result.usable_polygon     = usable_poly       # stored for drag validation
+    result.boundary_polygon   = boundary_poly    # full boundary (pre-setback) for cable routing
     result.total_modules      = total_modules
     result.total_capacity_kwp = round(total_kwp, 2)
     result.total_capacity_mwp = round(total_kwp / 1000.0, 4)
@@ -208,24 +266,16 @@ def run_layout_multi(
     results = []
     for i, b in enumerate(boundaries):
         name = b.name if b.name else f"Plant {i + 1}"
-        # ROW #4 BRIDGE — REMOVE IN ROW #6.
-        # Row #4 split water-named polygons out into BoundaryInfo.water_obstacles
-        # (parser-level autodetection). The new app's layout engine doesn't yet
-        # have a separate water-exclusion path (that's row #6's scope: legacy
-        # layout_engine.py uses different setbacks for water vs hard obstacles).
-        # Until row #6 lands the proper integration, merge water_obstacles into
-        # the obstacles list so panels are still excluded from ponds/canals
-        # (matches pre-row-#4 behaviour and keeps parity tests green).
-        merged_obstacles = list(b.obstacles) + list(getattr(b, "water_obstacles", []))
         try:
             r = run_layout(
                 boundary_wgs84=b.coords,
-                obstacles_wgs84=merged_obstacles,
+                obstacles_wgs84=b.obstacles,
                 params=params,
                 centroid_lat=centroid_lat,
                 centroid_lon=centroid_lon,
                 boundary_name=name,
                 line_obstructions_wgs84=b.line_obstructions,
+                water_obstacles_wgs84=getattr(b, "water_obstacles", []),
             )
             results.append(r)
         except Exception as exc:

@@ -157,6 +157,12 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
         obstacle_polygons_wgs84=[
             [(x, y) for (x, y) in obs] for obs in r.obstacle_polygons_wgs84
         ],
+        # Row #6: serialise water polygons separately so reconstruct_usable_polygon
+        # can subtract them on /refresh-inverters and /add-road.
+        water_obstacle_polygons_wgs84=[
+            [(x, y) for (x, y) in wo]
+            for wo in getattr(r, "water_obstacle_polygons_wgs84", []) or []
+        ],
         # Pre-projected corner rings so the desktop's MapCanvas can render
         # placed objects without client-side UTM↔WGS84 work. See ADR-0002
         # (no-basemap canvas) — we own the projection responsibility here.
@@ -345,6 +351,11 @@ def result_to_core(r: schemas.LayoutResult) -> core.LayoutResult:
     out.boundary_wgs84 = [(x, y) for (x, y) in r.boundary_wgs84]
     out.obstacle_polygons_wgs84 = [
         [(x, y) for (x, y) in obs] for obs in r.obstacle_polygons_wgs84
+    ]
+    # Row #6: deserialise water polygons (default-empty for older clients).
+    out.water_obstacle_polygons_wgs84 = [
+        [(x, y) for (x, y) in wo]
+        for wo in (getattr(r, "water_obstacle_polygons_wgs84", []) or [])
     ]
     out.placed_string_inverters = [
         core.PlacedStringInverter(

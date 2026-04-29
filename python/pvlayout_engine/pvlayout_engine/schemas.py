@@ -265,6 +265,11 @@ class LayoutResult(_Model):
     utm_epsg: int = 0
     boundary_wgs84: list[UTMPoint] = Field(default_factory=list)
     obstacle_polygons_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
+    # Row #6: water-body polygons (ponds, canals, reservoirs) on the wire so
+    # /refresh-inverters and /add-road can rebuild usable_polygon with the
+    # same exclusions /layout originally applied. Optional + default-empty
+    # for backward-compat with older clients.
+    water_obstacle_polygons_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     # WGS84 (lon, lat) corner rings of placed_tables / placed_icrs — emitted
     # so the desktop's MapCanvas can render polygons without client-side
     # UTM↔WGS84 projection. Each ring is a closed 5-tuple [TL, TR, BR, BL, TL].

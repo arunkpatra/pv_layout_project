@@ -52,6 +52,19 @@ def reconstruct_usable_polygon(
         if usable.is_empty:
             return None
 
+    # Row #6: subtract water-body polygons (ponds, canals, reservoirs).
+    # Mirrors layout_engine.run_layout's section 3a so /refresh-inverters and
+    # /add-road reconstruct the SAME usable_polygon /layout originally produced.
+    water_polys = []
+    for wo in getattr(result, "water_obstacle_polygons_wgs84", []) or []:
+        wo_utm = wgs84_to_utm(wo, result.utm_epsg)
+        if len(wo_utm) >= 3:
+            water_polys.append(Polygon(wo_utm))
+    if water_polys:
+        usable = usable.difference(unary_union(water_polys))
+        if usable.is_empty:
+            return None
+
     # Subtract user-drawn obstructions (already in UTM)
     road_polys = [
         Polygon(rd.points_utm) for rd in result.placed_roads if len(rd.points_utm) >= 3
