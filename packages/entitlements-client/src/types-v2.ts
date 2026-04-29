@@ -161,3 +161,100 @@ export type UsageReportV2Result = z.infer<typeof usageReportV2ResultSchema>
 export const usageReportV2ResponseSchema = v2SuccessResponseSchema(
   usageReportV2ResultSchema
 )
+
+// ---------------------------------------------------------------------------
+// /v2/blobs/* — pre-signed S3 upload URLs (B6 KMZ + B7 run-result)
+// ---------------------------------------------------------------------------
+
+/**
+ * KMZ upload-URL request. The desktop computes sha256 over the KMZ bytes
+ * and reports the file size; both are signed into the resulting URL so
+ * the PUT must declare matching `Content-Type`/`Content-Length`. Backend
+ * cap: 50 MB (52428800 bytes).
+ *
+ * Backend's content-addressed key path is
+ * `projects/<userId>/kmz/<sha256>.kmz` — re-uploading the same KMZ is an
+ * idempotent S3 overwrite (same key, same bytes). See B6 handoff
+ * 2026-04-30.
+ */
+export const kmzUploadUrlRequestSchema = z.object({
+  kmzSha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/u, "sha256 must be 64 lowercase hex chars"),
+  kmzSize: z
+    .number()
+    .int()
+    .min(1)
+    .max(52_428_800, "kmzSize cannot exceed 50 MB"),
+})
+
+export type KmzUploadUrlRequest = z.infer<typeof kmzUploadUrlRequestSchema>
+
+/**
+ * Common shape of B6 + B7 + B16-embedded responses: a presigned PUT URL,
+ * the eventual `s3://...` blob reference (passed back to B11 / B16 as
+ * `kmzBlobUrl` / `layoutResultBlobUrl`), and a 15-minute expiry.
+ */
+export const presignedUploadUrlResultSchema = z.object({
+  uploadUrl: z.string().url(),
+  blobUrl: z.string(),
+  expiresAt: z.string().datetime(),
+})
+
+export type PresignedUploadUrlResult = z.infer<
+  typeof presignedUploadUrlResultSchema
+>
+
+export const kmzUploadUrlResponseSchema = v2SuccessResponseSchema(
+  presignedUploadUrlResultSchema
+)
+
+/**
+ * Run-result upload-URL request (B7). Discriminated by `type`; backend
+ * enforces a per-type Content-Type + size cap + S3 key prefix:
+ *   layout / energy → application/json   (25 / 10 MB)   runs/<r>/<t>.json
+ *   dxf             → application/dxf    (100 MB)       runs/<r>/exports/run.dxf
+ *   pdf             → application/pdf    (50 MB)        runs/<r>/exports/run.pdf
+ *   kmz             → application/vnd.google-earth.kmz (50 MB)  runs/<r>/exports/run.kmz
+ *
+ * Ownership is enforced server-side: Run must exist + not be soft-deleted
+ * + belong to a non-deleted Project owned by the caller. 404 otherwise.
+ */
+export const runResultTypes = [
+  "layout",
+  "energy",
+  "dxf",
+  "pdf",
+  "kmz",
+] as const
+
+export type RunResultType = (typeof runResultTypes)[number]
+
+export const runResultTypeSchema = z.enum(runResultTypes)
+
+export const runResultUploadUrlRequestSchema = z.object({
+  type: runResultTypeSchema,
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  size: z.number().int().min(1),
+})
+
+export type RunResultUploadUrlRequest = z.infer<
+  typeof runResultUploadUrlRequestSchema
+>
+
+/** Per-type Content-Type strings the desktop MUST send on PUT. */
+export const RUN_RESULT_CONTENT_TYPES: Record<RunResultType, string> = {
+  layout: "application/json",
+  energy: "application/json",
+  dxf: "application/dxf",
+  pdf: "application/pdf",
+  kmz: "application/vnd.google-earth.kmz",
+}
+
+/** KMZ Content-Type the desktop MUST send on PUT for B6 uploads. */
+export const KMZ_CONTENT_TYPE = "application/vnd.google-earth.kmz"
+
+export const runResultUploadUrlResponseSchema = v2SuccessResponseSchema(
+  presignedUploadUrlResultSchema
+)

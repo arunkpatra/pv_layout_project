@@ -30,9 +30,13 @@ import {
 } from "./types"
 import {
   entitlementSummaryV2ResponseSchema,
+  kmzUploadUrlResponseSchema,
+  runResultUploadUrlResponseSchema,
   usageReportV2ResponseSchema,
   v2ErrorResponseSchema,
   type EntitlementSummaryV2,
+  type PresignedUploadUrlResult,
+  type RunResultType,
   type UsageReportV2Result,
   type V2ErrorCode,
 } from "./types-v2"
@@ -82,6 +86,38 @@ export interface EntitlementsClient {
     feature: string,
     idempotencyKey: string
   ): Promise<UsageReportV2Result>
+  /**
+   * V2 — `POST /v2/blobs/kmz-upload-url` (B6). Mints a 15-minute
+   * presigned PUT URL for a KMZ blob keyed by sha256. Caller PUTs
+   * `Content-Type: application/vnd.google-earth.kmz` + matching
+   * `Content-Length`. The returned `blobUrl` is what the caller passes
+   * to B11 (`POST /v2/projects`) as `kmzBlobUrl`.
+   */
+  getKmzUploadUrl(
+    key: string,
+    sha256: string,
+    size: number
+  ): Promise<PresignedUploadUrlResult>
+  /**
+   * V2 — `POST /v2/blobs/run-result-upload-url` (B7). Mints a
+   * 15-minute presigned PUT URL for one of the per-run result blobs.
+   * Backend ownership-checks: the (projectId, runId) pair must exist,
+   * not be soft-deleted, and belong to the caller. 404 otherwise.
+   *
+   * For the *primary* layout/energy result of a freshly-created run,
+   * prefer the upload URL embedded in B16's response (`POST
+   * /v2/projects/:id/runs`). Use B7 for additional exports
+   * (DXF/PDF/KMZ) after the run exists.
+   */
+  getRunResultUploadUrl(
+    key: string,
+    args: {
+      type: RunResultType
+      projectId: string
+      runId: string
+      size: number
+    }
+  ): Promise<PresignedUploadUrlResult>
 }
 
 /**
@@ -245,6 +281,43 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `V2 usage-report response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async getKmzUploadUrl(key, sha256, size) {
+      const raw = await request(
+        "/v2/blobs/kmz-upload-url",
+        {
+          method: "POST",
+          body: JSON.stringify({ kmzSha256: sha256, kmzSize: size }),
+        },
+        key
+      )
+      const parsed = kmzUploadUrlResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `KMZ upload-url response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async getRunResultUploadUrl(key, args) {
+      const raw = await request(
+        "/v2/blobs/run-result-upload-url",
+        { method: "POST", body: JSON.stringify(args) },
+        key
+      )
+      const parsed = runResultUploadUrlResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Run-result upload-url response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

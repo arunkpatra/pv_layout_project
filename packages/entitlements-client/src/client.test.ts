@@ -603,3 +603,246 @@ describe("reportUsageV2", () => {
     expect(a).toEqual(b) // …but the server returns the same payload.
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — getKmzUploadUrl (B6)
+// ---------------------------------------------------------------------------
+
+const SAMPLE_SHA256 =
+  "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+
+const successKmzUploadUrl = {
+  success: true,
+  data: {
+    uploadUrl:
+      "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/usr_abc/kmz/9f86.kmz?X-Amz-Signature=...",
+    blobUrl: `s3://solarlayout-local-projects/projects/usr_abc/kmz/${SAMPLE_SHA256}.kmz`,
+    expiresAt: "2026-04-30T12:15:00.000Z",
+  },
+}
+
+describe("getKmzUploadUrl", () => {
+  test("posts {kmzSha256, kmzSize} to /v2/blobs/kmz-upload-url and returns the presigned URL", async () => {
+    let seenUrl = ""
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successKmzUploadUrl)
+      },
+    })
+    const res = await client.getKmzUploadUrl(KEY, SAMPLE_SHA256, 1234)
+    expect(seenUrl).toBe(
+      "https://api.solarlayout.in/v2/blobs/kmz-upload-url"
+    )
+    expect(JSON.parse(seenBody)).toEqual({
+      kmzSha256: SAMPLE_SHA256,
+      kmzSize: 1234,
+    })
+    expect(res.uploadUrl).toContain("X-Amz-Signature")
+    expect(res.blobUrl).toContain(`/${SAMPLE_SHA256}.kmz`)
+    expect(res.expiresAt).toBe("2026-04-30T12:15:00.000Z")
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successKmzUploadUrl)
+      },
+    })
+    await client.getKmzUploadUrl(KEY, SAMPLE_SHA256, 1)
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 400 VALIDATION_ERROR (size out of range)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "kmzSize must be 1..52428800",
+              details: { field: "kmzSize", got: 99_999_999 },
+            },
+          },
+          400
+        ),
+    })
+    try {
+      await client.getKmzUploadUrl(KEY, SAMPLE_SHA256, 99_999_999)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(400)
+      expect(e.code).toBe("VALIDATION_ERROR")
+      expect(e.message).toContain("kmzSize")
+    }
+  })
+
+  test("maps 503 S3_NOT_CONFIGURED (env not wired)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "S3_NOT_CONFIGURED",
+              message: "S3 bucket env var missing",
+            },
+          },
+          503
+        ),
+    })
+    try {
+      await client.getKmzUploadUrl(KEY, SAMPLE_SHA256, 1)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(503)
+      expect(e.code).toBe("S3_NOT_CONFIGURED")
+    }
+  })
+
+  test("rejects malformed presigned-URL response (schema guard)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          success: true,
+          data: { uploadUrl: "not-a-url", blobUrl: "x", expiresAt: "x" },
+        }),
+    })
+    try {
+      await client.getKmzUploadUrl(KEY, SAMPLE_SHA256, 1)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// V2 — getRunResultUploadUrl (B7)
+// ---------------------------------------------------------------------------
+
+const successRunResultUploadUrl = {
+  success: true,
+  data: {
+    uploadUrl:
+      "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/usr_abc/prj_xyz/runs/run_qrs/exports/run.dxf?X-Amz-Signature=...",
+    blobUrl:
+      "s3://solarlayout-local-projects/projects/usr_abc/prj_xyz/runs/run_qrs/exports/run.dxf",
+    expiresAt: "2026-04-30T12:15:00.000Z",
+  },
+}
+
+describe("getRunResultUploadUrl", () => {
+  test("posts {type, projectId, runId, size} for DXF export", async () => {
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successRunResultUploadUrl)
+      },
+    })
+    const res = await client.getRunResultUploadUrl(KEY, {
+      type: "dxf",
+      projectId: "prj_xyz",
+      runId: "run_qrs",
+      size: 1024,
+    })
+    expect(JSON.parse(seenBody)).toEqual({
+      type: "dxf",
+      projectId: "prj_xyz",
+      runId: "run_qrs",
+      size: 1024,
+    })
+    expect(res.uploadUrl).toContain("exports/run.dxf")
+  })
+
+  test("targets /v2/blobs/run-result-upload-url on the configured base URL", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      baseUrl: "http://localhost:3003",
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return jsonResponse(successRunResultUploadUrl)
+      },
+    })
+    await client.getRunResultUploadUrl(KEY, {
+      type: "layout",
+      projectId: "prj_xyz",
+      runId: "run_qrs",
+      size: 1,
+    })
+    expect(seenUrl).toBe(
+      "http://localhost:3003/v2/blobs/run-result-upload-url"
+    )
+  })
+
+  test("maps 404 NOT_FOUND when projectId/runId don't exist or aren't yours", async () => {
+    // Backend ownership rule — surfaces as 404 from the run-result mint.
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Run \"run_missing\" not found",
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.getRunResultUploadUrl(KEY, {
+        type: "pdf",
+        projectId: "prj_x",
+        runId: "run_missing",
+        size: 1,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("maps 400 VALIDATION_ERROR for unknown discriminator type", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "type must be one of layout|energy|dxf|pdf|kmz",
+            },
+          },
+          400
+        ),
+    })
+    try {
+      // Cast: simulate a caller passing a wrong literal — the wire is what
+      // we're testing. Type-system would normally prevent this.
+      await client.getRunResultUploadUrl(KEY, {
+        type: "json" as unknown as "dxf",
+        projectId: "prj_x",
+        runId: "run_x",
+        size: 1,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(400)
+      expect(e.code).toBe("VALIDATION_ERROR")
+    }
+  })
+})

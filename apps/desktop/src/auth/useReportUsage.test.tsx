@@ -41,8 +41,10 @@ function makeClient(
     reportUsage: vi.fn(),
     getEntitlementsV2: vi.fn(),
     reportUsageV2: vi.fn(),
+    getKmzUploadUrl: vi.fn(),
+    getRunResultUploadUrl: vi.fn(),
     ...overrides,
-  }
+  } as EntitlementsClient
 }
 
 function makeWrapper(): {
