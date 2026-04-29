@@ -16,16 +16,29 @@
  * suitable for pasting into the desktop session.
  */
 
-import crypto from "node:crypto"
 import { adminPrisma } from "../src/index.js"
 
 const FIXTURE_PREFIX = "_desktop_test_"
+
+/**
+ * Stable IDs for the PRO_PLUS user's B7 fixture (Project + Run). These
+ * are 40-char alphanumeric IDs the desktop can hardcode in test
+ * fixtures and trust to survive seed re-runs. The shape matches the
+ * semantic-ID extension's contract (`<prefix>_<36-char-base62>`).
+ */
+export const FIXTURE_IDS = {
+  PRO_PLUS_PROJECT: "prj_b7fixturePROPLUS00000000000000000000",
+  PRO_PLUS_RUN: "run_b7fixturePROPLUS00000000000000000000",
+} as const
 
 interface FixtureSpec {
   scenario: string
   clerkId: string
   email: string
   name: string
+  /** Stable license-key suffix — script reuses it on every re-run so
+   *  the desktop can hardcode the resulting key in test fixtures. */
+  keySuffix: string
   /** entitlement specs in creation order; quota math takes max across them */
   entitlements: Array<{
     productSlug: string
@@ -34,6 +47,9 @@ interface FixtureSpec {
   }>
   /** how many projects to create */
   projectCount: number
+  /** when set, also seeds 1 UsageRecord + 1 Run with stable IDs so
+   *  the desktop can exercise B7 against real (projectId, runId) */
+  withB7Fixture?: boolean
   /** plain-English description for the markdown summary */
   description: string
 }
@@ -44,6 +60,7 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}free`,
     email: "desktop-test-free@solarlayout.test",
     name: "FREE",
+    keySuffix: "stable",
     entitlements: [{ productSlug: "pv-layout-free", usedCalculations: 0 }],
     projectCount: 0,
     description: "Free 5/5 remaining; 0 projects",
@@ -53,6 +70,7 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}basic`,
     email: "desktop-test-basic@solarlayout.test",
     name: "BASIC",
+    keySuffix: "stable",
     entitlements: [
       { productSlug: "pv-layout-free", usedCalculations: 5 },
       { productSlug: "pv-layout-basic", usedCalculations: 0 },
@@ -65,6 +83,7 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}pro`,
     email: "desktop-test-pro@solarlayout.test",
     name: "PRO",
+    keySuffix: "stable",
     entitlements: [
       { productSlug: "pv-layout-free", usedCalculations: 5 },
       { productSlug: "pv-layout-pro", usedCalculations: 0 },
@@ -77,18 +96,22 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}pro_plus`,
     email: "desktop-test-pro_plus@solarlayout.test",
     name: "PRO_PLUS",
+    keySuffix: "stable",
     entitlements: [
       { productSlug: "pv-layout-free", usedCalculations: 5 },
       { productSlug: "pv-layout-pro-plus", usedCalculations: 0 },
     ],
     projectCount: 0,
-    description: "Free 0/5 + Pro Plus 50/50 remaining; 0 projects",
+    withB7Fixture: true,
+    description:
+      "Free 0/5 + Pro Plus 50/50 remaining; 1 Project + 1 Run with stable IDs (FIXTURE_IDS) for B7 verification across all 5 result types",
   },
   {
     scenario: "MULTI",
     clerkId: `${FIXTURE_PREFIX}multi`,
     email: "desktop-test-multi@solarlayout.test",
     name: "MULTI",
+    keySuffix: "stable",
     entitlements: [
       { productSlug: "pv-layout-free", usedCalculations: 2 },
       { productSlug: "pv-layout-pro", usedCalculations: 2 },
@@ -102,6 +125,7 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}exhausted`,
     email: "desktop-test-exhausted@solarlayout.test",
     name: "EXHAUSTED",
+    keySuffix: "stable",
     entitlements: [
       { productSlug: "pv-layout-free", usedCalculations: 5 },
       { productSlug: "pv-layout-pro", usedCalculations: 10 },
@@ -115,6 +139,7 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}deactivated`,
     email: "desktop-test-deactivated@solarlayout.test",
     name: "DEACTIVATED",
+    keySuffix: "stable",
     entitlements: [
       {
         productSlug: "pv-layout-pro",
@@ -131,6 +156,7 @@ const FIXTURES: FixtureSpec[] = [
     clerkId: `${FIXTURE_PREFIX}quota_edge`,
     email: "desktop-test-quota_edge@solarlayout.test",
     name: "QUOTA_EDGE",
+    keySuffix: "stable",
     entitlements: [{ productSlug: "pv-layout-free", usedCalculations: 0 }],
     projectCount: 3,
     description:
@@ -203,9 +229,10 @@ async function provision(spec: FixtureSpec): Promise<{ key: string }> {
       })
     }
 
-    const keySuffix = crypto.randomBytes(8).toString("base64url")
-    const key = `sl_live_desktop_test_${spec.scenario}_${keySuffix}`
-    await tx.licenseKey.create({ data: { userId: user.id, key } })
+    const key = `sl_live_desktop_test_${spec.scenario}_${spec.keySuffix}`
+    const licenseKey = await tx.licenseKey.create({
+      data: { userId: user.id, key },
+    })
 
     for (let i = 0; i < spec.projectCount; i++) {
       await tx.project.create({
@@ -214,6 +241,49 @@ async function provision(spec: FixtureSpec): Promise<{ key: string }> {
           name: `${spec.scenario} Project ${i + 1}`,
           kmzBlobUrl: `s3://solarlayout-local-projects/projects/${user.id}/kmz/${"0".repeat(63)}${i}.kmz`,
           kmzSha256: `${"0".repeat(63)}${i}`,
+        },
+      })
+    }
+
+    if (spec.withB7Fixture) {
+      // Find an active+non-exhausted entitlement to bill the seeded Run against.
+      // For PRO_PLUS this is the Pro Plus entitlement.
+      const activeEnt = await tx.entitlement.findFirstOrThrow({
+        where: { userId: user.id, deactivatedAt: null },
+        include: { product: true },
+      })
+
+      await tx.project.create({
+        data: {
+          id: FIXTURE_IDS.PRO_PLUS_PROJECT,
+          userId: user.id,
+          name: "B7 fixture",
+          kmzBlobUrl: `s3://solarlayout-local-projects/projects/${user.id}/kmz/${"f".repeat(64)}.kmz`,
+          kmzSha256: "f".repeat(64),
+        },
+      })
+
+      const usageRecord = await tx.usageRecord.create({
+        data: {
+          userId: user.id,
+          licenseKeyId: licenseKey.id,
+          productId: activeEnt.productId,
+          featureKey: "plant_layout",
+        },
+      })
+
+      await tx.run.create({
+        data: {
+          id: FIXTURE_IDS.PRO_PLUS_RUN,
+          projectId: FIXTURE_IDS.PRO_PLUS_PROJECT,
+          name: "B7 fixture run",
+          params: { rows: 4, cols: 4 },
+          inputsSnapshot: {
+            kmzSha256: "f".repeat(64),
+            note: "B7 verification fixture — desktop hardcodes runId in tests",
+          },
+          billedFeatureKey: "plant_layout",
+          usageRecordId: usageRecord.id,
         },
       })
     }
@@ -241,6 +311,9 @@ async function main() {
   for (const { spec, key } of results) {
     console.log(`| ${spec.scenario} | \`${key}\` | ${spec.description} |`)
   }
+  console.log("\nB7 fixture stable IDs (PRO_PLUS user):")
+  console.log(`  projectId = ${FIXTURE_IDS.PRO_PLUS_PROJECT}`)
+  console.log(`  runId     = ${FIXTURE_IDS.PRO_PLUS_RUN}`)
   console.log("=".repeat(78))
 }
 
