@@ -258,3 +258,59 @@ export const KMZ_CONTENT_TYPE = "application/vnd.google-earth.kmz"
 export const runResultUploadUrlResponseSchema = v2SuccessResponseSchema(
   presignedUploadUrlResultSchema
 )
+
+// ---------------------------------------------------------------------------
+// /v2/projects — B11 (POST = create) + Project wire shape
+// ---------------------------------------------------------------------------
+
+/**
+ * B11 request body. Mirrors `CreateProjectSchema` in
+ * `renewable_energy/apps/mvp_api/src/modules/projects/projects.routes.ts`:
+ *   - `name` 1..200 chars
+ *   - `kmzBlobUrl` non-empty (`s3://<bucket>/projects/<userId>/kmz/<sha>.kmz`)
+ *   - `kmzSha256` 64-char lowercase hex
+ *   - `edits` optional, opaque JSON; defaults to `{}` server-side
+ *
+ * The `kmzBlobUrl` + `kmzSha256` fields come from the F6 `uploadKmzToS3`
+ * orchestrator's return value; the desktop never mints these directly.
+ */
+export const createProjectV2RequestSchema = z.object({
+  name: z.string().min(1).max(200),
+  kmzBlobUrl: z.string().min(1),
+  kmzSha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/u, "sha256 must be 64 lowercase hex chars"),
+  edits: z.unknown().optional(),
+})
+
+export type CreateProjectV2Request = z.infer<typeof createProjectV2RequestSchema>
+
+/**
+ * Backend `ProjectWire` shape returned by B11/B12/B13 (`createProject`,
+ * `getProject`, `patchProject`). Mirrors `ProjectWire` in
+ * `renewable_energy/apps/mvp_api/src/modules/projects/projects.service.ts`.
+ *
+ *   - `id` semantic-prefixed (`prj_*`)
+ *   - `userId` opaque (`usr_*`); the desktop is single-user-per-key so
+ *     this is informational only
+ *   - `edits` is opaque JSON (server-side `Json` column); the desktop
+ *     treats it as `unknown` until D1–D7 narrow it
+ *   - `deletedAt` is null for live projects; soft-deleted ones carry a
+ *     timestamp string. The desktop's active flow only sees null.
+ */
+export const projectV2WireSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  name: z.string(),
+  kmzBlobUrl: z.string().min(1),
+  kmzSha256: z.string().regex(/^[0-9a-f]{64}$/u),
+  edits: z.unknown(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  deletedAt: z.string().nullable(),
+})
+
+export type ProjectV2Wire = z.infer<typeof projectV2WireSchema>
+
+export const createProjectV2ResponseSchema =
+  v2SuccessResponseSchema(projectV2WireSchema)

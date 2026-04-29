@@ -846,3 +846,210 @@ describe("getRunResultUploadUrl", () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — createProjectV2 (B11)
+// ---------------------------------------------------------------------------
+
+const SAMPLE_KMZ_SHA =
+  "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+
+const successCreatedProject = {
+  success: true,
+  data: {
+    id: "prj_abc123",
+    userId: "usr_test1",
+    name: "Site A",
+    kmzBlobUrl: `s3://solarlayout-local-projects/projects/usr_test1/kmz/${SAMPLE_KMZ_SHA}.kmz`,
+    kmzSha256: SAMPLE_KMZ_SHA,
+    edits: {},
+    createdAt: "2026-04-30T12:00:00.000Z",
+    updatedAt: "2026-04-30T12:00:00.000Z",
+    deletedAt: null,
+  },
+}
+
+describe("createProjectV2", () => {
+  test("posts {name, kmzBlobUrl, kmzSha256} to /v2/projects and returns the new project", async () => {
+    let seenUrl = ""
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successCreatedProject, 201)
+      },
+    })
+    const project = await client.createProjectV2(KEY, {
+      name: "Site A",
+      kmzBlobUrl: successCreatedProject.data.kmzBlobUrl,
+      kmzSha256: SAMPLE_KMZ_SHA,
+    })
+    expect(seenUrl).toBe("https://api.solarlayout.in/v2/projects")
+    expect(JSON.parse(seenBody)).toEqual({
+      name: "Site A",
+      kmzBlobUrl: successCreatedProject.data.kmzBlobUrl,
+      kmzSha256: SAMPLE_KMZ_SHA,
+    })
+    expect(project.id).toBe("prj_abc123")
+    expect(project.name).toBe("Site A")
+    expect(project.kmzSha256).toBe(SAMPLE_KMZ_SHA)
+    expect(project.deletedAt).toBeNull()
+  })
+
+  test("forwards optional edits when supplied", async () => {
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successCreatedProject, 201)
+      },
+    })
+    const customEdits = { layoutOverrides: { rows: 8 } }
+    await client.createProjectV2(KEY, {
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: SAMPLE_KMZ_SHA,
+      edits: customEdits,
+    })
+    expect(JSON.parse(seenBody).edits).toEqual(customEdits)
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successCreatedProject, 201)
+      },
+    })
+    await client.createProjectV2(KEY, {
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: SAMPLE_KMZ_SHA,
+    })
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 402 PAYMENT_REQUIRED with quota numbers in the message (over-quota)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "PAYMENT_REQUIRED",
+              message:
+                "Project quota exhausted (3/3). Delete a project or upgrade your plan to add more.",
+            },
+          },
+          402
+        ),
+    })
+    try {
+      await client.createProjectV2(KEY, {
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: SAMPLE_KMZ_SHA,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(402)
+      expect(e.code).toBe("PAYMENT_REQUIRED")
+      expect(e.message).toContain("3/3")
+    }
+  })
+
+  test("maps 401 UNAUTHORIZED via V2 envelope", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "License key not recognised.",
+            },
+          },
+          401
+        ),
+    })
+    try {
+      await client.createProjectV2(KEY, {
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: SAMPLE_KMZ_SHA,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(401)
+      expect(e.code).toBe("UNAUTHORIZED")
+    }
+  })
+
+  test("maps 400 VALIDATION_ERROR (e.g. bad sha256)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Invalid request body",
+              details: { fieldErrors: { kmzSha256: ["must be 64-char hex"] } },
+            },
+          },
+          400
+        ),
+    })
+    try {
+      await client.createProjectV2(KEY, {
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: "nope",
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(400)
+      expect(e.code).toBe("VALIDATION_ERROR")
+    }
+  })
+
+  test("rejects a malformed success body (schema guard — missing deletedAt)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: true,
+            data: {
+              id: "prj_abc",
+              userId: "usr_x",
+              name: "Site A",
+              kmzBlobUrl: "s3://b/k",
+              kmzSha256: SAMPLE_KMZ_SHA,
+              edits: {},
+              createdAt: "2026-04-30T12:00:00.000Z",
+              updatedAt: "2026-04-30T12:00:00.000Z",
+              // missing deletedAt
+            },
+          },
+          201
+        ),
+    })
+    try {
+      await client.createProjectV2(KEY, {
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: SAMPLE_KMZ_SHA,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+})

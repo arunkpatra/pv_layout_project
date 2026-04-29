@@ -19,6 +19,9 @@ import {
   projectQuotaStateSchema,
   entitlementSummaryV2DataSchema,
   entitlementSummaryV2ResponseSchema,
+  createProjectV2RequestSchema,
+  createProjectV2ResponseSchema,
+  projectV2WireSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
 } from "./types-v2"
@@ -263,6 +266,143 @@ describe("entitlementSummaryV2ResponseSchema", () => {
         remainingCalculations: 0,
         // missing V2 fields
       },
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B11 — POST /v2/projects (create-project request + project wire shape)
+// ---------------------------------------------------------------------------
+
+const VALID_SHA = "a".repeat(64)
+
+describe("createProjectV2RequestSchema", () => {
+  test("parses a minimal valid body", () => {
+    const r = createProjectV2RequestSchema.safeParse({
+      name: "Site A",
+      kmzBlobUrl: `s3://b/projects/u/kmz/${VALID_SHA}.kmz`,
+      kmzSha256: VALID_SHA,
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("accepts optional edits passthrough", () => {
+    const r = createProjectV2RequestSchema.safeParse({
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: VALID_SHA,
+      edits: { layoutOverrides: { rows: 8 } },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects empty name", () => {
+    const r = createProjectV2RequestSchema.safeParse({
+      name: "",
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: VALID_SHA,
+    })
+    expect(r.success).toBe(false)
+  })
+
+  test("rejects name longer than 200 chars", () => {
+    const r = createProjectV2RequestSchema.safeParse({
+      name: "x".repeat(201),
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: VALID_SHA,
+    })
+    expect(r.success).toBe(false)
+  })
+
+  test("rejects non-hex sha256", () => {
+    const r = createProjectV2RequestSchema.safeParse({
+      name: "ok",
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: "nope",
+    })
+    expect(r.success).toBe(false)
+  })
+
+  test("rejects sha256 with uppercase hex (backend wants lowercase)", () => {
+    const r = createProjectV2RequestSchema.safeParse({
+      name: "ok",
+      kmzBlobUrl: "s3://b/k",
+      kmzSha256: "A".repeat(64),
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("projectV2WireSchema", () => {
+  const wireFixture = {
+    id: "prj_abc123",
+    userId: "usr_test1",
+    name: "Site A",
+    kmzBlobUrl: `s3://solarlayout-local-projects/projects/usr_test1/kmz/${VALID_SHA}.kmz`,
+    kmzSha256: VALID_SHA,
+    edits: {},
+    createdAt: "2026-04-30T12:00:00.000Z",
+    updatedAt: "2026-04-30T12:00:00.000Z",
+    deletedAt: null,
+  }
+
+  test("parses the full backend ProjectWire shape", () => {
+    expect(projectV2WireSchema.safeParse(wireFixture).success).toBe(true)
+  })
+
+  test("accepts deletedAt as a soft-delete timestamp", () => {
+    const r = projectV2WireSchema.safeParse({
+      ...wireFixture,
+      deletedAt: "2026-04-30T13:00:00.000Z",
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("accepts arbitrary edits (unknown JSON)", () => {
+    const r = projectV2WireSchema.safeParse({
+      ...wireFixture,
+      edits: { layoutOverrides: { rows: 8 } },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when deletedAt is missing entirely (must be string|null)", () => {
+    const v = { ...wireFixture } as Record<string, unknown>
+    delete v.deletedAt
+    expect(projectV2WireSchema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects when userId is missing", () => {
+    const v = { ...wireFixture } as Record<string, unknown>
+    delete v.userId
+    expect(projectV2WireSchema.safeParse(v).success).toBe(false)
+  })
+})
+
+describe("createProjectV2ResponseSchema", () => {
+  test("parses the V2 success envelope around a Project wire", () => {
+    const r = createProjectV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        id: "prj_abc",
+        userId: "usr_x",
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: VALID_SHA,
+        edits: {},
+        createdAt: "2026-04-30T12:00:00.000Z",
+        updatedAt: "2026-04-30T12:00:00.000Z",
+        deletedAt: null,
+      },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects {success: false} (that's the V2 error envelope)", () => {
+    const r = createProjectV2ResponseSchema.safeParse({
+      success: false,
+      error: { code: "PAYMENT_REQUIRED", message: "x" },
     })
     expect(r.success).toBe(false)
   })

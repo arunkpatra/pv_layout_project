@@ -37,6 +37,7 @@ function makeClient(
     reportUsageV2: vi.fn(),
     getKmzUploadUrl: vi.fn(),
     getRunResultUploadUrl: vi.fn(),
+    createProjectV2: vi.fn(),
     ...overrides,
   }
 }

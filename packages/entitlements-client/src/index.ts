@@ -59,6 +59,9 @@ export {
   runResultUploadUrlRequestSchema,
   runResultUploadUrlResponseSchema,
   presignedUploadUrlResultSchema,
+  createProjectV2RequestSchema,
+  createProjectV2ResponseSchema,
+  projectV2WireSchema,
   KMZ_CONTENT_TYPE,
   RUN_RESULT_CONTENT_TYPES,
   type V2ErrorCode,
@@ -72,4 +75,6 @@ export {
   type RunResultType,
   type RunResultUploadUrlRequest,
   type PresignedUploadUrlResult,
+  type CreateProjectV2Request,
+  type ProjectV2Wire,
 } from "./types-v2"

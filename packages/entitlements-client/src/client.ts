@@ -29,13 +29,16 @@ import {
   type UsageReportResult,
 } from "./types"
 import {
+  createProjectV2ResponseSchema,
   entitlementSummaryV2ResponseSchema,
   kmzUploadUrlResponseSchema,
   runResultUploadUrlResponseSchema,
   usageReportV2ResponseSchema,
   v2ErrorResponseSchema,
+  type CreateProjectV2Request,
   type EntitlementSummaryV2,
   type PresignedUploadUrlResult,
+  type ProjectV2Wire,
   type RunResultType,
   type UsageReportV2Result,
   type V2ErrorCode,
@@ -118,6 +121,21 @@ export interface EntitlementsClient {
       size: number
     }
   ): Promise<PresignedUploadUrlResult>
+  /**
+   * V2 — `POST /v2/projects` (B11). Creates a new Project row owned by the
+   * caller with the supplied name + S3 KMZ reference. Body must match
+   * `createProjectV2RequestSchema`; the desktop's normal flow is
+   *   uploadKmzToS3() → use the returned blobUrl + kmzSha256 here.
+   *
+   * Backend ordering: quota check first (402 PAYMENT_REQUIRED if at
+   * `projectsRemaining = 0`), then row insert. Returns 201 with the new
+   * `ProjectV2Wire` row on success. The desktop maps the 402 code to the
+   * upsell modal in `useCreateProjectMutation`.
+   */
+  createProjectV2(
+    key: string,
+    body: CreateProjectV2Request
+  ): Promise<ProjectV2Wire>
 }
 
 /**
@@ -318,6 +336,23 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `Run-result upload-url response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async createProjectV2(key, body) {
+      const raw = await request(
+        "/v2/projects",
+        { method: "POST", body: JSON.stringify(body) },
+        key
+      )
+      const parsed = createProjectV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Create-project response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

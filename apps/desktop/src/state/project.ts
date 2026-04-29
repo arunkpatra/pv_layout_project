@@ -18,6 +18,7 @@
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
 import type { ParsedKMZ } from "@solarlayout/sidecar-client"
+import type { ProjectV2Wire } from "@solarlayout/entitlements-client"
 
 // ---------------------------------------------------------------------------
 // Parity-era types — the locally-parsed KMZ workflow.
@@ -42,28 +43,29 @@ export type RunId = string
  * User-authored edits to a project that aren't part of the original KMZ —
  * drawn obstructions, water bodies, road overrides, ICR repositions, etc.
  *
- * Starts empty; D1–D7 rows extend the shape as drawing tools land. Backend
- * round-trips this as an opaque JSONB column (`PATCH /v2/projects/:id` with
- * `{edits}` body — see B13).
+ * Starts opaque; D1–D7 rows narrow the shape as drawing tools land. Backend
+ * round-trips this as an opaque JSON column (`PATCH /v2/projects/:id` with
+ * `{edits}` body — see B13). At parity-close (2026-04-29) the desktop has
+ * no edits to round-trip, so a fresh project always carries `{}`.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface ProjectEdits {}
+export type ProjectEdits = unknown
 
 /**
- * Backend-persisted project metadata. The KMZ blob itself lives in S3 at
- * `kmzBlobUrl`; this struct only holds the URL + sha256 fingerprint.
- * Mirrors the `Project` Prisma model shape from
- * `renewable_energy/packages/mvp_db/prisma/schema.prisma` (B3).
+ * Backend-persisted project metadata. Type-alias of B11/B12/B13's
+ * `ProjectV2Wire` response shape — the desktop stores the wire row
+ * verbatim, no adapter. The KMZ blob itself lives in S3 at `kmzBlobUrl`;
+ * this struct only holds the URL + sha256 fingerprint.
+ *
+ * `userId` is informational only — the desktop is single-user-per-key,
+ * so it's never used for branching, just persisted for audit. `deletedAt`
+ * is null for live projects in the active flow; soft-deleted records are
+ * filtered out server-side before reaching the desktop.
+ *
+ * Source of truth: `ProjectV2Wire` in
+ * `renewable_energy/apps/mvp_api/src/modules/projects/projects.service.ts`,
+ * mirrored to `packages/entitlements-client/src/types-v2.ts`.
  */
-export interface PersistedProject {
-  id: ProjectId
-  name: string
-  kmzBlobUrl: string
-  kmzSha256: string
-  edits: ProjectEdits
-  createdAt: string
-  updatedAt: string
-}
+export type PersistedProject = ProjectV2Wire
 
 /**
  * Backend-persisted run record. One Run per "Generate Layout" click.

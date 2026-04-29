@@ -44,10 +44,13 @@ import {
   saveLicenseKey,
 } from "./auth/licenseKey"
 import {
+  entitlementsClient,
   useEntitlementsQuery,
   useSyncEntitlementsToSidecar,
 } from "./auth/useEntitlements"
+import { useCreateProjectMutation } from "./auth/useCreateProject"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
+import { EntitlementsError } from "@solarlayout/entitlements-client"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
 import { openAndParseKmz } from "./project/kmzLoader"
@@ -123,8 +126,13 @@ export function App(): JSX.Element {
   // prop-drilling through this component.
   const project = useProjectStore((s) => s.project)
   const setProject = useProjectStore((s) => s.setProject)
+  const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
   const [openError, setOpenError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
+  // P1 — quota-exceeded modal triggered by 402 PAYMENT_REQUIRED from B11.
+  // Holds the human-readable detail from the backend so the modal can
+  // surface "3/3" naturally without re-deriving the numbers locally.
+  const [upsellDetail, setUpsellDetail] = useState<string | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -340,11 +348,29 @@ export function App(): JSX.Element {
     void entQuery.refetch()
   }, [entQuery])
 
+  // ── P1 — new-project mutation (uploadKmzToS3 + createProjectV2) ──────────
+  // Bound to the active license key + module-singleton entitlements client
+  // so successful creates invalidate ["entitlements", key] and the quota
+  // chip + projectsActive update automatically. Tauri runs use the
+  // tauri-plugin-http transport so the S3 PUT bypasses CSP.
+  const createProjectMutation = useCreateProjectMutation(
+    activeKey,
+    entitlementsClient,
+    {
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    }
+  )
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
+  // P1 wiring: parse locally for the canvas (existing behaviour) AND
+  // upload + create the persisted project via B6 → S3 → B11. The two
+  // halves share the same bytes — `openAndParseKmz` returns them so we
+  // don't re-read the file from disk for the upload step.
   const handleOpenKmz = useCallback(async () => {
     if (!sidecarClient || opening) return
     setOpening(true)
     setOpenError(null)
+    setUpsellDetail(null)
     try {
       const result = await openAndParseKmz(sidecarClient)
       if (!result) return // user cancelled the native dialog
@@ -359,6 +385,28 @@ export function App(): JSX.Element {
       resetLayerVisibility()
       resetEditingState()
       setLayoutFormKey((k) => k + 1)
+
+      // Persist via B11 BEFORE touching the parity-era project slice so a
+      // 402 (quota exceeded) leaves the canvas in its prior state — no
+      // half-loaded "ghost project" if the create fails.
+      const projectName = stripKmzExtension(result.fileName)
+      try {
+        const persisted = await createProjectMutation.mutateAsync({
+          bytes: result.bytes,
+          name: projectName,
+        })
+        setCurrentProject(persisted)
+      } catch (err) {
+        if (err instanceof EntitlementsError && err.code === "PAYMENT_REQUIRED") {
+          // Surface upsell modal; leave project state unchanged.
+          setUpsellDetail(err.message)
+          return
+        }
+        // Non-quota errors (upload failures, 401, 5xx) flow through the
+        // generic open-error overlay below.
+        throw err
+      }
+
       setProject({ kmz: result.parsed, fileName: result.fileName })
       setPaletteOpen(false)
     } catch (err) {
@@ -372,10 +420,12 @@ export function App(): JSX.Element {
     sidecarClient,
     opening,
     setProject,
+    setCurrentProject,
     clearLayoutResult,
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
+    createProjectMutation,
   ])
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
@@ -736,6 +786,12 @@ export function App(): JSX.Element {
                 onRetry={() => void handleOpenKmz()}
               />
             )}
+            {upsellDetail && (
+              <UpsellOverlay
+                detail={upsellDetail}
+                onDismiss={() => setUpsellDetail(null)}
+              />
+            )}
             {layoutMutation.isError && (
               <OpenErrorOverlay
                 detail={
@@ -917,6 +973,48 @@ function OpeningOverlay() {
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div className="pointer-events-auto px-[16px] py-[10px] rounded-[var(--radius-md)] bg-[var(--surface-panel)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)] text-[13px] text-[var(--text-secondary)]">
         Parsing KMZ…
+      </div>
+    </div>
+  )
+}
+
+function stripKmzExtension(fileName: string): string {
+  const trimmed = fileName.trim()
+  const lower = trimmed.toLowerCase()
+  if (lower.endsWith(".kmz")) return trimmed.slice(0, -4)
+  if (lower.endsWith(".kml")) return trimmed.slice(0, -4)
+  return trimmed
+}
+
+/**
+ * P1 — quota-exceeded modal. Mirrors `OpenErrorOverlay`'s visual
+ * treatment but leans on the warning surface tokens (vs error) since
+ * over-quota isn't a failure mode — it's a deliberate ceiling. Tap
+ * "Manage projects" to open the project list (P3 lands the actual
+ * recents/manage view; for now this is a no-op placeholder so the
+ * modal isn't dead-end).
+ */
+function UpsellOverlay({
+  detail,
+  onDismiss,
+}: {
+  detail: string
+  onDismiss: () => void
+}) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto max-w-[480px] bg-[var(--surface-panel)] border border-[var(--border-default)] rounded-[var(--radius-lg)] shadow-[var(--shadow-md)] p-[20px] flex flex-col gap-[10px]">
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+          Project quota reached
+        </h2>
+        <p className="text-[12px] text-[var(--text-secondary)] leading-normal break-words">
+          {detail}
+        </p>
+        <div className="flex items-center justify-end gap-[8px]">
+          <Button type="button" variant="ghost" size="md" onClick={onDismiss}>
+            Close
+          </Button>
+        </div>
       </div>
     </div>
   )

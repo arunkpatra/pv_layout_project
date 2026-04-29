@@ -41,7 +41,13 @@ const pickFetch = () => (inTauri() ? (tauriFetch as typeof fetch) : undefined)
 // `renewable_energy/apps/mvp_api/src/env.ts`).
 const apiBaseUrl = import.meta.env.VITE_SOLARLAYOUT_API_URL
 
-const entitlementsClient = createEntitlementsClient({
+/**
+ * Module-singleton client. Exported so V2 mutation hooks
+ * (`useReportUsageMutation`, `useCreateProjectMutation`) bind to the same
+ * instance the entitlements query uses — one base URL, one fetch impl,
+ * one place to swap.
+ */
+export const entitlementsClient = createEntitlementsClient({
   fetchImpl: pickFetch(),
   baseUrl: apiBaseUrl,
 })

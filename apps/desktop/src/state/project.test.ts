@@ -101,12 +101,14 @@ describe("useProjectStore", () => {
 
 const samplePersistedProject: PersistedProject = {
   id: "prj_01HX7Z3K9D2MN5Q8R7T1V4W6Y0",
+  userId: "usr_test1",
   name: "Phase Boundary 2",
   kmzBlobUrl: "https://s3.ap-south-1.amazonaws.com/.../phaseboundary2.kmz",
   kmzSha256: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
   edits: {},
   createdAt: "2026-04-29T10:00:00Z",
   updatedAt: "2026-04-29T10:00:00Z",
+  deletedAt: null,
 }
 
 function makeRun(id: string, projectId: string, name: string): Run {
