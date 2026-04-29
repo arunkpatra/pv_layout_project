@@ -57,6 +57,29 @@ const mockProjectFindMany = mock(
   async (..._args: unknown[]): Promise<MockProject[]> => [],
 )
 
+interface MockProjectDetail {
+  id: string
+  userId: string
+  name: string
+  kmzBlobUrl: string
+  kmzSha256: string
+  edits: unknown
+  createdAt: Date
+  updatedAt: Date
+  deletedAt: Date | null
+  runs: Array<{
+    id: string
+    name: string
+    params: unknown
+    billedFeatureKey: string
+    createdAt: Date
+  }>
+}
+
+const mockProjectFindFirst = mock(
+  async (..._args: unknown[]): Promise<MockProjectDetail | null> => null,
+)
+
 const mockProjectCount = mock(async (..._args: unknown[]) => 0)
 
 const mockProjectCreate = mock(
@@ -98,6 +121,7 @@ mock.module("../../lib/db.js", () => ({
     licenseKey: { findFirst: async () => mockLicenseKey },
     project: {
       findMany: mockProjectFindMany,
+      findFirst: mockProjectFindFirst,
       count: mockProjectCount,
       create: mockProjectCreate,
     },
@@ -445,5 +469,174 @@ describe("POST /v2/projects", () => {
       { data: { edits?: unknown } },
     ]
     expect(call?.[0]?.data?.edits).toEqual(customEdits)
+  })
+})
+
+// ─── B12 — GET /v2/projects/:id ──────────────────────────────────────────────
+
+interface ProjectDetailWire {
+  id: string
+  userId: string
+  name: string
+  kmzBlobUrl: string
+  kmzSha256: string
+  edits: unknown
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+  runs: Array<{
+    id: string
+    name: string
+    params: unknown
+    billedFeatureKey: string
+    createdAt: string
+  }>
+}
+
+const getDetail = (id: string) =>
+  app2.request(`/v2/projects/${id}`, {
+    headers: { Authorization: "Bearer sl_live_testkey" },
+  })
+
+let app2: Hono<MvpHonoEnv>
+
+describe("GET /v2/projects/:id", () => {
+  beforeEach(() => {
+    mockProjectFindFirst.mockReset()
+    mockProjectFindFirst.mockImplementation(async () => null)
+    app2 = makeApp()
+  })
+
+  it("returns 200 + Project with embedded runs[] summary", async () => {
+    const created = new Date("2026-04-01T00:00:00Z")
+    const updated = new Date("2026-04-15T00:00:00Z")
+    const r1 = new Date("2026-04-10T00:00:00Z")
+    const r2 = new Date("2026-04-14T00:00:00Z")
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "a".repeat(64),
+      edits: { foo: "bar" },
+      createdAt: created,
+      updatedAt: updated,
+      deletedAt: null,
+      runs: [
+        {
+          id: "run_2",
+          name: "Run 2",
+          params: { rows: 4, cols: 4 },
+          billedFeatureKey: "plant_layout",
+          createdAt: r2,
+        },
+        {
+          id: "run_1",
+          name: "Run 1",
+          params: { rows: 3, cols: 3 },
+          billedFeatureKey: "plant_layout",
+          createdAt: r1,
+        },
+      ],
+    }))
+    const res = await getDetail("prj_x")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: ProjectDetailWire }
+    expect(body.data.id).toBe("prj_x")
+    expect(body.data.name).toBe("Site A")
+    expect(body.data.kmzSha256).toBe("a".repeat(64))
+    expect(body.data.edits).toEqual({ foo: "bar" })
+    expect(body.data.createdAt).toBe(created.toISOString())
+    expect(body.data.updatedAt).toBe(updated.toISOString())
+    expect(body.data.deletedAt).toBeNull()
+    expect(body.data.runs).toHaveLength(2)
+    expect(body.data.runs[0]!.id).toBe("run_2")
+    expect(body.data.runs[0]!.params).toEqual({ rows: 4, cols: 4 })
+    expect(body.data.runs[0]!.billedFeatureKey).toBe("plant_layout")
+    expect(body.data.runs[0]!.createdAt).toBe(r2.toISOString())
+  })
+
+  it("returns 404 when the project doesn't exist", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await getDetail("prj_nope")
+    expect(res.status).toBe(404)
+    const body = (await res.json()) as { error: { code: string } }
+    expect(body.error.code).toBe("NOT_FOUND")
+  })
+
+  it("returns 404 when the project belongs to another user (where filter excludes by userId)", async () => {
+    // findFirst returns null because the where clause filters userId.
+    // Verifies the route never leaks cross-user info.
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await getDetail("prj_other")
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when the project is soft-deleted", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await getDetail("prj_deleted")
+    expect(res.status).toBe(404)
+  })
+
+  it("scopes the lookup with where: { id, userId, deletedAt: null }", async () => {
+    await getDetail("prj_x")
+    const call = mockProjectFindFirst.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      id: "prj_x",
+      userId: "usr_test1",
+      deletedAt: null,
+    })
+  })
+
+  it("the embedded runs include filters deletedAt:null and orders createdAt DESC, with the right select fields only", async () => {
+    await getDetail("prj_x")
+    const call = mockProjectFindFirst.mock.calls[0] as unknown as [
+      {
+        include: {
+          runs: {
+            where: Record<string, unknown>
+            orderBy: Record<string, "asc" | "desc">
+            select: Record<string, true>
+          }
+        }
+      },
+    ]
+    const runs = call?.[0]?.include?.runs
+    expect(runs?.where).toMatchObject({ deletedAt: null })
+    expect(runs?.orderBy).toEqual({ createdAt: "desc" })
+    // Only the lightweight summary fields — heavy fields stay in B17
+    expect(runs?.select).toMatchObject({
+      id: true,
+      name: true,
+      params: true,
+      billedFeatureKey: true,
+      createdAt: true,
+    })
+    // Heavy fields explicitly NOT selected
+    expect(runs?.select).not.toHaveProperty("inputsSnapshot")
+    expect(runs?.select).not.toHaveProperty("layoutResultBlobUrl")
+    expect(runs?.select).not.toHaveProperty("energyResultBlobUrl")
+    expect(runs?.select).not.toHaveProperty("exportsBlobUrls")
+  })
+
+  it("returns runs: [] for a project with no runs", async () => {
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_norun",
+      userId: "usr_test1",
+      name: "Empty",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "0".repeat(64),
+      edits: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      runs: [],
+    }))
+    const res = await getDetail("prj_norun")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: ProjectDetailWire }
+    expect(body.data.runs).toEqual([])
   })
 })

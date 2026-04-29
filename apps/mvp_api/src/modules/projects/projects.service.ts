@@ -1,5 +1,5 @@
 import { db } from "../../lib/db.js"
-import { AppError } from "../../lib/errors.js"
+import { AppError, NotFoundError } from "../../lib/errors.js"
 import { getProjectQuotaState } from "../entitlements/entitlements.service.js"
 
 export interface ProjectSummary {
@@ -118,5 +118,69 @@ export async function createProject(
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
+  }
+}
+
+export interface RunSummary {
+  id: string
+  name: string
+  params: unknown
+  billedFeatureKey: string
+  createdAt: string
+}
+
+export interface ProjectDetail extends ProjectWire {
+  runs: RunSummary[]
+}
+
+/**
+ * Project detail with embedded run summaries. Heavy fields
+ * (inputsSnapshot, blob URLs, exports list) are intentionally omitted —
+ * the desktop fetches them per-run via B17 (`GET /v2/projects/:id/runs/:runId`)
+ * to keep this list view fast even for projects with many runs.
+ *
+ * 404 on any miss: project doesn't exist, soft-deleted, or owned by a
+ * different user. Cross-user existence is never leaked.
+ */
+export async function getProject(
+  userId: string,
+  projectId: string,
+): Promise<ProjectDetail> {
+  const project = await db.project.findFirst({
+    where: { id: projectId, userId, deletedAt: null },
+    include: {
+      runs: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          params: true,
+          billedFeatureKey: true,
+          createdAt: true,
+        },
+      },
+    },
+  })
+  if (!project) {
+    throw new NotFoundError("Project", projectId)
+  }
+  return {
+    id: project.id,
+    userId: project.userId,
+    name: project.name,
+    kmzBlobUrl: project.kmzBlobUrl,
+    kmzSha256: project.kmzSha256,
+    edits: project.edits,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+    deletedAt: project.deletedAt?.toISOString() ?? null,
+    runs: project.runs.map((r) => ({
+      id: r.id,
+      name: r.name,
+      params: r.params,
+      billedFeatureKey: r.billedFeatureKey,
+      createdAt: r.createdAt.toISOString(),
+    })),
   }
 }

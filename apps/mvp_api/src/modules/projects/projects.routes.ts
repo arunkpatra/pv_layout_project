@@ -4,7 +4,11 @@ import { licenseKeyAuth } from "../../middleware/license-key-auth.js"
 import { ok } from "../../lib/response.js"
 import { AppError } from "../../lib/errors.js"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
-import { createProject, listProjects } from "./projects.service.js"
+import {
+  createProject,
+  getProject,
+  listProjects,
+} from "./projects.service.js"
 
 export const projectsRoutes = new Hono<MvpHonoEnv>()
 
@@ -24,6 +28,12 @@ const CreateProjectSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/, "must be 64-char lowercase hex"),
   edits: z.unknown().optional(),
+})
+
+projectsRoutes.get("/v2/projects/:id", async (c) => {
+  const user = c.get("user")
+  const project = await getProject(user.id, c.req.param("id"))
+  return c.json(ok(project))
 })
 
 projectsRoutes.post("/v2/projects", async (c) => {
