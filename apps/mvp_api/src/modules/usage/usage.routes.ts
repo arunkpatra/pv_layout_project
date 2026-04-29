@@ -20,6 +20,8 @@ const UsageReportV2Schema = z.object({
   idempotencyKey: z.string().min(1),
 })
 
+// FROZEN — no new features. Maintained for legacy install only.
+// New usage-reporting fields ship on /v2/usage/report (below) only.
 usageRoutes.post("/usage/report", async (c) => {
   let body: unknown
   try {

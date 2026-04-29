@@ -1,3 +1,5 @@
+// FROZEN — no new features. Maintained for legacy install only.
+// V2 supersedes this surface; see docs/initiatives/post-parity-v2-backend-plan.md.
 import { Hono } from "hono"
 import { ok } from "../../lib/response.js"
 import { ValidationError } from "../../lib/errors.js"

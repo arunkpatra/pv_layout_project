@@ -14,6 +14,9 @@ entitlementsRoutes.use("/entitlements", licenseKeyAuth)
 entitlementsRoutes.use("/v2/entitlements", licenseKeyAuth)
 entitlementsRoutes.use("/usage/history", licenseKeyAuth)
 
+// FROZEN — no new features. Maintained for legacy install only.
+// V1 EntitlementSummary shape is bit-stable; consumed by legacy desktop,
+// mvp_web, and mvp_admin. New fields ship on /v2/entitlements (below) only.
 entitlementsRoutes.get("/entitlements", async (c) => {
   const user = c.get("user")
   const summary = await computeEntitlementSummary(user)
@@ -26,6 +29,7 @@ entitlementsRoutes.get("/v2/entitlements", async (c) => {
   return c.json(ok(summary))
 })
 
+// FROZEN — no new features. Maintained for legacy install only.
 entitlementsRoutes.get("/usage/history", async (c) => {
   const user = c.get("user")
   const records = await db.usageRecord.findMany({
