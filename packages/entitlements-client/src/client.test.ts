@@ -226,6 +226,7 @@ const successfulEntitlementsV2 = {
     projectQuota: 3,
     projectsActive: 0,
     projectsRemaining: 3,
+    entitlementsActive: true,
   },
 }
 

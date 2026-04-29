@@ -163,6 +163,7 @@ describe("useEntitlementsQuery", () => {
       projectQuota: 5,
       projectsActive: 0,
       projectsRemaining: 5,
+      entitlementsActive: true,
     }
     mockClient.getEntitlementsV2.mockResolvedValueOnce(real)
 

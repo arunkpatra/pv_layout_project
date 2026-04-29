@@ -97,6 +97,9 @@ function previewEntitlements(
     projectQuota,
     projectsActive: 0,
     projectsRemaining: projectQuota,
+    // Preview entitlements always represent a healthy paying-customer
+    // surface — no deactivated path through the design preview rig.
+    entitlementsActive: true,
   }
 }
 

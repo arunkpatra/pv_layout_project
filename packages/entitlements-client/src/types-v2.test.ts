@@ -210,12 +210,42 @@ describe("entitlementSummaryV2DataSchema", () => {
     projectQuota: 3,
     projectsActive: 0,
     projectsRemaining: 3,
+    entitlementsActive: true,
   }
 
   test("parses a full V2 EntitlementSummary fixture", () => {
     expect(entitlementSummaryV2DataSchema.safeParse(v2Fixture).success).toBe(
       true
     )
+  })
+
+  test("parses a deactivated user (licensed=false + entitlementsActive=false)", () => {
+    const r = entitlementSummaryV2DataSchema.safeParse({
+      ...v2Fixture,
+      licensed: false,
+      entitlementsActive: false,
+      projectQuota: 0,
+      projectsRemaining: 0,
+      remainingCalculations: 0,
+      availableFeatures: [],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("parses an exhausted user (licensed=false + entitlementsActive=true)", () => {
+    const r = entitlementSummaryV2DataSchema.safeParse({
+      ...v2Fixture,
+      licensed: false,
+      entitlementsActive: true, // entitlement still active, just no calcs left
+      remainingCalculations: 0,
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when entitlementsActive is missing (required field)", () => {
+    const v: Record<string, unknown> = { ...v2Fixture }
+    delete v.entitlementsActive
+    expect(entitlementSummaryV2DataSchema.safeParse(v).success).toBe(false)
   })
 
   test("V2 data still parses against V1's entitlementsDataSchema (sub-type)", () => {
@@ -248,6 +278,7 @@ describe("entitlementSummaryV2ResponseSchema", () => {
         projectQuota: 0,
         projectsActive: 0,
         projectsRemaining: 0,
+        entitlementsActive: false,
       },
     })
     expect(r.success).toBe(true)

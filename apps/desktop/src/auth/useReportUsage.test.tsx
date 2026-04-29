@@ -103,6 +103,7 @@ const STUB_ENTITLEMENTS: EntitlementSummaryV2 = {
   projectQuota: 10,
   projectsActive: 0,
   projectsRemaining: 10,
+  entitlementsActive: true,
 }
 
 describe("useReportUsageMutation — happy path", () => {

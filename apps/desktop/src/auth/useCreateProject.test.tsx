@@ -67,6 +67,7 @@ const STUB_ENTITLEMENTS: EntitlementSummaryV2 = {
   projectQuota: 10,
   projectsActive: 2,
   projectsRemaining: 8,
+  entitlementsActive: true,
 }
 
 function makeClient(

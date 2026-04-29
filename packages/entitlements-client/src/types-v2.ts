@@ -100,14 +100,43 @@ export const projectQuotaStateSchema = z.object({
 export type ProjectQuotaState = z.infer<typeof projectQuotaStateSchema>
 
 /**
+ * `entitlementsActive` — V2-only signal that the user has at least one
+ * non-deactivated entitlement, regardless of whether its calc balance is
+ * exhausted. The V1 `licensed` field carries the orthogonal "can compute
+ * right now" semantic (see backend handoff 2026-04-30); together they
+ * disambiguate the three blocked-from-compute states the desktop's UX
+ * needs to distinguish at P10:
+ *
+ *   licensed=true                              → normal
+ *   licensed=false && entitlementsActive=true  → exhausted (Buy more →)
+ *   licensed=false && entitlementsActive=false → deactivated (Contact support)
+ *
+ * Note: the V1 `licensed` flag itself is the V1 wire field; auth success
+ * is the HTTP 200 (licenseKeyAuth middleware 401s on missing/bad/revoked
+ * keys before the handler runs), so a 200 response is itself the "key is
+ * valid" signal.
+ *
+ * Backend definition: `count(entitlement WHERE userId AND deactivatedAt
+ * IS NULL) > 0`. No exhaustion check — exhausted-but-active is still a
+ * paying customer.
+ */
+export const entitlementsActiveStateSchema = z.object({
+  entitlementsActive: z.boolean(),
+})
+
+export type EntitlementsActiveState = z.infer<
+  typeof entitlementsActiveStateSchema
+>
+
+/**
  * EntitlementSummaryV2 — strict superset of V1 Entitlements. Existing
  * V1 consumers (FeatureGate, TopBar chip, plans dialog) continue to read
  * the same fields; V2-aware consumers (P10 quota indicator, P1 new-project
  * upsell) read the additional fields.
  */
-export const entitlementSummaryV2DataSchema = entitlementsDataSchema.extend(
-  projectQuotaStateSchema.shape
-)
+export const entitlementSummaryV2DataSchema = entitlementsDataSchema
+  .extend(projectQuotaStateSchema.shape)
+  .extend(entitlementsActiveStateSchema.shape)
 
 export type EntitlementSummaryV2 = z.infer<
   typeof entitlementSummaryV2DataSchema

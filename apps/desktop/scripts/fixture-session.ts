@@ -90,6 +90,7 @@ async function checkEntitlements(
     quota?: number
     projectsActive?: number
     licensed?: boolean
+    entitlementsActive?: boolean
   }
 ): Promise<void> {
   try {
@@ -128,13 +129,21 @@ async function checkEntitlements(
     if (expect.licensed !== undefined && ent.licensed !== expect.licensed) {
       mismatches.push(`licensed=${ent.licensed} expected=${expect.licensed}`)
     }
+    if (
+      expect.entitlementsActive !== undefined &&
+      ent.entitlementsActive !== expect.entitlementsActive
+    ) {
+      mismatches.push(
+        `entitlementsActive=${ent.entitlementsActive} expected=${expect.entitlementsActive}`
+      )
+    }
     if (mismatches.length > 0) {
       record(scenario, "warn", mismatches.join("; "))
     } else {
       record(
         scenario,
         "pass",
-        `plans=${ent.plans.length} calcs=${ent.usedCalculations}/${ent.totalCalculations} quota=${ent.projectsActive}/${ent.projectQuota}`
+        `licensed=${ent.licensed} entActive=${ent.entitlementsActive} calcs=${ent.usedCalculations}/${ent.totalCalculations} quota=${ent.projectsActive}/${ent.projectQuota}`
       )
     }
   } catch (err) {
@@ -368,6 +377,10 @@ async function main(): Promise<void> {
 
   // ── 1. Entitlements for all 8 fixtures ──────────────────────────────────
   console.log("--- B8 — GET /v2/entitlements (all 8 fixtures) ---")
+  // licensed/entitlementsActive semantics (locked with backend 2026-04-30):
+  //   licensed=true                              → normal compute
+  //   licensed=false && entitlementsActive=true  → exhausted (Buy more)
+  //   licensed=false && entitlementsActive=false → deactivated (Contact support)
   await checkEntitlements(client, "B8 FREE", FIXTURE_KEYS.FREE, {
     plans: 1,
     totalCalcs: 5,
@@ -375,37 +388,45 @@ async function main(): Promise<void> {
     quota: 3,
     projectsActive: 0,
     licensed: true,
+    entitlementsActive: true,
   })
   await checkEntitlements(client, "B8 BASIC", FIXTURE_KEYS.BASIC, {
     quota: 5,
     projectsActive: 0,
     licensed: true,
+    entitlementsActive: true,
   })
   await checkEntitlements(client, "B8 PRO", FIXTURE_KEYS.PRO, {
     quota: 10,
     projectsActive: 0,
     licensed: true,
+    entitlementsActive: true,
   })
   await checkEntitlements(client, "B8 PRO_PLUS", FIXTURE_KEYS.PRO_PLUS, {
     quota: 15,
     projectsActive: 1, // B7 fixture project
     licensed: true,
+    entitlementsActive: true,
   })
   await checkEntitlements(client, "B8 MULTI", FIXTURE_KEYS.MULTI, {
     licensed: true,
+    entitlementsActive: true,
   })
   await checkEntitlements(client, "B8 EXHAUSTED", FIXTURE_KEYS.EXHAUSTED, {
     remainingCalcs: 0,
-    licensed: true,
+    licensed: false, // out of credits
+    entitlementsActive: true, // entitlement still active, just exhausted
   })
   await checkEntitlements(client, "B8 DEACTIVATED", FIXTURE_KEYS.DEACTIVATED, {
     quota: 0,
-    licensed: true,
+    licensed: false,
+    entitlementsActive: false, // entitlement deactivated → "Contact support"
   })
   await checkEntitlements(client, "B8 QUOTA_EDGE", FIXTURE_KEYS.QUOTA_EDGE, {
     quota: 3,
     projectsActive: 3, // at the ceiling
     licensed: true,
+    entitlementsActive: true,
   })
 
   // ── 2. Auth ─────────────────────────────────────────────────────────────
