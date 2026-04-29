@@ -14,7 +14,7 @@ from typing import List, Tuple
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
-from pvlayout_core.models.project import LayoutParameters, LayoutResult, PlacedTable, M2_PER_ACRE
+from pvlayout_core.models.project import LayoutParameters, LayoutResult, PlacedTable, DesignType, M2_PER_ACRE
 from pvlayout_core.core.spacing_calc import auto_spacing
 from pvlayout_core.core.icr_placer import place_icrs
 from pvlayout_core.core.kmz_parser import BoundaryInfo
@@ -267,16 +267,30 @@ def run_layout_multi(
     for i, b in enumerate(boundaries):
         name = b.name if b.name else f"Plant {i + 1}"
         try:
-            r = run_layout(
-                boundary_wgs84=b.coords,
-                obstacles_wgs84=b.obstacles,
-                params=params,
-                centroid_lat=centroid_lat,
-                centroid_lon=centroid_lon,
-                boundary_name=name,
-                line_obstructions_wgs84=b.line_obstructions,
-                water_obstacles_wgs84=getattr(b, "water_obstacles", []),
-            )
+            water_obs = getattr(b, "water_obstacles", [])
+            if params.design_type == DesignType.SINGLE_AXIS_TRACKER:
+                from pvlayout_core.core.tracker_layout_engine import run_layout_tracker
+                r = run_layout_tracker(
+                    boundary_wgs84=b.coords,
+                    obstacles_wgs84=b.obstacles,
+                    params=params,
+                    centroid_lat=centroid_lat,
+                    centroid_lon=centroid_lon,
+                    boundary_name=name,
+                    line_obstructions_wgs84=b.line_obstructions,
+                    water_obstacles_wgs84=water_obs,
+                )
+            else:
+                r = run_layout(
+                    boundary_wgs84=b.coords,
+                    obstacles_wgs84=b.obstacles,
+                    params=params,
+                    centroid_lat=centroid_lat,
+                    centroid_lon=centroid_lon,
+                    boundary_name=name,
+                    line_obstructions_wgs84=b.line_obstructions,
+                    water_obstacles_wgs84=water_obs,
+                )
             results.append(r)
         except Exception as exc:
             empty = LayoutResult()
