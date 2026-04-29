@@ -360,3 +360,39 @@ export async function getRunDetail(
     exportsBlobUrls: [],
   }
 }
+
+/**
+ * Soft-delete a Run. Does NOT refund the calc — the linked UsageRecord
+ * stays as-is per V2-plan §2 ("Run delete does NOT refund the calc"):
+ * users get one debit per Generate-Layout intent regardless of whether
+ * they later delete the result.
+ *
+ * Joined ownership filter same as B17: 404 on miss / not-yours /
+ * soft-deleted-run / soft-deleted-project. Second DELETE on a
+ * soft-deleted run returns 404 (idempotency-via-not-found).
+ *
+ * Does NOT touch S3 blobs — orphan-cleanup is a deferred job.
+ */
+export async function deleteRun(
+  userId: string,
+  projectId: string,
+  runId: string,
+): Promise<void> {
+  const existing = await db.run.findFirst({
+    where: {
+      id: runId,
+      projectId,
+      deletedAt: null,
+      project: { userId, deletedAt: null },
+    },
+    select: { id: true },
+  })
+  if (!existing) {
+    throw new NotFoundError("Run", runId)
+  }
+
+  await db.run.update({
+    where: { id: runId },
+    data: { deletedAt: new Date() },
+  })
+}

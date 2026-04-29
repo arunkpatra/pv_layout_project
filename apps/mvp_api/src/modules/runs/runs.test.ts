@@ -77,6 +77,16 @@ const mockRunDetailFindFirst = mock(
   async (..._args: unknown[]): Promise<MockRunDetail | null> => null,
 )
 
+const mockRunUpdate = mock(
+  async (args: {
+    where: { id: string }
+    data: { deletedAt?: Date | null }
+  }) => ({
+    id: args.where.id,
+    deletedAt: args.data.deletedAt ?? null,
+  }),
+)
+
 const mockUsageRecordFindFirst = mock(
   async (..._args: unknown[]): Promise<{
     id: string
@@ -214,6 +224,7 @@ mock.module("../../lib/db.js", () => ({
       findMany: mockRunFindMany,
       findFirst: mockRunDetailFindFirst,
       create: mockRunCreate,
+      update: mockRunUpdate,
     },
     usageRecord: {
       findFirst: mockUsageRecordFindFirst,
@@ -778,5 +789,103 @@ describe("GET /v2/projects/:id/runs/:runId", () => {
       deletedAt: null,
       project: { userId: "usr_test1", deletedAt: null },
     })
+  })
+})
+
+// ─── B18 — DELETE /v2/projects/:id/runs/:runId ───────────────────────────────
+
+const delRun = (projectId: string, runId: string) =>
+  makeApp().request(`/v2/projects/${projectId}/runs/${runId}`, {
+    method: "DELETE",
+    headers: { Authorization: "Bearer sl_live_testkey" },
+  })
+
+describe("DELETE /v2/projects/:id/runs/:runId", () => {
+  beforeEach(() => {
+    mockRunDetailFindFirst.mockReset()
+    mockRunDetailFindFirst.mockImplementation(async () => ({ ...baseRun }))
+    mockRunUpdate.mockClear()
+    // Clear cross-test pollution — these mocks accumulate calls across all
+    // describes in this file, and B18's "does NOT touch" assertions need
+    // fresh counters.
+    mockUsageRecordCreate.mockClear()
+    mockGetPresignedUploadUrl.mockClear()
+    mockGetPresignedDownloadUrl.mockClear()
+  })
+
+  it("returns 204 with empty body on success", async () => {
+    const res = await delRun("prj_x", "run_x")
+    expect(res.status).toBe(204)
+    const body = await res.text()
+    expect(body).toBe("")
+  })
+
+  it("scopes ownership lookup with the joined where filter", async () => {
+    await delRun("prj_x", "run_x")
+    const call = mockRunDetailFindFirst.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      id: "run_x",
+      projectId: "prj_x",
+      deletedAt: null,
+      project: { userId: "usr_test1", deletedAt: null },
+    })
+  })
+
+  it("sets run.deletedAt to a Date and only updates by id", async () => {
+    await delRun("prj_x", "run_x")
+    const call = mockRunUpdate.mock.calls[0] as unknown as [
+      { where: { id: string }; data: { deletedAt?: Date } },
+    ]
+    expect(call?.[0]?.where).toEqual({ id: "run_x" })
+    expect(call?.[0]?.data?.deletedAt).toBeInstanceOf(Date)
+  })
+
+  it("does NOT refund the calc — the linked UsageRecord stays untouched", async () => {
+    await delRun("prj_x", "run_x")
+    // The mock surface for runs.test.ts includes usageRecord.create but NOT
+    // any update/delete — and the service file imports neither. We assert
+    // the contract by ensuring the service never triggers anything outside
+    // its narrow soft-delete scope.
+    expect(mockUsageRecordCreate).not.toHaveBeenCalled()
+    expect(mockRunUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("returns 404 when the run doesn't exist (or belongs to another user)", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await delRun("prj_x", "run_other")
+    expect(res.status).toBe(404)
+    expect(mockRunUpdate).not.toHaveBeenCalled()
+  })
+
+  it("returns 404 when the run is soft-deleted (where filter excludes)", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await delRun("prj_x", "run_deleted")
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when the parent project is soft-deleted (joined ownership filter)", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => null)
+    const res = await delRun("prj_deleted", "run_x")
+    expect(res.status).toBe(404)
+  })
+
+  it("idempotency: a second DELETE on a soft-deleted run returns 404", async () => {
+    mockRunDetailFindFirst.mockImplementationOnce(async () => ({
+      ...baseRun,
+    }))
+    mockRunDetailFindFirst.mockImplementationOnce(async () => null)
+    const r1 = await delRun("prj_x", "run_x")
+    expect(r1.status).toBe(204)
+    const r2 = await delRun("prj_x", "run_x")
+    expect(r2.status).toBe(404)
+  })
+
+  it("does not perform any S3 / blob operations on delete", async () => {
+    await delRun("prj_x", "run_x")
+    // No upload or download URL signed — DELETE is a metadata-only op
+    expect(mockGetPresignedUploadUrl).not.toHaveBeenCalled()
+    expect(mockGetPresignedDownloadUrl).not.toHaveBeenCalled()
   })
 })
