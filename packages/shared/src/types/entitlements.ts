@@ -42,4 +42,12 @@ export interface ProjectQuotaState {
 
 export interface EntitlementSummaryV2
   extends EntitlementSummary,
-    ProjectQuotaState {}
+    ProjectQuotaState {
+  /** True iff the user has at least one entitlement with `deactivatedAt IS NULL`,
+   *  regardless of exhaustion. Lets the desktop split EXHAUSTED (this=true,
+   *  remainingCalculations=0 — self-service "Buy more" CTA) from DEACTIVATED
+   *  (this=false — "Contact support" CTA). Without this field both states
+   *  collapse to identical envelopes (`licensed=false`, `remainingCalculations=0`,
+   *  `projectQuota=0`) and the desktop can't disambiguate. */
+  entitlementsActive: boolean
+}

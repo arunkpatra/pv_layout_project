@@ -107,7 +107,15 @@ export async function getProjectQuotaState(
  * V2 entitlement summary — strict superset of V1.
  * V1 shape is preserved exactly (re-uses computeEntitlementSummary);
  * V2 adds projectQuota + projectsActive + projectsRemaining for the
- * desktop's per-tier project ceiling.
+ * desktop's per-tier project ceiling, and `entitlementsActive` so the
+ * desktop can split EXHAUSTED (active=true, self-service buy-more) from
+ * DEACTIVATED (active=false, contact-support). The two states are
+ * otherwise indistinguishable in the V2 envelope.
+ *
+ * `entitlementsActive` is intentionally a separate filter from quota /
+ * remaining-calcs: it's `count(deactivatedAt IS NULL) > 0` with no
+ * exhaustion check, since an exhausted entitlement is still an active
+ * subscription that just needs a credit top-up.
  */
 export async function computeEntitlementSummaryV2(user: {
   id: string
@@ -116,5 +124,8 @@ export async function computeEntitlementSummaryV2(user: {
 }): Promise<EntitlementSummaryV2> {
   const v1 = await computeEntitlementSummary(user)
   const quota = await getProjectQuotaState(user.id)
-  return { ...v1, ...quota }
+  const activeCount = await db.entitlement.count({
+    where: { userId: user.id, deactivatedAt: null },
+  })
+  return { ...v1, ...quota, entitlementsActive: activeCount > 0 }
 }

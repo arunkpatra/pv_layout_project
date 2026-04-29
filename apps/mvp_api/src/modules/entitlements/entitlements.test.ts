@@ -50,11 +50,15 @@ const mockUsageRecordFindMany = mock(async () => [
 ])
 
 const mockProjectCount = mock(async () => 0)
+const mockEntitlementCount = mock(async () => 1)
 
 mock.module("../../lib/db.js", () => ({
   db: {
     licenseKey: { findFirst: mockLicenseKeyFindFirst },
-    entitlement: { findMany: mockEntitlementFindMany },
+    entitlement: {
+      findMany: mockEntitlementFindMany,
+      count: mockEntitlementCount,
+    },
     usageRecord: { findMany: mockUsageRecordFindMany },
     project: { count: mockProjectCount },
   },
@@ -344,6 +348,7 @@ interface V2Body {
   projectQuota: number
   projectsActive: number
   projectsRemaining: number
+  entitlementsActive: boolean
 }
 
 const FREE_ENT = {
@@ -403,6 +408,8 @@ describe("GET /v2/entitlements", () => {
   beforeEach(() => {
     mockProjectCount.mockReset()
     mockProjectCount.mockImplementation(async () => 0)
+    mockEntitlementCount.mockReset()
+    mockEntitlementCount.mockImplementation(async () => 1)
   })
 
   it("free-only user → projectQuota = 3, projectsActive = 0, projectsRemaining = 3", async () => {
@@ -503,6 +510,36 @@ describe("GET /v2/entitlements", () => {
     expect(body.projectQuota).toBe(10)
     expect(body.projectsActive).toBe(1)
     expect(body.projectsRemaining).toBe(9)
+    expect(body.entitlementsActive).toBe(true)
+  })
+
+  it("EXHAUSTED user (all entitlements maxed, none deactivated) → entitlementsActive=true", async () => {
+    // findMany has the standard filter (deactivatedAt:null + non-exhausted),
+    // so the V1 service sees zero usable plans → licensed=false, remaining=0.
+    mockEntitlementFindMany.mockImplementation(async () => [] as never)
+    // But the count query (deactivatedAt IS NULL only) still finds the
+    // exhausted-but-active entitlement → 2 (Free + Pro both deactivatedAt=null).
+    mockEntitlementCount.mockImplementation(async () => 2)
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.licensed).toBe(false)
+    expect(body.remainingCalculations).toBe(0)
+    expect(body.projectQuota).toBe(0)
+    expect(body.entitlementsActive).toBe(true)
+  })
+
+  it("DEACTIVATED user (all entitlements have deactivatedAt set) → entitlementsActive=false", async () => {
+    // findMany filter drops everything, count filter drops everything.
+    mockEntitlementFindMany.mockImplementation(async () => [] as never)
+    mockEntitlementCount.mockImplementation(async () => 0)
+    const app = makeApp()
+    const res = await v2Get(app)
+    const body = ((await res.json()) as { data: V2Body }).data
+    expect(body.licensed).toBe(false)
+    expect(body.remainingCalculations).toBe(0)
+    expect(body.projectQuota).toBe(0)
+    expect(body.entitlementsActive).toBe(false)
   })
 
   it("returns 401 when Authorization is missing", async () => {
@@ -525,5 +562,6 @@ describe("V1 GET /entitlements stability under B8", () => {
     expect(body.data["projectQuota"]).toBeUndefined()
     expect(body.data["projectsActive"]).toBeUndefined()
     expect(body.data["projectsRemaining"]).toBeUndefined()
+    expect(body.data["entitlementsActive"]).toBeUndefined()
   })
 })
