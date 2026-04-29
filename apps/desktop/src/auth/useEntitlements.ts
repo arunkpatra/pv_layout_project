@@ -34,7 +34,17 @@ const inTauri = () =>
 // fetch so the design-preview mode can stub a happy-path response.
 const pickFetch = () => (inTauri() ? (tauriFetch as typeof fetch) : undefined)
 
-const entitlementsClient = createEntitlementsClient({ fetchImpl: pickFetch() })
+// API base URL — defaults to production; can be overridden at build time
+// via `VITE_SOLARLAYOUT_API_URL` (see `apps/desktop/src/vite-env.d.ts`
+// and `apps/desktop/.env.example`). Local dev points this at
+// `http://localhost:3003` (mvp_api default port from
+// `renewable_energy/apps/mvp_api/src/env.ts`).
+const apiBaseUrl = import.meta.env.VITE_SOLARLAYOUT_API_URL
+
+const entitlementsClient = createEntitlementsClient({
+  fetchImpl: pickFetch(),
+  baseUrl: apiBaseUrl,
+})
 
 const KEY_QUERY_KEY = "entitlements" as const
 
