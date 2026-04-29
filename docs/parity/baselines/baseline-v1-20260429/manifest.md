@@ -35,6 +35,8 @@ DC cable structure breakdown (from JSON inspection):
 
 The `_bundle_dc_cables` function IS firing as designed — the 135 horizontal collectors prove it. The remaining cables are per-table fallbacks where the horizontal-collector path failed `_path_ok` (probably blocked by polygon geometry).
 
+**LA positions:** `placed_las[]` (22 records: `x`, `y`, `width`, `height`, `radius`, `index`) added 2026-04-29 for row #2 parity test.
+
 ## Params used
 
 `LayoutParameters()` defaults plus `enable_cable_calc=True`. Specifically (verified against `models/project.py` defaults at this baseline):

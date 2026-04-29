@@ -152,6 +152,18 @@ def _serialize_cable(cr) -> Dict[str, Any]:
     }
 
 
+def _serialize_la(la) -> Dict[str, Any]:
+    """Convert legacy PlacedLA to JSON-friendly dict for parity comparison."""
+    return {
+        "x": la.x,
+        "y": la.y,
+        "width": la.width,
+        "height": la.height,
+        "radius": la.radius,
+        "index": la.index,
+    }
+
+
 def _aggregate_results(results) -> Dict[str, Any]:
     """Aggregate counts and totals across all LayoutResult objects."""
     counts: Dict[str, int] = {
@@ -169,6 +181,7 @@ def _aggregate_results(results) -> Dict[str, Any]:
     }
     dc_cables: List[Dict[str, Any]] = []
     ac_cables: List[Dict[str, Any]] = []
+    las: List[Dict[str, Any]] = []
 
     for r in results:
         counts["placed_tables"] += len(r.placed_tables)
@@ -182,12 +195,19 @@ def _aggregate_results(results) -> Dict[str, Any]:
         totals["total_ac_cable_m"] += r.total_ac_cable_m
         dc_cables.extend(_serialize_cable(c) for c in r.dc_cable_runs)
         ac_cables.extend(_serialize_cable(c) for c in r.ac_cable_runs)
+        las.extend(_serialize_la(la) for la in r.placed_las)
 
     totals["total_capacity_kwp"] = round(totals["total_capacity_kwp"], 2)
     totals["total_dc_cable_m"] = round(totals["total_dc_cable_m"], 1)
     totals["total_ac_cable_m"] = round(totals["total_ac_cable_m"], 1)
 
-    return {"counts": counts, "totals": totals, "dc_cable_runs": dc_cables, "ac_cable_runs": ac_cables}
+    return {
+        "counts": counts,
+        "totals": totals,
+        "dc_cable_runs": dc_cables,
+        "ac_cable_runs": ac_cables,
+        "placed_las": las,
+    }
 
 
 def main() -> int:
@@ -240,6 +260,7 @@ def main() -> int:
         "timings_s": timings,
         "counts": agg["counts"],
         "totals": agg["totals"],
+        "placed_las": agg["placed_las"],
         "dc_cable_runs": agg["dc_cable_runs"],
         "ac_cable_runs": agg["ac_cable_runs"],
     }
