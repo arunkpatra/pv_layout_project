@@ -81,16 +81,19 @@ def fetch_solar_irradiance(
     lon: float,
     tilt_deg: float,
     azimuth_deg: float = 0.0,
+    is_sat: bool = False,
+    sat_max_angle_deg: float = 55.0,
 ) -> Tuple[float, float, str, List[float], List[float]]:
     """
     Attempt to fetch annual GHI and GTI from PVGIS, then NASA POWER.
 
     Parameters
     ----------
-    lat, lon      : site coordinates (WGS84 decimal degrees)
-    tilt_deg      : panel tilt angle in degrees
-    azimuth_deg   : panel azimuth in PVGIS convention (0=South, 90=West,
-                    -90=East, 180=North).  Pass 0 for north-hemisphere sites.
+    lat, lon           : site coordinates (WGS84 decimal degrees)
+    tilt_deg           : panel tilt angle (fixed-tilt only)
+    azimuth_deg        : panel azimuth in PVGIS convention (0=South) — fixed tilt only
+    is_sat             : True → fetch PVGIS with trackingtype=1 (HSAT N-S axis)
+    sat_max_angle_deg  : tracker max rotation angle (passed as max_angle to PVGIS)
 
     Returns
     -------
@@ -98,6 +101,17 @@ def fetch_solar_irradiance(
     monthly_ghi_12 / monthly_gti_12 are lists of 12 floats (kWh/m²/month).
     Both monthly lists are empty on failure.
     """
+    if is_sat:
+        try:
+            return _fetch_pvgis_sat(lat, lon, sat_max_angle_deg)
+        except Exception:
+            pass
+        try:
+            return _fetch_nasa_power(lat, lon, tilt_deg)
+        except Exception:
+            pass
+        return 0.0, 0.0, "unavailable", [], []
+
     try:
         return _fetch_pvgis(lat, lon, tilt_deg, azimuth_deg)
     except Exception:
@@ -112,7 +126,7 @@ def fetch_solar_irradiance(
 def _fetch_pvgis(lat, lon, tilt_deg, azimuth_deg
                  ) -> Tuple[float, float, str, List[float], List[float]]:
     """
-    PVGIS 5.2 PVcalc endpoint.
+    PVGIS 5.2 PVcalc endpoint — fixed-tilt.
     With loss=0 and peakpower=1, E_y ≈ specific yield without system losses
     (kWh/kWp/year).  H(i)_y is the actual in-plane irradiation (kWh/m²/yr).
     Also captures monthly H(i)_m and H(h)_m.
@@ -136,6 +150,120 @@ def _fetch_pvgis(lat, lon, tilt_deg, azimuth_deg
     monthly_data = data["outputs"]["monthly"]["fixed"]
     monthly_gti = [float(m["H(i)_m"]) for m in monthly_data]
     monthly_ghi = [float(m["H(h)_m"]) for m in monthly_data]
+
+    # Apply PVGIS GHI correction factor (1.2) to all GHI and GTI values.
+    # GTI is scaled proportionally since it is derived from GHI via the
+    # transposition model.
+    _GHI_FACTOR = 1.2
+    ghi         = ghi * _GHI_FACTOR
+    gti         = gti * _GHI_FACTOR
+    monthly_ghi = [v * _GHI_FACTOR for v in monthly_ghi]
+    monthly_gti = [v * _GHI_FACTOR for v in monthly_gti]
+
+    return ghi, gti, "pvgis", monthly_ghi, monthly_gti
+
+
+def _fetch_pvgis_sat(lat, lon, max_angle_deg: float = 55.0
+                    ) -> Tuple[float, float, str, List[float], List[float]]:
+    """
+    Fetch monthly GHI from PVGIS (fixed horizontal, angle=0) and compute
+    the HSAT tracked GTI using our own solar transposition model.
+
+    Why not use PVGIS trackingtype=1?
+    PVGIS PVcalc with trackingtype=1 returns H(i)_y identical to fixed
+    horizontal (GHI) — the tracking gain is zero in the API response.
+    This appears to be a known limitation of the PVGIS v5.2 PVcalc endpoint
+    for horizontal single-axis trackers.
+
+    Our approach:
+      1. Fetch monthly GHI from PVGIS (fixed horizontal panel = GHI).
+      2. Build a synthetic 8760-hour GHI profile scaled to the monthly totals.
+      3. Apply the HSAT tracking angle formula to each hour to get hourly GTI.
+      4. Sum hourly GTI by month → monthly_gti.
+    This correctly produces H(i) > GHI as expected for a tracker system.
+    """
+    import requests
+    from pvlayout_core.core.solar_transposition import ghi_to_gti_hsat
+    import math as _math
+    from datetime import datetime as _dt, timedelta as _td
+
+    # ── Step 1: fetch monthly GHI from PVGIS (fixed horizontal = GHI) ────────
+    url = (
+        "https://re.jrc.ec.europa.eu/api/v5_2/PVcalc"
+        f"?lat={lat:.4f}&lon={lon:.4f}"
+        "&peakpower=1&loss=0"
+        "&trackingtype=0"
+        "&angle=0"        # horizontal → H(i) = GHI
+        "&aspect=0"
+        "&outputformat=json&browser=0"
+    )
+    resp = requests.get(url, timeout=20)
+    resp.raise_for_status()
+    data     = resp.json()
+    out      = data["outputs"]
+    totals   = out["totals"]["fixed"]
+    monthly_data = out["monthly"]["fixed"]
+
+    ghi          = float(totals["H(i)_y"])          # annual GHI kWh/m²
+    monthly_ghi  = [float(m["H(i)_m"]) for m in monthly_data]  # 12 monthly
+
+    # ── Step 2: synthetic 8760-hour GHI profile calibrated to monthly totals ──
+    # Use cosine of solar zenith as clear-sky shape, scale per month.
+    YEAR = 2023   # non-leap reference year
+    lat_r = _math.radians(lat)
+    start = _dt(YEAR, 1, 1, 0, 30)
+    timestamps: List[str] = []
+    ghi_shape: List[float] = []
+
+    for h in range(8760):
+        dt = start + _td(hours=h)
+        doy = dt.timetuple().tm_yday
+        hour_solar = dt.hour + 0.5   # mid-hour
+
+        # Solar declination & hour angle
+        delta = _math.radians(23.45 * _math.sin(_math.radians(360 / 365 * (doy - 81))))
+        omega = _math.radians(15 * (hour_solar - 12))
+        cos_z = (_math.sin(lat_r) * _math.sin(delta)
+                 + _math.cos(lat_r) * _math.cos(delta) * _math.cos(omega))
+        ghi_shape.append(max(0.0, cos_z))
+        timestamps.append(dt.strftime("%Y-%m-%d %H:%M"))
+
+    # Scale each month so monthly sum matches PVGIS monthly GHI
+    DAYS_PER_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31]
+    ghi_wm2: List[float] = [0.0] * 8760
+    h = 0
+    for m_idx, days in enumerate(DAYS_PER_MONTH):
+        n_hrs = days * 24
+        shape_sum = sum(ghi_shape[h:h + n_hrs])
+        if shape_sum > 0:
+            # monthly_ghi in kWh/m² → convert to W·h/m² then scale shape
+            target_wh = monthly_ghi[m_idx] * 1000.0
+            scale = target_wh / shape_sum
+            for i in range(h, h + n_hrs):
+                ghi_wm2[i] = ghi_shape[i] * scale
+        h += n_hrs
+
+    # ── Step 3: apply HSAT transposition to get hourly tracked GTI ────────────
+    import numpy as _np
+    gti_wm2_arr = ghi_to_gti_hsat(ghi_wm2, timestamps, lat, max_angle_deg)
+
+    # ── Step 4: sum to monthly & annual totals ────────────────────────────────
+    monthly_gti: List[float] = []
+    h = 0
+    for days in DAYS_PER_MONTH:
+        n_hrs = days * 24
+        month_gti_wh = float(_np.sum(gti_wm2_arr[h:h + n_hrs]))
+        monthly_gti.append(round(month_gti_wh / 1000.0, 2))   # kWh/m²
+        h += n_hrs
+
+    gti = round(sum(monthly_gti), 1)   # annual tracked GTI kWh/m²
+
+    # ── Apply PVGIS GHI correction factor (1.2) ───────────────────────────────
+    _GHI_FACTOR = 1.2
+    ghi         = ghi * _GHI_FACTOR
+    gti         = gti * _GHI_FACTOR
+    monthly_ghi = [v * _GHI_FACTOR for v in monthly_ghi]
+    monthly_gti = [v * _GHI_FACTOR for v in monthly_gti]
 
     return ghi, gti, "pvgis", monthly_ghi, monthly_gti
 
@@ -640,7 +768,9 @@ def _ensure_gti(params: EnergyParameters) -> List[float]:
     """
     Return the hourly GTI array from params.
     If params.hourly_gti_wm2 is empty but params.hourly_ghi_wm2 is present,
-    compute GTI via solar transposition (Erbs + Hay-Davies).
+    compute GTI via solar transposition:
+      • HSAT (is_sat=True) → Erbs + HSAT tracking angle per hour
+      • Fixed tilt          → Erbs + Hay-Davies isotropic tilt
     """
     if params.hourly_gti_wm2:
         return params.hourly_gti_wm2
@@ -648,14 +778,23 @@ def _ensure_gti(params: EnergyParameters) -> List[float]:
     if not params.hourly_ghi_wm2:
         return []
 
-    from pvlayout_core.core.solar_transposition import ghi_to_gti
-    gti_arr = ghi_to_gti(
-        params.hourly_ghi_wm2,
-        params.hourly_timestamps,
-        lat_deg=params.site_lat,
-        tilt_deg=params.site_tilt_deg,
-        azimuth_pvgis=params.site_azimuth_pvgis,
-    )
+    if params.is_sat:
+        from pvlayout_core.core.solar_transposition import ghi_to_gti_hsat
+        gti_arr = ghi_to_gti_hsat(
+            params.hourly_ghi_wm2,
+            params.hourly_timestamps,
+            lat_deg=params.site_lat,
+            max_angle_deg=params.sat_max_angle_deg,
+        )
+    else:
+        from pvlayout_core.core.solar_transposition import ghi_to_gti
+        gti_arr = ghi_to_gti(
+            params.hourly_ghi_wm2,
+            params.hourly_timestamps,
+            lat_deg=params.site_lat,
+            tilt_deg=params.site_tilt_deg,
+            azimuth_pvgis=params.site_azimuth_pvgis,
+        )
     return gti_arr.tolist()
 
 

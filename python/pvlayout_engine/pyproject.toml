@@ -22,6 +22,7 @@ dependencies = [
     "numpy>=1.24",
     "ezdxf>=1.0",
     "Pillow>=10.0",  # row #5: satellite tile fetch + preview PNG generation
+    "requests>=2.32",  # row #8: PVGIS / NASA POWER irradiance fetch in energy_calculator
 
     # HTTP sidecar
     "fastapi>=0.115",

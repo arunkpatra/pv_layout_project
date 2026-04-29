@@ -2,7 +2,7 @@
 
 **Mission:** catch the new app up to legacy `baseline-v1-20260429`.
 **Last updated:** 2026-04-29
-**Status:** 7 / 12 done.
+**Status:** 8 / 12 done.
 
 This file is the single source of truth for what gets built. Replaces the prior `SPIKE_PLAN.md` + `parity/PLAN.md` + `parity/BACKLOG.md` (now in [`historical/`](./historical/)).
 
@@ -37,7 +37,7 @@ Rows are domain-grouped; within a group, listed in dependency order. Pick top `t
 | 6 | Layout engine + water-body integration | T2 | `core/layout_engine.py` @ `9362083` + `9c751b7` | Parity table count + position match on both reference plants; row-#4 water_obstacles bridge in `layout_engine.py:run_layout_multi` removed (water_obstacles routed through their own exclusion path with legacy's setback semantics). | **done** |
 | **Energy** | | | | | |
 | 7 | Solar transposition rewrite (HSAT GHI→GTI) | T3 | `core/solar_transposition.py` @ `9362083` | Parity transposition output match; discovery memo committed. | **done** |
-| 8 | Energy calculator + SAT GTI fix | T3 | `core/energy_calculator.py` @ `9362083` | Parity 25-year yield match within solar tolerance; discovery memo committed. | todo |
+| 8 | Energy calculator + SAT GTI fix | T3 | `core/energy_calculator.py` @ `9362083` | Parity 25-year yield match within solar tolerance; discovery memo committed. | **done** |
 | **New product mode** | | | | | |
 | 9 | Single-axis-tracker layout mode | T3 | `core/tracker_layout_engine.py` (new) @ `9362083` | New mode produces output; parity check on a SAT plant; discovery memo committed. | todo |
 | **Exports** | | | | | |
