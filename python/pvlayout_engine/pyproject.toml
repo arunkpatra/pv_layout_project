@@ -21,6 +21,8 @@ dependencies = [
     "matplotlib>=3.7",
     "numpy>=1.24",
     "ezdxf>=1.0",
+    "Pillow>=10.0",  # row #5: satellite tile fetch + preview PNG generation
+
     # HTTP sidecar
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",

@@ -2,7 +2,7 @@
 
 **Mission:** catch the new app up to legacy `baseline-v1-20260429`.
 **Last updated:** 2026-04-29
-**Status:** 4 / 12 done.
+**Status:** 5 / 12 done.
 
 This file is the single source of truth for what gets built. Replaces the prior `SPIKE_PLAN.md` + `parity/PLAN.md` + `parity/BACKLOG.md` (now in [`historical/`](./historical/)).
 
@@ -33,7 +33,7 @@ Rows are domain-grouped; within a group, listed in dependency order. Pick top `t
 | 3 | Bundled DC + MST AC | T2 | `core/string_inverter_manager.py` @ `9362083` | Parity test 3/3 on phaseboundary2 (counts exact, DC ±0.1m, AC modulo Pattern V −613.5m ± 200m). | **done** (P0) |
 | **Layout & KMZ** | | | | | |
 | 4 | KMZ parser + water/canal/TL autodetection | T3 | `core/kmz_parser.py` @ `9362083` + `9c751b7` | Parity boundary geometry match; new app loads legacy KMZs identically; discovery memo committed. | **done** |
-| 5 | Satellite water-body detection | T3 | `core/satellite_water_detector.py` (new) @ `9362083` | Feature reachable from new-app UI; parity-driven test on a known plant; discovery memo committed. | todo |
+| 5 | Satellite water-body detection | T3 | `core/satellite_water_detector.py` (new) @ `9362083` | Feature reachable from new-app UI; parity-driven test on a known plant; discovery memo committed. | **done** |
 | 6 | Layout engine + water-body integration | T2 | `core/layout_engine.py` @ `9362083` + `9c751b7` | Parity table count + position match on both reference plants; row-#4 water_obstacles bridge in `layout_engine.py:run_layout_multi` removed (water_obstacles routed through their own exclusion path with legacy's setback semantics). | todo |
 | **Energy** | | | | | |
 | 7 | Solar transposition rewrite (HSAT GHI→GTI) | T3 | `core/solar_transposition.py` @ `9362083` | Parity transposition output match; discovery memo committed. | todo |

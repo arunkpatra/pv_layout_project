@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pvlayout_engine.config import SidecarConfig
 from pvlayout_engine.routes.layout import router as layout_router
 from pvlayout_engine.routes.session import router as session_router
+from pvlayout_engine.routes.water import router as water_router
 from pvlayout_engine.schemas import HealthResponse
 from pvlayout_engine.session import SessionState
 
@@ -104,6 +105,10 @@ def build_app(config: SidecarConfig) -> FastAPI:
     # --- Layout routes (S3) -------------------------------------------------
     # /parse-kmz, /layout, /refresh-inverters — all token-gated.
     authed.include_router(layout_router)
+
+    # --- Water-detection route (Row #5) -------------------------------------
+    # /detect-water — sync; satellite tile fetch + classifier; token-gated.
+    authed.include_router(water_router)
 
     app.include_router(authed)
 

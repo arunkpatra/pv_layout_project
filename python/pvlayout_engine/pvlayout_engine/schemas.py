@@ -361,6 +361,37 @@ class LayoutResponse(_Model):
     results: list[LayoutResult]
 
 
+# ---------------------------------------------------------------------------
+# Water-body detection (POST /detect-water) — Row #5
+# ---------------------------------------------------------------------------
+
+
+class DetectWaterRequest(_Model):
+    """Inputs for satellite water detection.
+
+    return_previews=True (default) returns base64 PNG previews per
+    boundary so the UI can show legacy's two-phase review screen.
+    Set False for headless / bandwidth-conscious flows.
+    """
+
+    parsed_kmz: ParsedKMZ
+    return_previews: bool = True
+
+
+class WaterDetectionPerBoundary(_Model):
+    """One per boundary in the parsed KMZ."""
+
+    boundary_name: str
+    rings_wgs84: list[list[Wgs84Point]]
+    preview_png_b64: str | None = None
+
+
+class DetectWaterResponse(_Model):
+    """Response from POST /detect-water."""
+
+    results: list[WaterDetectionPerBoundary]
+
+
 class IcrOverrideWgs84(_Model):
     """S11: a per-boundary override of one ICR's position.
 
