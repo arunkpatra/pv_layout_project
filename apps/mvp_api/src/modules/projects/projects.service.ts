@@ -236,3 +236,46 @@ export async function patchProject(
     deletedAt: updated.deletedAt?.toISOString() ?? null,
   }
 }
+
+/**
+ * Soft-delete a project + cascade soft-delete to its non-deleted runs.
+ *
+ * Both updates land in a single $transaction so we can never end up
+ * with a deleted project that still shows live runs (or vice-versa).
+ * Single Date is used for both updates so the audit trail makes the
+ * cascade obvious.
+ *
+ * Blob assets in S3 are NOT touched — orphan-cleanup is a deferred
+ * job (see plan §7). Multiple Projects may share the same KMZ
+ * (content-addressed by sha256), so blob lifetime depends on whether
+ * any non-deleted Project still references it.
+ *
+ * 404 on miss: project doesn't exist, soft-deleted, or owned by a
+ * different user. A second DELETE on a soft-deleted project is also
+ * 404 (idempotent in the GET-after-DELETE sense, not the
+ * "POST twice == one effect" sense).
+ */
+export async function deleteProject(
+  userId: string,
+  projectId: string,
+): Promise<void> {
+  const existing = await db.project.findFirst({
+    where: { id: projectId, userId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!existing) {
+    throw new NotFoundError("Project", projectId)
+  }
+
+  const now = new Date()
+  await db.$transaction([
+    db.project.update({
+      where: { id: projectId },
+      data: { deletedAt: now },
+    }),
+    db.run.updateMany({
+      where: { projectId, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+  ])
+}

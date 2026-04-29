@@ -6,6 +6,7 @@ import { AppError } from "../../lib/errors.js"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 import {
   createProject,
+  deleteProject,
   getProject,
   listProjects,
   patchProject,
@@ -46,6 +47,12 @@ const PatchProjectSchema = z
   .refine((v) => v.name !== undefined || v.edits !== undefined, {
     message: "At least one of `name` or `edits` is required",
   })
+
+projectsRoutes.delete("/v2/projects/:id", async (c) => {
+  const user = c.get("user")
+  await deleteProject(user.id, c.req.param("id"))
+  return c.body(null, 204)
+})
 
 projectsRoutes.patch("/v2/projects/:id", async (c) => {
   let body: unknown

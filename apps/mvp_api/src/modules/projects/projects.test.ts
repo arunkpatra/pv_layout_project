@@ -108,7 +108,7 @@ const mockProjectCreate = mock(
 
 interface MockUpdateArgs {
   where: { id: string }
-  data: { name?: string; edits?: unknown }
+  data: { name?: string; edits?: unknown; deletedAt?: Date | null }
 }
 
 const mockProjectUpdate = mock(async (args: MockUpdateArgs) => ({
@@ -120,8 +120,14 @@ const mockProjectUpdate = mock(async (args: MockUpdateArgs) => ({
   edits: args.data.edits ?? {},
   createdAt: new Date("2026-04-01T00:00:00Z"),
   updatedAt: new Date("2026-04-30T12:00:00Z"),
-  deletedAt: null,
+  deletedAt: args.data.deletedAt ?? null,
 }))
+
+const mockRunUpdateMany = mock(
+  async (..._args: unknown[]): Promise<{ count: number }> => ({ count: 0 }),
+)
+
+const mockTransactionBatch = mock(async (operations: unknown[]) => operations)
 
 const mockEntitlementFindMany = mock(
   async (..._args: unknown[]) => [
@@ -143,7 +149,9 @@ mock.module("../../lib/db.js", () => ({
       create: mockProjectCreate,
       update: mockProjectUpdate,
     },
+    run: { updateMany: mockRunUpdateMany },
     entitlement: { findMany: mockEntitlementFindMany },
+    $transaction: mockTransactionBatch,
   },
 }))
 
@@ -788,5 +796,139 @@ describe("PATCH /v2/projects/:id", () => {
       expect(res.status).toBe(200)
     }
     expect(mockProjectUpdate).toHaveBeenCalledTimes(5)
+  })
+})
+
+// ─── B14 — DELETE /v2/projects/:id ───────────────────────────────────────────
+
+const del = (id: string) =>
+  app4.request(`/v2/projects/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: "Bearer sl_live_testkey" },
+  })
+
+let app4: Hono<MvpHonoEnv>
+
+describe("DELETE /v2/projects/:id", () => {
+  beforeEach(() => {
+    mockProjectFindFirst.mockReset()
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "0".repeat(64),
+      edits: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      runs: [],
+    }))
+    mockProjectUpdate.mockClear()
+    mockRunUpdateMany.mockReset()
+    mockRunUpdateMany.mockImplementation(async () => ({ count: 2 }))
+    mockTransactionBatch.mockClear()
+    mockTransactionBatch.mockImplementation(async (ops: unknown[]) => ops)
+    app4 = makeApp()
+  })
+
+  it("returns 204 with empty body on success", async () => {
+    const res = await del("prj_x")
+    expect(res.status).toBe(204)
+    const body = await res.text()
+    expect(body).toBe("")
+  })
+
+  it("scopes ownership lookup with where: { id, userId, deletedAt: null }", async () => {
+    await del("prj_x")
+    const call = mockProjectFindFirst.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      id: "prj_x",
+      userId: "usr_test1",
+      deletedAt: null,
+    })
+  })
+
+  it("issues project + run updates inside a $transaction batch", async () => {
+    await del("prj_x")
+    expect(mockTransactionBatch).toHaveBeenCalledTimes(1)
+  })
+
+  it("sets project.deletedAt to a Date", async () => {
+    await del("prj_x")
+    const call = mockProjectUpdate.mock.calls[0] as unknown as [
+      { where: { id: string }; data: { deletedAt?: Date } },
+    ]
+    expect(call?.[0]?.where).toEqual({ id: "prj_x" })
+    expect(call?.[0]?.data?.deletedAt).toBeInstanceOf(Date)
+  })
+
+  it("cascades soft-delete to non-deleted runs only (where projectId, deletedAt: null)", async () => {
+    await del("prj_x")
+    const call = mockRunUpdateMany.mock.calls[0] as unknown as [
+      {
+        where: Record<string, unknown>
+        data: { deletedAt?: Date }
+      },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      projectId: "prj_x",
+      deletedAt: null,
+    })
+    expect(call?.[0]?.data?.deletedAt).toBeInstanceOf(Date)
+  })
+
+  it("project + run timestamps match (single Date used for both)", async () => {
+    await del("prj_x")
+    const projectCall = mockProjectUpdate.mock.calls[0] as unknown as [
+      { data: { deletedAt: Date } },
+    ]
+    const runCall = mockRunUpdateMany.mock.calls[0] as unknown as [
+      { data: { deletedAt: Date } },
+    ]
+    expect(projectCall?.[0]?.data?.deletedAt.getTime()).toBe(
+      runCall?.[0]?.data?.deletedAt.getTime(),
+    )
+  })
+
+  it("returns 404 when the project doesn't exist (or belongs to another user)", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await del("prj_other")
+    expect(res.status).toBe(404)
+    expect(mockProjectUpdate).not.toHaveBeenCalled()
+    expect(mockRunUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it("idempotency: a second DELETE on a soft-deleted project returns 404 (where filter excludes)", async () => {
+    // First call succeeds (default mock), second call sees the project as
+    // already-deleted (findFirst with deletedAt: null filter returns null).
+    mockProjectFindFirst.mockImplementationOnce(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "0".repeat(64),
+      edits: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      runs: [],
+    }))
+    mockProjectFindFirst.mockImplementationOnce(async () => null)
+    const r1 = await del("prj_x")
+    expect(r1.status).toBe(204)
+    const r2 = await del("prj_x")
+    expect(r2.status).toBe(404)
+  })
+
+  it("does not perform any S3 / blob operations on delete (orphan blobs persist by design)", async () => {
+    // Asserted by the mock surface: only project.update + run.updateMany.
+    // No s3.ts helper imported by this module, so no smoke required here.
+    await del("prj_x")
+    expect(mockTransactionBatch).toHaveBeenCalledTimes(1)
+    expect(mockProjectUpdate).toHaveBeenCalledTimes(1)
+    expect(mockRunUpdateMany).toHaveBeenCalledTimes(1)
   })
 })
