@@ -2,7 +2,7 @@
 
 **Mission:** ship the new SolarLayout desktop app for PVLayout — full functional coverage of legacy PyQt5 capabilities + project/run/multi-tab architecture + V2 backend integration. Match Claude-Desktop quality bar throughout.
 **Last updated:** 2026-04-29
-**Status:** 3 / TBD done.
+**Status:** 3 / 52 done. (53 total rows; X5 telemetry deferred.)
 
 This file replaces the parity-era `docs/PLAN.md` (closed 12/12 done on 2026-04-29; archived at [docs/historical/PLAN-parity-v1.md](./historical/PLAN-parity-v1.md)).
 
@@ -76,6 +76,8 @@ Phase-grouped; within a phase, dependency-ordered. `Depends` column references r
 ### Phase 4 — Legacy GUI parity (the big bucket)
 
 Reference: [`docs/post-parity/discovery/2026-04-29-001-legacy-app-capability-audit.md`](./post-parity/discovery/2026-04-29-001-legacy-app-capability-audit.md). Each row in this phase ports a legacy capability into the new project/run model.
+
+> **Phase 4 scope reality:** most rows here have parity-era React components already shipping (`MapCanvas`, `SummaryPanel`, `LayoutPanel`, `VisibilitySection`, drawing toolbar, dialogs). They currently wire to the parity-era `useProjectStore.project` shape. **Per-row scope is therefore: (a) wire to the post-parity `currentProject` / `runs[selectedRunId]` model from F4, (b) add post-parity test coverage where missing, (c) verify acceptance against the new state.** Genuine net-new builds in this phase: **D1–D7** drawing tools (partial scaffolding only), **L1** analysis overlay, **C8** click-selection inspector. The `Source / Notes` for each row reads as "build this"; expect the real diff to be smaller than the prose suggests once we get here.
 
 #### Input panel (left side)
 
@@ -204,5 +206,6 @@ Resolved questions captured during scoping. Each item: locked decision + rationa
 
 ## Changelog
 
+- **2026-04-29 v1.2** — Plan-status review: counter `TBD` → `52` (53 rows, X5 deferred). Added Phase 4 scope-reality note flagging that most rows have parity-era components already shipping; per-row scope is rewire + tests + acceptance verification, not from-scratch UI builds.
 - **2026-04-29 v1.1** — Promoted to `docs/PLAN.md`; old parity table archived to `docs/historical/PLAN-parity-v1.md`. Folded in audit-flagged corrections: F1 license-key-bearer auth (not Clerk), F4 semantic-ID prefix note, F6 AWS S3 (not Vercel Blob). Resolved Open Questions into Decisions log. Path references updated for new location.
 - **2026-04-29 v1.0** — Initial scoping at `docs/post-parity/PLAN.md`. Consolidates decisions from 2026-04-29 brainstorm session + legacy capability audit + backend contract audit.
