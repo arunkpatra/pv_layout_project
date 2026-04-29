@@ -122,3 +122,42 @@ export const entitlementSummaryV2ResponseSchema = v2SuccessResponseSchema(
 // drifted away from V1 and the desktop's V1 consumers will break.
 const _v2IsV1Compatible: Entitlements = {} as EntitlementSummaryV2
 void _v2IsV1Compatible
+
+// ---------------------------------------------------------------------------
+// /v2/usage/report — idempotent debit + refreshed entitlements
+// ---------------------------------------------------------------------------
+
+/**
+ * V2 usage-report request body. `idempotencyKey` is mandatory in V2 (V1's
+ * route accepts a body without it). The desktop generates one fresh UUID v4
+ * per "Generate Layout" intent and reuses the same key on transient retries
+ * — same key → same response, no double-debit.
+ *
+ * Backend per the 2026-04-30 handoff: uniqueness is enforced server-side
+ * via `@@unique([userId, idempotencyKey])`; non-empty string accepted; we
+ * agreed to UUID v4 (36 chars) on the desktop side.
+ */
+export const usageReportV2RequestSchema = z.object({
+  feature: z.string(),
+  idempotencyKey: z.string().min(1),
+})
+
+export type UsageReportV2Request = z.infer<typeof usageReportV2RequestSchema>
+
+/**
+ * V2 usage-report success body — strict superset of V1's
+ * `{ recorded, remainingCalculations }`. The new `availableFeatures` lets
+ * the desktop refresh local UI gating in the same round-trip after a
+ * debit (no separate `/v2/entitlements` fetch required after every click).
+ */
+export const usageReportV2ResultSchema = z.object({
+  recorded: z.boolean(),
+  remainingCalculations: z.number().int().nonnegative(),
+  availableFeatures: z.array(z.string()),
+})
+
+export type UsageReportV2Result = z.infer<typeof usageReportV2ResultSchema>
+
+export const usageReportV2ResponseSchema = v2SuccessResponseSchema(
+  usageReportV2ResultSchema
+)

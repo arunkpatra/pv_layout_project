@@ -407,3 +407,199 @@ describe("getEntitlementsV2", () => {
     }
   })
 })
+
+describe("reportUsageV2", () => {
+  const IDEM = "9c4f3e8a-5d6b-4f7c-9e2d-1a8b3c4d5e6f"
+
+  test("posts feature + idempotencyKey to /v2/usage/report and returns refreshed entitlements", async () => {
+    let seenBody = ""
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse({
+          success: true,
+          data: {
+            recorded: true,
+            remainingCalculations: 41,
+            availableFeatures: [
+              "plant_layout",
+              "obstruction_exclusion",
+              "cable_routing",
+              "cable_measurements",
+            ],
+          },
+        })
+      },
+    })
+    const res = await client.reportUsageV2(KEY, "cable_routing", IDEM)
+    expect(seenUrl).toBe("https://api.solarlayout.in/v2/usage/report")
+    expect(JSON.parse(seenBody)).toEqual({
+      feature: "cable_routing",
+      idempotencyKey: IDEM,
+    })
+    expect(res.recorded).toBe(true)
+    expect(res.remainingCalculations).toBe(41)
+    expect(res.availableFeatures).toContain("cable_routing")
+  })
+
+  test("sends Bearer auth header", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse({
+          success: true,
+          data: {
+            recorded: true,
+            remainingCalculations: 0,
+            availableFeatures: [],
+          },
+        })
+      },
+    })
+    await client.reportUsageV2(KEY, "plant_layout", IDEM)
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 402 V2 envelope (PAYMENT_REQUIRED) — exhausted user", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "PAYMENT_REQUIRED",
+              message:
+                "No remaining calculations — purchase more at solarlayout.in",
+            },
+          },
+          402
+        ),
+    })
+    try {
+      await client.reportUsageV2(KEY, "plant_layout", IDEM)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(402)
+      expect(e.code).toBe("PAYMENT_REQUIRED")
+      expect(e.message).toContain("No remaining calculations")
+    }
+  })
+
+  test("maps 409 V2 envelope (CONFLICT) — concurrent decrement race", async () => {
+    // Backend's contract: 409 means the same idempotencyKey is being
+    // processed concurrently. Caller should retry shortly after.
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "CONFLICT",
+              message: "Calculation already in progress — retry",
+            },
+          },
+          409
+        ),
+    })
+    try {
+      await client.reportUsageV2(KEY, "plant_layout", IDEM)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(409)
+      expect(e.code).toBe("CONFLICT")
+    }
+  })
+
+  test("maps 400 V2 envelope (VALIDATION_ERROR) — empty idempotencyKey", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "idempotencyKey must be non-empty",
+            },
+          },
+          400
+        ),
+    })
+    try {
+      await client.reportUsageV2(KEY, "plant_layout", "")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.code).toBe("VALIDATION_ERROR")
+      expect(e.status).toBe(400)
+    }
+  })
+
+  test("maps network error to status=0 (transient — caller should retry with same key)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () => {
+        throw new TypeError("Failed to fetch")
+      },
+    })
+    try {
+      await client.reportUsageV2(KEY, "plant_layout", IDEM)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.code).toBeUndefined()
+      expect(e.message).toBe("Failed to fetch")
+    }
+  })
+
+  test("rejects a V2 success body missing the new availableFeatures field", async () => {
+    // V1 shape (no availableFeatures) accidentally returned by /v2 would
+    // be a backend bug — surface it loudly.
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          success: true,
+          data: { recorded: true, remainingCalculations: 5 },
+        }),
+    })
+    try {
+      await client.reportUsageV2(KEY, "plant_layout", IDEM)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+
+  test("idempotency contract — same key returns same response without double-debit", async () => {
+    // Backend semantic — exercised here as a unit-level claim about the
+    // client. The client does not de-dup itself; it relies on the server's
+    // `(userId, idempotencyKey)` unique constraint. Verifies that the
+    // client correctly forwards the same key on a retry and that the
+    // server (mocked here) returns the same response.
+    const stableResponse = {
+      success: true,
+      data: {
+        recorded: true,
+        remainingCalculations: 99,
+        availableFeatures: ["plant_layout"],
+      },
+    }
+    let calls = 0
+    const client = createEntitlementsClient({
+      fetchImpl: async () => {
+        calls += 1
+        return jsonResponse(stableResponse)
+      },
+    })
+    const a = await client.reportUsageV2(KEY, "plant_layout", IDEM)
+    const b = await client.reportUsageV2(KEY, "plant_layout", IDEM)
+    expect(calls).toBe(2) // The client doesn't memoise — each call hits.
+    expect(a).toEqual(b) // …but the server returns the same payload.
+  })
+})

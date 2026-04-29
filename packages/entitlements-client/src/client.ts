@@ -30,8 +30,10 @@ import {
 } from "./types"
 import {
   entitlementSummaryV2ResponseSchema,
+  usageReportV2ResponseSchema,
   v2ErrorResponseSchema,
   type EntitlementSummaryV2,
+  type UsageReportV2Result,
   type V2ErrorCode,
 } from "./types-v2"
 
@@ -67,6 +69,19 @@ export interface EntitlementsClient {
    * from any post-parity desktop code path; V1 stays for legacy.
    */
   getEntitlementsV2(key: string): Promise<EntitlementSummaryV2>
+  /**
+   * V2 — `POST /v2/usage/report`. Idempotent debit: same `idempotencyKey`
+   * returns the same response without re-debiting. Response includes
+   * `availableFeatures` so the desktop can refresh local UI gating in the
+   * same round-trip after a successful debit. Caller is responsible for
+   * generating one fresh UUID v4 per "Generate Layout" intent and
+   * REUSING the same key on transient retries.
+   */
+  reportUsageV2(
+    key: string,
+    feature: string,
+    idempotencyKey: string
+  ): Promise<UsageReportV2Result>
 }
 
 /**
@@ -210,6 +225,26 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `V2 entitlements response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async reportUsageV2(key, feature, idempotencyKey) {
+      const raw = await request(
+        "/v2/usage/report",
+        {
+          method: "POST",
+          body: JSON.stringify({ feature, idempotencyKey }),
+        },
+        key
+      )
+      const parsed = usageReportV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `V2 usage-report response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }
