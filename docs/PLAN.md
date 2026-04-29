@@ -2,7 +2,7 @@
 
 **Mission:** ship the new SolarLayout desktop app for PVLayout — full functional coverage of legacy PyQt5 capabilities + project/run/multi-tab architecture + V2 backend integration. Match Claude-Desktop quality bar throughout.
 **Last updated:** 2026-04-29
-**Status:** 0 / TBD done.
+**Status:** 1 / TBD done.
 
 This file replaces the parity-era `docs/PLAN.md` (closed 12/12 done on 2026-04-29; archived at [docs/historical/PLAN-parity-v1.md](./historical/PLAN-parity-v1.md)).
 
@@ -45,7 +45,7 @@ Phase-grouped; within a phase, dependency-ordered. `Depends` column references r
 | F1 | Sign-in flow (license key entry, OS-keychain storage) | T2 | Tauri Rust shell prompts for `sl_live_*` license key on first launch; stores in OS keychain (macOS Keychain / Windows Credential Vault / Linux Secret Service via `keyring` crate or Tauri stronghold plugin). React surface = simple modal. License key is the *only* auth artifact — no Clerk on the desktop. | — | Key stored in keychain; restart → key recovered; invalid key (verified against `GET /v2/entitlements`) shows clear error. | todo |
 | F2 | V2 entitlements client (Rust shell) | T2 | Rust shell calls `GET /v2/entitlements` at startup + after every `/usage/report`. Pushes result to React via Tauri command + sidecar via existing `POST /session`. Single source of truth for `availableFeatures`, `projectQuota`, `remainingCalculations`. | F1, B8 | Entitlements visible to both React (UI gating) and sidecar (compute gating); refresh on demand works. | todo |
 | F3 | Idempotency-key helper + retry policy for usage/report | T1 | Rust shell generates `idempotencyKey = uuid()` per "Generate Layout" intent; retries on network errors with same key. | F2, B9 | Network blip during /usage/report doesn't double-debit; integration test simulates retry. | todo |
-| F4 | Project + Run state in Zustand | T1 | Slice at `apps/desktop/src/state/project.ts` per ADR-0003. Holds `currentProject`, `runs[]`, `selectedRunId`. Plus `useProjectQuery` (TanStack Query) for server state. Project IDs use semantic-ID prefix `prj_`, Runs use `run_` (minted server-side; client treats as opaque strings). | — | State sliced cleanly; cross-component consumers work; type-safe. | todo |
+| F4 | Project + Run state in Zustand | T1 | Slice at `apps/desktop/src/state/project.ts` per ADR-0003. Holds `currentProject`, `runs[]`, `selectedRunId`. Plus `useProjectQuery` (TanStack Query) for server state. Project IDs use semantic-ID prefix `prj_`, Runs use `run_` (minted server-side; client treats as opaque strings). | — | State sliced cleanly; cross-component consumers work; type-safe. | **done** |
 | F5 | V2 backend HTTP client (Rust shell) | T2 | Rust crate exposing typed methods for V2 endpoints. React calls via Tauri commands. Generated types from V2 OpenAPI (or hand-written if OpenAPI spec absent). | F2 | All B10–B18 endpoints callable from React via Tauri; unit tests on the Rust client. | todo |
 | F6 | Blob upload helper (AWS S3) | T2 | Rust shell implements pre-signed PUT upload for KMZ + run results to **AWS S3** (`ap-south-1`). Pre-signed URLs minted by V2 backend (B6/B7); desktop only does the PUT. Use `reqwest` for the upload; multipart not needed at v1 sizes (KMZ ≤50MB). Progress reporting back to React via Tauri events. | F5, B6, B7 | KMZ upload + run-result upload work end-to-end against the V2 S3 buckets; 50MB KMZ doesn't time out; progress bar visible; failure modes (network, 4xx, 5xx) surface as toasts. | todo |
 
