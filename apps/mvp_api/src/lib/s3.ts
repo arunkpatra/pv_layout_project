@@ -61,6 +61,7 @@ export async function getPresignedUploadUrl(
   key: string,
   contentType: string,
   expiresIn = 900,
+  contentLength?: number,
 ): Promise<string | null> {
   const client = getS3()
   if (!client || !env.MVP_S3_PROJECTS_BUCKET) return null
@@ -71,6 +72,7 @@ export async function getPresignedUploadUrl(
       Bucket: env.MVP_S3_PROJECTS_BUCKET,
       Key: key,
       ContentType: contentType,
+      ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
     }),
     { expiresIn },
   )

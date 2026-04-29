@@ -19,6 +19,7 @@ import { customerRoutes } from "./modules/admin/customer.routes.js"
 import { productRoutes } from "./modules/admin/product.routes.js"
 import { dashboardAdminRoutes } from "./modules/admin/dashboard.routes.js"
 import { transactionsRoutes } from "./modules/transactions/transactions.routes.js"
+import { blobsRoutes } from "./modules/blobs/blobs.routes.js"
 
 export const app = new Hono<MvpHonoEnv>()
 
@@ -55,6 +56,7 @@ app.route("/", customerRoutes)
 app.route("/", productRoutes)
 app.route("/", dashboardAdminRoutes)
 app.route("/", transactionsRoutes)
+app.route("/", blobsRoutes)
 
 app.get("/", async (c) => {
   const status = {

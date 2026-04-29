@@ -36,7 +36,7 @@ downloads/pv_layout.zip             ← PV Layout desktop app (single zip for al
 
 **Key layout within each V2 projects bucket:**
 ```
-projects/<userId>/<projectId>/kmz/<kmzSha256>.kmz                  ← project KMZ (immutable, content-addressed)
+projects/<userId>/kmz/<kmzSha256>.kmz                              ← KMZ uploads (B6, content-addressed at user level)
 projects/<userId>/<projectId>/runs/<runId>/layout.json             ← layout result (B16)
 projects/<userId>/<projectId>/runs/<runId>/energy.json             ← energy result (B16, when computed)
 projects/<userId>/<projectId>/runs/<runId>/exports/<filename>      ← DXF / PDF / KMZ exports (B16)
