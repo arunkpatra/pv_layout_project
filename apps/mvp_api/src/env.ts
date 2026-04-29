@@ -13,6 +13,7 @@ const EnvSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().optional(),
   MVP_S3_DOWNLOADS_BUCKET: z.string().optional(),
+  MVP_S3_PROJECTS_BUCKET: z.string().optional(),
   // Clerk — used to verify dashboard JWT tokens
   CLERK_SECRET_KEY: z.string().optional(),
   // Stripe

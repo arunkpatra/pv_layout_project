@@ -26,6 +26,30 @@ Resources are namespaced by environment. Last verified: 2026-04-20.
 downloads/pv_layout.zip             ← PV Layout desktop app (single zip for all tiers)
 ```
 
+### V2 Projects Buckets (post-parity desktop app)
+
+| Environment | Bucket Name | Purpose |
+|---|---|---|
+| local | `solarlayout-local-projects` | KMZ uploads + run-result artifacts (V2) — local dev |
+| staging | `solarlayout-staging-projects` | Same — staging |
+| prod | `solarlayout-prod-projects` | Same — production |
+
+**Key layout within each V2 projects bucket:**
+```
+projects/<userId>/<projectId>/kmz/<kmzSha256>.kmz                  ← project KMZ (immutable, content-addressed)
+projects/<userId>/<projectId>/runs/<runId>/layout.json             ← layout result (B16)
+projects/<userId>/<projectId>/runs/<runId>/energy.json             ← energy result (B16, when computed)
+projects/<userId>/<projectId>/runs/<runId>/exports/<filename>      ← DXF / PDF / KMZ exports (B16)
+```
+
+**Configuration (V2 projects buckets):**
+- Public access fully blocked
+- No versioning (content-addressed via sha256 in the key — overwrites are idempotent)
+- Lifecycle: abort incomplete multipart uploads after 7 days; orphan-cleanup of soft-deleted projects/runs is a deferred backlog item, not v1
+- No CORS — the Tauri desktop's Rust shell makes native HTTP requests, no browser origin involved
+- Encryption: S3 default SSE-S3
+- Decision memo: `docs/initiatives/findings/2026-04-30-001-v2-s3-buckets.md`
+
 **Configuration applied to all buckets:**
 - Public access fully blocked (BlockPublicAcls, IgnorePublicAcls, BlockPublicPolicy, RestrictPublicBuckets)
 - Region: `ap-south-1`

@@ -1,4 +1,8 @@
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3"
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { env } from "../env.js"
 
@@ -38,6 +42,35 @@ export async function getPresignedDownloadUrl(
       Bucket: env.MVP_S3_DOWNLOADS_BUCKET,
       Key: key,
       ResponseContentDisposition: `attachment; filename="${filename}"`,
+    }),
+    { expiresIn },
+  )
+}
+
+/**
+ * Pre-signed PUT for the V2 projects bucket — used by B6/B7 endpoints
+ * (KMZ upload, run-result upload). Returns null when S3 is not configured
+ * (graceful degradation, mirrors getPresignedDownloadUrl). The desktop
+ * client must send the same Content-Type header on its PUT or S3 will
+ * reject the signature.
+ *
+ * Default expiresIn is 900s (15 min) — uploads should land quickly; longer
+ * lifetimes only widen the window for replay-style misuse.
+ */
+export async function getPresignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresIn = 900,
+): Promise<string | null> {
+  const client = getS3()
+  if (!client || !env.MVP_S3_PROJECTS_BUCKET) return null
+
+  return getSignedUrl(
+    client,
+    new PutObjectCommand({
+      Bucket: env.MVP_S3_PROJECTS_BUCKET,
+      Key: key,
+      ContentType: contentType,
     }),
     { expiresIn },
   )
