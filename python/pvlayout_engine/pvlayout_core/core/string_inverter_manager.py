@@ -1322,6 +1322,9 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     # only Pattern V uses ``route_poly``.
     route_poly = _build_route_polygon(result)
 
+    # Table → inverter map. Unused after P0 Task 6 (bundled DC routing no
+    # longer needs per-table lookup), but kept intentionally — removing is
+    # out of P0 scope. See docs/parity/plans/p00-quick-win-port.md §Task-6.
     tbl_to_inv = {}
     for inv_idx, group in enumerate(groups):
         for t in group:
