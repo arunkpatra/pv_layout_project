@@ -106,6 +106,23 @@ const mockProjectCreate = mock(
   }),
 )
 
+interface MockUpdateArgs {
+  where: { id: string }
+  data: { name?: string; edits?: unknown }
+}
+
+const mockProjectUpdate = mock(async (args: MockUpdateArgs) => ({
+  id: args.where.id,
+  userId: "usr_test1",
+  name: args.data.name ?? "Original",
+  kmzBlobUrl: "s3://b/k.kmz",
+  kmzSha256: "0".repeat(64),
+  edits: args.data.edits ?? {},
+  createdAt: new Date("2026-04-01T00:00:00Z"),
+  updatedAt: new Date("2026-04-30T12:00:00Z"),
+  deletedAt: null,
+}))
+
 const mockEntitlementFindMany = mock(
   async (..._args: unknown[]) => [
     {
@@ -124,6 +141,7 @@ mock.module("../../lib/db.js", () => ({
       findFirst: mockProjectFindFirst,
       count: mockProjectCount,
       create: mockProjectCreate,
+      update: mockProjectUpdate,
     },
     entitlement: { findMany: mockEntitlementFindMany },
   },
@@ -638,5 +656,137 @@ describe("GET /v2/projects/:id", () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as { data: ProjectDetailWire }
     expect(body.data.runs).toEqual([])
+  })
+})
+
+// ─── B13 — PATCH /v2/projects/:id ────────────────────────────────────────────
+
+const patch = (id: string, body: object | string) =>
+  app3.request(`/v2/projects/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer sl_live_testkey",
+    },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  })
+
+let app3: Hono<MvpHonoEnv>
+
+describe("PATCH /v2/projects/:id", () => {
+  beforeEach(() => {
+    mockProjectFindFirst.mockReset()
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "Original",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "0".repeat(64),
+      edits: {},
+      createdAt: new Date("2026-04-01T00:00:00Z"),
+      updatedAt: new Date("2026-04-15T00:00:00Z"),
+      deletedAt: null,
+      runs: [],
+    }))
+    mockProjectUpdate.mockClear()
+    app3 = makeApp()
+  })
+
+  it("PATCH name → 200 with updated row", async () => {
+    const res = await patch("prj_x", { name: "Renamed" })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: { name: string; updatedAt: string } }
+    expect(body.data.name).toBe("Renamed")
+    const call = mockProjectUpdate.mock.calls[0] as unknown as [
+      { where: { id: string }; data: { name?: string; edits?: unknown } },
+    ]
+    expect(call?.[0]?.where).toEqual({ id: "prj_x" })
+    expect(call?.[0]?.data).toEqual({ name: "Renamed" })
+  })
+
+  it("PATCH edits → 200, only edits in update.data", async () => {
+    const newEdits = { layoutOverrides: { rows: 8 } }
+    const res = await patch("prj_x", { edits: newEdits })
+    expect(res.status).toBe(200)
+    const call = mockProjectUpdate.mock.calls[0] as unknown as [
+      { data: { name?: string; edits?: unknown } },
+    ]
+    expect(call?.[0]?.data).toEqual({ edits: newEdits })
+  })
+
+  it("PATCH both name and edits → 200, both in update.data", async () => {
+    const res = await patch("prj_x", { name: "X", edits: { foo: 1 } })
+    expect(res.status).toBe(200)
+    const call = mockProjectUpdate.mock.calls[0] as unknown as [
+      { data: { name?: string; edits?: unknown } },
+    ]
+    expect(call?.[0]?.data).toEqual({ name: "X", edits: { foo: 1 } })
+  })
+
+  it("rejects kmzBlobUrl in body with 400 (immutable post-create)", async () => {
+    const res = await patch("prj_x", { kmzBlobUrl: "s3://other" })
+    expect(res.status).toBe(400)
+    expect(mockProjectUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects kmzSha256 in body with 400 (immutable post-create)", async () => {
+    const res = await patch("prj_x", { kmzSha256: "f".repeat(64) })
+    expect(res.status).toBe(400)
+    expect(mockProjectUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects an empty body with 400 (must update at least one field)", async () => {
+    const res = await patch("prj_x", {})
+    expect(res.status).toBe(400)
+    expect(mockProjectUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects empty name with 400", async () => {
+    const res = await patch("prj_x", { name: "" })
+    expect(res.status).toBe(400)
+  })
+
+  it("rejects unknown fields strictly with 400", async () => {
+    const res = await patch("prj_x", { foo: "bar" })
+    expect(res.status).toBe(400)
+  })
+
+  it("rejects malformed JSON body with 400", async () => {
+    const res = await patch("prj_x", "not-json")
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 404 when the project doesn't exist (or belongs to another user — same response, no leakage)", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await patch("prj_other", { name: "X" })
+    expect(res.status).toBe(404)
+    expect(mockProjectUpdate).not.toHaveBeenCalled()
+  })
+
+  it("returns 404 when the project is soft-deleted", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await patch("prj_deleted", { name: "X" })
+    expect(res.status).toBe(404)
+  })
+
+  it("scopes the ownership lookup with where: { id, userId, deletedAt: null }", async () => {
+    await patch("prj_x", { name: "Y" })
+    const call = mockProjectFindFirst.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      id: "prj_x",
+      userId: "usr_test1",
+      deletedAt: null,
+    })
+  })
+
+  it("supports rapid-fire small edits (auto-save shape)", async () => {
+    // 5 consecutive small patches, each with a tiny edits delta.
+    for (let i = 0; i < 5; i++) {
+      const res = await patch("prj_x", { edits: { tick: i } })
+      expect(res.status).toBe(200)
+    }
+    expect(mockProjectUpdate).toHaveBeenCalledTimes(5)
   })
 })

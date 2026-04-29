@@ -8,6 +8,7 @@ import {
   createProject,
   getProject,
   listProjects,
+  patchProject,
 } from "./projects.service.js"
 
 export const projectsRoutes = new Hono<MvpHonoEnv>()
@@ -33,6 +34,38 @@ const CreateProjectSchema = z.object({
 projectsRoutes.get("/v2/projects/:id", async (c) => {
   const user = c.get("user")
   const project = await getProject(user.id, c.req.param("id"))
+  return c.json(ok(project))
+})
+
+const PatchProjectSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    edits: z.unknown().optional(),
+  })
+  .strict()
+  .refine((v) => v.name !== undefined || v.edits !== undefined, {
+    message: "At least one of `name` or `edits` is required",
+  })
+
+projectsRoutes.patch("/v2/projects/:id", async (c) => {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    throw new AppError("VALIDATION_ERROR", "Body must be valid JSON", 400)
+  }
+  const parsed = PatchProjectSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Invalid request body",
+      400,
+      parsed.error.flatten(),
+    )
+  }
+
+  const user = c.get("user")
+  const project = await patchProject(user.id, c.req.param("id"), parsed.data)
   return c.json(ok(project))
 })
 

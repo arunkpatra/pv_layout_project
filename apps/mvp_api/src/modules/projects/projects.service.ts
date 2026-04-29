@@ -184,3 +184,55 @@ export async function getProject(
     })),
   }
 }
+
+export interface PatchProjectInput {
+  name?: string
+  edits?: unknown
+}
+
+/**
+ * Auto-save target. Updates only the supplied fields; `kmzBlobUrl` and
+ * `kmzSha256` are immutable post-create (rejected at the route via Zod
+ * `.strict()` so the desktop fails fast on a mistakenly-included key).
+ *
+ * Ownership is checked via a pre-flight findFirst — projects owned by
+ * another user, soft-deleted projects, and non-existent IDs all return
+ * the same 404, never leaking which case applies. Two queries (find +
+ * update) is acceptable for an auto-save endpoint where network latency
+ * dwarfs DB ops.
+ */
+export async function patchProject(
+  userId: string,
+  projectId: string,
+  patch: PatchProjectInput,
+): Promise<ProjectWire> {
+  const existing = await db.project.findFirst({
+    where: { id: projectId, userId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!existing) {
+    throw new NotFoundError("Project", projectId)
+  }
+
+  const updated = await db.project.update({
+    where: { id: projectId },
+    data: {
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.edits !== undefined
+        ? { edits: patch.edits as object }
+        : {}),
+    },
+  })
+
+  return {
+    id: updated.id,
+    userId: updated.userId,
+    name: updated.name,
+    kmzBlobUrl: updated.kmzBlobUrl,
+    kmzSha256: updated.kmzSha256,
+    edits: updated.edits,
+    createdAt: updated.createdAt.toISOString(),
+    updatedAt: updated.updatedAt.toISOString(),
+    deletedAt: updated.deletedAt?.toISOString() ?? null,
+  }
+}
