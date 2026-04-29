@@ -208,10 +208,19 @@ def run_layout_multi(
     results = []
     for i, b in enumerate(boundaries):
         name = b.name if b.name else f"Plant {i + 1}"
+        # ROW #4 BRIDGE — REMOVE IN ROW #6.
+        # Row #4 split water-named polygons out into BoundaryInfo.water_obstacles
+        # (parser-level autodetection). The new app's layout engine doesn't yet
+        # have a separate water-exclusion path (that's row #6's scope: legacy
+        # layout_engine.py uses different setbacks for water vs hard obstacles).
+        # Until row #6 lands the proper integration, merge water_obstacles into
+        # the obstacles list so panels are still excluded from ponds/canals
+        # (matches pre-row-#4 behaviour and keeps parity tests green).
+        merged_obstacles = list(b.obstacles) + list(getattr(b, "water_obstacles", []))
         try:
             r = run_layout(
                 boundary_wgs84=b.coords,
-                obstacles_wgs84=b.obstacles,
+                obstacles_wgs84=merged_obstacles,
                 params=params,
                 centroid_lat=centroid_lat,
                 centroid_lon=centroid_lon,

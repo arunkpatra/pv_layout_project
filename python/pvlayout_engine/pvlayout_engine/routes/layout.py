@@ -123,6 +123,11 @@ async def parse_kmz(file: UploadFile = FastAPIFile(...)) -> ParsedKMZ:
                 obstacles=[
                     [(lon, lat) for (lon, lat) in obs] for obs in b.obstacles
                 ],
+                # Row #4: surface autodetected water obstacles on the wire.
+                water_obstacles=[
+                    [(lon, lat) for (lon, lat) in wo]
+                    for wo in getattr(b, "water_obstacles", [])
+                ],
                 line_obstructions=[
                     [(lon, lat) for (lon, lat) in line]
                     for line in b.line_obstructions
@@ -377,6 +382,13 @@ def _boundaries_to_core(wire_boundaries: list[BoundaryInfo]) -> list:
         cb = CoreBoundary(b.name, [(lon, lat) for (lon, lat) in b.coords])
         cb.obstacles = [
             [(lon, lat) for (lon, lat) in obs] for obs in b.obstacles
+        ]
+        # Row #4: route water_obstacles through to the domain object so the
+        # row-#4 bridge in run_layout_multi can fold them into exclusions.
+        # Older wire payloads without this field default to [] via Pydantic.
+        cb.water_obstacles = [
+            [(lon, lat) for (lon, lat) in wo]
+            for wo in getattr(b, "water_obstacles", [])
         ]
         cb.line_obstructions = [
             [(lon, lat) for (lon, lat) in line] for line in b.line_obstructions

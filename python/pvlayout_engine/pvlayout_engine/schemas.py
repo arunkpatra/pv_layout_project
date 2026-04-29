@@ -329,6 +329,9 @@ class BoundaryInfo(_Model):
     name: str
     coords: list[Wgs84Point]
     obstacles: list[list[Wgs84Point]] = Field(default_factory=list)
+    # Row #4: ponds / canals / reservoirs detected by KMZ Placemark name.
+    # Optional + default-empty for backward compatibility with older clients.
+    water_obstacles: list[list[Wgs84Point]] = Field(default_factory=list)
     line_obstructions: list[list[Wgs84Point]] = Field(default_factory=list)
 
 
