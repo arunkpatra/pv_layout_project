@@ -2,7 +2,7 @@
 
 **Mission:** ship the new SolarLayout desktop app for PVLayout — full functional coverage of legacy PyQt5 capabilities + project/run/multi-tab architecture + V2 backend integration. Match Claude-Desktop quality bar throughout.
 **Last updated:** 2026-04-29
-**Status:** 1 / TBD done.
+**Status:** 2 / TBD done.
 
 This file replaces the parity-era `docs/PLAN.md` (closed 12/12 done on 2026-04-29; archived at [docs/historical/PLAN-parity-v1.md](./historical/PLAN-parity-v1.md)).
 
@@ -42,7 +42,7 @@ Phase-grouped; within a phase, dependency-ordered. `Depends` column references r
 
 | # | Feature | Tier | Source / Notes | Depends | Acceptance | Status |
 |---|---|---|---|---|---|---|
-| F1 | Sign-in flow (license key entry, OS-keychain storage) | T2 | Tauri Rust shell prompts for `sl_live_*` license key on first launch; stores in OS keychain (macOS Keychain / Windows Credential Vault / Linux Secret Service via `keyring` crate or Tauri stronghold plugin). React surface = simple modal. License key is the *only* auth artifact — no Clerk on the desktop. | — | Key stored in keychain; restart → key recovered; invalid key (verified against `GET /v2/entitlements`) shows clear error. | todo |
+| F1 | Sign-in flow (license key entry, OS-keychain storage) | T2 | Implementation pre-existed from parity-era S7: Rust `keyring` crate (`apps/desktop/src-tauri/src/keyring.rs`) with three Tauri commands (`get_license`, `save_license`, `clear_license`); TS wrapper `apps/desktop/src/auth/licenseKey.ts` with preview-mode fallback; `apps/desktop/src/dialogs/LicenseKeyDialog.tsx` (first-launch + change modes); state machine in `App.tsx`. F1 row delivered the missing **test coverage**: `licenseKey.test.ts` (preview + Tauri-mocked roundtrip, 11 cases) + `LicenseKeyDialog.test.tsx` (RTL render/validation/submit/error, 9 cases). License key is the *only* auth artifact — no Clerk on the desktop. **V1 swap note:** verification currently calls V1 `/entitlements`; F2 swaps to `/v2/entitlements` when backend B8 lands. | — | Key stored in keychain; restart → key recovered (verified live in S7 Human Gate); invalid key shows clear error (V1 today; V2 in F2). All 20 new test cases green. | **done** |
 | F2 | V2 entitlements client (Rust shell) | T2 | Rust shell calls `GET /v2/entitlements` at startup + after every `/usage/report`. Pushes result to React via Tauri command + sidecar via existing `POST /session`. Single source of truth for `availableFeatures`, `projectQuota`, `remainingCalculations`. | F1, B8 | Entitlements visible to both React (UI gating) and sidecar (compute gating); refresh on demand works. | todo |
 | F3 | Idempotency-key helper + retry policy for usage/report | T1 | Rust shell generates `idempotencyKey = uuid()` per "Generate Layout" intent; retries on network errors with same key. | F2, B9 | Network blip during /usage/report doesn't double-debit; integration test simulates retry. | todo |
 | F4 | Project + Run state in Zustand | T1 | Slice at `apps/desktop/src/state/project.ts` per ADR-0003. Holds `currentProject`, `runs[]`, `selectedRunId`. Plus `useProjectQuery` (TanStack Query) for server state. Project IDs use semantic-ID prefix `prj_`, Runs use `run_` (minted server-side; client treats as opaque strings). | — | State sliced cleanly; cross-component consumers work; type-safe. | **done** |
