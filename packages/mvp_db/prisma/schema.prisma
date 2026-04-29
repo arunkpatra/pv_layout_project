@@ -140,6 +140,7 @@ model UsageRecord {
   metadata       Json?
   idempotencyKey String?
   createdAt      DateTime   @default(now())
+  run            Run?
 
   @@unique([userId, idempotencyKey])
   @@map("usage_records")
@@ -183,8 +184,30 @@ model Project {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
+  runs       Run[]
 
   @@index([userId])
   @@index([deletedAt])
   @@map("projects")
+}
+
+model Run {
+  id                  String      @id @default("")
+  projectId           String
+  project             Project     @relation(fields: [projectId], references: [id])
+  name                String
+  params              Json
+  inputsSnapshot      Json
+  layoutResultBlobUrl String?
+  energyResultBlobUrl String?
+  exportsBlobUrls     Json        @default("[]")
+  billedFeatureKey    String
+  usageRecordId       String      @unique
+  usageRecord         UsageRecord @relation(fields: [usageRecordId], references: [id])
+  createdAt           DateTime    @default(now())
+  deletedAt           DateTime?
+
+  @@index([projectId])
+  @@index([deletedAt])
+  @@map("runs")
 }

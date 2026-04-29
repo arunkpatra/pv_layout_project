@@ -17,4 +17,5 @@ export const ID_PREFIXES: Record<string, string> = {
   UsageRecord: "ur",
   Transaction: "txn",
   Project: "prj",
+  Run: "run",
 }
