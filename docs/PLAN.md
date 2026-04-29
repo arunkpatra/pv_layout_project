@@ -2,7 +2,7 @@
 
 **Mission:** catch the new app up to legacy `baseline-v1-20260429`.
 **Last updated:** 2026-04-29
-**Status:** 2 / 12 done.
+**Status:** 3 / 12 done.
 
 This file is the single source of truth for what gets built. Replaces the prior `SPIKE_PLAN.md` + `parity/PLAN.md` + `parity/BACKLOG.md` (now in [`historical/`](./historical/)).
 
@@ -28,7 +28,7 @@ Rows are domain-grouped; within a group, listed in dependency order. Pick top `t
 |---|---|---|---|---|---|
 | **Models & Inputs** | | | | | |
 | 1 | Project model field additions | T1 | `models/project.py` @ `9362083` | Sidecar pytest green. | **done** |
-| 2 | LA placement algorithm | T2 | `core/la_manager.py` @ `9362083` | Sidecar pytest green; parity LA count + position match on phaseboundary2. | todo |
+| 2 | LA placement algorithm | T2 | `core/la_manager.py` @ `9362083` | Sidecar pytest green; parity LA count + position match on phaseboundary2. | **done** |
 | **Cable** | | | | | |
 | 3 | Bundled DC + MST AC | T2 | `core/string_inverter_manager.py` @ `9362083` | Parity test 3/3 on phaseboundary2 (counts exact, DC ±0.1m, AC modulo Pattern V −613.5m ± 200m). | **done** (P0) |
 | **Layout & KMZ** | | | | | |
