@@ -1,4 +1,6 @@
 import { db } from "../../lib/db.js"
+import { AppError } from "../../lib/errors.js"
+import { getProjectQuotaState } from "../entitlements/entitlements.service.js"
 
 export interface ProjectSummary {
   id: string
@@ -49,4 +51,72 @@ export async function listProjects(userId: string): Promise<ProjectSummary[]> {
     runsCount: p._count.runs,
     lastRunAt: p.runs[0]?.createdAt.toISOString() ?? null,
   }))
+}
+
+export interface CreateProjectInput {
+  name: string
+  kmzBlobUrl: string
+  kmzSha256: string
+  edits?: unknown
+}
+
+export interface ProjectWire {
+  id: string
+  userId: string
+  name: string
+  kmzBlobUrl: string
+  kmzSha256: string
+  edits: unknown
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+/**
+ * Create a new Project for the user after enforcing the per-tier
+ * concurrent-project quota.
+ *
+ * Quota check is best-effort (count + insert is not in a single
+ * SERIALIZABLE tx). Acceptable because the desktop is single-user-
+ * single-machine and project creates are user-driven UI clicks; a
+ * concurrent-create race is very unlikely. If we ever observe over-
+ * quota state in prod, wrap in a SERIALIZABLE tx + retry.
+ */
+export async function createProject(
+  userId: string,
+  input: CreateProjectInput,
+): Promise<ProjectWire> {
+  const quota = await getProjectQuotaState(userId)
+  if (quota.projectsRemaining <= 0) {
+    throw new AppError(
+      "PAYMENT_REQUIRED",
+      `Project quota exhausted (${quota.projectsActive}/${quota.projectQuota}). ` +
+        `Delete a project or upgrade your plan to add more.`,
+      402,
+    )
+  }
+
+  const project = await db.project.create({
+    data: {
+      userId,
+      name: input.name,
+      kmzBlobUrl: input.kmzBlobUrl,
+      kmzSha256: input.kmzSha256,
+      ...(input.edits !== undefined
+        ? { edits: input.edits as object }
+        : {}),
+    },
+  })
+
+  return {
+    id: project.id,
+    userId: project.userId,
+    name: project.name,
+    kmzBlobUrl: project.kmzBlobUrl,
+    kmzSha256: project.kmzSha256,
+    edits: project.edits,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+    deletedAt: project.deletedAt?.toISOString() ?? null,
+  }
 }

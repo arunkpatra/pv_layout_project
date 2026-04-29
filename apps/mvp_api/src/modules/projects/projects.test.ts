@@ -57,10 +57,51 @@ const mockProjectFindMany = mock(
   async (..._args: unknown[]): Promise<MockProject[]> => [],
 )
 
+const mockProjectCount = mock(async (..._args: unknown[]) => 0)
+
+const mockProjectCreate = mock(
+  async (
+    args: {
+      data: {
+        userId: string
+        name: string
+        kmzBlobUrl: string
+        kmzSha256: string
+        edits?: unknown
+      }
+    },
+  ) => ({
+    id: "prj_created",
+    userId: args.data.userId,
+    name: args.data.name,
+    kmzBlobUrl: args.data.kmzBlobUrl,
+    kmzSha256: args.data.kmzSha256,
+    edits: args.data.edits ?? {},
+    createdAt: new Date("2026-04-30T00:00:00Z"),
+    updatedAt: new Date("2026-04-30T00:00:00Z"),
+    deletedAt: null,
+  }),
+)
+
+const mockEntitlementFindMany = mock(
+  async (..._args: unknown[]) => [
+    {
+      totalCalculations: 5,
+      usedCalculations: 0,
+      product: { projectQuota: 3 },
+    },
+  ],
+)
+
 mock.module("../../lib/db.js", () => ({
   db: {
     licenseKey: { findFirst: async () => mockLicenseKey },
-    project: { findMany: mockProjectFindMany },
+    project: {
+      findMany: mockProjectFindMany,
+      count: mockProjectCount,
+      create: mockProjectCreate,
+    },
+    entitlement: { findMany: mockEntitlementFindMany },
   },
 }))
 
@@ -233,5 +274,176 @@ describe("GET /v2/projects", () => {
     const res = await get(app)
     const body = (await res.json()) as { data: ProjectSummary[] }
     expect(body.data.map((p) => p.id)).toEqual(["prj_newest", "prj_older"])
+  })
+})
+
+// ─── B11 — POST /v2/projects ─────────────────────────────────────────────────
+
+interface CreatedProject {
+  id: string
+  userId: string
+  name: string
+  kmzBlobUrl: string
+  kmzSha256: string
+  edits: unknown
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+const VALID_SHA = "a".repeat(64)
+const validBody = (overrides: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    name: "Site A",
+    kmzBlobUrl: `s3://solarlayout-local-projects/projects/usr_test1/kmz/${VALID_SHA}.kmz`,
+    kmzSha256: VALID_SHA,
+    ...overrides,
+  })
+
+const post = (app: Hono<MvpHonoEnv>, body: string) =>
+  app.request("/v2/projects", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer sl_live_testkey",
+    },
+    body,
+  })
+
+describe("POST /v2/projects", () => {
+  beforeEach(() => {
+    mockProjectCount.mockReset()
+    mockProjectCount.mockImplementation(async () => 0)
+    mockProjectCreate.mockClear()
+    mockEntitlementFindMany.mockReset()
+    // Free tier default — quota 3
+    mockEntitlementFindMany.mockImplementation(async () => [
+      {
+        totalCalculations: 5,
+        usedCalculations: 0,
+        product: { projectQuota: 3 },
+      },
+    ])
+  })
+
+  it("happy path: under quota → 201 with the new Project row", async () => {
+    mockProjectCount.mockImplementation(async () => 0)
+    const app = makeApp()
+    const res = await post(app, validBody())
+    expect(res.status).toBe(201)
+    const body = (await res.json()) as { data: CreatedProject }
+    expect(body.data.id).toBe("prj_created")
+    expect(body.data.userId).toBe("usr_test1")
+    expect(body.data.name).toBe("Site A")
+    expect(body.data.kmzSha256).toBe(VALID_SHA)
+    expect(body.data.deletedAt).toBeNull()
+    expect(mockProjectCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it("at-edge: quota=3 / active=2 → 201 (still room for one)", async () => {
+    mockProjectCount.mockImplementation(async () => 2)
+    const app = makeApp()
+    const res = await post(app, validBody())
+    expect(res.status).toBe(201)
+  })
+
+  it("over-quota: quota=3 / active=3 → 402 PAYMENT_REQUIRED with quota numbers in the message", async () => {
+    mockProjectCount.mockImplementation(async () => 3)
+    const app = makeApp()
+    const res = await post(app, validBody())
+    expect(res.status).toBe(402)
+    const body = (await res.json()) as {
+      success: boolean
+      error: { code: string; message: string }
+    }
+    expect(body.success).toBe(false)
+    expect(body.error.code).toBe("PAYMENT_REQUIRED")
+    // Message surfaces both numbers so the desktop can render them
+    expect(body.error.message).toContain("3")
+    expect(mockProjectCreate).not.toHaveBeenCalled()
+  })
+
+  it("zero-quota (no active+non-exhausted entitlement) → 402 even with no projects", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [] as never)
+    mockProjectCount.mockImplementation(async () => 0)
+    const app = makeApp()
+    const res = await post(app, validBody())
+    expect(res.status).toBe(402)
+  })
+
+  it("upgraded quota: pro user (10) creates beyond free's 3", async () => {
+    mockEntitlementFindMany.mockImplementation(async () => [
+      { totalCalculations: 5, usedCalculations: 0, product: { projectQuota: 3 } },
+      { totalCalculations: 10, usedCalculations: 0, product: { projectQuota: 10 } },
+    ])
+    mockProjectCount.mockImplementation(async () => 5)
+    const app = makeApp()
+    const res = await post(app, validBody())
+    expect(res.status).toBe(201)
+  })
+
+  it("validation: missing name → 400", async () => {
+    const app = makeApp()
+    const body = JSON.stringify({
+      kmzBlobUrl: `s3://b/k.kmz`,
+      kmzSha256: VALID_SHA,
+    })
+    const res = await post(app, body)
+    expect(res.status).toBe(400)
+  })
+
+  it("validation: empty name → 400", async () => {
+    const app = makeApp()
+    const res = await post(app, validBody({ name: "" }))
+    expect(res.status).toBe(400)
+  })
+
+  it("validation: missing kmzBlobUrl → 400", async () => {
+    const app = makeApp()
+    const body = JSON.stringify({ name: "X", kmzSha256: VALID_SHA })
+    const res = await post(app, body)
+    expect(res.status).toBe(400)
+  })
+
+  it("validation: bad sha256 (not 64-char hex) → 400", async () => {
+    const app = makeApp()
+    const res = await post(app, validBody({ kmzSha256: "nope" }))
+    expect(res.status).toBe(400)
+  })
+
+  it("validation: malformed JSON body → 400", async () => {
+    const app = makeApp()
+    const res = await app.request("/v2/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: "not-json",
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("edits defaults to {} when omitted", async () => {
+    mockProjectCount.mockImplementation(async () => 0)
+    const app = makeApp()
+    await post(app, validBody())
+    const call = mockProjectCreate.mock.calls[0] as unknown as [
+      { data: { edits?: unknown } },
+    ]
+    // Either omitted (Prisma applies @default('{}')) or explicitly {}
+    const edits = call?.[0]?.data?.edits
+    expect(edits === undefined || JSON.stringify(edits) === "{}").toBe(true)
+  })
+
+  it("passes edits through when supplied", async () => {
+    mockProjectCount.mockImplementation(async () => 0)
+    const app = makeApp()
+    const customEdits = { layoutOverrides: { rows: 8 } }
+    await post(app, validBody({ edits: customEdits }))
+    const call = mockProjectCreate.mock.calls[0] as unknown as [
+      { data: { edits?: unknown } },
+    ]
+    expect(call?.[0]?.data?.edits).toEqual(customEdits)
   })
 })

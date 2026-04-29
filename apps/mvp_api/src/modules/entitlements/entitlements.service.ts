@@ -78,15 +78,56 @@ export async function computeEntitlementSummary(user: {
   }
 }
 
-export interface EntitlementSummaryV2 extends EntitlementSummary {
+export interface ProjectQuotaState {
   /** Max projectQuota across active + non-exhausted entitlements. 0 if none. */
   projectQuota: number
   /** Count of the user's non-deleted Project rows. */
   projectsActive: number
   /** max(0, projectQuota - projectsActive). When 0, the desktop must
-   *  enter read-only mode for any over-quota project. */
+   *  enter read-only mode for any over-quota project, and B11 rejects
+   *  new project creation with 402. */
   projectsRemaining: number
 }
+
+/**
+ * Compute the user's per-tier concurrent-project quota state.
+ *
+ * `projectQuota` is the max `Product.projectQuota` over `entitlements`
+ * where `deactivatedAt IS NULL AND usedCalculations < totalCalculations`.
+ * Exhausted or deactivated entitlements never contribute. Free-tier auto-
+ * provisioning means a user with no purchased plans still has 3 (the
+ * Free tier's quota) — until they exhaust their 5 free calcs, after which
+ * `projectQuota` drops to 0 and projects become read-only.
+ */
+export async function getProjectQuotaState(
+  userId: string,
+): Promise<ProjectQuotaState> {
+  const usable = await db.entitlement.findMany({
+    where: { userId, deactivatedAt: null },
+    select: {
+      totalCalculations: true,
+      usedCalculations: true,
+      product: { select: { projectQuota: true } },
+    },
+  })
+  const projectQuota = usable
+    .filter((e) => e.usedCalculations < e.totalCalculations)
+    .reduce((max, e) => Math.max(max, e.product.projectQuota), 0)
+
+  const projectsActive = await db.project.count({
+    where: { userId, deletedAt: null },
+  })
+
+  return {
+    projectQuota,
+    projectsActive,
+    projectsRemaining: Math.max(0, projectQuota - projectsActive),
+  }
+}
+
+export interface EntitlementSummaryV2
+  extends EntitlementSummary,
+    ProjectQuotaState {}
 
 /**
  * V2 entitlement summary — strict superset of V1.
@@ -100,24 +141,6 @@ export async function computeEntitlementSummaryV2(user: {
   email: string
 }): Promise<EntitlementSummaryV2> {
   const v1 = await computeEntitlementSummary(user)
-
-  const usable = await db.entitlement.findMany({
-    where: { userId: user.id, deactivatedAt: null },
-    select: {
-      totalCalculations: true,
-      usedCalculations: true,
-      product: { select: { projectQuota: true } },
-    },
-  })
-  const projectQuota = usable
-    .filter((e) => e.usedCalculations < e.totalCalculations)
-    .reduce((max, e) => Math.max(max, e.product.projectQuota), 0)
-
-  const projectsActive = await db.project.count({
-    where: { userId: user.id, deletedAt: null },
-  })
-
-  const projectsRemaining = Math.max(0, projectQuota - projectsActive)
-
-  return { ...v1, projectQuota, projectsActive, projectsRemaining }
+  const quota = await getProjectQuotaState(user.id)
+  return { ...v1, ...quota }
 }
