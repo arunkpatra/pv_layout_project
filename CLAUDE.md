@@ -22,7 +22,7 @@ A ground-up rewrite of the **SolarLayout** desktop product — a native desktop 
 
 ### Working agreements
 - **Backlog-driven.** Work proceeds row-by-row through [docs/PLAN.md](./docs/PLAN.md). Pick the top `todo` row; do it; flip to `done`. No spike-execution protocol, no per-row gate memo.
-- **Tiered process per row.** T1 = port + sidecar pytest. T2 = T1 + numeric parity test against the legacy baseline. T3 = T2 + a short discovery memo + Prasanta in the loop. The row's tier is non-negotiable for that row; don't lighten or heavyen it on the fly.
+- **Tiered process per row.** T1 = port + sidecar pytest. T2 = T1 + numeric parity test against the legacy baseline. T3 = T2 + a short discovery memo capturing solar-domain decisions (Prasanta reviews accumulated memos in a single pass at end-of-port; no per-row Prasanta gate). The row's tier is non-negotiable for that row; don't lighten or heavyen it on the fly.
 - **No new features during the parity push.** If a request comes in that isn't in PLAN.md or required by an in-PLAN row's acceptance, it waits until the table is fully `done`.
 - **Functional parity is the contract.** A feature that behaves one way in legacy at `baseline-v1-20260429` must behave identically here unless explicitly documented as a divergence (e.g., S11.5 Pattern V).
 - **Design bar is explicit and non-negotiable** for code that lands in the new-app UI surface — see §12 of `ARCHITECTURE.md` and `DESIGN_FOUNDATIONS.md`. "It works" is not done. "It matches the quality bar" is done. (Most parity rows touch `pvlayout_core/` only and don't trigger this bar.)
@@ -195,7 +195,7 @@ cd python/pvlayout_engine && uv run pytest tests/ -q
 3. Apply the row's tier ceremony:
    - **T1** — implement → `uv run pytest tests/ -q` in `python/pvlayout_engine` → commit.
    - **T2** — T1 plus a numeric parity test against the legacy baseline at `docs/parity/baselines/baseline-v1-20260429/`.
-   - **T3** — T2 plus a short discovery memo at `docs/parity/findings/YYYY-MM-DD-NNN-<slug>.md` capturing solar-domain decisions; loop Prasanta in via Arun's daily comms; Prasanta acks before close.
+   - **T3** — T2 plus a short discovery memo at `docs/parity/findings/YYYY-MM-DD-NNN-<slug>.md` capturing solar-domain decisions. Memo is the audit trail and prep material for Prasanta's end-of-port review (no per-row Prasanta gate; row close = T2 close + memo committed).
 4. Flip `Status` to `done` in PLAN.md and bump the count in the Status line at the top of the file when `Acceptance` is met.
 5. Atomic commit per row: `parity: <feature name>`. Intra-row checkpoints use `wip: <summary>`.
 

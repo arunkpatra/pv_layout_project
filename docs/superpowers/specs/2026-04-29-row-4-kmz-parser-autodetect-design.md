@@ -1,10 +1,10 @@
 # Row #4 — KMZ parser + water/canal/TL autodetection (design)
 
 **PLAN row:** [`docs/PLAN.md`](../../PLAN.md) row #4
-**Tier:** T3 (port + parity test + discovery memo + Prasanta in the loop)
+**Tier:** T3 (port + parity test + deferred-review discovery memo)
 **Source:** legacy `core/kmz_parser.py` @ branch `baseline-v1-20260429`, originating commits `9362083` + `9c751b7`
 **Target:** `python/pvlayout_engine/pvlayout_core/core/kmz_parser.py`
-**Acceptance:** parity boundary geometry match against legacy on all three test KMZ fixtures; new app loads legacy KMZs identically; sidecar pytest green; Prasanta acks autodetect heuristics before row close.
+**Acceptance:** parity boundary geometry match against legacy on all three test KMZ fixtures; new app loads legacy KMZs identically; sidecar pytest green; discovery memo committed.
 **Date:** 2026-04-29
 
 ---
@@ -23,7 +23,7 @@ Port legacy `core/kmz_parser.py` (185 → ~400 lines) to add water/canal/transmi
 
 **Scope is parser-only.** Layout engine integration of `water_obstacles` (panel exclusion, water-body setbacks, propagation to `LayoutResult.water_obstacle_polygons_wgs84` which row #1 added) is row #6's contract. Satellite-image-driven water detection (the *automatic* detection that doesn't rely on KMZ Placemark names) is row #5's contract.
 
-**T3 ceremony.** Per [CLAUDE.md §9](../../../CLAUDE.md), the row is gated on Prasanta acking the autodetect heuristics. Acks happen during implementation, not during brainstorm. The discovery memo (`docs/parity/findings/2026-04-29-001-kmz-autodetect-heuristics.md`) is drafted as part of the row commit; Arun routes to Prasanta via daily comms; Prasanta's ack arrives as a follow-up commit (or as the row-close commit) before the PLAN.md status flip.
+**T3 ceremony.** Per the 2026-04-29 policy update ([CLAUDE.md §2](../../../CLAUDE.md), [PLAN.md "Tier policy"](../../PLAN.md), and [PLAN.md "Out of scope"](../../PLAN.md)), the row has **no per-row Prasanta gate**. Prasanta reviews the accumulated T3 discovery memos in a single pass at end-of-port. Row #4's discovery memo (`docs/parity/findings/2026-04-29-001-kmz-autodetect-heuristics.md`) is the audit trail of solar-domain decisions made during the port and serves as prep material for that end-of-port review. Memo lands in the row commit alongside the code; PLAN.md flip happens immediately on green tests.
 
 ## 2. Changes
 
@@ -236,7 +236,7 @@ def test_validate_boundaries_clean_on_known_fixtures(kmz_name):
 
 ### 2.3 `docs/parity/findings/2026-04-29-001-kmz-autodetect-heuristics.md` — new
 
-Discovery memo for Prasanta. Drafted by Arun as part of the row commit; Prasanta acks via Arun's daily comms before the PLAN.md flip.
+Discovery memo. Drafted by Arun as part of the row commit; deferred-review artifact for Prasanta's end-of-port review per the 2026-04-29 policy update. No per-row gate.
 
 Sections (full template):
 
@@ -245,8 +245,8 @@ Sections (full template):
 
 **Row:** [docs/PLAN.md](../../PLAN.md) row #4 (T3)
 **Date:** 2026-04-29
-**Author:** Arun (port) — for Prasanta (solar-domain ack)
-**Status:** awaiting ack
+**Author:** Arun (port) — solar-domain decisions captured for Prasanta's end-of-port review
+**Status:** committed; deferred review
 
 ## Background
 
@@ -309,10 +309,11 @@ For LineString placemarks:
 - `_TL_KEYWORDS` is defined but **not used** by parse_kmz at this baseline.
   Likely consumed by a downstream legacy commit / row.
 
-## Open questions / refinement candidates (no urgency)
+## Open questions / refinement candidates (for end-of-port review)
 
-These are observations from the port; please respond at your convenience.
-Refinements, if any, become a follow-up row in PLAN.md.
+These are observations from the port. Prasanta reviews them with the
+other accumulated memos at end-of-port. Refinements, if any, become
+follow-up rows in PLAN.md after the parity sweep is complete.
 
 1. **Dead `_TL_KEYWORDS`.** Defined but unused by the parser at the
    baseline. Should we keep it dormant (preserves legacy parity) or wire
@@ -338,29 +339,25 @@ Refinements, if any, become a follow-up row in PLAN.md.
    misspelled). False-positive risk on customer KMZs? Tightening to
    word-boundary regex would change behaviour from legacy.
 
-## Prasanta — please ack
+## For end-of-port review
 
-Mark each box and reply (a Slack/email reply is fine; I'll commit your ack):
+When Prasanta reviews the accumulated memos at end-of-port, the
+decision points for this finding are:
 
-- [ ] The verbatim port faithfully mirrors legacy and is acceptable for
-      parity. **(Required for row close.)**
-- [ ] The keyword lists are correct for Indian-EPC use cases — OR list
-      refinements you'd like in a follow-up row.
-- [ ] The classification rules match how customers actually draw KMZs.
+1. Is the verbatim port faithful to legacy and acceptable for parity?
+2. Are the keyword lists correct for Indian-EPC use cases? If not,
+   which entries should be added/removed?
+3. Do the classification rules match how customers actually draw KMZs?
 
-## Decision (filled by Arun after Prasanta replies)
-
-[ ] Accepted as-is — refinements deferred / not needed.
-[ ] Accepted with follow-up row to refine keywords (linked here when
-    raised in PLAN.md).
-[ ] Rejected — re-design needed.
+Refinements, if any, become follow-up rows in PLAN.md raised after
+the parity sweep is complete.
 ```
 
 ### 2.4 `docs/PLAN.md`
 
 Row #4 → **done**, status bump `3 / 12 done.` → `4 / 12 done.`
 
-**Gated on Prasanta's ack.** PLAN.md flip happens in the same commit as the row code, but only after Prasanta replies. If Prasanta is delayed, the row code can land as a `wip:` checkpoint commit; the PLAN.md flip waits.
+PLAN.md flip lands in the same commit as the row code (no per-row Prasanta gate per the 2026-04-29 policy update).
 
 ## 3. Acceptance
 
@@ -377,13 +374,12 @@ cd python/pvlayout_engine && uv run pytest tests/ -q
   - `test_validate_boundaries_clean_on_known_fixtures[complex-plant-layout.kmz]`
   - `test_validate_boundaries_clean_on_known_fixtures[Kudlugi Boundary (89 acres).kmz]`
 - Expected total: **80 passed**, 6 skipped, 0 failed.
-- Discovery memo committed; Prasanta has acked.
+- Discovery memo committed.
 
 ## 4. Risks
 
 - **Legacy import collision with `pvlayout_core.*`.** The fixture's `_purge_legacy_modules()` only purges bare `core.*` modules; `pvlayout_core.core.kmz_parser` lives under a different namespace and is unaffected. Mitigated by the import order in the test (legacy fixture first, then `from pvlayout_core...`).
 - **Test KMZ fixture drift.** If a fixture is regenerated mid-row, both legacy and new parser run on the new file — comparison stays valid. Risk only if fixtures are silently corrupted; mitigated by the `validate_boundaries` test asserting all three are clean.
-- **Prasanta delay blocks row close.** Per CLAUDE.md §9, Prasanta acks before close. Mitigation: code can land as `wip:` if Prasanta is delayed > 1 working day; PLAN.md flip waits for ack.
 - **Behavioural delta on the new app.** Current new-app `parse_kmz` doesn't recognise water names, so it would treat phaseboundary2's two ponds as either obstacles (if contained) or top-level boundaries (if not). The parity test will FAIL on the current code (good — proves the row is needed) and PASS after the port.
 
 ## 5. Out of scope
@@ -406,8 +402,8 @@ cd python/pvlayout_engine && uv run pytest tests/ -q
 3. Add `tests/parity/test_kmz_parser_parity.py`.
 4. Run `uv run pytest tests/ -q` from `python/pvlayout_engine/`. Expect 80 passed, 6 skipped, 0 failed.
 5. Draft discovery memo at `docs/parity/findings/2026-04-29-001-kmz-autodetect-heuristics.md`.
-6. Commit: `parity: row #4 — KMZ parser + water/canal/TL autodetection` (gates PLAN.md flip on Prasanta's ack).
-7. Arun routes memo to Prasanta. On ack: PLAN.md flip + memo Decision section filled. On non-ack: handle per Prasanta's response.
+6. Flip `docs/PLAN.md` row #4 to **done**; bump status `3 / 12 done.` → `4 / 12 done.`.
+7. Commit: `parity: row #4 — KMZ parser + water/canal/TL autodetection` (code + parity test + memo + PLAN.md flip, atomic).
 
 ## 7. Cross-references
 
