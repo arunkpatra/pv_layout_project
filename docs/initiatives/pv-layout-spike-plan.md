@@ -1,8 +1,12 @@
+> **⚠️ SUPERSEDED 2026-04-29** — this spike plan was for the old "cloud-native web port" direction, now retired. PVLayout is shipping as a Tauri desktop app. The active backend initiative is **[post-parity-v2-backend-plan.md](./post-parity-v2-backend-plan.md)**. This document is preserved as historical context only — do not pick up any spike below as new work.
+
+---
+
 # PV Layout Engine — Spike Plan
 
-**Initiative:** PV Layout Engine — Cloud Platform Port  
-**Foundational document:** [pv-layout-cloud.md](./pv-layout-cloud.md)  
-**Status:** In Progress  
+**Initiative:** PV Layout Engine — Cloud Platform Port (superseded)
+**Foundational document:** [pv-layout-cloud.md](./pv-layout-cloud.md) — also superseded
+**Status:** Superseded (2026-04-29)
 **Created:** 2026-04-19
 
 ---

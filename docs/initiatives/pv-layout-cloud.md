@@ -1,8 +1,12 @@
+> **⚠️ SUPERSEDED 2026-04-29** — the "fully cloud-native, web-based experience" direction described below is no longer current. PVLayout is being shipped as a Tauri **desktop application** (Windows / macOS / Linux), with this backend providing entitlements + project + run storage + billing. See **[post-parity-v2-backend-plan.md](./post-parity-v2-backend-plan.md)** for the active backend initiative. This document is preserved as historical context only — do not act on its scope or roadmap.
+
+---
+
 # Initiative: PV Layout Engine — Cloud Platform Port
 
-**Status:** In Progress  
-**Created:** 2026-04-19  
-**Spike plan:** [pv-layout-spike-plan.md](./pv-layout-spike-plan.md)  
+**Status:** Superseded (2026-04-29)
+**Created:** 2026-04-19
+**Spike plan:** [pv-layout-spike-plan.md](./pv-layout-spike-plan.md) — also superseded
 **Primary reference:** This document is the authoritative source for all work on this initiative. All architecture, spike, and implementation decisions must trace back to it.
 
 ---
