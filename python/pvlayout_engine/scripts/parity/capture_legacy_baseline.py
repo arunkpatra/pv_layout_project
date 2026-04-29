@@ -41,27 +41,25 @@ def _bootstrap_legacy(legacy_repo: Path) -> None:
 
 
 def _build_default_params():
-    """Build a LayoutParameters using the canonical parity-test values.
+    """Build a LayoutParameters using the dataclass defaults (which are the
+    GUI input-panel defaults) plus enable_cable_calc=True.
 
-    These match the S11.5 gate memo's reference run:
-      placed_tables=611, placed_string_inverters=62, placed_las=22 on phaseboundary2.
+    Legacy and new-project LayoutParameters dataclasses are byte-identical at
+    this baseline, with defaults: wattage=580 Wp, modules_in_row=28,
+    rows_per_table=2, max_strings_per_inverter=20, design_mode=STRING_INVERTER,
+    enable_cable_calc=False.
 
-    Legacy LayoutParameters uses:
-      - module: ModuleSpec(length, width, wattage)
-      - table:  TableConfig(modules_in_row, rows_per_table)
-    Both are dataclasses with field-level defaults; we override what matters.
+    These defaults produce the S11.5 gate memo's reference numbers
+    (placed_tables=611, placed_string_inverters=62, placed_las=22 on
+    phaseboundary2) when run through the new project's S11.5 pipeline.
+    The legacy capture in this script will produce different cable counts
+    (bundled DC + MST AC topology) but the same table / inverter / LA counts.
     """
     # These imports resolve to legacy flat namespace after _bootstrap_legacy()
-    from models.project import LayoutParameters, ModuleSpec, TableConfig, DesignMode
+    from models.project import LayoutParameters
 
     p = LayoutParameters()
-    # Module spec: canonical parity values (overriding legacy defaults of 580 Wp, 2.38m, 1.13m)
-    p.module = ModuleSpec(wattage=545, length=2.279, width=1.134)
-    # Table config: 2 rows × 28 modules/row
-    p.table = TableConfig(modules_in_row=28, rows_per_table=2)
     p.enable_cable_calc = True
-    p.design_mode = DesignMode.STRING_INVERTER
-    p.max_strings_per_inverter = 30
     return p
 
 
