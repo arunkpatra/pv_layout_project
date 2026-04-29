@@ -120,6 +120,7 @@ model CheckoutSession {
   stripeCheckoutSessionUrl String
   status                   String?
   processedAt              DateTime?
+  idempotencyKey           String?
   createdAt                DateTime     @default(now())
   transaction              Transaction?
 
@@ -127,17 +128,19 @@ model CheckoutSession {
 }
 
 model UsageRecord {
-  id           String     @id @default("")
-  userId       String
-  user         User       @relation(fields: [userId], references: [id])
-  licenseKeyId String
-  licenseKey   LicenseKey @relation(fields: [licenseKeyId], references: [id])
-  productId    String
-  product      Product    @relation(fields: [productId], references: [id])
-  featureKey   String
-  metadata     Json?
-  createdAt    DateTime   @default(now())
+  id             String     @id @default("")
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  licenseKeyId   String
+  licenseKey     LicenseKey @relation(fields: [licenseKeyId], references: [id])
+  productId      String
+  product        Product    @relation(fields: [productId], references: [id])
+  featureKey     String
+  metadata       Json?
+  idempotencyKey String?
+  createdAt      DateTime   @default(now())
 
+  @@unique([userId, idempotencyKey])
   @@map("usage_records")
 }
 
