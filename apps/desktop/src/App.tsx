@@ -8,6 +8,7 @@ import {
 } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
+import { open as openExternalUrl } from "@tauri-apps/plugin-shell"
 import { listen } from "@tauri-apps/api/event"
 import { useQueryClient } from "@tanstack/react-query"
 import {
@@ -117,6 +118,21 @@ interface SidecarConfig {
 
 const inTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+
+const BUY_MORE_URL = "https://solarlayout.in/pricing"
+
+/**
+ * Mask a license key for display in the account dropdown — keeps the
+ * `sl_live_` prefix visible (so the user can confirm it's their key)
+ * and the last 4 chars (helps identify which key is in use when the
+ * user has multiple). Returns undefined when the key is null so the
+ * TopBar prop can be passed through verbatim.
+ */
+function maskLicenseKey(key: string | null): string | undefined {
+  if (!key) return undefined
+  if (key.length <= 12) return key
+  return `${key.slice(0, 8)}…${key.slice(-4)}`
+}
 
 export function App(): JSX.Element {
   const [sidecarPhase, setSidecarPhase] = useState<SidecarPhase>({ kind: "booting" })
@@ -1113,6 +1129,26 @@ export function App(): JSX.Element {
   // 5) Ready — render the full shell with entitlements in context.
   const entitlements = entQuery.data as EntitlementSummaryV2
 
+  // S4 — account-menu data: masked license key + a compact quota summary
+  // node mirroring the QuotaIndicator chip's numbers, plus a Buy more
+  // handler that opens the marketing pricing page in an external browser.
+  const maskedLicenseKey = maskLicenseKey(savedKey)
+  const accountQuotaSummary = (
+    <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+      {entitlements.remainingCalculations} calcs ·{" "}
+      {entitlements.projectsRemaining} projects remaining
+    </span>
+  )
+  const handleBuyMore = (): void => {
+    if (inTauri()) {
+      void openExternalUrl(BUY_MORE_URL).catch((err) => {
+        console.error("openExternalUrl failed:", err)
+      })
+    } else if (typeof window !== "undefined") {
+      window.open(BUY_MORE_URL, "_blank", "noopener,noreferrer")
+    }
+  }
+
   return (
     <EntitlementsProvider
       value={{
@@ -1135,8 +1171,11 @@ export function App(): JSX.Element {
             userInitials={initialsFor(entitlements.user.name) ?? "--"}
             userName={entitlements.user.name ?? undefined}
             userEmail={entitlements.user.email ?? undefined}
+            maskedLicenseKey={maskedLicenseKey}
+            quotaSummary={accountQuotaSummary}
             onViewLicense={() => setInfoDialogOpen(true)}
             onClearLicense={() => void handleClearLicense()}
+            onBuyMore={handleBuyMore}
           />
         }
         tabsBar={

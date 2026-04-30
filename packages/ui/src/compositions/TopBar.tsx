@@ -21,11 +21,28 @@ export interface TopBarProps {
   userInitials?: string
   userName?: string
   userEmail?: string
+  /**
+   * Masked license key for the account dropdown (e.g. "sl_live_…XYZ4").
+   * Rendered under the user name/email block. Hidden when undefined.
+   */
+  maskedLicenseKey?: string
+  /**
+   * Compact quota readout for the account dropdown — "{N} calcs · {M} projects
+   * remaining" style. The app provides the node so we don't import
+   * entitlements types into the UI package. Hidden when undefined.
+   */
+  quotaSummary?: ReactNode
   onToggleToolRail?: () => void
   onToggleInspector?: () => void
   onViewLicense?: () => void
   onClearLicense?: () => void
   onSettings?: () => void
+  /**
+   * Opens the upgrade / Buy more flow (typically the marketing site
+   * pricing page in an external browser). Menu item only renders when
+   * provided.
+   */
+  onBuyMore?: () => void
 }
 
 /**
@@ -59,11 +76,14 @@ export function TopBar({
   userInitials = "AP",
   userName,
   userEmail,
+  maskedLicenseKey,
+  quotaSummary,
   onToggleToolRail,
   onToggleInspector,
   onViewLicense,
   onClearLicense,
   onSettings,
+  onBuyMore,
 }: TopBarProps) {
   const isMac = useIsMac()
   return (
@@ -148,9 +168,9 @@ export function TopBar({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          {(userName || userEmail) && (
+          {(userName || userEmail || maskedLicenseKey || quotaSummary) && (
             <>
-              <div className="px-[10px] py-[6px]">
+              <div className="px-[10px] py-[6px] flex flex-col gap-[2px]">
                 {userName && (
                   <div className="text-[13px] font-medium text-[var(--text-primary)]">
                     {userName}
@@ -159,6 +179,12 @@ export function TopBar({
                 {userEmail && (
                   <div className="text-[11px] text-[var(--text-muted)]">{userEmail}</div>
                 )}
+                {maskedLicenseKey && (
+                  <div className="text-[11px] text-[var(--text-muted)] font-mono tabular-nums">
+                    {maskedLicenseKey}
+                  </div>
+                )}
+                {quotaSummary && <div className="mt-[2px]">{quotaSummary}</div>}
               </div>
               <DropdownMenuSeparator />
             </>
@@ -170,6 +196,9 @@ export function TopBar({
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onViewLicense}>View license</DropdownMenuItem>
           <DropdownMenuItem onSelect={onClearLicense}>Clear license</DropdownMenuItem>
+          {onBuyMore && (
+            <DropdownMenuItem onSelect={onBuyMore}>Buy more</DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem>About SolarLayout</DropdownMenuItem>
         </DropdownMenuContent>

@@ -147,6 +147,56 @@ describe("<TopBar>", () => {
     expect(onClearLicense).toHaveBeenCalledTimes(1)
   })
 
+  it("renders the masked license key inside the account dropdown when supplied", async () => {
+    const user = userEvent.setup()
+    render(<TopBar maskedLicenseKey="sl_live_…XYZ4" />)
+    await user.click(screen.getByRole("button", { name: "Account menu" }))
+    expect(screen.getByText("sl_live_…XYZ4")).toBeInTheDocument()
+  })
+
+  it("renders the quota summary node inside the account dropdown when supplied", async () => {
+    const user = userEvent.setup()
+    render(
+      <TopBar quotaSummary={<span>5 calcs · 2 projects remaining</span>} />
+    )
+    await user.click(screen.getByRole("button", { name: "Account menu" }))
+    expect(
+      screen.getByText("5 calcs · 2 projects remaining")
+    ).toBeInTheDocument()
+  })
+
+  it("does not render the Buy more menu item when onBuyMore is absent", async () => {
+    const user = userEvent.setup()
+    render(<TopBar />)
+    await user.click(screen.getByRole("button", { name: "Account menu" }))
+    expect(screen.queryByText("Buy more")).toBeNull()
+  })
+
+  it("renders the Buy more menu item when onBuyMore is provided", async () => {
+    const user = userEvent.setup()
+    render(<TopBar onBuyMore={vi.fn()} />)
+    await user.click(screen.getByRole("button", { name: "Account menu" }))
+    expect(screen.getByText("Buy more")).toBeInTheDocument()
+  })
+
+  it("Buy more menu item calls onBuyMore", async () => {
+    const onBuyMore = vi.fn()
+    const user = userEvent.setup()
+    render(<TopBar onBuyMore={onBuyMore} />)
+    await user.click(screen.getByRole("button", { name: "Account menu" }))
+    await user.click(screen.getByText("Buy more"))
+    expect(onBuyMore).toHaveBeenCalledTimes(1)
+  })
+
+  it("hides the user/license/quota header block when no header props are supplied", async () => {
+    const user = userEvent.setup()
+    render(<TopBar />)
+    await user.click(screen.getByRole("button", { name: "Account menu" }))
+    // Account label still renders, but no name / email / key / quota.
+    expect(screen.getByText("Account")).toBeInTheDocument()
+    expect(screen.queryByText(/sl_live_/)).toBeNull()
+  })
+
   it("root container carries data-tauri-drag-region for native window dragging", () => {
     const { container } = render(<TopBar />)
     const root = container.querySelector("[data-tauri-drag-region]")
