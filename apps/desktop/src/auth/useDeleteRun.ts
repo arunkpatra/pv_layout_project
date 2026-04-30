@@ -16,7 +16,7 @@
  * Preview-license-key short-circuit removes from the slice in-memory
  * only, no network call.
  */
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { UseMutationResult } from "@tanstack/react-query"
 import {
   EntitlementsError,
@@ -51,6 +51,8 @@ export function useDeleteRunMutation(
   licenseKey: string | null,
   client: EntitlementsClient
 ): UseMutationResult<void, Error, DeleteRunVars> {
+  const queryClient = useQueryClient()
+
   return useMutation<void, Error, DeleteRunVars>({
     mutationFn: async (vars) => {
       if (!licenseKey) {
@@ -75,6 +77,16 @@ export function useDeleteRunMutation(
       // `removeRun` already nulls selectedRunId if the removed run was
       // the selected one (slice invariant), so no extra work needed
       // for selection bookkeeping.
+      // RecentsView's B10 listing carries `runsCount` and (when the
+      // deleted run was the most-recent) `lastRunAt` +
+      // `mostRecentRunThumbnailBlobUrl`. Invalidate so the next Home
+      // visit reflects the soft-delete. Entitlements stays untouched
+      // — backend preserves the UsageRecord, no calc refund.
+      if (licenseKey) {
+        void queryClient.invalidateQueries({
+          queryKey: ["projects", licenseKey],
+        })
+      }
     },
   })
 }

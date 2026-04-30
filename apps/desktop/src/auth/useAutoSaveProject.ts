@@ -35,6 +35,7 @@
  *     fire-and-forget save — the user's next edit IS the retry trigger.
  */
 import { useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   type EntitlementsClient,
 } from "@solarlayout/entitlements-client"
@@ -78,6 +79,7 @@ export function useAutoSaveProject(
   options: UseAutoSaveProjectOptions = {}
 ): SaveStatus {
   const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS
+  const queryClient = useQueryClient()
 
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" })
 
@@ -131,6 +133,14 @@ export function useAutoSaveProject(
         if (cancelled) return
         lastSavedRef.current = editsJson
         setStatus({ kind: "saved", at: new Date().toISOString() })
+        // RecentsView's `Updated Xm ago` footer reads `updatedAt` off
+        // B10 — bumped server-side when this PATCH lands. Invalidate so
+        // the next Home visit reflects the fresh save.
+        if (licenseKey) {
+          void queryClient.invalidateQueries({
+            queryKey: ["projects", licenseKey],
+          })
+        }
       } catch (err) {
         if (cancelled) return
         const error = err instanceof Error ? err : new Error(String(err))
@@ -142,7 +152,7 @@ export function useAutoSaveProject(
       cancelled = true
       clearTimeout(timer)
     }
-  }, [licenseKey, projectId, editsJson, edits, client, debounceMs])
+  }, [licenseKey, projectId, editsJson, edits, client, debounceMs, queryClient])
 
   return status
 }

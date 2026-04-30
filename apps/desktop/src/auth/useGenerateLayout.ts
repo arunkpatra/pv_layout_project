@@ -239,6 +239,15 @@ export function useGenerateLayoutMutation(
         void queryClient.invalidateQueries({
           queryKey: [ENTITLEMENTS_QUERY_KEY, licenseKey],
         })
+        // RecentsView's B10 listing carries `runsCount`, `lastRunAt`,
+        // `mostRecentRunThumbnailBlobUrl`, and `updatedAt` — all four
+        // shift when a run is generated. Without this invalidation,
+        // navigating Home within `useProjectsListQuery`'s 30s
+        // staleTime serves stale data ("No runs yet" + placeholder
+        // thumbnail) — observed live during SP1 verification.
+        void queryClient.invalidateQueries({
+          queryKey: ["projects", licenseKey],
+        })
       }
     },
   })
