@@ -760,4 +760,7 @@ The component definition stays in `packages/ui` as dead-but-harmless
 code; a Phase 4 polish row can remove the export when convenient.
 Typecheck green; HMR refresh. Status → `fixed` pending live confirm.
 
+[FE 2026-04-30 13:57] Live confirmed by user — pill gone. Closed via
+`abe3290` on `post-parity-v1-desktop`.
+
 ---
