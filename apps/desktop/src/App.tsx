@@ -56,6 +56,7 @@ import { useAutoSaveProject } from "./auth/useAutoSaveProject"
 import { useProjectsListQuery } from "./auth/useProjectsList"
 import { SaveIndicator } from "./auth/SaveIndicator"
 import { RecentsView } from "./recents/RecentsView"
+import { RunsList } from "./runs/RunsList"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
 import {
@@ -1055,6 +1056,7 @@ export function App(): JSX.Element {
               <TabsList>
                 <TabsTrigger value="layout">Layout</TabsTrigger>
                 <TabsTrigger value="energy">Energy yield</TabsTrigger>
+                <TabsTrigger value="runs">Runs</TabsTrigger>
               </TabsList>
               {/* forceMount: keep the LayoutPanel mounted across tab
                   switches so RHF's working form state survives. Hidden
@@ -1079,6 +1081,15 @@ export function App(): JSX.Element {
                 className="mt-[8px] -mx-[20px]"
               >
                 <EnergyTabContent />
+              </TabsContent>
+              {/* P5 — runs gallery + list, forceMount so multi-select
+                  state survives Inspector tab switches. */}
+              <TabsContent
+                value="runs"
+                forceMount
+                className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+              >
+                <RunsList />
               </TabsContent>
             </Tabs>
           </InspectorRoot>
