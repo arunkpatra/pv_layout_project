@@ -981,4 +981,8 @@ desktop tests still pass — no regression. Status → `fixed` pending
 live confirmation. Will close fully once user verifies the
 tab-switch round-trip restores the layout.
 
+[FE 2026-04-30 14:23] Live confirmed by user — tab-switch round-trip
+restores the prior layout. Closed via `7e24e36` on
+`post-parity-v1-desktop`.
+
 ---
