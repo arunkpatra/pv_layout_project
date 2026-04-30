@@ -2,7 +2,7 @@
 
 **Mission:** ship the new SolarLayout desktop app for PVLayout — full functional coverage of legacy PyQt5 capabilities + project/run/multi-tab architecture + V2 backend integration. Match Claude-Desktop quality bar throughout.
 **Last updated:** 2026-04-30
-**Status:** 19 / 52 done. (53 total rows; X5 telemetry deferred.)
+**Status:** 19 / 55 done. (56 total rows; X5 telemetry deferred. Phase 6 added 2026-04-30 — smoke-derived polish from Session 1; SP1 gates on a T3 design memo + backend's B23.)
 
 This file replaces the parity-era `docs/PLAN.md` (closed 12/12 done on 2026-04-29; archived at [docs/historical/PLAN-parity-v1.md](./historical/PLAN-parity-v1.md)).
 
@@ -151,6 +151,17 @@ Reference: [`docs/post-parity/discovery/2026-04-29-001-legacy-app-capability-aud
 | X3 | Auto-update + version check | T1 | Tauri updater; check on launch; user prompt to update. | — | Update flow works on macOS + Windows + Linux. | todo |
 | X4 | Crash reporting (Sentry or similar) | T1 | Tauri crash handler; opt-in (consent on first launch). | — | Crashes report to backend; PII scrubbed; opt-out works. | todo |
 | X5 | Telemetry events | deferred | Depends on backend B22; deferred until app has events worth reporting. | B22 | — | **deferred** |
+
+### Phase 6 — Smoke-derived polish
+
+UX gaps, polish work, and cross-repo design work surfaced during human smoke-testing of post-parity surfaces (see [docs/post-parity/SMOKE-LOG.md](./post-parity/SMOKE-LOG.md)). Each row references the SMOKE-LOG observation ID(s) that motivated it. Tier follows the standard policy: T1 desktop-only, T3 when a design memo is needed (typically cross-repo or non-trivial UX shape).
+
+| # | Feature | Tier | Source / Notes | Depends | Acceptance | Status |
+|---|---|---|---|---|---|---|
+| SP1 | Run gallery thumbnails (server-side pipeline) | T3 | SMOKE-LOG `S1-06`. User picked Option B (server-side thumbnail pipeline) over Option A (client-side capture). Cross-repo: backend's `B23` (Run thumbnails — wire extension + presigned-GET + sidecar PNG capability) is the partner row, committed at `555890e` on `post-parity-v2-backend`. T3 because the work spans backend schema + sidecar capability + desktop adapter + S3 storage shape — design memo locks PNG vs WebP, dimensions, render strategy (always vs on-demand), and storage projection before any code lands. Memo target: [docs/post-parity/findings/2026-04-30-001-run-thumbnail-pipeline.md](./post-parity/findings/) (in flight). After memo: backend ships B23 (schema + wire + S3 mint), desktop adapter mirrors `RunDetailV2Wire.thumbnailBlobUrl` + extends P6's flow with the post-Generate thumbnail PUT, `RunsList` swaps the placeholder `<div>` for an `<img>` with placeholder fallback for null. Backwards compat: pre-pipeline runs return `null` → existing placeholder renders, no migration data move. | B17, B23 | Run gallery cards render preview thumbnails for runs created post-pipeline; null `thumbnailBlobUrl` falls back to the existing placeholder; sidecar produces a PNG/WebP within the dimensions locked by the memo; storage cost stays within the projected ~$0.30/mo at projected run volume. | **todo** |
+| SP2 | In-place run-switch loading feedback | T1 | SMOKE-LOG `S1-07`. User picked Option A (in-place card spinner + StatusBar load text) over toast on click — the canvas update IS the success signal, toasts spam under rapid switching, the actual UX gap is the 1–2s loading window during B17 + S3 GET. Touches three surfaces: `apps/desktop/src/runs/RunsList.tsx` (card-level spinner driven by `useOpenRunMutation.isPending` matched against `selectedRunId`; faint card pulse), `apps/desktop/src/App.tsx` (StatusBar `leftMeta` reads `Loading run [timestamp]…` while open-run mutation is in flight), and the no-op case (clicking already-active run does nothing visually — by design). | P5, P7 | Click on non-active run card shows in-place loading state until canvas hydrates; click on already-active run is a no-op visually. | todo |
+| SP3 | Cmd-K Recents submenu + project rename / delete via Dialog modals | T1 | SMOKE-LOG `S1-10` thread + P3's interim `window.prompt` / `window.confirm` deferral. Two pieces in one row because they share visual surface: (a) palette grows a "Recents" submenu listing the user's projects (same data feeding `RecentsView`'s grid) for keyboard-driven quick-switch, replacing the existing `window.prompt("Project ID:")` interim; (b) project rename (P3 → B13) and delete (P3 → B14) move from `window.prompt` / `window.confirm` to proper `Dialog`-based modals (Radix Dialog primitive already wired in `@solarlayout/ui`). | P3, S3 | Palette → Recents lists projects with quick-switch; rename + delete trigger Dialog modals (not prompts) and surface validation/error states inline. | todo |
+
 
 ---
 
