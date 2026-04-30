@@ -244,9 +244,153 @@ When unsure, err one severity higher and demote during triage.
    row's acceptance criterion when possible.
 5. **Linked** = PLAN.md row ID (`P3`, `S2`, `B14`) if part of one;
    `new-row` if it earns its own; `inline` for cheap-fix-during-current-row.
-6. After triage, set **Status**: `open` / `in-progress` / `fixed` /
-   `dropped` / `deferred`. `fixed` requires a commit SHA in the
-   **Notes** column.
+6. **Owner** = `fe` / `be` / `both`. At-a-glance "whose court is this
+   in." Flips during the back-and-forth.
+7. **Status** values: `open` / `investigating` / `fixed` / `dropped`
+   / `deferred`. `fixed` requires a commit SHA in the **Thread**
+   column's final entry.
+8. **Thread** = append-only conversation log. Each entry is prefixed
+   `[FE 2026-MM-DD HH:MM]` or `[BE 2026-MM-DD HH:MM]`. The first
+   entry is always the **suggested action** the originator wants the
+   other side to take.
+
+---
+
+## Coordination protocol with the backend session
+
+This file lives in `pv_layout_project`. The backend Claude Code session
+lives in a separate repo (`renewable_energy`). Arun is the human
+courier between sessions. The mechanics below are designed so each
+side can move at full speed without a synchronous channel and so the
+smoke log is the **single source of truth** for the conversation.
+
+### Setup (one-time)
+
+1. **Backend session clones (or already has) `pv_layout_project` for
+   read access.** The simplest path: a sibling clone next to
+   `renewable_energy` so the backend session can `git pull origin
+   post-parity-v1-desktop` and `cat docs/post-parity/SMOKE-LOG.md`
+   directly. No new tools — just a checkout.
+2. **Frontend session pushes after every smoke-log commit.** That
+   guarantees backend sees a stable state when they pull.
+3. **Both sides use ISO date + 24h local time** (`2026-04-30 14:30`)
+   in `[FE …]` / `[BE …]` thread prefixes.
+
+### Per-observation flow
+
+```
+   FE                                   BE
+    │                                     │
+    1. observe + log row to SMOKE-LOG     │
+       (Status=open, Owner=fe|be|both)    │
+       commit + push                      │
+    │                                     │
+    2. (if Owner ∈ {be, both})            │
+       Arun pastes the row block ──────►  │
+    │                                     3. BE pulls + reads context
+    │                                        from latest SMOKE-LOG
+    │                                     │
+    │                                     4. BE investigates;
+    │  ◄────────── Arun pastes BE reply      drafts a `[BE date] …`
+    │              block to FE               thread entry +
+    │                                        suggested status/owner
+    │                                        update
+    5. FE integrates BE's entry into     │
+       the row's Thread; updates Status   │
+       + Owner; commit + push             │
+    │                                     │
+    6. Loop until Status ∈ {fixed,        │
+       dropped, deferred}                 │
+```
+
+### What Arun ships (and doesn't)
+
+**Arun ships:**
+
+- A single observation row block (the markdown table row + its full
+  thread to date) when FE wants BE to act.
+- A single `[BE date] …` thread entry block when BE wants to update
+  the row.
+- A whole-section block when one side has notes that span multiple
+  observations.
+
+**Arun doesn't:**
+
+- Ship the entire SMOKE-LOG.md doc — the other side pulls it.
+- Paraphrase or rewrite content. Both sides see verbatim text. If
+  something's unclear, Arun asks the originator to rephrase before
+  relay.
+
+### Block formats Arun forwards
+
+**FE → BE — request for action:**
+
+````
+SMOKE-LOG: requesting action on S1-04
+
+| ID    | Sev | Surface  | Owner | Title                          | Status |
+|-------|-----|----------|-------|--------------------------------|--------|
+| S1-04 | P1  | backend  | be    | B11 quota ceiling not enforced | open   |
+
+Repro: …
+Acceptance: …
+
+Thread:
+[FE 2026-04-30 14:00] Action requested: verify B11 enforces
+projectQuota=3 on FREE — observed 4th create succeeds despite
+EntitlementSummary.projectQuota=3.
+````
+
+**BE → FE — investigation finding / fix landed / disagreement:**
+
+````
+SMOKE-LOG: update on S1-04
+
+[BE 2026-04-30 14:30] Investigated. Root cause: B11 was reading
+projectQuota from the wrong source. Fixed at SHA 9a3b1c2 on
+post-parity-v2-backend. Suggest Status → fixed once FE re-runs the
+repro.
+````
+
+### Status & Owner cheatsheet
+
+| Status         | Owner       | Meaning                                                 |
+|----------------|-------------|---------------------------------------------------------|
+| open           | fe / be     | Logged, not yet picked up.                              |
+| investigating  | fe / be     | Side named in Owner is actively digging.                |
+| open           | both        | Cross-cutting — both sides need to look together.       |
+| fixed          | (last fixer)| Resolved; final thread entry includes commit SHA.       |
+| dropped        | (last actor)| Decided not a real issue; final entry says why.         |
+| deferred       | (last actor)| Real but won't fix this session; linked to a PLAN row. |
+
+### What stays inside one repo
+
+- **Frontend fixes** — commit lands in `pv_layout_project` only.
+  Update the row's Thread + Status.
+- **Backend fixes** — commit lands in `renewable_energy` only. The
+  backend session may keep its own audit trail there
+  (`docs/initiatives/...`); the SMOKE-LOG row references the backend
+  SHA in the final thread entry.
+- **Contract / wire-shape changes** — both repos commit. The smoke
+  row's Thread captures both SHAs.
+
+### Push cadence
+
+- **FE pushes after every smoke-log commit.** Even mid-session.
+- **BE never edits this file directly.** All BE updates flow through
+  Arun → FE → commit → push. This avoids merge conflicts and keeps
+  one source of truth.
+- If the FE session is mid-flight on something else, batch is fine —
+  but push within ~10 minutes of a smoke-log change so backend never
+  pulls a >10-minute-stale view.
+
+### When the protocol gets in the way
+
+If a finding needs a real-time conversation (rare), Arun bridges
+voice / chat between sessions and the resulting decisions get
+backfilled into the row's Thread as `[FE+BE 2026-MM-DD HH:MM]
+synchronous decision: …`. Don't let the protocol block urgent fixes
+— but always close the loop in the doc afterward.
 
 ---
 
@@ -314,10 +458,12 @@ extra-attention items inside flows already on the route.
 
 #### Observations
 
-| ID    | Sev | Surface | Title | Repro | Acceptance | Status | Linked | Notes |
-|-------|-----|---------|-------|-------|------------|--------|--------|-------|
-|       |     |         |       |       |            |        |        |       |
+| ID    | Sev | Surface | Owner | Title | Repro | Acceptance | Status | Linked | Thread |
+|-------|-----|---------|-------|-------|-------|------------|--------|--------|--------|
+|       |     |         |       |       |       |            |        |        |        |
 
-_Fill in observations during the session; triage at the end._
+_Fill in observations during the session; triage at the end. Use the
+**Coordination protocol** section above for any row whose Owner
+becomes `be` or `both`._
 
 ---
