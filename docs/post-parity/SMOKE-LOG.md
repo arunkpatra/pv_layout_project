@@ -517,7 +517,7 @@ extra-attention items inside flows already on the route.
 | S1-08 | P1  | frontend | fe    | Layout state lost on tab-switch round-trip (S2 regression)   | 1. Open project A; Generate Layout (run_A produced + canvas shows panels/ICRs). 2. Open a second project B (with no runs). Tab opens; canvas shows just B's boundary. 3. Click back on tab A. 4. Canvas shows only A's boundary — no panels, no ICRs. The previously-generated run is gone visually but still exists in `runs[]` (visible in Inspector → Runs tab if you check). | Switching back to a tab whose project has runs auto-restores the most-recent run on canvas. The P7 selectedRunId-driven effect fires B17 + S3 GET + setLayoutResult during the B12-driven hydration. Mental model: opening a project shows the prior work, not blank boundary + manual click. | fixed  | S2, P2  | see S1-08 below           |
 | S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
 | S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
-| S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | open   | F4-era menu wiring | see S1-11 below           |
+| S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | fixed  | F4-era menu wiring | see S1-11 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1170,5 +1170,23 @@ audit of the codebase suggests this is the only `listen` in
 `App.tsx`. Will verify before shipping.
 
 Awaiting user go-ahead.
+
+[FE 2026-04-30 14:49] User said ship. Patched
+`apps/desktop/src/App.tsx`:840–851 with the ref-pattern variant
+(stronger than the textbook `cancelled`-only fix because it
+eliminates the race entirely rather than patching it):
+
+- New `handleOpenKmzRef` ref, kept current via a small effect that
+  watches `handleOpenKmz`.
+- Listener-registration effect now has `[]` deps — fires once per
+  App mount, not per `handleOpenKmz` change.
+- Listener body invokes `handleOpenKmzRef.current()` so it always
+  calls the latest closure without re-registering.
+- `cancelled` flag retained as belt-and-suspenders for the original
+  mount/unmount-during-promise-resolution race path.
+
+Typecheck green. Status → `fixed` pending live confirmation. Will
+close fully once user verifies a single File menu click opens
+exactly one file picker.
 
 ---

@@ -837,18 +837,40 @@ export function App(): JSX.Element {
   // (the `.` in the Rust menu-item id is translated to `/` at emit time
   // because Tauri 2's event-name validator rejects dots). The command
   // palette + empty-state button call handleOpenKmz directly.
+  //
+  // S1-11 — register the listener exactly once for the App's lifetime.
+  // The previous effect re-ran on every `handleOpenKmz` change (its
+  // useCallback deps shift during normal session work) and Tauri's
+  // `listen` returns a Promise — cleanup fired before the prior promise
+  // resolved, so old listeners stayed registered. Result: N re-renders
+  // since the last successful unregister = N listeners stacked = N file
+  // pickers per menu click.
+  //
+  // The ref pattern decouples the listener from `handleOpenKmz`'s
+  // identity: the effect mounts once, the ref always points at the
+  // latest `handleOpenKmz`, and the listener invokes through the ref.
+  // The `cancelled` flag is belt-and-suspenders for the original race
+  // path on mount/unmount.
+  const handleOpenKmzRef = useRef(handleOpenKmz)
+  useEffect(() => {
+    handleOpenKmzRef.current = handleOpenKmz
+  }, [handleOpenKmz])
+
   useEffect(() => {
     if (!inTauri()) return
+    let cancelled = false
     let unlisten: (() => void) | undefined
     void listen("menu:file/open_kmz", () => {
-      void handleOpenKmz()
+      void handleOpenKmzRef.current()
     }).then((fn) => {
-      unlisten = fn
+      if (cancelled) fn()
+      else unlisten = fn
     })
     return () => {
+      cancelled = true
       unlisten?.()
     }
-  }, [handleOpenKmz])
+  }, [])
 
   const openPalette = useCallback(() => setPaletteOpen(true), [])
 
