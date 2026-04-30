@@ -19,7 +19,6 @@ import type { EntitlementSummaryV2 } from "@solarlayout/entitlements-client"
 import {
   AppShell,
   Button,
-  CommandBarHint,
   CommandGroup,
   CommandItem,
   CommandPalette,
@@ -1205,7 +1204,6 @@ export function App(): JSX.Element {
             showLas={showLas}
             onMapReady={handleMapReady}
           >
-            <CommandBarHint onClick={openPalette} />
             {!project && (
               <RecentsView
                 isLoading={projectsListQuery.isLoading}

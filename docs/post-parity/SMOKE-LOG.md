@@ -511,6 +511,7 @@ extra-attention items inside flows already on the route.
 | S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | fixed  | F6     | see S1-02 below           |
 | S1-03 | P3  | frontend | fe    | StatusBar drops the line-obstruction count                  | 1. Open `phaseboundary2.kmz` (which contains a TL line obstruction). 2. StatusBar reads `1 boundary · 0 obstacles` despite the TL being clearly rendered as a red dashed polyline on the canvas. | StatusBar text includes the line-obstructions count when non-zero (or shows it always for symmetry).                          | fixed  | F4     | see S1-03 below           |
 | S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded: Inspector panel is hidden entirely + the TopBar Inspector toggle button is hidden. Inspector restores on next project open with the user's prior `inspectorOpen` preference.        | fixed  | inline  | see S1-04 below           |
+| S1-05 | P3  | frontend | fe    | Redundant `Press ⌘K for commands` pill above the canvas      | 1. Sign in. 2. RecentsView (or any canvas state). 3. Floating `Press ⌘K for commands` pill renders top-left of canvas, duplicating the TopBar's palette button. | Floating hint removed; TopBar's palette button is the canonical entry point.                                                                                                                                  | fixed  | inline  | see S1-05 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -730,6 +731,33 @@ absent (existing pattern), so the chrome stays clean. The user's
 prior `inspectorOpen` preference survives close/reopen because it
 lives in App-level `useState`, not derived from `project`.
 
+Typecheck green; HMR refresh. Status → `fixed` pending live confirm.
+
+[FE 2026-04-30 13:55] Live confirmed by user via screenshot — no
+inspector panel and no inspector toggle while on RecentsView.
+Closed via `57f49ba` on `post-parity-v1-desktop`.
+
+##### S1-05 thread
+
+[FE 2026-04-30 13:55] User flagged a redundant floating "Press ⌘K
+for commands" pill at the top-left of the canvas (visible above
+RecentsView when no project loaded; also above the map when a
+project is loaded). Code comment at
+`packages/ui/src/compositions/MapCanvas.tsx:496` reads "kept here
+for proximity; unchanged from S6" — it predates S1's TopBar palette
+button. Now the TopBar has its own `Press ⌘K for commands` control,
+so the floating hint is redundant.
+
+User initially read the floating pill as "unclickable text," but
+it's actually a `<button>` wired to `openPalette` — the styling
+reads label-y rather than button-y. That's its own UX issue, but
+the cleaner fix is to remove the hint entirely since the TopBar
+button is the canonical entry point.
+
+Removed `<CommandBarHint onClick={openPalette} />` from
+`apps/desktop/src/App.tsx` + dropped the `CommandBarHint` import.
+The component definition stays in `packages/ui` as dead-but-harmless
+code; a Phase 4 polish row can remove the export when convenient.
 Typecheck green; HMR refresh. Status → `fixed` pending live confirm.
 
 ---
