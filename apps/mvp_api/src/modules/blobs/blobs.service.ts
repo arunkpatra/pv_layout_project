@@ -9,7 +9,13 @@ const UPLOAD_URL_TTL_SECONDS = 900 // 15 min
 
 const MB = 1024 * 1024
 
-export type RunResultType = "layout" | "energy" | "dxf" | "pdf" | "kmz"
+export type RunResultType =
+  | "layout"
+  | "energy"
+  | "dxf"
+  | "pdf"
+  | "kmz"
+  | "thumbnail"
 
 export const RUN_RESULT_SPEC: Record<
   RunResultType,
@@ -39,6 +45,11 @@ export const RUN_RESULT_SPEC: Record<
     contentType: KMZ_CONTENT_TYPE,
     maxSize: 50 * MB,
     filename: "exports/run.kmz",
+  },
+  thumbnail: {
+    contentType: "image/webp",
+    maxSize: 50_000,
+    filename: "thumbnail.webp",
   },
 }
 

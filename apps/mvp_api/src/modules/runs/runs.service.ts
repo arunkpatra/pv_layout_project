@@ -296,6 +296,11 @@ export interface RunDetailWire extends RunWire {
   /** Presigned GET URL for energy.json. Set only for energy-class
    *  features (energy_yield, generation_estimates); null otherwise. */
   energyResultBlobUrl: string | null
+  /** Presigned GET URL for thumbnail.webp (Path A — deterministic key,
+   *  always-sign). Pre-SP1 runs return a valid URL that 404s on read;
+   *  the desktop's <img onError> falls back, and the browser
+   *  negative-caches the 404. Null only when the bucket is unset. */
+  thumbnailBlobUrl: string | null
   /** v1 always returns []. Future: list of {type, url} for any
    *  exports the desktop has registered (no register-export endpoint
    *  yet — desktop calls B7 directly for export uploads). */
@@ -333,6 +338,7 @@ export async function getRunDetail(
   const bucket = env.MVP_S3_PROJECTS_BUCKET
   const layoutKey = `projects/${userId}/${projectId}/runs/${runId}/layout.json`
   const energyKey = `projects/${userId}/${projectId}/runs/${runId}/energy.json`
+  const thumbnailKey = `projects/${userId}/${projectId}/runs/${runId}/thumbnail.webp`
 
   const layoutResultBlobUrl = bucket
     ? await getPresignedDownloadUrl(
@@ -352,11 +358,20 @@ export async function getRunDetail(
         )
       : null
     : null
+  const thumbnailBlobUrl = bucket
+    ? await getPresignedDownloadUrl(
+        thumbnailKey,
+        "thumbnail.webp",
+        READ_URL_TTL_SECONDS,
+        bucket,
+      )
+    : null
 
   return {
     ...toRunWire(run as RawRun),
     layoutResultBlobUrl,
     energyResultBlobUrl,
+    thumbnailBlobUrl,
     exportsBlobUrls: [],
   }
 }

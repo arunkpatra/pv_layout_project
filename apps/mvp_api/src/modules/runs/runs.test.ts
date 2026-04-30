@@ -657,6 +657,7 @@ interface RunDetailWire {
   inputsSnapshot: unknown
   layoutResultBlobUrl: string | null
   energyResultBlobUrl: string | null
+  thumbnailBlobUrl: string | null
   exportsBlobUrls: unknown[]
   billedFeatureKey: string
   usageRecordId: string
@@ -714,8 +715,25 @@ describe("GET /v2/projects/:id/runs/:runId", () => {
     )
     // Energy URL null for layout-class feature
     expect(body.data.energyResultBlobUrl).toBeNull()
+    // Thumbnail URL always-signed deterministically (Path A); pre-SP1 runs
+    // get a valid URL that 404s on read — desktop's <img onError> falls back.
+    expect(body.data.thumbnailBlobUrl).toContain(
+      "/runs/run_x/thumbnail.webp",
+    )
     // exportsBlobUrls is [] for v1
     expect(body.data.exportsBlobUrls).toEqual([])
+  })
+
+  it("thumbnail URL signed for energy-class feature too (always-sign, regardless of feature)", async () => {
+    mockRunDetailFindFirst.mockImplementation(async () => ({
+      ...baseRun,
+      billedFeatureKey: "energy_yield",
+    }))
+    const res = await getRun("prj_x", "run_x")
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.thumbnailBlobUrl).toContain(
+      "/runs/run_x/thumbnail.webp",
+    )
   })
 
   it("energy-class feature: BOTH layoutResultBlobUrl AND energyResultBlobUrl set", async () => {

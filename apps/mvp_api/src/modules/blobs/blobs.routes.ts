@@ -80,6 +80,12 @@ const RunResultUploadUrlSchema = z.discriminatedUnion("type", [
     runId: z.string().min(1),
     size: z.number().int().positive().max(RUN_RESULT_SPEC.kmz.maxSize),
   }),
+  z.object({
+    type: z.literal("thumbnail"),
+    projectId: z.string().min(1),
+    runId: z.string().min(1),
+    size: z.number().int().positive().max(RUN_RESULT_SPEC.thumbnail.maxSize),
+  }),
 ])
 
 blobsRoutes.post("/v2/blobs/run-result-upload-url", async (c) => {

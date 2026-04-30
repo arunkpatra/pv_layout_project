@@ -215,7 +215,7 @@ const TEN_MB = 10 * ONE_MB
 const HUNDRED_MB = 100 * ONE_MB
 
 interface RunResultBody {
-  type: "layout" | "energy" | "dxf" | "pdf" | "kmz"
+  type: "layout" | "energy" | "dxf" | "pdf" | "kmz" | "thumbnail"
   projectId: string
   runId: string
   size: number
@@ -312,6 +312,39 @@ describe("POST /v2/blobs/run-result-upload-url", () => {
       "projects/usr_test1/prj_test_owned/runs/run_test_owned/exports/run.kmz",
     )
     expect(call?.[1]).toBe("application/vnd.google-earth.kmz")
+  })
+
+  it("happy path thumbnail: image/webp, 50KB cap, thumbnail.webp at run root", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      runResultBody({ type: "thumbnail", size: 30_000 }),
+    )
+    expect(res.status).toBe(200)
+    const call = mockGetPresignedUploadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_test_owned/runs/run_test_owned/thumbnail.webp",
+    )
+    expect(call?.[1]).toBe("image/webp")
+    expect(call?.[3]).toBe(30_000)
+  })
+
+  it("accepts thumbnail at exactly 50_000 bytes (50KB ceiling)", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      runResultBody({ type: "thumbnail", size: 50_000 }),
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it("returns 400 when thumbnail size > 50_000", async () => {
+    const app = makeApp()
+    const res = await postRunResult(
+      app,
+      runResultBody({ type: "thumbnail", size: 50_001 }),
+    )
+    expect(res.status).toBe(400)
   })
 
   it("returns 404 when the run does not belong to the caller (or does not exist)", async () => {
