@@ -124,6 +124,7 @@ export function useGenerateLayoutMutation(
   const queryClient = useQueryClient()
   const setResult = useLayoutResultStore((s) => s.setResult)
   const addRun = useProjectStore((s) => s.addRun)
+  const selectRun = useProjectStore((s) => s.selectRun)
 
   return useMutation<GenerateLayoutResult, Error, GenerateLayoutVars>({
     mutationFn: async (vars) => {
@@ -194,8 +195,12 @@ export function useGenerateLayoutMutation(
       // Hydrate canvas state mirroring the parity-era useLayoutMutation
       // pattern, plus the post-parity additions: run row added to the
       // project's runs[] gallery, entitlements invalidated so the quota
-      // chip + remainingCalculations refresh on the next render.
-      setResult(data.layoutResult)
+      // chip + remainingCalculations refresh on the next render. P7's
+      // selectedRunId-driven auto-fetch skips its B17 round-trip when
+      // `selectedRunId === resultRunId` — so passing the run id into
+      // setResult here makes the just-generated run "active" without
+      // triggering a redundant fetch loop.
+      setResult(data.layoutResult, data.run.id)
       addRun({
         id: data.run.id,
         name: data.run.name,
@@ -203,6 +208,10 @@ export function useGenerateLayoutMutation(
         billedFeatureKey: data.run.billedFeatureKey,
         createdAt: data.run.createdAt,
       })
+      // Make the new run the "active" one in the gallery — drives P5's
+      // active-row indicator + makes P7's auto-fetch a no-op (resultRunId
+      // already matches).
+      selectRun(data.run.id)
       if (licenseKey) {
         void queryClient.invalidateQueries({
           queryKey: [ENTITLEMENTS_QUERY_KEY, licenseKey],

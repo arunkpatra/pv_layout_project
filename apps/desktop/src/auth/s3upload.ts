@@ -241,26 +241,31 @@ export interface UploadRunResultResult {
 // Download — P2 (open-existing-project flow)
 // ---------------------------------------------------------------------------
 
-export interface DownloadKmzOptions {
-  /** Presigned GET URL minted by B12 (`ProjectDetail.kmzDownloadUrl`). */
+export interface DownloadFromS3GetOptions {
+  /**
+   * Presigned GET URL — minted by B12 (`ProjectDetail.kmzDownloadUrl`)
+   * for the project KMZ, or B17 (`RunDetail.layoutResultBlobUrl` /
+   * `energyResultBlobUrl`) for run result JSON. Carries its own AWS
+   * signature in the query string.
+   */
   url: string
   /** Test seam — defaults to tauri-plugin-http or globalThis.fetch. */
   fetchImpl?: FetchLike
 }
 
 /**
- * GET a presigned KMZ URL and return the raw bytes. The desktop's
- * open-existing-project flow uses these bytes as input to the sidecar's
- * /parse-kmz, exactly mirroring the new-project path (P1) where the
- * bytes come from the local file picker.
+ * GET a presigned S3 URL and return the raw bytes. Generic enough to
+ * cover both KMZ blobs (P2 open-existing-project) and run result JSON
+ * (P7 open-run); the caller decides what to do with the bytes (sidecar
+ * /parse-kmz vs JSON.parse).
  *
- * The presigned URL carries its own AWS signature in the query string —
- * never send `Authorization` (S3 will reject the signature if any
+ * Never send `Authorization` (S3 will reject the signature if any
  * non-signed header is included). 1h TTL by backend convention; on a
- * 403 the desktop should re-call B12 to get a fresh URL.
+ * 403 the caller should re-mint via the corresponding V2 endpoint
+ * (B12 / B17) and retry.
  */
-export async function downloadKmzFromS3(
-  opts: DownloadKmzOptions
+export async function downloadBytesFromS3GetUrl(
+  opts: DownloadFromS3GetOptions
 ): Promise<Uint8Array> {
   const fetchImpl = opts.fetchImpl ?? defaultFetch()
   let response: Response
@@ -280,6 +285,10 @@ export async function downloadKmzFromS3(
   const buf = await response.arrayBuffer()
   return new Uint8Array(buf)
 }
+
+/** Backward-compat alias for the P2 open-project KMZ download path.
+ *  New callers should use `downloadBytesFromS3GetUrl` directly. */
+export const downloadKmzFromS3 = downloadBytesFromS3GetUrl
 
 /**
  * Upload a per-run result blob end-to-end (DXF / PDF / KMZ exports;

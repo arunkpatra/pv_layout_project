@@ -34,6 +34,8 @@ import {
   patchProjectV2ResponseSchema,
   projectSummaryListRowV2Schema,
   listProjectsV2ResponseSchema,
+  runDetailV2WireSchema,
+  getRunV2ResponseSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
 } from "./types-v2"
@@ -920,6 +922,96 @@ describe("listProjectsV2ResponseSchema", () => {
           lastRunAt: "2026-04-30T11:00:00.000Z",
         },
       ],
+    })
+    expect(r.success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B17 — GET /v2/projects/:id/runs/:runId (full Run detail)
+// ---------------------------------------------------------------------------
+
+describe("runDetailV2WireSchema", () => {
+  const baseRun = {
+    id: "run_abc",
+    projectId: "prj_xyz",
+    name: "Run 1",
+    params: {},
+    inputsSnapshot: {},
+    billedFeatureKey: "plant_layout",
+    usageRecordId: "ur_q",
+    createdAt: "2026-04-30T12:00:00.000Z",
+    deletedAt: null,
+  }
+
+  test("parses a layout-class run (energyResultBlobUrl=null is the v1 default)", () => {
+    const r = runDetailV2WireSchema.safeParse({
+      ...baseRun,
+      layoutResultBlobUrl: "https://s3.example/presigned-layout",
+      energyResultBlobUrl: null,
+      exportsBlobUrls: [],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("parses an energy-class run (both URLs populated)", () => {
+    const r = runDetailV2WireSchema.safeParse({
+      ...baseRun,
+      billedFeatureKey: "energy_yield",
+      layoutResultBlobUrl: "https://s3.example/layout",
+      energyResultBlobUrl: "https://s3.example/energy",
+      exportsBlobUrls: [],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("accepts layoutResultBlobUrl=null (S3 unset on backend)", () => {
+    const r = runDetailV2WireSchema.safeParse({
+      ...baseRun,
+      layoutResultBlobUrl: null,
+      energyResultBlobUrl: null,
+      exportsBlobUrls: [],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when exportsBlobUrls is missing entirely (must be array, even if empty)", () => {
+    const v: Record<string, unknown> = {
+      ...baseRun,
+      layoutResultBlobUrl: null,
+      energyResultBlobUrl: null,
+    }
+    expect(runDetailV2WireSchema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects when layoutResultBlobUrl is undefined (must be string|null)", () => {
+    const v: Record<string, unknown> = {
+      ...baseRun,
+      energyResultBlobUrl: null,
+      exportsBlobUrls: [],
+    }
+    expect(runDetailV2WireSchema.safeParse(v).success).toBe(false)
+  })
+})
+
+describe("getRunV2ResponseSchema", () => {
+  test("parses a full success envelope", () => {
+    const r = getRunV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        id: "run_a",
+        projectId: "prj_x",
+        name: "x",
+        params: {},
+        inputsSnapshot: {},
+        billedFeatureKey: "plant_layout",
+        usageRecordId: "ur_q",
+        createdAt: "2026-04-30T12:00:00.000Z",
+        deletedAt: null,
+        layoutResultBlobUrl: "https://s3.example/url",
+        energyResultBlobUrl: null,
+        exportsBlobUrls: [],
+      },
     })
     expect(r.success).toBe(true)
   })

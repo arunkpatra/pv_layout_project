@@ -33,6 +33,7 @@ import {
   createRunV2ResponseSchema,
   entitlementSummaryV2ResponseSchema,
   getProjectV2ResponseSchema,
+  getRunV2ResponseSchema,
   kmzUploadUrlResponseSchema,
   listProjectsV2ResponseSchema,
   patchProjectV2ResponseSchema,
@@ -48,6 +49,7 @@ import {
   type ProjectDetailV2Wire,
   type ProjectSummaryListRowV2,
   type ProjectV2Wire,
+  type RunDetailV2Wire,
   type RunResultType,
   type UsageReportV2Result,
   type V2ErrorCode,
@@ -220,6 +222,24 @@ export interface EntitlementsClient {
    * `runsCount` + `lastRunAt` for the gallery card UX.
    */
   listProjectsV2(key: string): Promise<ProjectSummaryListRowV2[]>
+  /**
+   * V2 — `GET /v2/projects/:id/runs/:runId` (B17). Full run detail with
+   * presigned-GET URLs for the result blobs (`layoutResultBlobUrl`
+   * always; `energyResultBlobUrl` only for energy-class features).
+   * Powers P7's "load run onto canvas" flow:
+   *
+   *   getRunV2 → fetch(detail.layoutResultBlobUrl) → LayoutResult JSON
+   *           → setLayoutResultStore.setResult → canvas re-renders
+   *
+   * 404 NOT_FOUND if run doesn't exist, soft-deleted, or the parent
+   * project belongs to another user (cross-user existence is never
+   * leaked through this endpoint either).
+   */
+  getRunV2(
+    key: string,
+    projectId: string,
+    runId: string
+  ): Promise<RunDetailV2Wire>
 }
 
 /**
@@ -516,6 +536,20 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `List-projects response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async getRunV2(key, projectId, runId) {
+      const path = `/v2/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}`
+      const raw = await request(path, { method: "GET" }, key)
+      const parsed = getRunV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Get-run response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

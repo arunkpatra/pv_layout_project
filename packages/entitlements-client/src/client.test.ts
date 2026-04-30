@@ -1896,3 +1896,127 @@ describe("listProjectsV2", () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — getRunV2 (B17)
+// ---------------------------------------------------------------------------
+
+const successRunDetail = {
+  success: true,
+  data: {
+    id: "run_abc",
+    projectId: "prj_xyz",
+    name: "Layout @ 2026-04-30",
+    params: { rows: 8 },
+    inputsSnapshot: { module_length: 2 },
+    billedFeatureKey: "plant_layout",
+    usageRecordId: "ur_q",
+    createdAt: "2026-04-30T12:00:00.000Z",
+    deletedAt: null,
+    layoutResultBlobUrl:
+      "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/u/p/runs/r/layout.json?X-Amz-Signature=...",
+    energyResultBlobUrl: null,
+    exportsBlobUrls: [],
+  },
+}
+
+describe("getRunV2", () => {
+  test("GETs /v2/projects/:id/runs/:runId and returns the RunDetail", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        return jsonResponse(successRunDetail)
+      },
+    })
+    const detail = await client.getRunV2(KEY, "prj_xyz", "run_abc")
+    expect(seenUrl).toBe(
+      "https://api.solarlayout.in/v2/projects/prj_xyz/runs/run_abc"
+    )
+    expect(seenMethod).toBe("GET")
+    expect(detail.id).toBe("run_abc")
+    expect(detail.layoutResultBlobUrl).toContain("X-Amz-Signature")
+    expect(detail.energyResultBlobUrl).toBeNull()
+  })
+
+  test("URL-encodes both path segments (projectId + runId)", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return jsonResponse(successRunDetail)
+      },
+    })
+    await client.getRunV2(KEY, "prj_with spaces", "run_odd/chars")
+    expect(seenUrl).toContain("/v2/projects/prj_with%20spaces/runs/run_odd%2Fchars")
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successRunDetail)
+      },
+    })
+    await client.getRunV2(KEY, "prj_x", "run_a")
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("accepts layoutResultBlobUrl=null (S3 bucket env unset on backend)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          ...successRunDetail,
+          data: {
+            ...successRunDetail.data,
+            layoutResultBlobUrl: null,
+          },
+        }),
+    })
+    const detail = await client.getRunV2(KEY, "prj_x", "run_a")
+    expect(detail.layoutResultBlobUrl).toBeNull()
+  })
+
+  test("maps 404 NOT_FOUND when run doesn't exist", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: 'Run "run_missing" not found',
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.getRunV2(KEY, "prj_x", "run_missing")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("rejects malformed success body (schema guard — missing exportsBlobUrls)", async () => {
+    const data: Record<string, unknown> = { ...successRunDetail.data }
+    delete data.exportsBlobUrls
+    const client = createEntitlementsClient({
+      fetchImpl: async () => jsonResponse({ success: true, data }),
+    })
+    try {
+      await client.getRunV2(KEY, "prj_x", "run_a")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+})

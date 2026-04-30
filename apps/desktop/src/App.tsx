@@ -54,6 +54,7 @@ import { useRenameProjectMutation } from "./auth/useRenameProject"
 import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { useAutoSaveProject } from "./auth/useAutoSaveProject"
 import { useProjectsListQuery } from "./auth/useProjectsList"
+import { useOpenRunMutation } from "./auth/useOpenRun"
 import { SaveIndicator } from "./auth/SaveIndicator"
 import { RecentsView } from "./recents/RecentsView"
 import { RunsList } from "./runs/RunsList"
@@ -460,6 +461,28 @@ export function App(): JSX.Element {
   // mutations invalidate the cache (their hooks include
   // ["projects", key] in onSuccess invalidations).
   const projectsListQuery = useProjectsListQuery(activeKey, entitlementsClient)
+
+  // ── P7 — open-run mutation + auto-fetch on selectedRunId change ─────────
+  // Fires when the user clicks an older run in the P5 gallery. The
+  // dedup is via useLayoutResultStore.resultRunId — when P6 generates
+  // a new run, both selectedRunId AND resultRunId update to the same
+  // id in onSuccess, so this effect's predicate skips the redundant
+  // re-fetch.
+  const openRunMutation = useOpenRunMutation(activeKey, entitlementsClient, {
+    fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+  })
+  const selectedRunId = useProjectStore((s) => s.selectedRunId)
+  const resultRunId = useLayoutResultStore((s) => s.resultRunId)
+  const openRunMutate = openRunMutation.mutate
+  useEffect(() => {
+    if (!selectedRunId) return
+    if (!currentProject) return
+    if (selectedRunId === resultRunId) return // already displayed
+    openRunMutate({
+      projectId: currentProject.id,
+      runId: selectedRunId,
+    })
+  }, [selectedRunId, currentProject, resultRunId, openRunMutate])
 
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND

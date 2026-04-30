@@ -572,3 +572,36 @@ export type ProjectSummaryListRowV2 = z.infer<
 export const listProjectsV2ResponseSchema = v2SuccessResponseSchema(
   z.array(projectSummaryListRowV2Schema)
 )
+
+// ---------------------------------------------------------------------------
+// /v2/projects/:id/runs/:runId — B17 (GET = full run detail)
+// ---------------------------------------------------------------------------
+
+/**
+ * B17 RunDetail — the full run row + presigned-GET URLs for the result
+ * blobs. Mirrors `RunDetailWire` in
+ * `renewable_energy/apps/mvp_api/src/modules/runs/runs.service.ts` (still
+ * service-local; backend offered to move to shared/types/project-v2.ts
+ * on request — not asked yet).
+ *
+ *   layoutResultBlobUrl — presigned-GET (1h TTL) for `layout.json`.
+ *     Always set when S3 is configured. May 404 on read if the desktop
+ *     hasn't uploaded yet (mid-flight or sidecar crash); the desktop's
+ *     `useOpenRunMutation` surfaces this as a typed S3DownloadError.
+ *   energyResultBlobUrl — presigned-GET for `energy.json`. Non-null
+ *     ONLY for energy-class features (energy_yield, generation_estimates).
+ *     For layout-class runs (today's only consumer), this is always null.
+ *   exportsBlobUrls — v1 always `[]` per backend's contract. Reserved
+ *     for a future register-export endpoint; the desktop currently
+ *     calls B7 directly for DXF/PDF/KMZ exports.
+ */
+export const runDetailV2WireSchema = runWireV2Schema.extend({
+  layoutResultBlobUrl: z.string().url().nullable(),
+  energyResultBlobUrl: z.string().url().nullable(),
+  exportsBlobUrls: z.array(z.unknown()),
+})
+
+export type RunDetailV2Wire = z.infer<typeof runDetailV2WireSchema>
+
+export const getRunV2ResponseSchema =
+  v2SuccessResponseSchema(runDetailV2WireSchema)

@@ -447,14 +447,102 @@ async function checkP2EndToEnd(
   }
 }
 
-async function checkB16HappyFree(
+async function checkB17Detail(
+  client: EntitlementsClient,
+  projectId: string,
+  runId: string
+): Promise<void> {
+  // P7 contract: B17 returns the full Run row + presigned-GET URLs for
+  // the result blobs. Test the SHAPE here — actual S3 GET against the
+  // layoutResultBlobUrl would 404 because B16 in the fixture session
+  // creates the Run row but doesn't run the sidecar to upload the
+  // result blob. Real desktop flow is sidecar /layout → S3 PUT, which
+  // requires a running pvlayout_engine.
+  try {
+    const detail = await client.getRunV2(FIXTURE_KEYS.FREE, projectId, runId)
+    if (detail.id !== runId) {
+      record(
+        "B17 run detail",
+        "fail",
+        `id mismatch: expected ${runId}, got ${detail.id}`
+      )
+      return
+    }
+    if (detail.layoutResultBlobUrl === null) {
+      record(
+        "B17 run detail",
+        "warn",
+        "layoutResultBlobUrl=null (S3 bucket env unset on backend?)"
+      )
+      return
+    }
+    if (!detail.layoutResultBlobUrl.startsWith("https://")) {
+      record(
+        "B17 run detail",
+        "warn",
+        `layoutResultBlobUrl unexpected: ${detail.layoutResultBlobUrl}`
+      )
+      return
+    }
+    if (detail.energyResultBlobUrl !== null) {
+      record(
+        "B17 run detail",
+        "warn",
+        `energyResultBlobUrl populated for layout-class run: ${detail.energyResultBlobUrl}`
+      )
+      return
+    }
+    if (!Array.isArray(detail.exportsBlobUrls)) {
+      record(
+        "B17 run detail",
+        "warn",
+        `exportsBlobUrls not array: ${detail.exportsBlobUrls}`
+      )
+      return
+    }
+    record(
+      "B17 run detail",
+      "pass",
+      `id=${detail.id} layoutBlob=presigned energyBlob=null exports=${detail.exportsBlobUrls.length}`
+    )
+  } catch (err) {
+    record("B17 run detail", "fail", fmtErr(err))
+  }
+}
+
+async function checkB17NotFound(
   client: EntitlementsClient,
   projectId: string
 ): Promise<void> {
+  try {
+    await client.getRunV2(FIXTURE_KEYS.FREE, projectId, "run_definitely_missing")
+    record(
+      "B17 missing run → 404",
+      "fail",
+      "expected 404 NOT_FOUND, got success"
+    )
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 404 &&
+      err.code === "NOT_FOUND"
+    ) {
+      record("B17 missing run → 404", "pass", "status=404 code=NOT_FOUND")
+    } else {
+      record("B17 missing run → 404", "fail", fmtErr(err))
+    }
+  }
+}
+
+async function checkB16HappyFree(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<string | null> {
   // B16 atomic: debit + UsageRecord + Run + presigned uploadUrl. We don't
   // run the actual sidecar /layout here (that needs the pvlayout_engine
   // process) — the contract under test is the *API* surface: response
   // shape + atomic debit semantics.
+  // Returns the new runId on success so the P7 chain can use it.
   try {
     const idem = crypto.randomUUID()
     const result = await client.createRunV2(FIXTURE_KEYS.FREE, projectId, {
@@ -470,7 +558,7 @@ async function checkB16HappyFree(
         "warn",
         `run id without run_ prefix: ${result.run.id}`
       )
-      return
+      return null
     }
     if (result.upload.type !== "layout") {
       record(
@@ -478,7 +566,7 @@ async function checkB16HappyFree(
         "warn",
         `upload.type=${result.upload.type} expected layout`
       )
-      return
+      return null
     }
     if (!result.upload.uploadUrl.startsWith("https://")) {
       record(
@@ -486,15 +574,17 @@ async function checkB16HappyFree(
         "warn",
         `upload.uploadUrl not https: ${result.upload.uploadUrl}`
       )
-      return
+      return null
     }
     record(
       "B16 FREE happy",
       "pass",
       `run=${result.run.id} type=${result.upload.type} usageRecordId=${result.run.usageRecordId}`
     )
+    return result.run.id
   } catch (err) {
     record("B16 FREE happy", "fail", fmtErr(err))
+    return null
   }
 }
 
@@ -959,8 +1049,9 @@ async function main(): Promise<void> {
   // through the idempotency replay (1) + the happy-path test (1) + step
   // 9's B9 idempotency (1). Plenty of headroom.
   console.log("\n--- B16 atomic Run create ---")
+  let createdRunId: string | null = null
   if (createdProjectId !== null) {
-    await checkB16HappyFree(client, createdProjectId)
+    createdRunId = await checkB16HappyFree(client, createdProjectId)
     await checkB16Idempotency(client, createdProjectId)
   } else {
     record(
@@ -999,14 +1090,28 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 9. B10 recents list (S3) ────────────────────────────────────────────
+  // ── 9. B17 run detail (P7) ──────────────────────────────────────────────
+  // Driven against the run B16 just created above. Tests the SHAPE of
+  // RunDetail (presigned URLs etc); actual S3 GET of the result blob
+  // would 404 because the sidecar isn't running to upload it. P7 unit
+  // tests cover the bytes path with mocked fetch.
+  console.log("\n--- B17 run detail (P7) ---")
+  if (createdProjectId !== null && createdRunId !== null) {
+    await checkB17Detail(client, createdProjectId, createdRunId)
+    await checkB17NotFound(client, createdProjectId)
+  } else {
+    record("B17 run detail", "warn", "skipped — no project + run from above")
+    record("B17 missing run → 404", "warn", "skipped — no project from above")
+  }
+
+  // ── 10. B10 recents list (S3) ───────────────────────────────────────────
   // After P1 above, FREE has at least one project. Verify the list endpoint
   // returns it. Run BEFORE the P3 chain (which deletes one) so the count
   // is predictable.
   console.log("\n--- B10 recents list (S3) ---")
   await checkB10List(client, 1)
 
-  // ── 10. B13 rename + B14 delete (P3) ────────────────────────────────────
+  // ── 11. B13 rename + B14 delete (P3) ────────────────────────────────────
   // Create a dedicated project for the rename/delete chain so we don't
   // tamper with the one P2/B16 used (those tests already mutated state
   // on it; mixing in a delete would invalidate downstream assertions).
@@ -1035,7 +1140,7 @@ async function main(): Promise<void> {
     record("B14 double-delete → 404", "warn", "skipped (same reason)")
   }
 
-  // ── 11. B9 idempotency ──────────────────────────────────────────────────
+  // ── 12. B9 idempotency ──────────────────────────────────────────────────
   console.log("\n--- B9 idempotency ---")
   await checkB9HappyFree(client)
 
