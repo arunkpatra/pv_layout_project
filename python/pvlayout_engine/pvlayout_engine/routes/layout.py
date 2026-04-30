@@ -31,7 +31,9 @@ LayoutResult.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
+import os
 import tempfile
 from pathlib import Path
 
@@ -174,14 +176,47 @@ def layout(request: LayoutRequest) -> LayoutResponse:
 
     # Mirror the PyQt app's post-layout ordering: LAs first (they may
     # remove tables + update total_capacity_kwp), then string inverters.
-    for r in core_results:
-        if r.usable_polygon is None:
-            # Error path (e.g. unprocessable boundary); skip inverter pass.
-            continue
-        place_lightning_arresters(r, core_params)
-        place_string_inverters(r, core_params)
+    #
+    # Multi-plot perf: each LayoutResult is independent after
+    # run_layout_multi (no shared mutable state between plots). For
+    # multi-plot inputs with cable calc on, we dispatch the per-plot LA
+    # + string-inverter chain across worker processes — wall-clock
+    # scales with min(P, cpu_count). Single-plot stays in-process
+    # (process pool startup is ~150ms wasted on a 5s job).
+    # PVLAYOUT_DISABLE_PARALLEL=1 forces sequential (test/debug).
+    use_parallel = (
+        len(core_results) > 1
+        and core_params.enable_cable_calc
+        and os.environ.get("PVLAYOUT_DISABLE_PARALLEL") != "1"
+    )
+    if use_parallel:
+        max_workers = min(len(core_results), os.cpu_count() or 4)
+        args_list = [(r, core_params) for r in core_results]
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as ex:
+            core_results = list(ex.map(_run_per_plot_pipeline, args_list))
+    else:
+        for r in core_results:
+            if r.usable_polygon is None:
+                # Error path (e.g. unprocessable boundary); skip inverter pass.
+                continue
+            place_lightning_arresters(r, core_params)
+            place_string_inverters(r, core_params)
 
     return LayoutResponse(results=[adapters.result_from_core(r) for r in core_results])
+
+
+def _run_per_plot_pipeline(args):
+    """
+    Top-level worker for ProcessPoolExecutor.map above. Must be at module
+    scope (not a closure) for the spawn start method (default on macOS).
+    Mutates ``result`` in place and returns it.
+    """
+    result, params = args
+    if result.usable_polygon is None:
+        return result
+    place_lightning_arresters(result, params)
+    place_string_inverters(result, params)
+    return result
 
 
 # ---------------------------------------------------------------------------
