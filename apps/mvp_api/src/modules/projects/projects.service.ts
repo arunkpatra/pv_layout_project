@@ -14,6 +14,7 @@ import type {
 export type { ProjectDetail, ProjectWire, RunSummary }
 
 const KMZ_DOWNLOAD_TTL_SECONDS = 3600 // 1 hour — matches B17 read TTL
+const THUMBNAIL_DOWNLOAD_TTL_SECONDS = 3600 // 1 hour — matches B17 thumbnail TTL
 
 export interface ProjectSummary {
   id: string
@@ -24,6 +25,12 @@ export interface ProjectSummary {
   updatedAt: string
   runsCount: number
   lastRunAt: string | null
+  /** Presigned-GET URL for the most recent non-soft-deleted run's
+   *  `thumbnail.webp` (Path A — deterministic key, always-sign). Null when
+   *  the project has 0 runs OR the bucket env is unset. Pre-SP1 runs return
+   *  a valid URL that 404s on read; the desktop's `<img onError>` falls
+   *  back, mirroring the B17 RunDetail pattern. */
+  mostRecentRunThumbnailBlobUrl: string | null
 }
 
 const LIST_CAP = 100
@@ -33,8 +40,12 @@ const LIST_CAP = 100
  * capped at 100 (no pagination at v1 — desktop ceiling is 15 quota
  * concurrent so 100 is comfortable headroom).
  *
- * Each summary carries runsCount (excluding soft-deleted runs) and
- * lastRunAt (latest non-soft-deleted Run.createdAt, or null).
+ * Each summary carries runsCount (excluding soft-deleted runs),
+ * lastRunAt (latest non-soft-deleted Run.createdAt, or null), and a
+ * presigned-GET URL for the most-recent run's thumbnail. Signing is
+ * deterministic against the conventional key path (Path A) so projects
+ * whose runs predate the thumbnail pipeline still get a URL — it just
+ * 404s on read, and the desktop falls back to the placeholder.
  */
 export async function listProjects(userId: string): Promise<ProjectSummary[]> {
   const projects = await db.project.findMany({
@@ -44,7 +55,7 @@ export async function listProjects(userId: string): Promise<ProjectSummary[]> {
     include: {
       runs: {
         where: { deletedAt: null },
-        select: { createdAt: true },
+        select: { id: true, createdAt: true },
         orderBy: { createdAt: "desc" },
         take: 1,
       },
@@ -54,16 +65,32 @@ export async function listProjects(userId: string): Promise<ProjectSummary[]> {
     },
   })
 
-  return projects.map((p) => ({
-    id: p.id,
-    name: p.name,
-    kmzBlobUrl: p.kmzBlobUrl,
-    kmzSha256: p.kmzSha256,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-    runsCount: p._count.runs,
-    lastRunAt: p.runs[0]?.createdAt.toISOString() ?? null,
-  }))
+  const bucket = env.MVP_S3_PROJECTS_BUCKET
+  return await Promise.all(
+    projects.map(async (p) => {
+      const latestRun = p.runs[0]
+      const mostRecentRunThumbnailBlobUrl =
+        bucket && latestRun
+          ? await getPresignedDownloadUrl(
+              `projects/${userId}/${p.id}/runs/${latestRun.id}/thumbnail.webp`,
+              "thumbnail.webp",
+              THUMBNAIL_DOWNLOAD_TTL_SECONDS,
+              bucket,
+            )
+          : null
+      return {
+        id: p.id,
+        name: p.name,
+        kmzBlobUrl: p.kmzBlobUrl,
+        kmzSha256: p.kmzSha256,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+        runsCount: p._count.runs,
+        lastRunAt: latestRun?.createdAt.toISOString() ?? null,
+        mostRecentRunThumbnailBlobUrl,
+      }
+    }),
+  )
 }
 
 export interface CreateProjectInput {

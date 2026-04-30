@@ -49,7 +49,7 @@ interface MockProject {
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null
-  runs: { createdAt: Date }[]
+  runs: { id: string; createdAt: Date }[]
   _count: { runs: number }
 }
 
@@ -196,6 +196,7 @@ interface ProjectSummary {
   updatedAt: string
   runsCount: number
   lastRunAt: string | null
+  mostRecentRunThumbnailBlobUrl: string | null
 }
 
 describe("GET /v2/projects", () => {
@@ -213,7 +214,7 @@ describe("GET /v2/projects", () => {
     expect(body.data).toEqual([])
   })
 
-  it("returns project summaries with runsCount and lastRunAt", async () => {
+  it("returns project summaries with runsCount, lastRunAt, and presigned thumbnail URL", async () => {
     const created = new Date("2026-04-01T00:00:00Z")
     const updated = new Date("2026-04-15T00:00:00Z")
     const lastRun = new Date("2026-04-14T12:00:00Z")
@@ -227,10 +228,14 @@ describe("GET /v2/projects", () => {
         createdAt: created,
         updatedAt: updated,
         deletedAt: null,
-        runs: [{ createdAt: lastRun }],
+        runs: [{ id: "run_latest", createdAt: lastRun }],
         _count: { runs: 3 },
       },
     ])
+    mockGetPresignedDownloadUrl.mockImplementation(
+      async (key: string) =>
+        `https://signed.example/${key}?X-Amz-Sig=stub`,
+    )
     const app = makeApp()
     const res = await get(app)
     expect(res.status).toBe(200)
@@ -245,9 +250,13 @@ describe("GET /v2/projects", () => {
     expect(p.updatedAt).toBe(updated.toISOString())
     expect(p.runsCount).toBe(3)
     expect(p.lastRunAt).toBe(lastRun.toISOString())
+    // Path A — deterministic key against the latest run's id
+    expect(p.mostRecentRunThumbnailBlobUrl).toContain(
+      "projects/usr_test1/prj_1/runs/run_latest/thumbnail.webp",
+    )
   })
 
-  it("returns lastRunAt = null when project has no runs", async () => {
+  it("returns lastRunAt + mostRecentRunThumbnailBlobUrl = null when project has no runs", async () => {
     mockProjectFindMany.mockImplementation(async () => [
       {
         id: "prj_norun",
@@ -262,11 +271,42 @@ describe("GET /v2/projects", () => {
         _count: { runs: 0 },
       },
     ])
+    mockGetPresignedDownloadUrl.mockClear()
     const app = makeApp()
     const res = await get(app)
     const body = (await res.json()) as { data: ProjectSummary[] }
     expect(body.data[0]!.runsCount).toBe(0)
     expect(body.data[0]!.lastRunAt).toBeNull()
+    expect(body.data[0]!.mostRecentRunThumbnailBlobUrl).toBeNull()
+    // No sign call when there's no run to sign for
+    expect(mockGetPresignedDownloadUrl).not.toHaveBeenCalled()
+  })
+
+  it("signs thumbnail URL against MVP_S3_PROJECTS_BUCKET with 1h TTL", async () => {
+    mockProjectFindMany.mockImplementation(async () => [
+      {
+        id: "prj_x",
+        userId: "usr_test1",
+        name: "X",
+        kmzBlobUrl: "s3://b/k.kmz",
+        kmzSha256: "0".repeat(64),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        runs: [{ id: "run_x", createdAt: new Date() }],
+        _count: { runs: 1 },
+      },
+    ])
+    mockGetPresignedDownloadUrl.mockClear()
+    const app = makeApp()
+    await get(app)
+    const call = mockGetPresignedDownloadUrl.mock.calls[0]
+    expect(call?.[0]).toBe(
+      "projects/usr_test1/prj_x/runs/run_x/thumbnail.webp",
+    )
+    expect(call?.[1]).toBe("thumbnail.webp")
+    expect(call?.[2]).toBe(3600)
+    expect(call?.[3]).toBe("solarlayout-local-projects")
   })
 
   it("scopes to the caller (where: { userId: caller.id, deletedAt: null }) and orders updatedAt DESC, take:100", async () => {
