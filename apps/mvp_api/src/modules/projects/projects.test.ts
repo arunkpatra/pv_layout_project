@@ -575,6 +575,7 @@ interface ProjectDetailWire {
     params: unknown
     billedFeatureKey: string
     createdAt: string
+    thumbnailBlobUrl: string | null
   }>
 }
 
@@ -648,6 +649,50 @@ describe("GET /v2/projects/:id", () => {
     // canvas in one round-trip without a second mint endpoint.
     expect(body.data.kmzDownloadUrl).toBe(
       "https://signed.example/projects/usr_test1/kmz/abc.kmz?X-Amz-Sig=stub",
+    )
+  })
+
+  it("signs each embedded run's thumbnail URL deterministically (Path A)", async () => {
+    const r1 = new Date("2026-04-10T00:00:00Z")
+    const r2 = new Date("2026-04-14T00:00:00Z")
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "Site A",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "a".repeat(64),
+      edits: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      runs: [
+        {
+          id: "run_2",
+          name: "Run 2",
+          params: { rows: 4 },
+          billedFeatureKey: "plant_layout",
+          createdAt: r2,
+        },
+        {
+          id: "run_1",
+          name: "Run 1",
+          params: { rows: 3 },
+          billedFeatureKey: "plant_layout",
+          createdAt: r1,
+        },
+      ],
+    }))
+    mockGetPresignedDownloadUrl.mockImplementation(
+      async (key: string) => `https://signed.example/${key}?X-Amz-Sig=stub`,
+    )
+    const res = await getDetail("prj_x")
+    const body = (await res.json()) as { data: ProjectDetailWire }
+    // Always-sign per run, regardless of whether the underlying object exists
+    expect(body.data.runs[0]!.thumbnailBlobUrl).toContain(
+      "projects/usr_test1/prj_x/runs/run_2/thumbnail.webp",
+    )
+    expect(body.data.runs[1]!.thumbnailBlobUrl).toContain(
+      "projects/usr_test1/prj_x/runs/run_1/thumbnail.webp",
     )
   })
 

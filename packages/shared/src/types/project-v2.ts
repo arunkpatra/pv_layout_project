@@ -15,6 +15,12 @@ export interface RunSummary {
   /** The feature key billed for this run (e.g. "plant_layout"). */
   billedFeatureKey: string
   createdAt: string
+  /** Presigned-GET URL for `thumbnail.webp` (Path A — deterministic key,
+   *  always-sign). Pre-SP1 runs return a valid URL that 404s on read; the
+   *  desktop's `<img onError>` falls back. Null only when the bucket env
+   *  is unset (local dev without S3). Mirrors `RunDetailWire.thumbnailBlobUrl`
+   *  on B17 and `mostRecentRunThumbnailBlobUrl` on B10's ProjectSummary. */
+  thumbnailBlobUrl: string | null
 }
 
 export interface ProjectWire {

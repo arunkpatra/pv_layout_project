@@ -198,6 +198,24 @@ export async function getProject(
       )
     : null
 
+  const runs = await Promise.all(
+    project.runs.map(async (r) => ({
+      id: r.id,
+      name: r.name,
+      params: r.params,
+      billedFeatureKey: r.billedFeatureKey,
+      createdAt: r.createdAt.toISOString(),
+      thumbnailBlobUrl: bucket
+        ? await getPresignedDownloadUrl(
+            `projects/${userId}/${projectId}/runs/${r.id}/thumbnail.webp`,
+            "thumbnail.webp",
+            THUMBNAIL_DOWNLOAD_TTL_SECONDS,
+            bucket,
+          )
+        : null,
+    })),
+  )
+
   return {
     id: project.id,
     userId: project.userId,
@@ -209,13 +227,7 @@ export async function getProject(
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
     kmzDownloadUrl,
-    runs: project.runs.map((r) => ({
-      id: r.id,
-      name: r.name,
-      params: r.params,
-      billedFeatureKey: r.billedFeatureKey,
-      createdAt: r.createdAt.toISOString(),
-    })),
+    runs,
   }
 }
 

@@ -256,6 +256,7 @@ interface RunSummaryWire {
   params: unknown
   billedFeatureKey: string
   createdAt: string
+  thumbnailBlobUrl: string | null
 }
 
 describe("GET /v2/projects/:id/runs", () => {
@@ -273,7 +274,7 @@ describe("GET /v2/projects/:id/runs", () => {
     expect(body.data).toEqual([])
   })
 
-  it("returns 200 + run summaries (id, name, params, billedFeatureKey, createdAt)", async () => {
+  it("returns 200 + run summaries with always-signed thumbnail URLs (Path A)", async () => {
     const t1 = new Date("2026-04-15T00:00:00Z")
     const t2 = new Date("2026-04-20T00:00:00Z")
     mockRunFindMany.mockImplementation(async () => [
@@ -301,6 +302,13 @@ describe("GET /v2/projects/:id/runs", () => {
     expect(body.data[0]!.billedFeatureKey).toBe("energy_yield")
     expect(body.data[0]!.createdAt).toBe(t2.toISOString())
     expect(body.data[1]!.id).toBe("run_a")
+    // Path A — every run gets an always-signed deterministic URL
+    expect(body.data[0]!.thumbnailBlobUrl).toContain(
+      "projects/usr_test1/prj_x/runs/run_b/thumbnail.webp",
+    )
+    expect(body.data[1]!.thumbnailBlobUrl).toContain(
+      "projects/usr_test1/prj_x/runs/run_a/thumbnail.webp",
+    )
   })
 
   it("returns 404 when the project doesn't exist (or belongs to another user)", async () => {

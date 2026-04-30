@@ -12,6 +12,29 @@ import {
 } from "../usage/usage.service.js"
 import { RUN_RESULT_SPEC } from "../blobs/blobs.service.js"
 
+const THUMBNAIL_DOWNLOAD_TTL_SECONDS = 3600 // 1 hour — mirrors B17
+
+/**
+ * Deterministic Path A signer for a run's thumbnail.webp. Returns null
+ * when the bucket env is unset; otherwise always signs (regardless of
+ * whether the underlying object exists — pre-SP1 runs 404 on read and
+ * the desktop's `<img onError>` falls back to placeholder).
+ */
+async function signRunThumbnailUrl(
+  userId: string,
+  projectId: string,
+  runId: string,
+): Promise<string | null> {
+  const bucket = env.MVP_S3_PROJECTS_BUCKET
+  if (!bucket) return null
+  return await getPresignedDownloadUrl(
+    `projects/${userId}/${projectId}/runs/${runId}/thumbnail.webp`,
+    "thumbnail.webp",
+    THUMBNAIL_DOWNLOAD_TTL_SECONDS,
+    bucket,
+  )
+}
+
 /**
  * List runs in a project. Verifies the project exists and belongs to the
  * caller before returning any data — same 404 posture as B12 / B13 / B14:
@@ -45,13 +68,16 @@ export async function listRunsForProject(
     },
   })
 
-  return runs.map((r) => ({
-    id: r.id,
-    name: r.name,
-    params: r.params,
-    billedFeatureKey: r.billedFeatureKey,
-    createdAt: r.createdAt.toISOString(),
-  }))
+  return await Promise.all(
+    runs.map(async (r) => ({
+      id: r.id,
+      name: r.name,
+      params: r.params,
+      billedFeatureKey: r.billedFeatureKey,
+      createdAt: r.createdAt.toISOString(),
+      thumbnailBlobUrl: await signRunThumbnailUrl(userId, projectId, r.id),
+    })),
+  )
 }
 
 const UPLOAD_URL_TTL_SECONDS = 900 // 15 min
