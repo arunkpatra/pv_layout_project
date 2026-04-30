@@ -1276,6 +1276,10 @@ Status → `fixed` pending live verification: open
 the camera to fit all 6 plots at ~1km scale on first render, no
 manual zoom-out needed.
 
+[FE 2026-04-30 16:06] Live verified by user — camera now fits the
+full extent on first render. Closed via `2ecbc51` on
+`post-parity-v1-desktop`. Held P2 queue is empty.
+
 ##### S1-10 thread
 
 [FE 2026-04-30 14:44] User flagged that with a project loaded, there
