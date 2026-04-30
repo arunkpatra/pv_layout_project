@@ -505,12 +505,41 @@ extra-attention items inside flows already on the route.
 
 #### Observations
 
-| ID    | Sev | Surface | Owner | Title | Repro | Acceptance | Status | Linked | Thread |
-|-------|-----|---------|-------|-------|-------|------------|--------|--------|--------|
-|       |     |         |       |       |       |            |        |        |        |
+| ID    | Sev | Surface  | Owner | Title                                                       | Repro                                                                                                | Acceptance                                                              | Status | Linked | Thread (see below per ID) |
+|-------|-----|----------|-------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|--------|--------|---------------------------|
+| S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Depends on chosen path — see Thread.                                    | open   | F1     | see S1-01 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
 becomes `be` or `both`._
+
+##### S1-01 thread
+
+[FE 2026-04-30 13:18] Found while running the pre-flight UX checks
+on the F1 splash. Read the code at
+`apps/desktop/src/dialogs/LicenseKeyDialog.tsx:154` — button is
+gated on `value.trim().length === 0` (i.e. enabled on any non-empty
+input). The `sl_live_*` shape check runs in `handleSubmit` (line 62)
+via `isPlausibleLicenseKey`, and surfaces an inline `formatError`
+when the prefix doesn't match. So the actual UX is: type anything →
+submit attempt → inline error if shape is wrong → no network call.
+
+This is a deliberate pattern, not a defect. Tradeoff:
+
+- **Current (validation-on-submit)** — submit-attempt surfaces the
+  `sl_live_` requirement contextually. Disabled buttons are a known
+  UX anti-pattern (users don't know why a button is dead).
+- **Alternative (gate-button-by-shape)** — stronger guarantee that
+  no network call fires for malformed input; foot-gun against
+  password-manager autofill into the wrong field.
+
+Recommendation: **drop** (keep current behavior). Reasoning: backend
+401s on a bad key anyway, and the on-submit validation is more
+accessible than gray-button silence. If pre-flight scripts care, the
+narration should match the code, not the other way round.
+
+If you'd rather move to gate-by-shape: it's a one-line change at
+line 154 (`disabled={submitting || !isPlausibleLicenseKey(value.trim())}`).
+Roughly P3-inline.
 
 ---
