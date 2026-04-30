@@ -515,6 +515,7 @@ extra-attention items inside flows already on the route.
 | S1-06 | P3  | frontend, backend | both | Run gallery cards show empty thumbnail placeholder           | 1. Open project + Generate Layout. 2. Inspector → Runs tab. 3. Run card renders with title + type chip + timestamp but a blank gray placeholder where a layout preview thumbnail would help orient. | Thumbnail shows a recognizable preview of the run's layout. User-preferred path: server-side pipeline (Option B) subject to a detailed impact-analysis memo when the row is picked up.                       | deferred | new-row | see S1-06 below           |
 | S1-07 | P3  | frontend | fe    | No loading feedback during run-switch                        | 1. Open project + generate ≥2 runs (or open a project with multiple existing runs). 2. Inspector → Runs tab. 3. Click a non-active run card. 4. ~1–2s elapses during B17 fetch + S3 GET; canvas shows old run; no visible "loading" indication. 5. Canvas eventually updates; click felt unacknowledged. | While B17 + S3 GET are in flight: clicked card shows a subtle spinner in the thumbnail slot + StatusBar `leftMeta` reads `Loading run [timestamp]…`. Both clear when the canvas hydrates. No toast — the canvas update IS the success signal.                                       | deferred | new-row | see S1-07 below           |
 | S1-08 | P1  | frontend | fe    | Layout state lost on tab-switch round-trip (S2 regression)   | 1. Open project A; Generate Layout (run_A produced + canvas shows panels/ICRs). 2. Open a second project B (with no runs). Tab opens; canvas shows just B's boundary. 3. Click back on tab A. 4. Canvas shows only A's boundary — no panels, no ICRs. The previously-generated run is gone visually but still exists in `runs[]` (visible in Inspector → Runs tab if you check). | Switching back to a tab whose project has runs auto-restores the most-recent run on canvas. The P7 selectedRunId-driven effect fires B17 + S3 GET + setLayoutResult during the B12-driven hydration. Mental model: opening a project shows the prior work, not blank boundary + manual click. | fixed  | S2, P2  | see S1-08 below           |
+| S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -984,5 +985,61 @@ tab-switch round-trip restores the layout.
 [FE 2026-04-30 14:23] Live confirmed by user — tab-switch round-trip
 restores the prior layout. Closed via `7e24e36` on
 `post-parity-v1-desktop`.
+
+##### S1-09 thread
+
+[FE 2026-04-30 14:38] User reports camera over-zooming on first
+project-open from RecentsView. Code trace shows
+`fitToBoundariesIfNew` at `packages/ui/src/compositions/MapCanvas.tsx:416`
+correctly walks all features in the boundaries FeatureCollection
+via `computeBounds` — multi-plot bbox math is fine.
+
+**Race root cause (per user's sharper hypothesis):** when the
+project flips from null to non-null, S1-04's Inspector visibility
+gate triggers Framer Motion's AnimatePresence to animate the
+inspector slot from `width: 0` to `var(--size-inspector, 320px)`
+over `durations.base` (~180ms). At the *same render*,
+`boundariesGeoJson` populates and the MapCanvas effect at
+`MapCanvas.tsx:230` calls `fitBounds`. MapLibre computes the fit
+against the *current* container dimensions — which are still wider
+than they'll be after the inspector finishes animating. Result: a
+zoom level that's correct for "no inspector" but over-zoomed once
+the inspector takes 320px of the canvas width.
+
+This is consistent with the user's observation that the camera
+shows roughly half the multi-plot extent: the canvas is briefly
+~1.4× wider than its post-animation final width (1280 vs 960px on
+a typical Tauri window). fitBounds picks zoom Z such that bbox fits
+in 1280px; once container narrows to 960px, the same camera/zoom
+shows only ~75% of the bbox horizontally.
+
+User explicitly identified this race after I mistakenly attributed
+it to RecentsView dismounting. The dominant signal is the
+inspector-slot growing from 0 to 320px.
+
+**Fix (proposed):** wrap the `fitBounds` call so it fires after the
+inspector animation completes. Two implementation paths:
+
+1. `setTimeout(map.resize() + map.fitBounds(...), durations.base
+   in ms + 50)` — defers refit until after the animation, calls
+   `resize()` first so MapLibre re-measures the now-final container
+   width. Hardcoded delay; works but couples MapCanvas to the
+   inspector animation duration.
+2. Listen to a `ResizeObserver` on the map container and refit
+   when dimensions stabilize. More robust; no animation-duration
+   coupling. Covers other layout reflows too (window resize, etc.).
+
+Recommendation: ship option 2 (ResizeObserver), guarded so we don't
+re-fit on every micro-pixel reflow — only when bounds-key changes
+OR container width changed >50px from the last fit's basis. The
+ResizeObserver approach also fixes any future layout thrash from
+ToolRail toggle or window resize without bespoke handling.
+
+Severity: P2 — has manual workaround (zoom out) but materially
+hurts first impression on every project open. Worth fixing inline
+during smoke; the regression shows up consistently and the fix
+covers a class of future bugs.
+
+Awaiting user go-ahead: ship option 2 / option 1 / defer.
 
 ---
