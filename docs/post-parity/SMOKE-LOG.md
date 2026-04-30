@@ -517,6 +517,7 @@ extra-attention items inside flows already on the route.
 | S1-08 | P1  | frontend | fe    | Layout state lost on tab-switch round-trip (S2 regression)   | 1. Open project A; Generate Layout (run_A produced + canvas shows panels/ICRs). 2. Open a second project B (with no runs). Tab opens; canvas shows just B's boundary. 3. Click back on tab A. 4. Canvas shows only A's boundary — no panels, no ICRs. The previously-generated run is gone visually but still exists in `runs[]` (visible in Inspector → Runs tab if you check). | Switching back to a tab whose project has runs auto-restores the most-recent run on canvas. The P7 selectedRunId-driven effect fires B17 + S3 GET + setLayoutResult during the B12-driven hydration. Mental model: opening a project shows the prior work, not blank boundary + manual click. | fixed  | S2, P2  | see S1-08 below           |
 | S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
 | S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
+| S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | open   | F4-era menu wiring | see S1-11 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1099,5 +1100,75 @@ flow.
 
 Awaiting user go-ahead on #1: ship inline / defer / drop. (#2 stays
 deferred regardless.)
+
+##### S1-11 thread
+
+[FE 2026-04-30 14:47] Devastating P0 confirmed via code trace.
+Classic Tauri `listen()` async-cleanup race in
+`apps/desktop/src/App.tsx:840–851`:
+
+```ts
+useEffect(() => {
+    if (!inTauri()) return
+    let unlisten: (() => void) | undefined
+    void listen("menu:file/open_kmz", () => { void handleOpenKmz() })
+      .then((fn) => { unlisten = fn })   // ← async; resolves later
+    return () => { unlisten?.() }        // ← if cleanup runs before the
+                                         //   .then resolves, no-op;
+                                         //   listener stays registered
+  }, [handleOpenKmz])
+```
+
+**Why it stacks N times:**
+
+1. `handleOpenKmz` is a `useCallback` whose deps change as the user
+   works (sidecar state, opening flag, current project, etc.). Each
+   change → effect re-runs.
+2. Each effect run kicks off a fresh `listen(...)` promise.
+3. Cleanup fires *before* the prior `.then()` resolved, so
+   `unlisten` is still `undefined` and the old listener is never
+   unregistered.
+4. After N re-renders since the last successful unregister, N
+   listeners are stacked.
+5. One OS-menu click → N invocations of `handleOpenKmz` → N file
+   pickers queued. Cancelling one just reveals the next.
+
+The user's "5–6 pickers" matches typical re-render churn during a
+project session (sidecar boot transitions + project state updates +
+opening overlay flips).
+
+**Fix (textbook pattern — `cancelled` flag + immediate-unregister-on-late-resolve):**
+
+```ts
+useEffect(() => {
+    if (!inTauri()) return
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    void listen("menu:file/open_kmz", () => { void handleOpenKmz() })
+      .then((fn) => {
+        if (cancelled) fn()         // cleanup ran first → unregister now
+        else unlisten = fn
+      })
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [handleOpenKmz])
+```
+
+Now the cleanup handles both timings:
+- Promise resolved before cleanup → `unlisten?.()` runs.
+- Cleanup ran before promise → resolution sees `cancelled=true` and
+  immediately calls `fn()` to unregister.
+
+Severity: P0 — File menu is broken in any session that re-renders
+even once. Ship inline immediately.
+
+Side note: this same pattern can occur for any other `listen(...)`
+call elsewhere in the app — would be worth grep-checking. Quick
+audit of the codebase suggests this is the only `listen` in
+`App.tsx`. Will verify before shipping.
+
+Awaiting user go-ahead.
 
 ---
