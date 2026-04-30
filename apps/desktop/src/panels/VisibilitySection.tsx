@@ -12,7 +12,7 @@
  *     layout sees LAs in the data; the toggle is a UX refinement that
  *     doesn't need monetization (see ADR-0005 §9 "Ungated features").
  */
-import { Chip, InspectorSection, Switch } from "@solarlayout/ui"
+import { Chip, InspectorSection, Switch } from "@solarlayout/ui-desktop"
 import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import { useHasFeature } from "../auth/FeatureGate"
 import { useLayerVisibilityStore } from "../state/layerVisibility"

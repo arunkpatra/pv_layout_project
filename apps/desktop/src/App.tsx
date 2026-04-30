@@ -35,7 +35,7 @@ import {
   ToolRail,
   TopBar,
   type ToolId,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import {
   clearLicenseKey,
   getLicenseKey,

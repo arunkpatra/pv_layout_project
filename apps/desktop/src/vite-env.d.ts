@@ -14,7 +14,7 @@ interface ImportMetaEnv {
    *
    * Local dev workflow:
    *   1. Run the backend in `renewable_energy/`:
-   *      `bunx turbo dev --filter=@renewable-energy/api` (port 3003).
+   *      `bunx turbo dev --filter=@solarlayout/api` (port 3003).
    *   2. Create `apps/desktop/.env.local` with:
    *      `VITE_SOLARLAYOUT_API_URL=http://localhost:3003`
    *   3. Launch the desktop in dev: `bun run tauri dev`.

@@ -20,7 +20,7 @@ import {
   DialogTitle,
   Input,
   Label,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 
 const MAX_NAME_LEN = 200
 

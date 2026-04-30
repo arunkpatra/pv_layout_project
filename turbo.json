@@ -1,24 +1,136 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**", ".next/**"]
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**",
+        "build/**",
+        "tsconfig.tsbuildinfo"
+      ],
+      "env": [
+        "MVP_DATABASE_URL",
+        "MVP_CORS_ORIGINS",
+        "MVP_S3_DOWNLOADS_BUCKET",
+        "NODE_ENV",
+        "PORT",
+        "NODEJS_HELPERS",
+        "NEXT_PUBLIC_MVP_API_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL",
+        "CLERK_SECRET_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
+      ]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^lint"]
+    },
+    "format": {
+      "dependsOn": ["^format"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^typecheck"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "outputs": ["coverage/**"]
     },
     "dev": {
-      "persistent": true,
-      "cache": false
+      "cache": false,
+      "persistent": true
     },
     "clean": {
+      "cache": false
+    },
+    "@solarlayout/mvp-db#typecheck": {
+      "dependsOn": ["mvp-db:generate"],
+      "outputs": []
+    },
+    "@solarlayout/mvp-db#build": {
+      "dependsOn": ["mvp-db:generate"],
+      "outputs": ["dist/**", "tsconfig.tsbuildinfo"],
+      "env": [
+        "MVP_DATABASE_URL",
+        "MVP_S3_DOWNLOADS_BUCKET",
+        "NODEJS_HELPERS",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION",
+        "MVP_CORS_ORIGINS",
+        "CLERK_SECRET_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
+      ]
+    },
+    "@solarlayout/mvp-api#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@solarlayout/mvp-api#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": [
+        "MVP_DATABASE_URL",
+        "MVP_CORS_ORIGINS",
+        "MVP_S3_DOWNLOADS_BUCKET",
+        "NODEJS_HELPERS",
+        "NODE_ENV",
+        "PORT",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION",
+        "CLERK_SECRET_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
+      ]
+    },
+    "@solarlayout/mvp-admin#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+        "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL",
+        "NEXT_PUBLIC_MVP_API_URL",
+        "CLERK_SECRET_KEY",
+        "NODE_ENV"
+      ]
+    },
+    "@solarlayout/mvp-admin#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "mvp-db:generate": {
+      "inputs": ["prisma/**/*.prisma", "prisma.config.ts"],
+      "outputs": ["node_modules/.prisma/**"],
+      "cache": false
+    },
+    "mvp-db:validate": {
+      "inputs": ["prisma/**/*.prisma", "prisma.config.ts"],
+      "outputs": []
+    },
+    "mvp-db:status": {
+      "dependsOn": ["mvp-db:generate"],
+      "cache": false
+    },
+    "mvp-db:migrate": {
+      "dependsOn": ["mvp-db:generate"],
+      "cache": false
+    },
+    "mvp-db:studio": {
+      "dependsOn": ["mvp-db:generate"],
+      "persistent": true,
       "cache": false
     }
   }

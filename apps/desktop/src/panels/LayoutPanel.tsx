@@ -36,7 +36,7 @@ import {
   Select,
   SelectItem,
   Switch,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import {
   DEFAULT_LAYOUT_PARAMETERS,
   type LayoutParameters,

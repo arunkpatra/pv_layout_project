@@ -1,7 +1,7 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { ThemeProvider, TooltipProvider } from "@solarlayout/ui"
+import { ThemeProvider, TooltipProvider } from "@solarlayout/ui-desktop"
 import { App } from "./App"
 import "./main.css"
 

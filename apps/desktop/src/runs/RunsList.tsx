@@ -32,7 +32,7 @@ import {
   FEATURE_KEYS,
   type FeatureKey,
 } from "@solarlayout/entitlements-client"
-import { Button, Segmented, SegmentedItem } from "@solarlayout/ui"
+import { Button, Segmented, SegmentedItem } from "@solarlayout/ui-desktop"
 import {
   useProjectStore,
   type Run,

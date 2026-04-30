@@ -1,0 +1,11 @@
+{
+  "extends": "@solarlayout/typescript-config/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "composite": true,
+    "incremental": true
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}

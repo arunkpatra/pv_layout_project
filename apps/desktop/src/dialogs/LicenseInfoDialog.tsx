@@ -13,7 +13,7 @@ import {
   DialogDescription,
   DialogTitle,
   Separator,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import type { Entitlements } from "@solarlayout/entitlements-client"
 
 export interface LicenseInfoDialogProps {

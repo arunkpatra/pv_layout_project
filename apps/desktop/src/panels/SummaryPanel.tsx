@@ -12,7 +12,7 @@ import {
   PropertyRow,
   StatGrid,
   SummaryStat,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import type { LayoutResult } from "@solarlayout/sidecar-client"
 import { useLayoutResultStore } from "../state/layoutResult"

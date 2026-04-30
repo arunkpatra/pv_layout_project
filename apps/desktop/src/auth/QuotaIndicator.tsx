@@ -22,7 +22,7 @@
  * back to `window.open` so the design preview stays clickable.
  */
 import { type JSX } from "react"
-import { Chip } from "@solarlayout/ui"
+import { Chip } from "@solarlayout/ui-desktop"
 import type { EntitlementSummaryV2 } from "@solarlayout/entitlements-client"
 import { open as openExternalUrl } from "@tauri-apps/plugin-shell"
 
