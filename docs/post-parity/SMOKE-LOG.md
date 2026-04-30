@@ -516,6 +516,7 @@ extra-attention items inside flows already on the route.
 | S1-07 | P3  | frontend | fe    | No loading feedback during run-switch                        | 1. Open project + generate ≥2 runs (or open a project with multiple existing runs). 2. Inspector → Runs tab. 3. Click a non-active run card. 4. ~1–2s elapses during B17 fetch + S3 GET; canvas shows old run; no visible "loading" indication. 5. Canvas eventually updates; click felt unacknowledged. | While B17 + S3 GET are in flight: clicked card shows a subtle spinner in the thumbnail slot + StatusBar `leftMeta` reads `Loading run [timestamp]…`. Both clear when the canvas hydrates. No toast — the canvas update IS the success signal.                                       | deferred | new-row | see S1-07 below           |
 | S1-08 | P1  | frontend | fe    | Layout state lost on tab-switch round-trip (S2 regression)   | 1. Open project A; Generate Layout (run_A produced + canvas shows panels/ICRs). 2. Open a second project B (with no runs). Tab opens; canvas shows just B's boundary. 3. Click back on tab A. 4. Canvas shows only A's boundary — no panels, no ICRs. The previously-generated run is gone visually but still exists in `runs[]` (visible in Inspector → Runs tab if you check). | Switching back to a tab whose project has runs auto-restores the most-recent run on canvas. The P7 selectedRunId-driven effect fires B17 + S3 GET + setLayoutResult during the B12-driven hydration. Mental model: opening a project shows the prior work, not blank boundary + manual click. | fixed  | S2, P2  | see S1-08 below           |
 | S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
+| S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1041,5 +1042,62 @@ during smoke; the regression shows up consistently and the fix
 covers a class of future bugs.
 
 Awaiting user go-ahead: ship option 2 / option 1 / defer.
+
+##### S1-10 thread
+
+[FE 2026-04-30 14:44] User flagged that with a project loaded, there
+is no in-chrome way to navigate to RecentsView and pick a different
+project. Current options for switching projects all fall short:
+
+- **Tabs `+` button** opens KMZ picker → creates a new project (and
+  burns a quota slot). Wrong: industry convention is `+` = "new,"
+  not "open existing."
+- **Cmd-K palette → "Open existing project…"** uses
+  `window.prompt("Project ID:")` from P3-era interim. Demands the
+  user know the opaque project ID. Unusable for the actual mental
+  model.
+- **Close the active tab** drops back to RecentsView via the
+  S2 closeTab "fall-back to null" path — but it's non-obvious
+  navigation (close-to-go-home is destructive-feeling), and
+  triggers the "Unsaved edits?" confirm if P4 auto-save is mid-
+  flight.
+- **Sign out + sign back in** would work but is absurd.
+
+Three viable design patterns considered:
+
+1. **Wordmark-click-to-home.** Click `SolarLayout` in the topbar
+   breadcrumb → switches to home (RecentsView). Tabs preserved (the
+   tab strip remains; `activeTabId = null`). Same pattern as
+   Figma's home button, Linear's logo click, every browser. RecentsView
+   already renders correctly when `!project`.
+2. **Cmd-K palette → "Recents" submenu.** `⌘K → "Open project →"`
+   shows the user's projects inline (same data feeding the
+   RecentsView grid). Quick-switch without leaving keyboard.
+   Replaces the interim `window.prompt`. Separate row from #1.
+3. **Persistent left rail of projects.** Linear / Slack pattern.
+   Powerful but adds chrome real estate — not recommended for v1
+   (the design bar wants the canvas as the protagonist).
+
+`+` button stays as "new from KMZ" — keeping `+` as create matches
+industry convention; conflating create and open here would muddy
+the affordance.
+
+**Recommendation:** ship #1 as a small inline fix this session
+(~5–10 min: `onClick` on the wordmark span in TopBar, plus a tabs
+slice action that sets `activeTabId = null` while preserving the
+tabs[] array). Defer #2 to a Phase 4 polish row that also tackles
+rename / delete via proper Dialog modals (the existing
+`window.prompt` / `window.confirm` interims from P3).
+
+New-row name suggestion (for #2 + dialog work): `NP1 — Cmd-K
+palette: Recents submenu + project rename / delete dialogs`.
+
+Severity: P2 — functional gap with non-obvious workaround.
+Strongly worth fixing before Session 1 closes since the gap blocks
+the basic "I have multiple projects, let me switch between them"
+flow.
+
+Awaiting user go-ahead on #1: ship inline / defer / drop. (#2 stays
+deferred regardless.)
 
 ---
