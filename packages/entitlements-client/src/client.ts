@@ -30,6 +30,7 @@ import {
 } from "./types"
 import {
   createProjectV2ResponseSchema,
+  createRunV2ResponseSchema,
   entitlementSummaryV2ResponseSchema,
   getProjectV2ResponseSchema,
   kmzUploadUrlResponseSchema,
@@ -37,6 +38,8 @@ import {
   usageReportV2ResponseSchema,
   v2ErrorResponseSchema,
   type CreateProjectV2Request,
+  type CreateRunV2Request,
+  type CreateRunV2Result,
   type EntitlementSummaryV2,
   type PresignedUploadUrlResult,
   type ProjectDetailV2Wire,
@@ -152,6 +155,31 @@ export interface EntitlementsClient {
    * useOpenProject hook maps this to a "project not found" surface.
    */
   getProjectV2(key: string, projectId: string): Promise<ProjectDetailV2Wire>
+  /**
+   * V2 — `POST /v2/projects/:id/runs` (B16). Atomically debits one calc
+   * for the supplied feature, creates a UsageRecord + Run row in a single
+   * transaction, and returns both the new Run + a presigned upload URL
+   * for the result blob (layout.json or energy.json depending on
+   * billedFeatureKey).
+   *
+   * Idempotency: if `(userId, idempotencyKey)` already maps to a Run, the
+   * same Run is returned with a FRESH uploadUrl — no new debit. The
+   * desktop should generate one UUID v4 per "Generate Layout" intent and
+   * reuse it across transient retries; on a successful debit, the next
+   * intent gets a new key.
+   *
+   * Errors:
+   *   400 VALIDATION_ERROR (bad body / unknown feature key)
+   *   402 PAYMENT_REQUIRED (no entitlement covers the feature)
+   *   404 NOT_FOUND (project doesn't exist or isn't yours)
+   *   409 CONFLICT (entitlement deactivated between selection and debit)
+   *   503 S3_NOT_CONFIGURED (bucket env unset on backend)
+   */
+  createRunV2(
+    key: string,
+    projectId: string,
+    body: CreateRunV2Request
+  ): Promise<CreateRunV2Result>
 }
 
 /**
@@ -386,6 +414,24 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `Get-project response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async createRunV2(key, projectId, body) {
+      const path = `/v2/projects/${encodeURIComponent(projectId)}/runs`
+      const raw = await request(
+        path,
+        { method: "POST", body: JSON.stringify(body) },
+        key
+      )
+      const parsed = createRunV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Create-run response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

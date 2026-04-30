@@ -391,3 +391,97 @@ export type ProjectDetailV2Wire = z.infer<typeof projectDetailV2WireSchema>
 export const getProjectV2ResponseSchema = v2SuccessResponseSchema(
   projectDetailV2WireSchema
 )
+
+// ---------------------------------------------------------------------------
+// /v2/projects/:id/runs — B16 (POST = atomic debit + Run create)
+// ---------------------------------------------------------------------------
+
+/**
+ * B16 RunWire — full Run row shape returned by the create-run mutation.
+ * Strict superset of the B12 list-row `RunSummary` (adds `projectId`,
+ * `inputsSnapshot`, `usageRecordId`, `deletedAt`).
+ *
+ * Mirrors `RunWire` in
+ * `renewable_energy/apps/mvp_api/src/modules/runs/runs.service.ts`. Backend
+ * has offered to move this to `packages/shared/src/types/project-v2.ts` —
+ * still service-local at 66c510a; the desktop tracks the service-local
+ * definition until it moves.
+ *
+ *   - `usageRecordId` links the Run to the UsageRecord that paid for it
+ *     (ref-integrity for refund / audit flows; the desktop holds it for
+ *     symmetry with the wire but doesn't branch on it yet).
+ *   - `inputsSnapshot` is the immutable copy of the request inputs at
+ *     the moment of debit — distinct from `params` so future replays
+ *     can diff what the user submitted vs what was billed.
+ */
+export const runWireV2Schema = z.object({
+  id: z.string().min(1),
+  projectId: z.string().min(1),
+  name: z.string(),
+  params: z.unknown(),
+  inputsSnapshot: z.unknown(),
+  billedFeatureKey: z.string().min(1),
+  usageRecordId: z.string().min(1),
+  createdAt: z.string(),
+  deletedAt: z.string().nullable(),
+})
+
+export type RunWireV2 = z.infer<typeof runWireV2Schema>
+
+/**
+ * Upload descriptor returned alongside a freshly-created Run. Distinct
+ * from the B7 `presignedUploadUrlResultSchema`: B16 also carries a
+ * `type` discriminator (layout|energy) derived from `billedFeatureKey`,
+ * so the desktop knows which Content-Type to send on the PUT without
+ * guessing.
+ *
+ * Backend's intentional contract: an idempotent replay (same idempotency
+ * key) returns the same Run with a FRESH `uploadUrl` (the previous one
+ * may have aged past TTL). Desktop side: don't cache the URL beyond the
+ * single mutation invocation.
+ */
+export const runUploadDescriptorSchema = z.object({
+  uploadUrl: z.string().url(),
+  blobUrl: z.string().min(1),
+  expiresAt: z.string().datetime(),
+  type: z.enum(["layout", "energy"]),
+})
+
+export type RunUploadDescriptor = z.infer<typeof runUploadDescriptorSchema>
+
+/**
+ * B16 request body. Mirrors `CreateRunSchema` in
+ * `renewable_energy/apps/mvp_api/src/modules/runs/runs.routes.ts`:
+ *   - `name` 1..200 chars
+ *   - `params` opaque JSON (engine-specific knobs)
+ *   - `inputsSnapshot` opaque JSON (immutable record of what was billed)
+ *   - `billedFeatureKey` non-empty
+ *   - `idempotencyKey` non-empty (UUID v4 by desktop convention; backend
+ *     enforces uniqueness via `@@unique([userId, idempotencyKey])`)
+ */
+export const createRunV2RequestSchema = z.object({
+  name: z.string().min(1).max(200),
+  params: z.unknown(),
+  inputsSnapshot: z.unknown(),
+  billedFeatureKey: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+})
+
+export type CreateRunV2Request = z.infer<typeof createRunV2RequestSchema>
+
+/**
+ * B16 result body — `{ run, upload }`. The desktop's
+ * `useGenerateLayoutMutation` chains: `B16 → sidecar /layout → PUT
+ * upload.uploadUrl`, then surfaces the `run` to the project's runs[]
+ * slice + the layout result to `useLayoutResultStore`.
+ */
+export const createRunV2ResultSchema = z.object({
+  run: runWireV2Schema,
+  upload: runUploadDescriptorSchema,
+})
+
+export type CreateRunV2Result = z.infer<typeof createRunV2ResultSchema>
+
+export const createRunV2ResponseSchema = v2SuccessResponseSchema(
+  createRunV2ResultSchema
+)

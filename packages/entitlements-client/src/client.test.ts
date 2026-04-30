@@ -1235,3 +1235,269 @@ describe("getProjectV2", () => {
     expect(seenUrl).toContain("prj_with%20spaces%2Fodd")
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — createRunV2 (B16)
+// ---------------------------------------------------------------------------
+
+const successCreateRun = {
+  success: true,
+  data: {
+    run: {
+      id: "run_abc123",
+      projectId: "prj_xyz",
+      name: "Run 1",
+      params: { rows: 8 },
+      inputsSnapshot: { module_length: 2 },
+      billedFeatureKey: "plant_layout",
+      usageRecordId: "ur_qrs",
+      createdAt: "2026-04-30T12:05:00.000Z",
+      deletedAt: null,
+    },
+    upload: {
+      uploadUrl:
+        "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/u/p/runs/run_abc123/layout.json?X-Amz-Signature=...",
+      blobUrl:
+        "s3://solarlayout-local-projects/projects/u/p/runs/run_abc123/layout.json",
+      expiresAt: "2026-04-30T13:00:00.000Z",
+      type: "layout",
+    },
+  },
+}
+
+const VALID_IDEMP = "9c4f3e8a-5d6b-4f7c-9e2d-1a8b3c4d5e6f"
+
+describe("createRunV2", () => {
+  test("POSTs to /v2/projects/:id/runs and returns { run, upload }", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successCreateRun, 201)
+      },
+    })
+    const result = await client.createRunV2(KEY, "prj_xyz", {
+      name: "Run 1",
+      params: { rows: 8 },
+      inputsSnapshot: { module_length: 2 },
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: VALID_IDEMP,
+    })
+    expect(seenUrl).toBe("https://api.solarlayout.in/v2/projects/prj_xyz/runs")
+    expect(seenMethod).toBe("POST")
+    expect(JSON.parse(seenBody)).toEqual({
+      name: "Run 1",
+      params: { rows: 8 },
+      inputsSnapshot: { module_length: 2 },
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: VALID_IDEMP,
+    })
+    expect(result.run.id).toBe("run_abc123")
+    expect(result.upload.type).toBe("layout")
+    expect(result.upload.uploadUrl).toContain("X-Amz-Signature")
+  })
+
+  test("URL-encodes the projectId path segment", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return jsonResponse(successCreateRun, 201)
+      },
+    })
+    await client.createRunV2(KEY, "prj_with spaces", {
+      name: "x",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: VALID_IDEMP,
+    })
+    expect(seenUrl).toContain("/v2/projects/prj_with%20spaces/runs")
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successCreateRun, 201)
+      },
+    })
+    await client.createRunV2(KEY, "prj_x", {
+      name: "x",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: VALID_IDEMP,
+    })
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 402 PAYMENT_REQUIRED (no entitlement covers feature)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "PAYMENT_REQUIRED",
+              message:
+                "No remaining calculations — purchase more at solarlayout.in",
+            },
+          },
+          402
+        ),
+    })
+    try {
+      await client.createRunV2(KEY, "prj_x", {
+        name: "x",
+        params: {},
+        inputsSnapshot: {},
+        billedFeatureKey: "plant_layout",
+        idempotencyKey: VALID_IDEMP,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(402)
+      expect(e.code).toBe("PAYMENT_REQUIRED")
+    }
+  })
+
+  test("maps 404 NOT_FOUND (project doesn't exist or isn't yours)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: 'Project "prj_missing" not found',
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.createRunV2(KEY, "prj_missing", {
+        name: "x",
+        params: {},
+        inputsSnapshot: {},
+        billedFeatureKey: "plant_layout",
+        idempotencyKey: VALID_IDEMP,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("maps 409 CONFLICT (entitlement deactivated mid-flight)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "CONFLICT",
+              message: "Entitlement was deactivated — refresh and try again",
+            },
+          },
+          409
+        ),
+    })
+    try {
+      await client.createRunV2(KEY, "prj_x", {
+        name: "x",
+        params: {},
+        inputsSnapshot: {},
+        billedFeatureKey: "plant_layout",
+        idempotencyKey: VALID_IDEMP,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.code).toBe("CONFLICT")
+      expect(e.status).toBe(409)
+    }
+  })
+
+  test("idempotency contract — same key returns same run with FRESH uploadUrl", async () => {
+    // Backend's intentional design: a replay with the same idempotencyKey
+    // returns the same Run row (no double-debit) but mints a new
+    // uploadUrl (the previous one may have expired). The desktop's hook
+    // should NOT cache the URL beyond the single mutation invocation.
+    const stableRunId = "run_idempotent"
+    let mintedUrlCount = 0
+    const client = createEntitlementsClient({
+      fetchImpl: async () => {
+        mintedUrlCount += 1
+        return jsonResponse(
+          {
+            success: true,
+            data: {
+              run: {
+                ...successCreateRun.data.run,
+                id: stableRunId,
+              },
+              upload: {
+                ...successCreateRun.data.upload,
+                uploadUrl: `https://s3.example/presigned-${mintedUrlCount}`,
+              },
+            },
+          },
+          201
+        )
+      },
+    })
+    const a = await client.createRunV2(KEY, "prj_x", {
+      name: "x",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: VALID_IDEMP,
+    })
+    const b = await client.createRunV2(KEY, "prj_x", {
+      name: "x",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: VALID_IDEMP,
+    })
+    expect(a.run.id).toBe(b.run.id) // same Run
+    expect(a.upload.uploadUrl).not.toBe(b.upload.uploadUrl) // fresh URL
+  })
+
+  test("rejects malformed success body (schema guard — missing upload)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: true,
+            data: { run: successCreateRun.data.run },
+          },
+          201
+        ),
+    })
+    try {
+      await client.createRunV2(KEY, "prj_x", {
+        name: "x",
+        params: {},
+        inputsSnapshot: {},
+        billedFeatureKey: "plant_layout",
+        idempotencyKey: VALID_IDEMP,
+      })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+})

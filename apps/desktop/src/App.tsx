@@ -50,6 +50,7 @@ import {
 } from "./auth/useEntitlements"
 import { useCreateProjectMutation } from "./auth/useCreateProject"
 import { useOpenProjectMutation } from "./auth/useOpenProject"
+import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
@@ -61,7 +62,6 @@ import { useProjectStore } from "./state/project"
 import { useLayoutParamsStore } from "./state/layoutParams"
 import { useLayoutResultStore } from "./state/layoutResult"
 import { useLayerVisibilityStore } from "./state/layerVisibility"
-import { useLayoutMutation } from "./state/useLayoutMutation"
 import { useEditingStateStore } from "./state/editingState"
 import { useRefreshInvertersMutation } from "./state/useRefreshInvertersMutation"
 import { useAddRoadMutation } from "./state/useAddRoadMutation"
@@ -294,8 +294,24 @@ export function App(): JSX.Element {
     [layoutResult]
   )
 
-  // ── Layout mutation (S9). Hydrates useLayoutResultStore on success. ──────
-  const layoutMutation = useLayoutMutation(sidecarClient)
+  // ── Generate Layout mutation (P6). Replaces the parity-era
+  //    sidecar-only mutation that was here through S9–S11. Now goes
+  //    through B16 (atomic debit + Run row + presigned uploadUrl) →
+  //    sidecar /layout → S3 PUT result JSON → setLayoutResultStore +
+  //    addRun + invalidate entitlements. Single user click = 1 calc
+  //    debit + 1 persisted Run.
+  const generateLayoutMutation = useGenerateLayoutMutation(
+    activeKey,
+    entitlementsClient,
+    sidecarClient,
+    {
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    }
+  )
+  // Alias so existing canvas error-overlay branch keeps reading
+  // `.isError`/`.error`/`.reset` against the new hook without any other
+  // textual change in the JSX below.
+  const layoutMutation = generateLayoutMutation
   const clearLayoutResult = useLayoutResultStore((s) => s.clearResult)
   const resetLayoutParams = useLayoutParamsStore((s) => s.resetToDefaults)
   const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
@@ -316,13 +332,32 @@ export function App(): JSX.Element {
   // getState() reads the store synchronously, so we see the values setAll
   // just wrote. Also covers the retry path (no values in flight → last
   // submitted values are still the right ones).
+  // Pull currentProject (the backend-persisted project) for the projectId.
+  // Generate Layout requires it — without a backend project, B16 has nothing
+  // to attach the Run to. P1/P2 always set this on a successful open/create,
+  // so in normal use the gate just protects against a not-yet-loaded state.
+  const currentProject = useProjectStore((s) => s.currentProject)
   const handleGenerate = useCallback(() => {
-    if (!project) return
-    layoutMutation.mutate({
+    if (!project || !currentProject) return
+    generateLayoutMutation.mutate({
+      projectId: currentProject.id,
       parsedKmz: project.kmz,
       params: useLayoutParamsStore.getState().params,
     })
-  }, [project, layoutMutation])
+  }, [project, currentProject, generateLayoutMutation])
+
+  // Surface the upsell modal on Generate-Layout 402, mirroring the P1
+  // upload path. The B16 message contains the human-readable detail
+  // (e.g. "No remaining calculations — purchase more at solarlayout.in").
+  useEffect(() => {
+    const err = generateLayoutMutation.error
+    if (
+      err instanceof EntitlementsError &&
+      err.code === "PAYMENT_REQUIRED"
+    ) {
+      setUpsellDetail(err.message)
+    }
+  }, [generateLayoutMutation.error])
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const handleSubmitKey = useCallback((key: string) => {

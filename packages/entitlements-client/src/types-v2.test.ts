@@ -25,6 +25,11 @@ import {
   runSummaryV2WireSchema,
   projectDetailV2WireSchema,
   getProjectV2ResponseSchema,
+  runWireV2Schema,
+  runUploadDescriptorSchema,
+  createRunV2RequestSchema,
+  createRunV2ResultSchema,
+  createRunV2ResponseSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
 } from "./types-v2"
@@ -576,6 +581,204 @@ describe("getProjectV2ResponseSchema", () => {
       },
     })
     expect(r.success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B16 — POST /v2/projects/:id/runs (atomic debit + Run create)
+// ---------------------------------------------------------------------------
+
+describe("createRunV2RequestSchema", () => {
+  const validBody = {
+    name: "Run 1",
+    params: { rows: 8, cols: 12 },
+    inputsSnapshot: { module_length: 2, module_width: 1 },
+    billedFeatureKey: "plant_layout",
+    idempotencyKey: "9c4f3e8a-5d6b-4f7c-9e2d-1a8b3c4d5e6f",
+  }
+
+  test("parses a typical create-run body", () => {
+    expect(createRunV2RequestSchema.safeParse(validBody).success).toBe(true)
+  })
+
+  test("rejects empty name", () => {
+    expect(
+      createRunV2RequestSchema.safeParse({ ...validBody, name: "" }).success
+    ).toBe(false)
+  })
+
+  test("rejects name longer than 200 chars", () => {
+    expect(
+      createRunV2RequestSchema.safeParse({
+        ...validBody,
+        name: "x".repeat(201),
+      }).success
+    ).toBe(false)
+  })
+
+  test("rejects empty billedFeatureKey", () => {
+    expect(
+      createRunV2RequestSchema.safeParse({
+        ...validBody,
+        billedFeatureKey: "",
+      }).success
+    ).toBe(false)
+  })
+
+  test("rejects empty idempotencyKey (backend's @@unique guard would race-fail anyway)", () => {
+    expect(
+      createRunV2RequestSchema.safeParse({
+        ...validBody,
+        idempotencyKey: "",
+      }).success
+    ).toBe(false)
+  })
+})
+
+describe("runWireV2Schema", () => {
+  const sample = {
+    id: "run_abc",
+    projectId: "prj_xyz",
+    name: "Run 1",
+    params: { rows: 8 },
+    inputsSnapshot: { module_length: 2 },
+    billedFeatureKey: "plant_layout",
+    usageRecordId: "ur_qrs",
+    createdAt: "2026-04-30T12:05:00.000Z",
+    deletedAt: null,
+  }
+
+  test("parses the full RunWire shape", () => {
+    expect(runWireV2Schema.safeParse(sample).success).toBe(true)
+  })
+
+  test("accepts deletedAt as a soft-delete timestamp", () => {
+    expect(
+      runWireV2Schema.safeParse({
+        ...sample,
+        deletedAt: "2026-04-30T13:00:00.000Z",
+      }).success
+    ).toBe(true)
+  })
+
+  test("rejects when usageRecordId is missing (links Run to UsageRecord)", () => {
+    const v: Record<string, unknown> = { ...sample }
+    delete v.usageRecordId
+    expect(runWireV2Schema.safeParse(v).success).toBe(false)
+  })
+
+  // Note: `inputsSnapshot` and `params` use z.unknown(), which Zod treats
+  // as optional in the inferred type — schema-level "rejects missing" isn't
+  // expressible. Backend enforces presence at the route layer via explicit
+  // `if (parsed.data.inputsSnapshot === undefined)` guards, so the wire is
+  // safe; the desktop's mirror tracks what Zod can express.
+})
+
+describe("runUploadDescriptorSchema", () => {
+  test("parses a layout-class descriptor", () => {
+    const r = runUploadDescriptorSchema.safeParse({
+      uploadUrl: "https://s3.example/presigned?X-Amz-Sig=...",
+      blobUrl:
+        "s3://solarlayout-local-projects/projects/u/p/runs/r/layout.json",
+      expiresAt: "2026-04-30T13:00:00.000Z",
+      type: "layout",
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("parses an energy-class descriptor", () => {
+    const r = runUploadDescriptorSchema.safeParse({
+      uploadUrl: "https://s3.example/presigned",
+      blobUrl: "s3://b/r/energy.json",
+      expiresAt: "2026-04-30T13:00:00.000Z",
+      type: "energy",
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects unknown type discriminator (DXF/PDF/KMZ go through B7)", () => {
+    const r = runUploadDescriptorSchema.safeParse({
+      uploadUrl: "https://s3.example/presigned",
+      blobUrl: "s3://b/r/x.dxf",
+      expiresAt: "2026-04-30T13:00:00.000Z",
+      type: "dxf",
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("createRunV2ResponseSchema", () => {
+  test("parses the V2 success envelope around { run, upload }", () => {
+    const r = createRunV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        run: {
+          id: "run_abc",
+          projectId: "prj_xyz",
+          name: "Run 1",
+          params: {},
+          inputsSnapshot: {},
+          billedFeatureKey: "plant_layout",
+          usageRecordId: "ur_q",
+          createdAt: "2026-04-30T12:05:00.000Z",
+          deletedAt: null,
+        },
+        upload: {
+          uploadUrl: "https://s3.example/presigned",
+          blobUrl: "s3://b/p/r/layout.json",
+          expiresAt: "2026-04-30T13:00:00.000Z",
+          type: "layout",
+        },
+      },
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when upload field is missing", () => {
+    const r = createRunV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        run: {
+          id: "run_a",
+          projectId: "prj_x",
+          name: "x",
+          params: {},
+          inputsSnapshot: {},
+          billedFeatureKey: "plant_layout",
+          usageRecordId: "ur_q",
+          createdAt: "2026-04-30T12:00:00.000Z",
+          deletedAt: null,
+        },
+        // missing upload
+      },
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("createRunV2ResultSchema (inner data)", () => {
+  test("rejects when run.id is empty (semantic-id contract)", () => {
+    expect(
+      createRunV2ResultSchema.safeParse({
+        run: {
+          id: "",
+          projectId: "prj_x",
+          name: "x",
+          params: {},
+          inputsSnapshot: {},
+          billedFeatureKey: "plant_layout",
+          usageRecordId: "ur_q",
+          createdAt: "2026-04-30T12:00:00.000Z",
+          deletedAt: null,
+        },
+        upload: {
+          uploadUrl: "https://s3.example/presigned",
+          blobUrl: "s3://b/r/x.json",
+          expiresAt: "2026-04-30T13:00:00.000Z",
+          type: "layout",
+        },
+      }).success
+    ).toBe(false)
   })
 })
 

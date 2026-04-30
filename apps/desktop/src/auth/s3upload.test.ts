@@ -41,6 +41,7 @@ function makeClient(
     getRunResultUploadUrl: vi.fn(),
     createProjectV2: vi.fn(),
     getProjectV2: vi.fn(),
+    createRunV2: vi.fn(),
     ...overrides,
   }
 }

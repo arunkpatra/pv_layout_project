@@ -447,6 +447,168 @@ async function checkP2EndToEnd(
   }
 }
 
+async function checkB16HappyFree(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // B16 atomic: debit + UsageRecord + Run + presigned uploadUrl. We don't
+  // run the actual sidecar /layout here (that needs the pvlayout_engine
+  // process) — the contract under test is the *API* surface: response
+  // shape + atomic debit semantics.
+  try {
+    const idem = crypto.randomUUID()
+    const result = await client.createRunV2(FIXTURE_KEYS.FREE, projectId, {
+      name: "fixture-session run",
+      params: { rows: 8 },
+      inputsSnapshot: { rows: 8 },
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: idem,
+    })
+    if (!result.run.id.startsWith("run_")) {
+      record(
+        "B16 FREE happy",
+        "warn",
+        `run id without run_ prefix: ${result.run.id}`
+      )
+      return
+    }
+    if (result.upload.type !== "layout") {
+      record(
+        "B16 FREE happy",
+        "warn",
+        `upload.type=${result.upload.type} expected layout`
+      )
+      return
+    }
+    if (!result.upload.uploadUrl.startsWith("https://")) {
+      record(
+        "B16 FREE happy",
+        "warn",
+        `upload.uploadUrl not https: ${result.upload.uploadUrl}`
+      )
+      return
+    }
+    record(
+      "B16 FREE happy",
+      "pass",
+      `run=${result.run.id} type=${result.upload.type} usageRecordId=${result.run.usageRecordId}`
+    )
+  } catch (err) {
+    record("B16 FREE happy", "fail", fmtErr(err))
+  }
+}
+
+async function checkB16Idempotency(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // Same idempotency key → same Run, fresh upload URL. Backend's locked
+  // contract; the desktop relies on this for retry safety.
+  try {
+    const idem = crypto.randomUUID()
+    const a = await client.createRunV2(FIXTURE_KEYS.FREE, projectId, {
+      name: "idempotency-test",
+      params: { x: 1 },
+      inputsSnapshot: { x: 1 },
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: idem,
+    })
+    const b = await client.createRunV2(FIXTURE_KEYS.FREE, projectId, {
+      name: "idempotency-test",
+      params: { x: 1 },
+      inputsSnapshot: { x: 1 },
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: idem,
+    })
+    if (a.run.id !== b.run.id) {
+      record(
+        "B16 idempotency replay",
+        "fail",
+        `same key returned different runs: ${a.run.id} vs ${b.run.id}`
+      )
+      return
+    }
+    if (a.upload.uploadUrl === b.upload.uploadUrl) {
+      record(
+        "B16 idempotency replay",
+        "warn",
+        `replay returned the same uploadUrl (expected fresh URL each call)`
+      )
+      return
+    }
+    record(
+      "B16 idempotency replay",
+      "pass",
+      `same run=${a.run.id}; fresh uploadUrl on replay`
+    )
+  } catch (err) {
+    record("B16 idempotency replay", "fail", fmtErr(err))
+  }
+}
+
+async function checkB16Exhausted(
+  client: EntitlementsClient,
+  exhaustedProjectId: string
+): Promise<void> {
+  // EXHAUSTED has 0 calcs remaining. B16 must refuse with 402.
+  try {
+    const idem = crypto.randomUUID()
+    await client.createRunV2(FIXTURE_KEYS.EXHAUSTED, exhaustedProjectId, {
+      name: "should-not-create",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      idempotencyKey: idem,
+    })
+    record(
+      "B16 EXHAUSTED → 402",
+      "fail",
+      "expected 402 PAYMENT_REQUIRED, got success"
+    )
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 402 &&
+      err.code === "PAYMENT_REQUIRED"
+    ) {
+      record(
+        "B16 EXHAUSTED → 402",
+        "pass",
+        `status=402 code=PAYMENT_REQUIRED`
+      )
+    } else {
+      record("B16 EXHAUSTED → 402", "fail", fmtErr(err))
+    }
+  }
+}
+
+async function createProjectForKey(
+  client: EntitlementsClient,
+  key: string,
+  bytes: Uint8Array
+): Promise<string | null> {
+  // Helper for non-FREE keys (e.g. EXHAUSTED) — creates a project under
+  // their account so we can drive B16 against a project they own.
+  // Quota-edge keys may legitimately fail here; 402 → null + record warn.
+  try {
+    const upload = await uploadKmzToS3({
+      client,
+      licenseKey: key,
+      bytes,
+      fetchImpl: globalThis.fetch as never,
+    })
+    const project = await client.createProjectV2(key, {
+      name: `fixture-session-${Date.now()}`,
+      kmzBlobUrl: upload.blobUrl,
+      kmzSha256: upload.kmzSha256,
+    })
+    return project.id
+  } catch {
+    // Caller will record the failure if it cares.
+    return null
+  }
+}
+
 async function checkB9HappyFree(client: EntitlementsClient): Promise<void> {
   // FREE starts with 5/5 calcs. One usage/report should succeed; running it
   // again with the SAME idempotency key should NOT double-debit. We
@@ -586,7 +748,53 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 8. B9 idempotency ───────────────────────────────────────────────────
+  // ── 8. B16 atomic-debit + Run + uploadUrl (P6 backbone) ─────────────────
+  // Driven against the just-created FREE project from step 5. Each B16
+  // call debits one calc; FREE starts with 5 and we'll consume some
+  // through the idempotency replay (1) + the happy-path test (1) + step
+  // 9's B9 idempotency (1). Plenty of headroom.
+  console.log("\n--- B16 atomic Run create ---")
+  if (createdProjectId !== null) {
+    await checkB16HappyFree(client, createdProjectId)
+    await checkB16Idempotency(client, createdProjectId)
+  } else {
+    record(
+      "B16 FREE happy",
+      "warn",
+      "skipped — P1 didn't return a projectId"
+    )
+    record(
+      "B16 idempotency replay",
+      "warn",
+      "skipped — P1 didn't return a projectId"
+    )
+  }
+
+  // EXHAUSTED → 402: needs a project under the EXHAUSTED user. Spin one
+  // up via P1-equivalent flow (uploadKmzToS3 + createProjectV2). Skip if
+  // the EXHAUSTED account itself can't even create a project (depends
+  // on backend's EXHAUSTED fixture state).
+  const kmzBytes = new Uint8Array(await readFile(KMZ_PATH))
+  const exhaustedProjectId = await createProjectForKey(
+    client,
+    FIXTURE_KEYS.EXHAUSTED,
+    kmzBytes
+  )
+  if (exhaustedProjectId !== null) {
+    await checkB16Exhausted(client, exhaustedProjectId)
+  } else {
+    // Possible if EXHAUSTED can't create a project either (backend may
+    // refuse via 402 even on B11 if quota=0). Either way, the contract
+    // we want to verify is "B16 refuses on no calcs" — note as a warn
+    // and move on.
+    record(
+      "B16 EXHAUSTED → 402",
+      "warn",
+      "skipped — couldn't pre-create a project under EXHAUSTED user"
+    )
+  }
+
+  // ── 9. B9 idempotency ───────────────────────────────────────────────────
   console.log("\n--- B9 idempotency ---")
   await checkB9HappyFree(client)
 
