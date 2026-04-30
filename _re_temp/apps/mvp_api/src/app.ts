@@ -1,0 +1,112 @@
+import { Hono } from "hono"
+import { cors } from "hono/cors"
+import { env } from "./env.js"
+import { db } from "./lib/db.js"
+import { requestLogger } from "./middleware/logger.js"
+import { errorHandler } from "./middleware/error-handler.js"
+import type { MvpHonoEnv } from "./middleware/error-handler.js"
+import { renderRoot } from "./views/root.html.js"
+import { downloadsRoutes } from "./modules/downloads/downloads.routes.js"
+import { contactRoutes } from "./modules/contact/contact.routes.js"
+import { dashboardRoutes } from "./modules/dashboard/dashboard.routes.js"
+import { productsRoutes } from "./modules/products/products.routes.js"
+import { billingRoutes } from "./modules/billing/billing.routes.js"
+import { stripeWebhookRoutes } from "./modules/webhooks/stripe.webhook.routes.js"
+import { entitlementsRoutes } from "./modules/entitlements/entitlements.routes.js"
+import { usageRoutes } from "./modules/usage/usage.routes.js"
+import { adminRoutes } from "./modules/admin/admin.routes.js"
+import { customerRoutes } from "./modules/admin/customer.routes.js"
+import { productRoutes } from "./modules/admin/product.routes.js"
+import { dashboardAdminRoutes } from "./modules/admin/dashboard.routes.js"
+import { transactionsRoutes } from "./modules/transactions/transactions.routes.js"
+import { blobsRoutes } from "./modules/blobs/blobs.routes.js"
+import { projectsRoutes } from "./modules/projects/projects.routes.js"
+import { runsRoutes } from "./modules/runs/runs.routes.js"
+
+export const app = new Hono<MvpHonoEnv>()
+
+// ─── Middleware ────────────────────────────────────────────────────────────────
+
+// CORS — must be first so OPTIONS preflight requests are handled before logging
+const corsOrigins = env.MVP_CORS_ORIGINS
+  ? env.MVP_CORS_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:3002", "http://localhost:3004"] // mvp_web dev defaults
+
+app.use(
+  "*",
+  cors({
+    origin: corsOrigins,
+    allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  }),
+)
+app.use("*", requestLogger)
+app.onError(errorHandler)
+
+// ─── Routes ────────────────────────────────────────────────────────────────────
+
+app.route("/", downloadsRoutes)
+app.route("/", contactRoutes)
+app.route("/", dashboardRoutes)
+app.route("/", productsRoutes)
+app.route("/", billingRoutes)
+app.route("/", stripeWebhookRoutes)
+app.route("/", entitlementsRoutes)
+app.route("/", usageRoutes)
+app.route("/", adminRoutes)
+app.route("/", customerRoutes)
+app.route("/", productRoutes)
+app.route("/", dashboardAdminRoutes)
+app.route("/", transactionsRoutes)
+app.route("/", blobsRoutes)
+app.route("/", projectsRoutes)
+app.route("/", runsRoutes)
+
+app.get("/", async (c) => {
+  const status = {
+    database: "ok" as "ok" | "error",
+    timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV,
+  }
+
+  try {
+    await db.$queryRaw`SELECT 1`
+  } catch {
+    status.database = "error"
+  }
+
+  return c.html(renderRoot(status))
+})
+
+// ─── Health Checks ─────────────────────────────────────────────────────────────
+
+app.get("/health/live", (c) =>
+  c.json({
+    success: true,
+    data: {
+      status: "live",
+      service: "mvp-api",
+      timestamp: new Date().toISOString(),
+    },
+  }),
+)
+
+app.get("/health/ready", async (c) => {
+  const checks: Record<string, "ok" | "error"> = {}
+
+  try {
+    await db.$queryRaw`SELECT 1`
+    checks.database = "ok"
+  } catch {
+    checks.database = "error"
+  }
+
+  const allOk = Object.values(checks).every((v) => v === "ok")
+  return c.json(
+    {
+      success: allOk,
+      data: { status: allOk ? "ready" : "degraded", checks },
+    },
+    allOk ? 200 : 503,
+  )
+})

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "radix-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@renewable-energy/ui/components",
+    "utils": "@renewable-energy/ui/lib/utils",
+    "hooks": "@renewable-energy/ui/hooks",
+    "lib": "@renewable-energy/ui/lib",
+    "ui": "@renewable-energy/ui/components"
+  },
+  "rtl": false,
+  "menuColor": "default",
+  "menuAccent": "subtle"
+}
