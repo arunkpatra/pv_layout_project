@@ -47,6 +47,7 @@ const mockProductFindFirst = mock(async () => ({
   slug: "pv-layout-free",
   name: "Free",
   calculations: 5,
+  projectQuota: 3,
   isFree: true,
   active: true,
 }))
@@ -121,6 +122,7 @@ describe("clerkAuth middleware", () => {
       slug: "pv-layout-free",
       name: "Free",
       calculations: 5,
+      projectQuota: 3,
       isFree: true,
       active: true,
     }))
@@ -216,6 +218,7 @@ describe("clerkAuth middleware", () => {
           productId: "prod_free",
           transactionId: "txn_free_auto",
           totalCalculations: 5,
+          projectQuota: 3,
         }),
       }),
     )
@@ -275,6 +278,7 @@ describe("clerkAuth middleware", () => {
           productId: "prod_free",
           transactionId: "txn_free_auto",
           totalCalculations: 5,
+          projectQuota: 3,
         }),
       }),
     )

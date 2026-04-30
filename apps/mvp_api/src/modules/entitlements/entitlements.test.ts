@@ -28,6 +28,7 @@ const mockEntitlementFindMany = mock(async () => [
     productId: "prod_pro",
     totalCalculations: 10,
     usedCalculations: 3,
+    projectQuota: 10,
     purchasedAt: new Date(),
     product: {
       name: "Pro",
@@ -83,6 +84,7 @@ describe("GET /entitlements", () => {
         productId: "prod_pro",
         totalCalculations: 10,
         usedCalculations: 3,
+        projectQuota: 10,
         purchasedAt: new Date(),
         product: {
           name: "Pro",
@@ -149,6 +151,7 @@ describe("GET /entitlements", () => {
         productId: "prod_basic",
         totalCalculations: 5,
         usedCalculations: 5,
+        projectQuota: 5,
         purchasedAt: new Date(),
         product: {
           name: "Basic",
@@ -197,6 +200,7 @@ describe("GET /entitlements", () => {
         productId: "prod_basic",
         totalCalculations: 5,
         usedCalculations: 2,
+        projectQuota: 5,
         purchasedAt: new Date(),
         product: {
           name: "Basic",
@@ -229,6 +233,7 @@ describe("GET /entitlements", () => {
         productId: "prod_basic",
         totalCalculations: 3,
         usedCalculations: 1,
+        projectQuota: 5,
         purchasedAt: new Date(),
         product: {
           name: "Basic",
@@ -243,6 +248,7 @@ describe("GET /entitlements", () => {
         productId: "prod_pro",
         totalCalculations: 10,
         usedCalculations: 2,
+        projectQuota: 10,
         purchasedAt: new Date(),
         product: {
           name: "Pro",
@@ -357,6 +363,7 @@ const FREE_ENT = {
   productId: "prod_free",
   totalCalculations: 5,
   usedCalculations: 0,
+  projectQuota: 3,
   purchasedAt: new Date(),
   product: {
     name: "Free",
@@ -372,6 +379,7 @@ const BASIC_ENT = {
   productId: "prod_basic",
   totalCalculations: 5,
   usedCalculations: 1,
+  projectQuota: 5,
   purchasedAt: new Date(),
   product: {
     name: "Basic",
@@ -387,6 +395,7 @@ const PRO_ENT = {
   productId: "prod_pro",
   totalCalculations: 10,
   usedCalculations: 2,
+  projectQuota: 10,
   purchasedAt: new Date(),
   product: {
     name: "Pro",

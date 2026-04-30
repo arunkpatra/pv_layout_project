@@ -64,6 +64,7 @@ export async function createManualTransaction(
       checkoutSessionId: null,
       purchasedAt: params.purchasedAt,
       totalCalculations: product.calculations,
+      projectQuota: product.projectQuota,
     })
   })
 }

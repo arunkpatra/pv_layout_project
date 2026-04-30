@@ -45,6 +45,7 @@ export async function provisionEntitlement(
       source: "STRIPE",
       checkoutSessionId: session.id,
       totalCalculations: product.calculations,
+      projectQuota: product.projectQuota,
     })
 
     await tx.checkoutSession.update({

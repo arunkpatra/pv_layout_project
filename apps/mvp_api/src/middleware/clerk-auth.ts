@@ -117,6 +117,7 @@ export const clerkAuth: MiddlewareHandler = async (c, next) => {
                 productId: freeProduct.id,
                 transactionId: transaction.id,
                 totalCalculations: freeProduct.calculations,
+                projectQuota: freeProduct.projectQuota,
               },
             })
             await tx.licenseKey.create({

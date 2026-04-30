@@ -13,6 +13,7 @@ const mockProductFindUnique = mock(async () => ({
   slug: "pv-layout-pro",
   calculations: 100,
   priceAmount: 4999,
+  projectQuota: 10,
 }))
 const mockTxTransactionCreate = mock(async () => ({ id: "txn1" }))
 const mockTxEntitlementCreate = mock(async () => ({ id: "ent1" }))
@@ -55,6 +56,7 @@ describe("provisionEntitlement", () => {
       slug: "pv-layout-pro",
       calculations: 100,
       priceAmount: 4999,
+      projectQuota: 10,
     }))
     mockTxTransactionCreate.mockReset()
     mockTxEntitlementCreate.mockReset()
@@ -87,6 +89,14 @@ describe("provisionEntitlement", () => {
       }),
     )
     expect(mockTxEntitlementCreate).toHaveBeenCalledTimes(1)
+    expect(mockTxEntitlementCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalCalculations: 100,
+          projectQuota: 10,
+        }),
+      }),
+    )
   })
 
   it("uses purchase.amountTotal when purchase arg provided", async () => {

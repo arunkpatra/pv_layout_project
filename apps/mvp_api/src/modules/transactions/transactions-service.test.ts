@@ -44,6 +44,7 @@ describe("createManualTransaction", () => {
       active: true,
       priceAmount: 499,
       calculations: 10,
+      projectQuota: 10,
     })
 
     const result = await createManualTransaction({
@@ -74,6 +75,7 @@ describe("createManualTransaction", () => {
         data: expect.objectContaining({
           transactionId: "txn_new",
           totalCalculations: 10,
+          projectQuota: 10,
         }),
       }),
     )
@@ -109,7 +111,7 @@ describe("createManualTransaction", () => {
     dbMock.user.findUnique.mockResolvedValueOnce({ id: "usr_alice", email: "alice@example.com" })
     dbMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_pro", slug: "pv-layout-pro", isFree: false, active: false,
-      priceAmount: 499, calculations: 10,
+      priceAmount: 499, calculations: 10, projectQuota: 10,
     })
 
     const promise = createManualTransaction({
@@ -123,7 +125,7 @@ describe("createManualTransaction", () => {
     dbMock.user.findUnique.mockResolvedValueOnce({ id: "usr_alice", email: "alice@example.com" })
     dbMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_free", slug: "pv-layout-free", isFree: true, active: true,
-      priceAmount: 0, calculations: 5,
+      priceAmount: 0, calculations: 5, projectQuota: 3,
     })
 
     const promise = createManualTransaction({
@@ -140,7 +142,7 @@ describe("createManualTransaction", () => {
     dbMock.user.findUnique.mockResolvedValueOnce({ id: "usr_a", email: "a@b.com" })
     dbMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_pp", slug: "pv-layout-pro-plus", isFree: false, active: true,
-      priceAmount: 1499, calculations: 50,
+      priceAmount: 1499, calculations: 50, projectQuota: 15,
     })
 
     await createManualTransaction({
@@ -155,7 +157,10 @@ describe("createManualTransaction", () => {
     )
     expect(mockTxEntitlementCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ totalCalculations: 50 }),
+        data: expect.objectContaining({
+          totalCalculations: 50,
+          projectQuota: 15,
+        }),
       }),
     )
   })
@@ -164,7 +169,7 @@ describe("createManualTransaction", () => {
     dbMock.user.findUnique.mockResolvedValueOnce({ id: "usr_a", email: "a@b.com" })
     dbMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_pro", slug: "pv-layout-pro", isFree: false, active: true,
-      priceAmount: 499, calculations: 10,
+      priceAmount: 499, calculations: 10, projectQuota: 10,
     })
     const past = new Date("2026-04-20T12:00:00Z")
 

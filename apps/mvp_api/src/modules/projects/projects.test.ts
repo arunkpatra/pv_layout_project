@@ -134,7 +134,7 @@ const mockEntitlementFindMany = mock(
     {
       totalCalculations: 5,
       usedCalculations: 0,
-      product: { projectQuota: 3 },
+      projectQuota: 3,
     },
   ],
 )
@@ -371,7 +371,7 @@ describe("POST /v2/projects", () => {
       {
         totalCalculations: 5,
         usedCalculations: 0,
-        product: { projectQuota: 3 },
+        projectQuota: 3,
       },
     ])
   })
@@ -423,8 +423,8 @@ describe("POST /v2/projects", () => {
 
   it("upgraded quota: pro user (10) creates beyond free's 3", async () => {
     mockEntitlementFindMany.mockImplementation(async () => [
-      { totalCalculations: 5, usedCalculations: 0, product: { projectQuota: 3 } },
-      { totalCalculations: 10, usedCalculations: 0, product: { projectQuota: 10 } },
+      { totalCalculations: 5, usedCalculations: 0, projectQuota: 3 },
+      { totalCalculations: 10, usedCalculations: 0, projectQuota: 10 },
     ])
     mockProjectCount.mockImplementation(async () => 5)
     const app = makeApp()

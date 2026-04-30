@@ -106,6 +106,10 @@ model Entitlement {
   transaction       Transaction @relation(fields: [transactionId], references: [id])
   totalCalculations Int
   usedCalculations  Int         @default(0)
+  /// Snapshotted from Product.projectQuota at creation time so the
+  /// per-tier concurrent-project ceiling can be read off Entitlement
+  /// directly (no JOIN into Product). Backfilled for pre-B19 rows.
+  projectQuota      Int         @default(0)
   purchasedAt       DateTime    @default(now())
   deactivatedAt     DateTime?
 

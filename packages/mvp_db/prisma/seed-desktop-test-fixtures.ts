@@ -224,6 +224,7 @@ async function provision(spec: FixtureSpec): Promise<{ key: string }> {
           transactionId: txn.id,
           totalCalculations: product.calculations,
           usedCalculations: ent.usedCalculations,
+          projectQuota: product.projectQuota,
           deactivatedAt: ent.deactivated ? new Date() : null,
         },
       })

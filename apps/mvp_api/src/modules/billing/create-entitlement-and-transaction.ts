@@ -13,6 +13,10 @@ export interface SharedProvisionParams {
   checkoutSessionId?: string | null
   purchasedAt?: Date
   totalCalculations: number
+  /** Snapshotted from `Product.projectQuota` at creation time. Required —
+   *  callers must pass `product.projectQuota` so the per-tier project
+   *  ceiling can be read off Entitlement directly without a JOIN. */
+  projectQuota: number
 }
 
 /**
@@ -53,6 +57,7 @@ export async function createEntitlementAndTransaction(
       productId: params.productId,
       transactionId: transaction.id,
       totalCalculations: params.totalCalculations,
+      projectQuota: params.projectQuota,
     },
   })
 

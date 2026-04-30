@@ -70,12 +70,15 @@ export async function computeEntitlementSummary(user: {
 /**
  * Compute the user's per-tier concurrent-project quota state.
  *
- * `projectQuota` is the max `Product.projectQuota` over `entitlements`
+ * `projectQuota` is the max `Entitlement.projectQuota` over rows
  * where `deactivatedAt IS NULL AND usedCalculations < totalCalculations`.
  * Exhausted or deactivated entitlements never contribute. Free-tier auto-
  * provisioning means a user with no purchased plans still has 3 (the
  * Free tier's quota) — until they exhaust their 5 free calcs, after which
  * `projectQuota` drops to 0 and projects become read-only.
+ *
+ * Post-B19: projectQuota is snapshotted onto Entitlement at creation time
+ * (from Product.projectQuota), so this read no longer JOINs Product.
  */
 export async function getProjectQuotaState(
   userId: string,
@@ -85,12 +88,12 @@ export async function getProjectQuotaState(
     select: {
       totalCalculations: true,
       usedCalculations: true,
-      product: { select: { projectQuota: true } },
+      projectQuota: true,
     },
   })
   const projectQuota = usable
     .filter((e) => e.usedCalculations < e.totalCalculations)
-    .reduce((max, e) => Math.max(max, e.product.projectQuota), 0)
+    .reduce((max, e) => Math.max(max, e.projectQuota), 0)
 
   const projectsActive = await db.project.count({
     where: { userId, deletedAt: null },
