@@ -8,6 +8,7 @@ import { cn } from "../lib/cn"
  *
  * Slots:
  *   topBar     — 44px, project breadcrumb + chips + user menu
+ *   tabsBar    — 36px, multi-tab strip below topBar (S2; optional)
  *   toolRail   — 52px left rail (collapsible — width collapses to 0)
  *   canvas     — the protagonist; map or splash/empty state
  *   inspector  — 320px right panel (collapsible — width collapses to 0)
@@ -18,6 +19,7 @@ import { cn } from "../lib/cn"
  */
 export function AppShell({
   topBar,
+  tabsBar,
   toolRail,
   toolRailOpen = true,
   canvas,
@@ -27,6 +29,7 @@ export function AppShell({
   className,
 }: {
   topBar?: ReactNode
+  tabsBar?: ReactNode
   toolRail?: ReactNode
   toolRailOpen?: boolean
   canvas: ReactNode
@@ -49,6 +52,15 @@ export function AppShell({
         >
           {topBar}
         </header>
+      )}
+
+      {tabsBar && (
+        <div
+          className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-ground)]"
+          style={{ height: "var(--size-tabsbar, 36px)" }}
+        >
+          {tabsBar}
+        </div>
       )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

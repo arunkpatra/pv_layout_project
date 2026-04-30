@@ -59,6 +59,8 @@ import { SaveIndicator } from "./auth/SaveIndicator"
 import { QuotaIndicator } from "./auth/QuotaIndicator"
 import { RecentsView } from "./recents/RecentsView"
 import { RunsList } from "./runs/RunsList"
+import { TabsBar } from "./tabs/TabsBar"
+import { useTabsStore } from "./state/tabs"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
 import {
@@ -507,6 +509,16 @@ export function App(): JSX.Element {
     })
   }, [selectedRunId, currentProject, resultRunId, openRunMutate])
 
+  // ── S2 — multi-tab integration ──────────────────────────────────────────
+  // Tab state is metadata-only; the actual project state lives in its
+  // existing per-domain slices and is mutated by the open flow below.
+  // Switching a tab fires P2's open path (B12 + S3 GET + sidecar parse).
+  const activeTabId = useTabsStore((s) => s.activeTabId)
+  const tabsOpenTab = useTabsStore((s) => s.openTab)
+  const tabsCloseTab = useTabsStore((s) => s.closeTab)
+  const tabsSwitchTab = useTabsStore((s) => s.switchTab)
+  const tabsUpdateName = useTabsStore((s) => s.updateTabName)
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
   // upload + create the persisted project via B6 → S3 → B11. The two
@@ -536,12 +548,16 @@ export function App(): JSX.Element {
       // 402 (quota exceeded) leaves the canvas in its prior state — no
       // half-loaded "ghost project" if the create fails.
       const projectName = stripKmzExtension(result.fileName)
+      let persistedProjectId: string | null = null
+      let persistedProjectName: string | null = null
       try {
         const persisted = await createProjectMutation.mutateAsync({
           bytes: result.bytes,
           name: projectName,
         })
         setCurrentProject(persisted)
+        persistedProjectId = persisted.id
+        persistedProjectName = persisted.name
       } catch (err) {
         if (err instanceof EntitlementsError && err.code === "PAYMENT_REQUIRED") {
           // Surface upsell modal; leave project state unchanged.
@@ -554,6 +570,11 @@ export function App(): JSX.Element {
       }
 
       setProject({ kmz: result.parsed, fileName: result.fileName })
+      // S2 — register the just-created project as a tab. openTab dedupes
+      // by projectId, so re-opening is a no-op switch.
+      if (persistedProjectId && persistedProjectName) {
+        tabsOpenTab(persistedProjectId, persistedProjectName)
+      }
       setPaletteOpen(false)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
@@ -572,6 +593,7 @@ export function App(): JSX.Element {
     resetLayerVisibility,
     resetEditingState,
     createProjectMutation,
+    tabsOpenTab,
   ])
 
   // ── P2 / S3 — open-existing-project flow ────────────────────────────────
@@ -616,6 +638,10 @@ export function App(): JSX.Element {
       const restoredStack = undoStackFromEdits(opened.detail.edits) ?? []
       useEditingStateStore.getState().setUndoStack(restoredStack)
       setProject({ kmz: parsed, fileName })
+      // S2 — register/activate the tab for this project. Dedup logic
+      // makes this a no-op when this open was triggered BY a tab
+      // switch (the tab already exists + is active).
+      tabsOpenTab(opened.detail.id, opened.detail.name)
       setPaletteOpen(false)
     } catch (err) {
       // 404 NOT_FOUND → user-friendly "Project not found"; otherwise pipe
@@ -642,6 +668,7 @@ export function App(): JSX.Element {
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
+    tabsOpenTab,
   ])
 
   // Palette wrapper — interim, kept alongside S3's RecentsView card click
@@ -670,13 +697,15 @@ export function App(): JSX.Element {
         projectId: currentProject.id,
         name: trimmed,
       })
+      // S2 — keep the tab title in sync with the renamed project.
+      tabsUpdateName(currentProject.id, trimmed)
       setPaletteOpen(false)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
       console.error("rename project failed:", err)
       setOpenError(detail)
     }
-  }, [currentProject, renameProjectMutation])
+  }, [currentProject, renameProjectMutation, tabsUpdateName])
 
   const handleDeleteProject = useCallback(async () => {
     if (!currentProject) return
@@ -699,6 +728,12 @@ export function App(): JSX.Element {
       resetLayerVisibility()
       resetEditingState()
       setLayoutFormKey((k) => k + 1)
+      // S2 — close the tab for the deleted project. tabs.closeTab finds
+      // it by tab.id; we look up the tab carrying this projectId.
+      const tab = useTabsStore
+        .getState()
+        .tabs.find((t) => t.projectId === currentProject.id)
+      if (tab) tabsCloseTab(tab.id)
       setPaletteOpen(false)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
@@ -712,7 +747,59 @@ export function App(): JSX.Element {
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
+    tabsCloseTab,
   ])
+
+  // ── S2 — tab switch effect + close handler ──────────────────────────────
+  // When activeTabId changes, sync the project state:
+  //   - null → clear all project state (back to recents view)
+  //   - new tab pointing at a different project → fire P2's open flow
+  //   - new tab matching currentProject → no-op (likely a tab-create
+  //     immediately after a successful P1/P2 open; deduped by openTab)
+  useEffect(() => {
+    if (!activeTabId) {
+      if (currentProject) {
+        useProjectStore.getState().clearAll()
+        clearLayoutResult()
+        resetLayoutParams()
+        resetLayerVisibility()
+        resetEditingState()
+        setLayoutFormKey((k) => k + 1)
+      }
+      return
+    }
+    const tab = useTabsStore.getState().tabs.find((t) => t.id === activeTabId)
+    if (!tab) return
+    if (tab.projectId === currentProject?.id) return
+    void handleOpenProjectById(tab.projectId)
+  }, [
+    activeTabId,
+    currentProject,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+    resetEditingState,
+    handleOpenProjectById,
+  ])
+
+  const handleCloseTab = useCallback(
+    (tabId: string) => {
+      // Warn if closing the active tab while autosave is mid-flight —
+      // the 2s pending edits would get lost when the slice resets in
+      // the next tick.
+      if (
+        tabId === activeTabId &&
+        saveStatus.kind === "saving"
+      ) {
+        const ok = window.confirm(
+          "Unsaved edits to this project. Close anyway? Edits will save in the background but may be cancelled mid-flight."
+        )
+        if (!ok) return
+      }
+      tabsCloseTab(tabId)
+    },
+    [activeTabId, saveStatus.kind, tabsCloseTab]
+  )
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
   // (the `.` in the Rust menu-item id is translated to `/` at emit time
@@ -747,11 +834,26 @@ export function App(): JSX.Element {
         void handleOpenKmz()
         return
       }
+      // S2 — Cmd-T opens a new project (file picker → P1 flow). Synonym
+      // with the "+" tab-tile + Cmd-O for now; will diverge if Cmd-O
+      // gains an open-existing-project palette in a later S row.
+      if (meta && e.key.toLowerCase() === "t") {
+        e.preventDefault()
+        void handleOpenKmz()
+        return
+      }
+      // S2 — Cmd-W closes the active tab (with the same unsaved-edits
+      // warning used by the X button). No-op when no tabs open.
+      if (meta && e.key.toLowerCase() === "w") {
+        e.preventDefault()
+        if (activeTabId) handleCloseTab(activeTabId)
+        return
+      }
       if (e.key === "Escape") setPaletteOpen(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [handleOpenKmz])
+  }, [handleOpenKmz, activeTabId, handleCloseTab])
 
   // ── S11: interactive ICR drag + obstruction drawing ──────────────────────
   //
@@ -1035,6 +1137,13 @@ export function App(): JSX.Element {
             userEmail={entitlements.user.email ?? undefined}
             onViewLicense={() => setInfoDialogOpen(true)}
             onClearLicense={() => void handleClearLicense()}
+          />
+        }
+        tabsBar={
+          <TabsBar
+            onSwitch={tabsSwitchTab}
+            onClose={handleCloseTab}
+            onNewProject={() => void handleOpenKmz()}
           />
         }
         toolRail={<ToolRail activeTool={activeTool} onSelect={setActiveTool} />}
