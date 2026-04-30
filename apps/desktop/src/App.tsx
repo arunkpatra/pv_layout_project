@@ -1167,7 +1167,9 @@ export function App(): JSX.Element {
             chip={<QuotaIndicator entitlements={entitlements} />}
             onCommandPaletteClick={openPalette}
             onToggleToolRail={() => setToolRailOpen((v) => !v)}
-            onToggleInspector={() => setInspectorOpen((v) => !v)}
+            onToggleInspector={
+              project ? () => setInspectorOpen((v) => !v) : undefined
+            }
             userInitials={initialsFor(entitlements.user.name) ?? "--"}
             userName={entitlements.user.name ?? undefined}
             userEmail={entitlements.user.email ?? undefined}
@@ -1244,48 +1246,50 @@ export function App(): JSX.Element {
           </MapCanvas>
         }
         inspector={
-          <InspectorRoot>
-            <Tabs defaultValue="layout" className="px-[20px] pt-[18px]">
-              <TabsList>
-                <TabsTrigger value="layout">Layout</TabsTrigger>
-                <TabsTrigger value="energy">Energy yield</TabsTrigger>
-                <TabsTrigger value="runs">Runs</TabsTrigger>
-              </TabsList>
-              {/* forceMount: keep the LayoutPanel mounted across tab
-                  switches so RHF's working form state survives. Hidden
-                  via Radix's data-[state] attr + Tailwind variant. */}
-              <TabsContent
-                value="layout"
-                forceMount
-                className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
-              >
-                <LayoutPanel
-                  key={layoutFormKey}
-                  onGenerate={handleGenerate}
-                  generating={layoutMutation.isPending}
-                  noProject={!project}
-                />
-                {layoutResult && <VisibilitySection />}
-                {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
-                <SummaryPanel generating={layoutMutation.isPending} />
-              </TabsContent>
-              <TabsContent
-                value="energy"
-                className="mt-[8px] -mx-[20px]"
-              >
-                <EnergyTabContent />
-              </TabsContent>
-              {/* P5 — runs gallery + list, forceMount so multi-select
-                  state survives Inspector tab switches. */}
-              <TabsContent
-                value="runs"
-                forceMount
-                className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
-              >
-                <RunsList onDeleteRuns={handleDeleteRuns} />
-              </TabsContent>
-            </Tabs>
-          </InspectorRoot>
+          project ? (
+            <InspectorRoot>
+              <Tabs defaultValue="layout" className="px-[20px] pt-[18px]">
+                <TabsList>
+                  <TabsTrigger value="layout">Layout</TabsTrigger>
+                  <TabsTrigger value="energy">Energy yield</TabsTrigger>
+                  <TabsTrigger value="runs">Runs</TabsTrigger>
+                </TabsList>
+                {/* forceMount: keep the LayoutPanel mounted across tab
+                    switches so RHF's working form state survives. Hidden
+                    via Radix's data-[state] attr + Tailwind variant. */}
+                <TabsContent
+                  value="layout"
+                  forceMount
+                  className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+                >
+                  <LayoutPanel
+                    key={layoutFormKey}
+                    onGenerate={handleGenerate}
+                    generating={layoutMutation.isPending}
+                    noProject={!project}
+                  />
+                  {layoutResult && <VisibilitySection />}
+                  {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
+                  <SummaryPanel generating={layoutMutation.isPending} />
+                </TabsContent>
+                <TabsContent
+                  value="energy"
+                  className="mt-[8px] -mx-[20px]"
+                >
+                  <EnergyTabContent />
+                </TabsContent>
+                {/* P5 — runs gallery + list, forceMount so multi-select
+                    state survives Inspector tab switches. */}
+                <TabsContent
+                  value="runs"
+                  forceMount
+                  className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+                >
+                  <RunsList onDeleteRuns={handleDeleteRuns} />
+                </TabsContent>
+              </Tabs>
+            </InspectorRoot>
+          ) : undefined
         }
         statusBar={
           <StatusBar

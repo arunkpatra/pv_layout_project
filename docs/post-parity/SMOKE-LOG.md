@@ -510,7 +510,7 @@ extra-attention items inside flows already on the route.
 | S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Decision deferred — revisit at end of session.                          | deferred | F1     | see S1-01 below           |
 | S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | fixed  | F6     | see S1-02 below           |
 | S1-03 | P3  | frontend | fe    | StatusBar drops the line-obstruction count                  | 1. Open `phaseboundary2.kmz` (which contains a TL line obstruction). 2. StatusBar reads `1 boundary · 0 obstacles` despite the TL being clearly rendered as a red dashed polyline on the canvas. | StatusBar text includes the line-obstructions count when non-zero (or shows it always for symmetry).                          | fixed  | F4     | see S1-03 below           |
-| S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded, the Inspector either (a) shows an empty-state "Open a project to configure layout" message, or (b) is auto-collapsed, or (c) keeps the tabs but disables form inputs visually. Pick a design.   | open   | new-row | see S1-04 below           |
+| S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded: Inspector panel is hidden entirely + the TopBar Inspector toggle button is hidden. Inspector restores on next project open with the user's prior `inspectorOpen` preference.        | fixed  | inline  | see S1-04 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -719,5 +719,17 @@ empty state when no project loaded` (`IP` for Inspector Polish).
 Tier T1, depends F4, source = this S1-04 thread.
 
 Awaiting user pick: defer-to-new-row / inline-fix / drop.
+
+[FE 2026-04-30 13:50] User chose: hide the Inspector entirely when
+no project loaded. Reasonable + doable + correct UX (matches IDE /
+design-tool conventions for empty-selection state). Inline-fix:
+`apps/desktop/src/App.tsx` — `inspector={project ? <…> : undefined}`
+and `onToggleInspector={project ? handler : undefined}`. The
+TopBar already hides its toggle button when the handler prop is
+absent (existing pattern), so the chrome stays clean. The user's
+prior `inspectorOpen` preference survives close/reopen because it
+lives in App-level `useState`, not derived from `project`.
+
+Typecheck green; HMR refresh. Status → `fixed` pending live confirm.
 
 ---
