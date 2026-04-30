@@ -636,6 +636,7 @@ extra-attention items inside flows already on the route.
 | S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
 | S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
 | S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | fixed  | F4-era menu wiring | see S1-11 below           |
+| S1-12 | P1  | frontend (likely) | fe | Runs list rendering inconsistent across tab switches      | 1. Open project A; Generate Layout (run A1 created). 2. Open project B; Generate Layout (run B1 created). 3. Inspector → Runs tab on B shows **2 runs**. 4. Switch back to A, then back to B (or just switch tabs). 5. Inspector → Runs tab on B now shows **1 run**.                                                | Each project's Runs tab renders only that project's runs, consistently across tab switches. Run counts match server state (B12's runs[] / B15 if used).                                                                                                                                | open   | P5, P6, S2 | see S1-12 below — sub-agent investigating          |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1345,5 +1346,47 @@ per click, no stacking, no further pickers queued after Cancel.
 S1-11 closed via `4d10004` on `post-parity-v1-desktop`. The
 HMR-cannot-verify-event-listener-fixes lesson is now captured in
 the new `## Smoke reset` section of this doc (`ca09243`).
+
+##### S1-12 thread
+
+[FE 2026-04-30 15:15] User reports inconsistent runs-list rendering
+across tab switches. Sequence:
+
+1. Two projects open in tabs.
+2. Generate Layout on project A → run A1 added.
+3. Generate Layout on project B → Inspector → Runs tab shows
+   **2 runs** in B's gallery.
+4. Switch tabs (away then back, or just away). Returning to B's
+   Runs tab now shows **1 run**.
+
+Initial hypothesis space:
+
+- **State leak across projects** — the project slice's `runs[]`
+  is global ("current project's runs"); P6's `addRun` appends to
+  whatever the slice currently holds. If a tab switch from A to B
+  doesn't reset `runs[]` cleanly before B's Generate fires, A's
+  prior run could appear in B's gallery temporarily; then on the
+  next tab-switch round-trip, B12's authoritative server-side
+  runs[] for B would replace and "fix" the count. This matches
+  the symptom of "saw 2, then 1."
+- **Tab-create flow vs tab-switch flow inconsistency** — opening a
+  fresh project via P1 might bypass the `setRuns([])` call that a
+  tab-switch via `handleOpenProjectById` performs. P1's
+  `useCreateProjectMutation` may not call `setRuns` since the
+  project starts with zero runs by definition; if so, whatever
+  was in the slice carries over.
+- **B16 onSuccess race with another project loading** — if B16's
+  promise resolves while the user has already started a tab-
+  switch, `addRun` could append to the wrong project's slice
+  state.
+
+Severity: P1 — functional bug, breaks user trust in the runs list.
+Surface: frontend (likely; backend is unlikely to return duplicate
+runs from B16). Owner: fe.
+
+Sub-agent dispatched 2026-04-30 15:15 to investigate end-to-end
+across P1, P5, P6, S2's tab-switch effect, and the project slice's
+runs-management invariants. Awaiting findings before proposing a
+fix.
 
 ---
