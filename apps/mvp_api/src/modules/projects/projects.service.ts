@@ -1,6 +1,19 @@
 import { db } from "../../lib/db.js"
+import { env } from "../../env.js"
 import { AppError, NotFoundError } from "../../lib/errors.js"
+import { getPresignedDownloadUrl } from "../../lib/s3.js"
 import { getProjectQuotaState } from "../entitlements/entitlements.service.js"
+import type {
+  ProjectDetail,
+  ProjectWire,
+  RunSummary,
+} from "@renewable-energy/shared"
+
+// Re-export so existing intra-mvp_api imports (e.g. runs.service.ts uses
+// RunSummary from this module) keep working unchanged.
+export type { ProjectDetail, ProjectWire, RunSummary }
+
+const KMZ_DOWNLOAD_TTL_SECONDS = 3600 // 1 hour — matches B17 read TTL
 
 export interface ProjectSummary {
   id: string
@@ -60,18 +73,6 @@ export interface CreateProjectInput {
   edits?: unknown
 }
 
-export interface ProjectWire {
-  id: string
-  userId: string
-  name: string
-  kmzBlobUrl: string
-  kmzSha256: string
-  edits: unknown
-  createdAt: string
-  updatedAt: string
-  deletedAt: string | null
-}
-
 /**
  * Create a new Project for the user after enforcing the per-tier
  * concurrent-project quota.
@@ -121,23 +122,16 @@ export async function createProject(
   }
 }
 
-export interface RunSummary {
-  id: string
-  name: string
-  params: unknown
-  billedFeatureKey: string
-  createdAt: string
-}
-
-export interface ProjectDetail extends ProjectWire {
-  runs: RunSummary[]
-}
-
 /**
- * Project detail with embedded run summaries. Heavy fields
- * (inputsSnapshot, blob URLs, exports list) are intentionally omitted —
- * the desktop fetches them per-run via B17 (`GET /v2/projects/:id/runs/:runId`)
- * to keep this list view fast even for projects with many runs.
+ * Project detail with embedded run summaries and a presigned-GET URL for
+ * the KMZ blob. Heavy run fields (inputsSnapshot, blob URLs, exports list)
+ * stay on B17 — this list view stays fast even for projects with many runs.
+ *
+ * `kmzDownloadUrl` is signed at request time against
+ * `MVP_S3_PROJECTS_BUCKET` (1h TTL) so the desktop's open-existing-project
+ * flow is a single round-trip: B12 → S3 GET → sidecar parse → render. The
+ * key path matches B6's upload contract (`projects/<userId>/kmz/<sha>.kmz`).
+ * Null when the bucket env var is unset (local dev without S3).
  *
  * 404 on any miss: project doesn't exist, soft-deleted, or owned by a
  * different user. Cross-user existence is never leaked.
@@ -165,6 +159,18 @@ export async function getProject(
   if (!project) {
     throw new NotFoundError("Project", projectId)
   }
+
+  const bucket = env.MVP_S3_PROJECTS_BUCKET
+  const kmzKey = `projects/${userId}/kmz/${project.kmzSha256}.kmz`
+  const kmzDownloadUrl = bucket
+    ? await getPresignedDownloadUrl(
+        kmzKey,
+        `${project.name}.kmz`,
+        KMZ_DOWNLOAD_TTL_SECONDS,
+        bucket,
+      )
+    : null
+
   return {
     id: project.id,
     userId: project.userId,
@@ -175,6 +181,7 @@ export async function getProject(
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
+    kmzDownloadUrl,
     runs: project.runs.map((r) => ({
       id: r.id,
       name: r.name,

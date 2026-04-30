@@ -23,3 +23,8 @@ export type {
   CreateVersionInput,
   LayoutInputSnapshot,
 } from "./types/project.js"
+export type {
+  RunSummary,
+  ProjectWire,
+  ProjectDetail,
+} from "./types/project-v2.js"

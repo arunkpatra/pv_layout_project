@@ -139,6 +139,24 @@ const mockEntitlementFindMany = mock(
   ],
 )
 
+const mockGetPresignedDownloadUrl = mock(
+  async (
+    _key: string,
+    _filename: string,
+    _ttl: number,
+    _bucket?: string,
+  ): Promise<string | null> =>
+    "https://signed.example/projects/usr_test1/kmz/abc.kmz?X-Amz-Sig=stub",
+)
+
+mock.module("../../lib/s3.js", () => ({
+  getPresignedDownloadUrl: mockGetPresignedDownloadUrl,
+}))
+
+mock.module("../../env.js", () => ({
+  env: { MVP_S3_PROJECTS_BUCKET: "solarlayout-local-projects" },
+}))
+
 mock.module("../../lib/db.js", () => ({
   db: {
     licenseKey: { findFirst: async () => mockLicenseKey },
@@ -510,6 +528,7 @@ interface ProjectDetailWire {
   createdAt: string
   updatedAt: string
   deletedAt: string | null
+  kmzDownloadUrl: string | null
   runs: Array<{
     id: string
     name: string
@@ -530,6 +549,11 @@ describe("GET /v2/projects/:id", () => {
   beforeEach(() => {
     mockProjectFindFirst.mockReset()
     mockProjectFindFirst.mockImplementation(async () => null)
+    mockGetPresignedDownloadUrl.mockClear()
+    mockGetPresignedDownloadUrl.mockImplementation(
+      async () =>
+        "https://signed.example/projects/usr_test1/kmz/abc.kmz?X-Amz-Sig=stub",
+    )
     app2 = makeApp()
   })
 
@@ -580,6 +604,38 @@ describe("GET /v2/projects/:id", () => {
     expect(body.data.runs[0]!.params).toEqual({ rows: 4, cols: 4 })
     expect(body.data.runs[0]!.billedFeatureKey).toBe("plant_layout")
     expect(body.data.runs[0]!.createdAt).toBe(r2.toISOString())
+    // Embedded presigned-GET URL for the KMZ blob — desktop hydrates the
+    // canvas in one round-trip without a second mint endpoint.
+    expect(body.data.kmzDownloadUrl).toBe(
+      "https://signed.example/projects/usr_test1/kmz/abc.kmz?X-Amz-Sig=stub",
+    )
+  })
+
+  it("signs the KMZ download URL against MVP_S3_PROJECTS_BUCKET with the canonical key path and a 1h TTL", async () => {
+    const sha = "f".repeat(64)
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "Site A",
+      kmzBlobUrl: `s3://solarlayout-local-projects/projects/usr_test1/kmz/${sha}.kmz`,
+      kmzSha256: sha,
+      edits: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      runs: [],
+    }))
+    await getDetail("prj_x")
+    const call = mockGetPresignedDownloadUrl.mock.calls[0] as unknown as [
+      string,
+      string,
+      number,
+      string,
+    ]
+    expect(call?.[0]).toBe(`projects/usr_test1/kmz/${sha}.kmz`)
+    expect(call?.[1]).toBe("Site A.kmz")
+    expect(call?.[2]).toBe(3600)
+    expect(call?.[3]).toBe("solarlayout-local-projects")
   })
 
   it("returns 404 when the project doesn't exist", async () => {
