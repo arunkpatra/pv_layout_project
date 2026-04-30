@@ -508,7 +508,7 @@ extra-attention items inside flows already on the route.
 | ID    | Sev | Surface  | Owner | Title                                                       | Repro                                                                                                | Acceptance                                                              | Status | Linked | Thread (see below per ID) |
 |-------|-----|----------|-------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|--------|--------|---------------------------|
 | S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Decision deferred — revisit at end of session.                          | deferred | F1     | see S1-01 below           |
-| S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | open   | F6     | see S1-02 below           |
+| S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | fixed  | F6     | see S1-02 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -622,5 +622,12 @@ introduces this class of bug.
 Recommendation: **inline-fix now** — restart Tauri dev after the edit
 + patch lands, repeat the new-project step. This is a P0 block, fix
 takes ~1 minute, restart is fine since smoke is fresh.
+
+[FE 2026-04-30 13:32] Patched. Three S3 bucket hosts added to
+`http:default` allowlist in `apps/desktop/src-tauri/capabilities/default.json`.
+Typecheck + build green; will be confirmed end-to-end after Tauri
+restart + new-project retry. Status → `fixed` pending live retry.
+Will close fully once user confirms the new-project flow completes
+through to canvas hydration.
 
 ---
