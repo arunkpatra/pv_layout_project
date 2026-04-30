@@ -66,6 +66,37 @@ function classify(status: number): S3UploadErrorKind {
   return "UNEXPECTED"
 }
 
+/**
+ * Download-side error kinds. Disjoint from upload kinds because the
+ * meaningful failure modes differ — a download has no "content mismatch"
+ * (that's a pre-PUT signature concern), but does have a meaningful
+ * NOT_FOUND (the blob never made it to S3, vs the URL being expired).
+ */
+export type S3DownloadErrorKind =
+  | "EXPIRED_URL"
+  | "NOT_FOUND"
+  | "TRANSIENT"
+  | "NETWORK"
+  | "UNEXPECTED"
+
+export class S3DownloadError extends Error {
+  readonly kind: S3DownloadErrorKind
+  readonly status: number
+  constructor(kind: S3DownloadErrorKind, status: number, message: string) {
+    super(message)
+    this.name = "S3DownloadError"
+    this.kind = kind
+    this.status = status
+  }
+}
+
+function classifyDownload(status: number): S3DownloadErrorKind {
+  if (status === 403) return "EXPIRED_URL"
+  if (status === 404) return "NOT_FOUND"
+  if (status >= 500 && status < 600) return "TRANSIENT"
+  return "UNEXPECTED"
+}
+
 // ---------------------------------------------------------------------------
 // Generic PUT
 // ---------------------------------------------------------------------------
@@ -204,6 +235,50 @@ export interface UploadRunResultArgs {
 export interface UploadRunResultResult {
   blobUrl: string
   size: number
+}
+
+// ---------------------------------------------------------------------------
+// Download — P2 (open-existing-project flow)
+// ---------------------------------------------------------------------------
+
+export interface DownloadKmzOptions {
+  /** Presigned GET URL minted by B12 (`ProjectDetail.kmzDownloadUrl`). */
+  url: string
+  /** Test seam — defaults to tauri-plugin-http or globalThis.fetch. */
+  fetchImpl?: FetchLike
+}
+
+/**
+ * GET a presigned KMZ URL and return the raw bytes. The desktop's
+ * open-existing-project flow uses these bytes as input to the sidecar's
+ * /parse-kmz, exactly mirroring the new-project path (P1) where the
+ * bytes come from the local file picker.
+ *
+ * The presigned URL carries its own AWS signature in the query string —
+ * never send `Authorization` (S3 will reject the signature if any
+ * non-signed header is included). 1h TTL by backend convention; on a
+ * 403 the desktop should re-call B12 to get a fresh URL.
+ */
+export async function downloadKmzFromS3(
+  opts: DownloadKmzOptions
+): Promise<Uint8Array> {
+  const fetchImpl = opts.fetchImpl ?? defaultFetch()
+  let response: Response
+  try {
+    response = await fetchImpl(opts.url, { method: "GET" })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new S3DownloadError("NETWORK", 0, msg)
+  }
+  if (!response.ok) {
+    throw new S3DownloadError(
+      classifyDownload(response.status),
+      response.status,
+      `S3 GET failed: HTTP ${response.status}`
+    )
+  }
+  const buf = await response.arrayBuffer()
+  return new Uint8Array(buf)
 }
 
 /**

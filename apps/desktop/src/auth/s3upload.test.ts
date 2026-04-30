@@ -15,7 +15,9 @@ import { describe, it, expect, vi } from "vitest"
 import type { EntitlementsClient } from "@solarlayout/entitlements-client"
 import {
   S3UploadError,
+  S3DownloadError,
   putToS3,
+  downloadKmzFromS3,
   sha256Hex,
   uploadKmzToS3,
   uploadRunResultToS3,
@@ -38,6 +40,7 @@ function makeClient(
     getKmzUploadUrl: vi.fn(),
     getRunResultUploadUrl: vi.fn(),
     createProjectV2: vi.fn(),
+    getProjectV2: vi.fn(),
     ...overrides,
   }
 }
@@ -434,5 +437,103 @@ describe("uploadRunResultToS3", () => {
       })
     ).rejects.toThrow("Run not found")
     expect(fetchImpl).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// downloadKmzFromS3 — P2 (open-existing-project flow)
+// ---------------------------------------------------------------------------
+
+describe("downloadKmzFromS3", () => {
+  const PRESIGNED =
+    "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/u/kmz/abc.kmz?X-Amz-Signature=stub"
+
+  it("GETs the presigned URL and returns the bytes as a Uint8Array", async () => {
+    const payload = new Uint8Array([0x50, 0x4b, 0x03, 0x04]) // PK header
+    let seenUrl = ""
+    let seenMethod = ""
+    const fetchImpl = vi.fn(async (url, init) => {
+      seenUrl = String(url)
+      seenMethod = init?.method ?? "GET"
+      return new Response(payload.slice().buffer, { status: 200 })
+    }) as unknown as typeof fetch
+
+    const bytes = await downloadKmzFromS3({ url: PRESIGNED, fetchImpl })
+
+    expect(seenUrl).toBe(PRESIGNED)
+    expect(seenMethod).toBe("GET")
+    expect(bytes).toBeInstanceOf(Uint8Array)
+    expect(Array.from(bytes)).toEqual([0x50, 0x4b, 0x03, 0x04])
+  })
+
+  it("does NOT send Authorization (presigned URL carries the signature)", async () => {
+    let seenAuth: string | null = ""
+    const fetchImpl = vi.fn(async (_url, init) => {
+      seenAuth = new Headers(init?.headers).get("authorization")
+      return new Response(new Uint8Array(0).buffer, { status: 200 })
+    }) as unknown as typeof fetch
+    await downloadKmzFromS3({ url: PRESIGNED, fetchImpl })
+    expect(seenAuth).toBeNull()
+  })
+
+  it("maps 403 to S3DownloadError with kind=EXPIRED_URL (re-request from B12)", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response("Forbidden", { status: 403 })
+    ) as unknown as typeof fetch
+    let caught: unknown
+    try {
+      await downloadKmzFromS3({ url: PRESIGNED, fetchImpl })
+    } catch (err) {
+      caught = err
+    }
+    expect(caught).toBeInstanceOf(S3DownloadError)
+    const e = caught as S3DownloadError
+    expect(e.kind).toBe("EXPIRED_URL")
+    expect(e.status).toBe(403)
+  })
+
+  it("maps 404 to S3DownloadError with kind=NOT_FOUND", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response("Not Found", { status: 404 })
+    ) as unknown as typeof fetch
+    let caught: unknown
+    try {
+      await downloadKmzFromS3({ url: PRESIGNED, fetchImpl })
+    } catch (err) {
+      caught = err
+    }
+    const e = caught as S3DownloadError
+    expect(e.kind).toBe("NOT_FOUND")
+    expect(e.status).toBe(404)
+  })
+
+  it("maps 5xx to TRANSIENT", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response("", { status: 503 })
+    ) as unknown as typeof fetch
+    let caught: unknown
+    try {
+      await downloadKmzFromS3({ url: PRESIGNED, fetchImpl })
+    } catch (err) {
+      caught = err
+    }
+    const e = caught as S3DownloadError
+    expect(e.kind).toBe("TRANSIENT")
+    expect(e.status).toBe(503)
+  })
+
+  it("maps a thrown fetch (network failure) to NETWORK", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("Failed to fetch")
+    }) as unknown as typeof fetch
+    let caught: unknown
+    try {
+      await downloadKmzFromS3({ url: PRESIGNED, fetchImpl })
+    } catch (err) {
+      caught = err
+    }
+    const e = caught as S3DownloadError
+    expect(e.kind).toBe("NETWORK")
+    expect(e.status).toBe(0)
   })
 })

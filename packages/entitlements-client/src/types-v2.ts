@@ -1,8 +1,12 @@
 /**
  * V2 wire-shape mirrors for the SolarLayout mvp_api V2 surface.
  *
- * MIRROR OF: renewable_energy/packages/shared/src/types/api-v2.ts +
- * renewable_energy/packages/shared/src/types/entitlements.ts
+ * MIRROR OF:
+ *   - renewable_energy/packages/shared/src/types/api-v2.ts
+ *   - renewable_energy/packages/shared/src/types/entitlements.ts
+ *   - renewable_energy/packages/shared/src/types/project-v2.ts
+ *      (ProjectWire / ProjectDetail / RunSummary live here; legacy
+ *       project.ts holds dormant web-port types of the same name)
  *
  * Update in lockstep when the backend's shared types change. Until we
  * publish the shared package to a private registry (or vendor it via a
@@ -343,3 +347,47 @@ export type ProjectV2Wire = z.infer<typeof projectV2WireSchema>
 
 export const createProjectV2ResponseSchema =
   v2SuccessResponseSchema(projectV2WireSchema)
+
+/**
+ * B12 RunSummary — list-row shape embedded in `ProjectDetail.runs`.
+ * Heavy run fields (inputsSnapshot, blob URLs, exports) live on B17's
+ * RunDetailWire and aren't part of this summary. Mirrors `RunSummary`
+ * in `renewable_energy/packages/shared/src/types/project-v2.ts`.
+ */
+export const runSummaryV2WireSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  /** Engine-specific run params (rows, cols, …) — opaque on the wire. */
+  params: z.unknown(),
+  /** Feature key billed for this run (e.g. "plant_layout"). */
+  billedFeatureKey: z.string().min(1),
+  createdAt: z.string(),
+})
+
+export type RunSummaryV2Wire = z.infer<typeof runSummaryV2WireSchema>
+
+/**
+ * B12 ProjectDetail — full project metadata + KMZ download URL + embedded
+ * run summaries. Single round-trip is the open-project flow:
+ *
+ *   B12 → ProjectDetail
+ *      → fetch(kmzDownloadUrl) → bytes
+ *      → sidecar /parse-kmz → canvas state
+ *      → setCurrentProject + setRuns(detail.runs)
+ *
+ * `kmzDownloadUrl` is signed at request time (~1h TTL, attachment
+ * Content-Disposition with the project name). Null when
+ * `MVP_S3_PROJECTS_BUCKET` is unset on the backend (local dev without S3
+ * configured); the desktop surfaces a "KMZ unretrievable" error rather
+ * than parsing it as undefined.
+ */
+export const projectDetailV2WireSchema = projectV2WireSchema.extend({
+  kmzDownloadUrl: z.string().url().nullable(),
+  runs: z.array(runSummaryV2WireSchema),
+})
+
+export type ProjectDetailV2Wire = z.infer<typeof projectDetailV2WireSchema>
+
+export const getProjectV2ResponseSchema = v2SuccessResponseSchema(
+  projectDetailV2WireSchema
+)

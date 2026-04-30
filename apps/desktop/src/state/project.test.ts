@@ -111,15 +111,16 @@ const samplePersistedProject: PersistedProject = {
   deletedAt: null,
 }
 
-function makeRun(id: string, projectId: string, name: string): Run {
+// `projectId` is implicit (= currentProject.id) on the post-parity Run
+// summary shape; it's a parameter here only because the older test cases
+// referenced it for readability. We just discard it now — the slice
+// doesn't store it.
+function makeRun(id: string, _projectId: string, name: string): Run {
   return {
     id,
-    projectId,
     name,
     params: {},
     billedFeatureKey: "plant_layout",
-    layoutResultBlobUrl: null,
-    energyResultBlobUrl: null,
     createdAt: "2026-04-29T10:05:00Z",
   }
 }

@@ -18,7 +18,10 @@
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
 import type { ParsedKMZ } from "@solarlayout/sidecar-client"
-import type { ProjectV2Wire } from "@solarlayout/entitlements-client"
+import type {
+  ProjectV2Wire,
+  RunSummaryV2Wire,
+} from "@solarlayout/entitlements-client"
 
 // ---------------------------------------------------------------------------
 // Parity-era types — the locally-parsed KMZ workflow.
@@ -68,20 +71,21 @@ export type ProjectEdits = unknown
 export type PersistedProject = ProjectV2Wire
 
 /**
- * Backend-persisted run record. One Run per "Generate Layout" click.
- * Mirrors the `Run` Prisma model shape (B4). `params` is intentionally
- * loose at v1; later rows narrow it to the typed `LayoutParameters` shape.
+ * Backend-persisted run record at LIST-row granularity. Type-alias of
+ * B12's `RunSummaryV2Wire` — what the desktop receives when it fetches
+ * a project detail (B12) and what populates the runs gallery (P5).
+ *
+ * Detail-level fields (inputsSnapshot, presigned-GET layoutResultBlobUrl,
+ * energyResultBlobUrl, exports list) live on B17's RunDetail and don't
+ * belong in this list-row shape — fetched on demand when the user opens
+ * a specific run (P7). Keeping the slice strict to the wire shape means
+ * lockstep updates flow one-way (backend → desktop) without manual
+ * adapter code drifting.
+ *
+ * `projectId` is intentionally NOT on the wire — it's implicit in
+ * `currentProject.id` for any code branch that has a Run in scope.
  */
-export interface Run {
-  id: RunId
-  projectId: ProjectId
-  name: string
-  params: Record<string, unknown>
-  billedFeatureKey: string
-  layoutResultBlobUrl: string | null
-  energyResultBlobUrl: string | null
-  createdAt: string
-}
+export type Run = RunSummaryV2Wire
 
 // ---------------------------------------------------------------------------
 // Slice

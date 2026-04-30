@@ -22,6 +22,9 @@ import {
   createProjectV2RequestSchema,
   createProjectV2ResponseSchema,
   projectV2WireSchema,
+  runSummaryV2WireSchema,
+  projectDetailV2WireSchema,
+  getProjectV2ResponseSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
 } from "./types-v2"
@@ -436,6 +439,143 @@ describe("createProjectV2ResponseSchema", () => {
       error: { code: "PAYMENT_REQUIRED", message: "x" },
     })
     expect(r.success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B12 — GET /v2/projects/:id (RunSummary + ProjectDetail wire shapes)
+// ---------------------------------------------------------------------------
+
+describe("runSummaryV2WireSchema", () => {
+  const sample = {
+    id: "run_01HX7Z3K9D2MN5Q8R7T1V4W6Y0",
+    name: "Run 1",
+    params: { rows: 8, cols: 12 },
+    billedFeatureKey: "plant_layout",
+    createdAt: "2026-04-30T12:00:00.000Z",
+  }
+
+  test("parses a typical run-list-row shape", () => {
+    expect(runSummaryV2WireSchema.safeParse(sample).success).toBe(true)
+  })
+
+  test("accepts opaque params (unknown JSON)", () => {
+    const r = runSummaryV2WireSchema.safeParse({
+      ...sample,
+      params: null,
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when billedFeatureKey is missing (required for cost attribution)", () => {
+    const v: Record<string, unknown> = { ...sample }
+    delete v.billedFeatureKey
+    expect(runSummaryV2WireSchema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects when id is missing", () => {
+    const v: Record<string, unknown> = { ...sample }
+    delete v.id
+    expect(runSummaryV2WireSchema.safeParse(v).success).toBe(false)
+  })
+})
+
+describe("projectDetailV2WireSchema", () => {
+  const baseProject = {
+    id: "prj_abc123",
+    userId: "usr_test1",
+    name: "Site A",
+    kmzBlobUrl: `s3://b/projects/u/kmz/${VALID_SHA}.kmz`,
+    kmzSha256: VALID_SHA,
+    edits: {},
+    createdAt: "2026-04-30T12:00:00.000Z",
+    updatedAt: "2026-04-30T12:00:00.000Z",
+    deletedAt: null,
+  }
+  const sampleRun = {
+    id: "run_xyz",
+    name: "Run 1",
+    params: {},
+    billedFeatureKey: "plant_layout",
+    createdAt: "2026-04-30T12:05:00.000Z",
+  }
+
+  test("parses a project with empty runs array (fresh project)", () => {
+    const r = projectDetailV2WireSchema.safeParse({
+      ...baseProject,
+      kmzDownloadUrl: "https://s3.ap-south-1.amazonaws.com/b/k.kmz?X-Amz-Sig=...",
+      runs: [],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("parses a project with multiple runs", () => {
+    const r = projectDetailV2WireSchema.safeParse({
+      ...baseProject,
+      kmzDownloadUrl: "https://s3.example/presigned",
+      runs: [sampleRun, { ...sampleRun, id: "run_2" }],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("accepts kmzDownloadUrl=null (S3 bucket env unset on backend)", () => {
+    // Backend's documented graceful-degradation: returns null when
+    // MVP_S3_PROJECTS_BUCKET is unset (local dev without S3). The desktop
+    // surfaces a "KMZ unretrievable" error rather than crashing on a parse
+    // failure.
+    const r = projectDetailV2WireSchema.safeParse({
+      ...baseProject,
+      kmzDownloadUrl: null,
+      runs: [],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects kmzDownloadUrl=undefined (must be string|null, not absent)", () => {
+    const v: Record<string, unknown> = {
+      ...baseProject,
+      runs: [],
+    }
+    expect(projectDetailV2WireSchema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects when runs is missing entirely (must be array, even if empty)", () => {
+    const v: Record<string, unknown> = {
+      ...baseProject,
+      kmzDownloadUrl: null,
+    }
+    expect(projectDetailV2WireSchema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects when a run-summary entry is malformed", () => {
+    const r = projectDetailV2WireSchema.safeParse({
+      ...baseProject,
+      kmzDownloadUrl: null,
+      runs: [{ id: "run_x", name: "x" }], // missing billedFeatureKey + createdAt + params
+    })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("getProjectV2ResponseSchema", () => {
+  test("parses the V2 success envelope around a ProjectDetail", () => {
+    const r = getProjectV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        id: "prj_abc",
+        userId: "usr_x",
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: VALID_SHA,
+        edits: {},
+        createdAt: "2026-04-30T12:00:00.000Z",
+        updatedAt: "2026-04-30T12:00:00.000Z",
+        deletedAt: null,
+        kmzDownloadUrl: "https://s3.example/presigned",
+        runs: [],
+      },
+    })
+    expect(r.success).toBe(true)
   })
 })
 

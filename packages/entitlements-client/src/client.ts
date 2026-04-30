@@ -31,6 +31,7 @@ import {
 import {
   createProjectV2ResponseSchema,
   entitlementSummaryV2ResponseSchema,
+  getProjectV2ResponseSchema,
   kmzUploadUrlResponseSchema,
   runResultUploadUrlResponseSchema,
   usageReportV2ResponseSchema,
@@ -38,6 +39,7 @@ import {
   type CreateProjectV2Request,
   type EntitlementSummaryV2,
   type PresignedUploadUrlResult,
+  type ProjectDetailV2Wire,
   type ProjectV2Wire,
   type RunResultType,
   type UsageReportV2Result,
@@ -136,6 +138,20 @@ export interface EntitlementsClient {
     key: string,
     body: CreateProjectV2Request
   ): Promise<ProjectV2Wire>
+  /**
+   * V2 — `GET /v2/projects/:id` (B12). Returns the full ProjectDetail —
+   * project metadata + presigned KMZ download URL + embedded run summaries
+   * (non-soft-deleted, `createdAt DESC`). Single round-trip for the
+   * open-existing-project flow:
+   *
+   *   getProjectV2 → fetch(detail.kmzDownloadUrl) → bytes
+   *               → sidecar /parse-kmz → setCurrentProject + setRuns
+   *
+   * 404 NOT_FOUND when project doesn't exist, is soft-deleted, or belongs
+   * to another user (cross-user existence is never leaked). The desktop's
+   * useOpenProject hook maps this to a "project not found" surface.
+   */
+  getProjectV2(key: string, projectId: string): Promise<ProjectDetailV2Wire>
 }
 
 /**
@@ -353,6 +369,23 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `Create-project response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async getProjectV2(key, projectId) {
+      // encodeURIComponent guards against accidental reserved chars in
+      // an opaque ID. Backend IDs are CUID-style alphanumeric so this
+      // is belt-and-braces — but the cost is one function call.
+      const path = `/v2/projects/${encodeURIComponent(projectId)}`
+      const raw = await request(path, { method: "GET" }, key)
+      const parsed = getProjectV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Get-project response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

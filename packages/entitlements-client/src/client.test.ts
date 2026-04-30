@@ -1054,3 +1054,184 @@ describe("createProjectV2", () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — getProjectV2 (B12)
+// ---------------------------------------------------------------------------
+
+const successProjectDetail = {
+  success: true,
+  data: {
+    id: "prj_b7fixturePROPLUS00000000000000000000",
+    userId: "usr_test1",
+    name: "B7 fixture",
+    kmzBlobUrl: `s3://solarlayout-local-projects/projects/usr_test1/kmz/${SAMPLE_KMZ_SHA}.kmz`,
+    kmzSha256: SAMPLE_KMZ_SHA,
+    edits: {},
+    createdAt: "2026-04-30T10:00:00.000Z",
+    updatedAt: "2026-04-30T10:00:00.000Z",
+    deletedAt: null,
+    kmzDownloadUrl:
+      "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/usr_test1/kmz/abc.kmz?X-Amz-Signature=...",
+    runs: [
+      {
+        id: "run_b7fixturePROPLUS00000000000000000000",
+        name: "Run 1",
+        params: {},
+        billedFeatureKey: "plant_layout",
+        createdAt: "2026-04-30T10:05:00.000Z",
+      },
+    ],
+  },
+}
+
+describe("getProjectV2", () => {
+  test("GETs /v2/projects/:id and returns the ProjectDetail", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        return jsonResponse(successProjectDetail)
+      },
+    })
+    const detail = await client.getProjectV2(
+      KEY,
+      "prj_b7fixturePROPLUS00000000000000000000"
+    )
+    expect(seenUrl).toBe(
+      "https://api.solarlayout.in/v2/projects/prj_b7fixturePROPLUS00000000000000000000"
+    )
+    expect(seenMethod).toBe("GET")
+    expect(detail.id).toBe("prj_b7fixturePROPLUS00000000000000000000")
+    expect(detail.kmzDownloadUrl).toContain("X-Amz-Signature")
+    expect(detail.runs).toHaveLength(1)
+    expect(detail.runs[0]?.billedFeatureKey).toBe("plant_layout")
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successProjectDetail)
+      },
+    })
+    await client.getProjectV2(KEY, "prj_x")
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("accepts kmzDownloadUrl=null (S3 bucket env unset)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          ...successProjectDetail,
+          data: { ...successProjectDetail.data, kmzDownloadUrl: null },
+        }),
+    })
+    const detail = await client.getProjectV2(KEY, "prj_x")
+    expect(detail.kmzDownloadUrl).toBeNull()
+  })
+
+  test("maps 404 NOT_FOUND when project doesn't exist or isn't yours", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: 'Project "prj_missing" not found',
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.getProjectV2(KEY, "prj_missing")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("maps 401 UNAUTHORIZED via V2 envelope", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "License key not recognised.",
+            },
+          },
+          401
+        ),
+    })
+    try {
+      await client.getProjectV2(KEY, "prj_x")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(401)
+      expect(e.code).toBe("UNAUTHORIZED")
+    }
+  })
+
+  test("rejects malformed success body (schema guard — missing runs array)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            ...successProjectDetail.data,
+            runs: undefined,
+          },
+        }),
+    })
+    try {
+      await client.getProjectV2(KEY, "prj_x")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+
+  test("rejects malformed success body (schema guard — kmzDownloadUrl is undefined, not null)", async () => {
+    // Backend's null contract is explicit — undefined would be a wire bug.
+    const data: Record<string, unknown> = { ...successProjectDetail.data }
+    delete data.kmzDownloadUrl
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({ success: true, data }),
+    })
+    try {
+      await client.getProjectV2(KEY, "prj_x")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+
+  test("URL-encodes the projectId path segment", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return jsonResponse(successProjectDetail)
+      },
+    })
+    // Realistic IDs are alphanumeric (CUID-style), but defend against
+    // accidentally passing a string with reserved chars.
+    await client.getProjectV2(KEY, "prj_with spaces/odd")
+    expect(seenUrl).toContain("prj_with%20spaces%2Fodd")
+  })
+})

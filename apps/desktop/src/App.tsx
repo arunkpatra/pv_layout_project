@@ -49,6 +49,7 @@ import {
   useSyncEntitlementsToSidecar,
 } from "./auth/useEntitlements"
 import { useCreateProjectMutation } from "./auth/useCreateProject"
+import { useOpenProjectMutation } from "./auth/useOpenProject"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
@@ -127,6 +128,7 @@ export function App(): JSX.Element {
   const project = useProjectStore((s) => s.project)
   const setProject = useProjectStore((s) => s.setProject)
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
+  const setRuns = useProjectStore((s) => s.setRuns)
   const [openError, setOpenError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
   // P1 — quota-exceeded modal triggered by 402 PAYMENT_REQUIRED from B11.
@@ -361,6 +363,19 @@ export function App(): JSX.Element {
     }
   )
 
+  // ── P2 — open-existing-project mutation (B12 + S3 GET) ──────────────────
+  // Single round-trip: B12 returns ProjectDetail with embedded
+  // kmzDownloadUrl + runs[]; the hook then GETs the KMZ bytes from S3 via
+  // the presigned URL. App.tsx orchestrates the sidecar /parse-kmz +
+  // state hydration below in handleOpenExistingProject.
+  const openProjectMutation = useOpenProjectMutation(
+    activeKey,
+    entitlementsClient,
+    {
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    }
+  )
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
   // upload + create the persisted project via B6 → S3 → B11. The two
@@ -426,6 +441,72 @@ export function App(): JSX.Element {
     resetLayerVisibility,
     resetEditingState,
     createProjectMutation,
+  ])
+
+  // ── P2 — open-existing-project flow ─────────────────────────────────────
+  // Interim entry point: a window.prompt() captures a project ID. The
+  // proper recents-grid + tab-aware "Open existing…" UI lands at P3; this
+  // is enough to drive the round-trip end-to-end (and validate via the
+  // fixture-session smoke). Replace with the recents picker at P3.
+  const handleOpenExistingProject = useCallback(async () => {
+    if (!sidecarClient || opening) return
+    const raw = window.prompt("Project ID:")
+    if (!raw) return
+    const projectId = raw.trim()
+    if (!projectId) return
+    setOpening(true)
+    setOpenError(null)
+    setUpsellDetail(null)
+    try {
+      const opened = await openProjectMutation.mutateAsync({ projectId })
+      // Same reset as new-project — fresh canvas, fresh form, fresh
+      // visibility state. Layout result is dropped: open-existing doesn't
+      // hydrate a previous layout result yet (P7 will, when the user picks
+      // a specific run from the runs list).
+      clearLayoutResult()
+      resetLayoutParams()
+      resetLayerVisibility()
+      resetEditingState()
+      setLayoutFormKey((k) => k + 1)
+
+      // Parse the downloaded KMZ via the sidecar so the canvas can render.
+      // Mirror the kmzLoader.openAndParseKmz flow — same blob/Content-Type,
+      // filename derived from the project name.
+      const blob = new Blob([opened.bytes as BlobPart], {
+        type: "application/vnd.google-earth.kmz",
+      })
+      const fileName = `${opened.detail.name}.kmz`
+      const parsed = await sidecarClient.parseKmz(blob, fileName)
+
+      setCurrentProject(opened.detail)
+      setRuns(opened.detail.runs)
+      setProject({ kmz: parsed, fileName })
+      setPaletteOpen(false)
+    } catch (err) {
+      // 404 NOT_FOUND → user-friendly "Project not found"; otherwise pipe
+      // through the existing error-overlay surface.
+      let detail: string
+      if (err instanceof EntitlementsError && err.code === "NOT_FOUND") {
+        detail = `Project not found: ${projectId}`
+      } else {
+        detail = err instanceof Error ? err.message : String(err)
+      }
+      console.error("open existing project failed:", err)
+      setOpenError(detail)
+    } finally {
+      setOpening(false)
+    }
+  }, [
+    sidecarClient,
+    opening,
+    openProjectMutation,
+    setCurrentProject,
+    setRuns,
+    setProject,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+    resetEditingState,
   ])
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
@@ -860,6 +941,11 @@ export function App(): JSX.Element {
             label="Open KMZ…"
             shortcut="⌘O"
             onSelect={() => void handleOpenKmz()}
+          />
+          {/* P2 interim — recents UI lands at P3 and replaces this. */}
+          <PaletteItem
+            label="Open existing project…"
+            onSelect={() => void handleOpenExistingProject()}
           />
           <PaletteItem label="Save project" shortcut="⌘S" />
           <PaletteItem label="Export…" shortcut="⌘E" />

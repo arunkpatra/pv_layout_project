@@ -29,7 +29,7 @@ import {
   EntitlementsError,
   type EntitlementsClient,
 } from "@solarlayout/entitlements-client"
-import { uploadKmzToS3 } from "../src/auth/s3upload"
+import { downloadKmzFromS3, uploadKmzToS3 } from "../src/auth/s3upload"
 
 const API_BASE = process.env.SOLARLAYOUT_API_URL ?? "http://localhost:3003"
 
@@ -288,9 +288,11 @@ async function checkB7Wrongowner(client: EntitlementsClient): Promise<void> {
 
 async function checkB11HappyFreeWithUpload(
   client: EntitlementsClient
-): Promise<void> {
+): Promise<string | null> {
   // FREE starts with 0 projects + quota 3 → upload a real KMZ via B6 + S3 PUT
   // and create a Project via B11. End-to-end smoke for the whole P1 chain.
+  // Returns the new projectId on success (chained into the P2 check below)
+  // or null on failure / unexpected shape.
   try {
     const bytes = new Uint8Array(await readFile(KMZ_PATH))
 
@@ -314,15 +316,134 @@ async function checkB11HappyFreeWithUpload(
         "warn",
         `project id without prj_ prefix: ${project.id}`
       )
-      return
+      return null
     }
     record(
       "P1 chain (B6 + S3 + B11) on FREE",
       "pass",
       `created ${project.id}; sha=${upload.kmzSha256.slice(0, 8)}…; size=${upload.size}B`
     )
+    return project.id
   } catch (err) {
     record("P1 chain (B6 + S3 + B11) on FREE", "fail", fmtErr(err))
+    return null
+  }
+}
+
+async function checkB12ProPlusFixture(
+  client: EntitlementsClient
+): Promise<void> {
+  // PRO_PLUS owns the B7 fixture project → B12 must return ProjectDetail
+  // with embedded runs[] + a presigned kmzDownloadUrl. The desktop's P2
+  // open-existing-project flow drives exactly this path.
+  try {
+    const detail = await client.getProjectV2(
+      FIXTURE_KEYS.PRO_PLUS,
+      B7_FIXTURE.projectId
+    )
+    if (detail.id !== B7_FIXTURE.projectId) {
+      record(
+        "B12 PRO_PLUS fixture",
+        "fail",
+        `id mismatch: got ${detail.id}, expected ${B7_FIXTURE.projectId}`
+      )
+      return
+    }
+    if (detail.kmzDownloadUrl === null) {
+      record(
+        "B12 PRO_PLUS fixture",
+        "warn",
+        "kmzDownloadUrl=null (S3 bucket env unset on backend?)"
+      )
+      return
+    }
+    if (!detail.kmzDownloadUrl.startsWith("https://")) {
+      record(
+        "B12 PRO_PLUS fixture",
+        "warn",
+        `kmzDownloadUrl unexpected: ${detail.kmzDownloadUrl}`
+      )
+      return
+    }
+    record(
+      "B12 PRO_PLUS fixture",
+      "pass",
+      `id=${detail.id} runs=${detail.runs.length} kmzDownloadUrl=presigned`
+    )
+  } catch (err) {
+    record("B12 PRO_PLUS fixture", "fail", fmtErr(err))
+  }
+}
+
+async function checkB12NotFound(client: EntitlementsClient): Promise<void> {
+  // Cross-user existence is never leaked — FREE asking for PRO_PLUS's
+  // fixture project must 404, not 403.
+  try {
+    await client.getProjectV2(FIXTURE_KEYS.FREE, B7_FIXTURE.projectId)
+    record(
+      "B12 FREE → 404 (cross-user)",
+      "fail",
+      "expected 404 NOT_FOUND, got success"
+    )
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 404 &&
+      err.code === "NOT_FOUND"
+    ) {
+      record(
+        "B12 FREE → 404 (cross-user)",
+        "pass",
+        `status=404 code=NOT_FOUND`
+      )
+    } else {
+      record("B12 FREE → 404 (cross-user)", "fail", fmtErr(err))
+    }
+  }
+}
+
+async function checkP2EndToEnd(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // Full P2 chain: B12 mint → S3 GET → bytes returned. Mirrors what
+  // useOpenProjectMutation does in the desktop. We don't run the sidecar
+  // /parse-kmz here (would require booting the sidecar); the byte-level
+  // round-trip is the contract under test.
+  //
+  // Driven against the project we *just* created in checkB11 — that
+  // project has a real KMZ in S3 (the upload happened). The B7 fixture's
+  // project has a DB row but no S3 blob (B7's purpose is run-result
+  // uploads, not project KMZs), so it can't anchor this end-to-end check.
+  try {
+    const detail = await client.getProjectV2(FIXTURE_KEYS.FREE, projectId)
+    if (detail.kmzDownloadUrl === null) {
+      record(
+        "P2 chain (B12 + S3 GET) on FREE",
+        "warn",
+        "kmzDownloadUrl=null (S3 bucket env unset on backend?)"
+      )
+      return
+    }
+    const bytes = await downloadKmzFromS3({
+      url: detail.kmzDownloadUrl,
+      fetchImpl: globalThis.fetch as never,
+    })
+    if (bytes.byteLength === 0) {
+      record(
+        "P2 chain (B12 + S3 GET) on FREE",
+        "warn",
+        `downloaded 0 bytes`
+      )
+      return
+    }
+    record(
+      "P2 chain (B12 + S3 GET) on FREE",
+      "pass",
+      `${bytes.byteLength}B downloaded; project="${detail.name}"; runs=${detail.runs.length}`
+    )
+  } catch (err) {
+    record("P2 chain (B12 + S3 GET) on FREE", "fail", fmtErr(err))
   }
 }
 
@@ -445,9 +566,27 @@ async function main(): Promise<void> {
 
   // ── 5. End-to-end P1 chain (B6 + S3 + B11) ──────────────────────────────
   console.log("\n--- P1 end-to-end (B6 + S3 PUT + B11) ---")
-  await checkB11HappyFreeWithUpload(client)
+  const createdProjectId = await checkB11HappyFreeWithUpload(client)
 
-  // ── 6. B9 idempotency ───────────────────────────────────────────────────
+  // ── 6. B12 ProjectDetail + cross-user 404 ───────────────────────────────
+  console.log("\n--- B12 ProjectDetail ---")
+  await checkB12ProPlusFixture(client)
+  await checkB12NotFound(client)
+
+  // ── 7. End-to-end P2 chain (B12 + S3 GET) ───────────────────────────────
+  // Chained from P1 above so the project has a real S3 KMZ to download.
+  console.log("\n--- P2 end-to-end (B12 + S3 GET) ---")
+  if (createdProjectId !== null) {
+    await checkP2EndToEnd(client, createdProjectId)
+  } else {
+    record(
+      "P2 chain (B12 + S3 GET) on FREE",
+      "warn",
+      "skipped — P1 didn't return a projectId to chain from"
+    )
+  }
+
+  // ── 8. B9 idempotency ───────────────────────────────────────────────────
   console.log("\n--- B9 idempotency ---")
   await checkB9HappyFree(client)
 
