@@ -621,6 +621,76 @@ extra-attention items inside flows already on the route.
   instead. Don't log "no V2 history endpoint" as a finding — it's by
   design.
 
+#### Session close summary
+
+**Closed:** 2026-04-30 15:38. **App HEAD at close:** `88e10ae`.
+**Backend HEAD:** `3ee6f05` on `post-parity-v2-backend` (unchanged
+through the session — no backend findings).
+
+**Headline counts**
+- 13 observations logged
+- 2 P0 — both fixed live (S1-02 Tauri HTTP scope, S1-11 menu listener stacking)
+- 4 P1 — all fixed live (S1-08 tab-switch state restore, S1-12 runs slice carry-over on P1, S1-13 stale-mutation race in useOpenRun)
+- 4 P2 — 2 fixed inline (S1-04 inspector hide, S1-09 + S1-10 held with proposed fixes)
+- 5 P3 — 2 fixed inline (S1-03 statusbar count, S1-05 ⌘K pill removal); 3 deferred (S1-01 license button gating, S1-06 run thumbnails to new row, S1-07 run-switch loading to new row)
+
+**Surfaces exercised cleanly**
+F1 license entry · F2 entitlements · S1 TopBar chrome · S2 multi-tab
++ tab-switch state hydration · S3 RecentsView · S4 account dropdown
++ masked key + Buy more · P1 new project (B6 + S3 PUT + B11) · P2
+open existing (B12 + S3 GET) · P5 runs gallery · P6 generate layout
+(B16 + sidecar + S3 PUT) · P7 open run on canvas (B17 + S3 GET) ·
+P10 quota chip on PRO (licensed=true branch only).
+
+**Surfaces NOT yet exercised (Session 2 candidates)**
+- P3 rename / delete project (interim window.prompt UX)
+- P4 auto-save edits (debounced PATCH)
+- P9 delete run (multi-select)
+- Other tier license keys: FREE quota enforcement, BASIC, PRO_PLUS,
+  MULTI cheapest-first, EXHAUSTED → P10 upsell branch, DEACTIVATED →
+  P10 contact-support branch, QUOTA_EDGE → B11 402
+- Backend spot-check anchors: projectQuota per-tier under FREE / BASIC
+  / PRO_PLUS, kmzDownloadUrl past-1h-expiry behaviour, B16 idempotency
+  replay live, B17 exportsBlobUrls=[] always
+- Sidecar restart resilience, OS file menu under FREE quota
+- Session 2 should also verify the 2 held P2 fixes (S1-09, S1-10)
+  once they ship.
+
+**Process learnings folded into SMOKE-LOG.md this session**
+- New top-level section "Smoke reset" (`ca09243`) — quick / full
+  reset paths + post-reset verification + Tauri-restart-required-for-
+  listener-fixes rule + S3-orphans note.
+- Coordination protocol with the backend session is locked at v2
+  (`07ff024`); worked smoothly throughout.
+
+**Backend coordination footprint**
+- Zero backend rows opened this session (no contract bugs, no S3
+  bugs, no schema drift). Backend session was kept informed at
+  preflight + close; all 4 spot-check anchors and 4 guardrail
+  fixtures honored.
+- One backend-bound deferral: S1-06 (server-side run thumbnails,
+  Option B) earns its own backend B-row when the design memo lands.
+  Not active.
+
+**Held / queued for the next code task (no smoke needed)**
+- S1-09 P2 — camera over-zoom (Inspector-animation race) → ship the
+  ResizeObserver fix in MapCanvas, ~30–50 lines.
+- S1-10 P2 — wordmark click-to-home → ship the small TopBar `onHome`
+  prop + tabs-slice `goHome()` action + App.tsx wiring, ~15–20 lines.
+
+**Deferred to new rows (when polish phase opens)**
+- RP1 — Run thumbnail previews (Option B server-side; cross-repo
+  with backend, design memo first).
+- RP2 — In-place loading feedback for run-switch (Option A: card
+  spinner + StatusBar load text).
+- NP1 — Cmd-K palette: Recents submenu + project rename / delete
+  via Dialog modals (replaces current `window.prompt` interims).
+
+**Net commits this session**
+S2-era → close: `6c5d6bc → 88e10ae`. ~30 commits including the smoke
+preamble, protocol v1+v2, 4 P0/P1 fixes, 4 inline P2/P3 fixes, and
+the smoke-reset doc. Pushed to `origin/post-parity-v1-desktop`.
+
 #### Observations
 
 | ID    | Sev | Surface  | Owner | Title                                                       | Repro                                                                                                | Acceptance                                                              | Status | Linked | Thread (see below per ID) |
