@@ -238,7 +238,7 @@ describe("RecentsView", () => {
       expect(onOpen).not.toHaveBeenCalled()
     })
 
-    it("⋯ → Rename… opens the Rename dialog with the current name pre-filled", async () => {
+    it("⋯ → Rename opens the Rename dialog with the current name pre-filled", async () => {
       const user = userEvent.setup()
       render(
         <RecentsView
@@ -290,7 +290,7 @@ describe("RecentsView", () => {
       expect(onRename).toHaveBeenCalledWith("prj_a", "Renamed Site")
     })
 
-    it("⋯ → Delete… opens the destructive confirm dialog", async () => {
+    it("⋯ → Delete opens the destructive confirm dialog", async () => {
       const user = userEvent.setup()
       render(
         <RecentsView
@@ -316,7 +316,7 @@ describe("RecentsView", () => {
       ).toBeInTheDocument()
     })
 
-    it("Delete confirm invokes onDelete with the right projectId", async () => {
+    it("Delete confirm invokes onDelete with the right projectId (after type-to-confirm)", async () => {
       const onDelete = vi.fn().mockResolvedValue(undefined)
       const user = userEvent.setup()
       render(
@@ -336,6 +336,8 @@ describe("RecentsView", () => {
         })
       )
       await user.click(screen.getByRole("menuitem", { name: /Delete/i }))
+      // Type-to-confirm gate (anti-fat-finger guard).
+      await user.type(screen.getByLabelText(/Type/), "delete")
       await user.click(screen.getByRole("button", { name: "Delete" }))
       expect(onDelete).toHaveBeenCalledWith("prj_a")
     })
@@ -395,6 +397,7 @@ describe("RecentsView", () => {
         })
       )
       await user.click(screen.getByRole("menuitem", { name: /Delete/i }))
+      await user.type(screen.getByLabelText(/Type/), "delete")
       await user.click(screen.getByRole("button", { name: "Delete" }))
       expect(screen.getByText("Delete project")).toBeInTheDocument()
       expect(

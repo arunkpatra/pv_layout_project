@@ -26,7 +26,7 @@ export { SunMark } from "./components/Icon"
 // `lucide-react` dependency. Add new exports as new surfaces need them
 // rather than re-exporting the whole package (small subset = small
 // bundle slice).
-export { MoreHorizontal } from "lucide-react"
+export { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 export {
   ModuleIcon,
   TableIcon,

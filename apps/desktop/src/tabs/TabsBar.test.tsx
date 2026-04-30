@@ -275,7 +275,7 @@ describe("TabsBar", () => {
       expect(onRename).toHaveBeenCalledWith("prj_a", "Renamed Site A")
     })
 
-    it("Delete menu item opens DeleteProjectConfirmDialog; confirm invokes onDelete", async () => {
+    it("Delete menu item opens DeleteProjectConfirmDialog; confirm invokes onDelete (after type-to-confirm)", async () => {
       const onDelete = vi.fn().mockResolvedValue(undefined)
       useTabsStore.getState().openTab("prj_a", "Site A")
       const user = (await import("@testing-library/user-event")).default.setup()
@@ -294,6 +294,7 @@ describe("TabsBar", () => {
         await screen.findByRole("menuitem", { name: /Delete/i })
       )
       expect(screen.getByText("Delete project")).toBeInTheDocument()
+      await user.type(screen.getByLabelText(/Type/), "delete")
       await user.click(screen.getByRole("button", { name: "Delete" }))
       expect(onDelete).toHaveBeenCalledWith("prj_a")
     })

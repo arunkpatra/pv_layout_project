@@ -23,6 +23,8 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  Pencil,
+  Trash2,
 } from "@solarlayout/ui"
 import { useTabsStore, type Tab } from "../state/tabs"
 import { RenameProjectDialog } from "../dialogs/RenameProjectDialog"
@@ -300,18 +302,30 @@ function TabButton({
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>{tabBody}</ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {onRename && (
-            <ContextMenuItem onSelect={() => setRenameOpen(true)}>
-              Rename…
+            <ContextMenuItem
+              onSelect={() => setRenameOpen(true)}
+              className="cursor-pointer"
+            >
+              <span className="inline-flex items-center gap-[8px]">
+                <Pencil className="w-[12px] h-[12px] text-[var(--text-muted)]" />
+                Rename
+              </span>
             </ContextMenuItem>
           )}
           {onDelete && (
             <ContextMenuItem
               onSelect={() => setDeleteOpen(true)}
-              className="text-[var(--error-default)] data-[highlighted]:bg-[var(--error-subtle)] data-[highlighted]:text-[var(--error-default)]"
+              className="cursor-pointer text-[var(--error-default)] data-[highlighted]:bg-[var(--error-muted)] data-[highlighted]:text-[var(--error-default)]"
             >
-              Delete…
+              <span className="inline-flex items-center gap-[8px]">
+                <Trash2 className="w-[12px] h-[12px]" />
+                Delete
+              </span>
             </ContextMenuItem>
           )}
         </ContextMenuContent>

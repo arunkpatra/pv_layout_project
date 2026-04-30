@@ -39,6 +39,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "@solarlayout/ui"
 import { RenameProjectDialog } from "../dialogs/RenameProjectDialog"
 import { DeleteProjectConfirmDialog } from "../dialogs/DeleteProjectConfirmDialog"
@@ -295,15 +297,27 @@ function ProjectCard({
                 <MoreHorizontal className="w-[14px] h-[14px]" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
-                Rename…
+            <DropdownMenuContent
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <DropdownMenuItem
+                onSelect={() => setRenameOpen(true)}
+                className="cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-[8px]">
+                  <Pencil className="w-[12px] h-[12px] text-[var(--text-muted)]" />
+                  Rename
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => setDeleteOpen(true)}
-                className="text-[var(--error-default)] data-[highlighted]:bg-[var(--error-subtle)] data-[highlighted]:text-[var(--error-default)]"
+                className="cursor-pointer text-[var(--error-default)] data-[highlighted]:bg-[var(--error-muted)] data-[highlighted]:text-[var(--error-default)]"
               >
-                Delete…
+                <span className="inline-flex items-center gap-[8px]">
+                  <Trash2 className="w-[12px] h-[12px]" />
+                  Delete
+                </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

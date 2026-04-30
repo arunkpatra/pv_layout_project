@@ -1882,7 +1882,7 @@ Coverage targets:
 | ID | Surface | Severity | Owner | Status |
 |---|---|---|---|---|
 | S2-01 | TopBar calc pill display | P3 (defer) | FE | open |
-| S2-02 | P3 rename / delete via Cmd-K — UX broken on three counts | P1 | FE | resolved-by-SP3 |
+| S2-02 | P3 rename / delete via Cmd-K — UX broken on three counts | P1 | FE | **closed** (SP3 shipped + live-verified 2026-04-30) |
 
 ---
 
@@ -1997,6 +1997,69 @@ complete feature surface.
 **Session 2 status: closed inconclusive.** No fixes flowed from
 this session; the only artifact is S2-02's diagnostic + the
 Session 3 coverage list above.
+
+---
+
+#### S2-02 closeout — SP3 shipped + live-verified (2026-04-30)
+
+SP3 implementation landed at `2d38d97` on `post-parity-v1-desktop`
++ a follow-up polish commit (icons, cursor-pointer, drop ellipsis
+suffix, stopPropagation on menu content, type-to-confirm gate on
+Delete dialog). Live verification flow on `localhost:3003`:
+
+1. **Rename via Recents card ⋯ menu** — Pencil icon left-aligned
+   in dropdown, hover-bg muted, cursor-pointer. Click → Dialog
+   opens with current name pre-filled. Save → B13 PATCH lands +
+   tab title syncs (when project has an open tab) + dialog
+   closes. Confirmed via `GET /v2/projects` — response shows new
+   name + bumped `updatedAt`.
+2. **Rename via tab right-click ContextMenu** — same Pencil icon,
+   same dialog component instance per tab, same persistence.
+   `GET /v2/projects` confirms second rename also persisted.
+3. **Delete via Recents card ⋯ menu** — Trash2 icon, error-tone
+   red text, hover-bg `--error-muted` (token-correct), cursor-
+   pointer. Click → confirm Dialog opens. Delete button starts
+   **disabled**; Type-to-confirm input below the warning copy
+   gates the destructive action (must type literal `delete`,
+   case-insensitive). After typing → button enables → click
+   fires B14 + clears slice + closes any tab pointing at the
+   project (tab cleanup in `useDeleteProject.onSuccess` runs
+   BEFORE clearAll, so the tab-switch effect doesn't fire B12
+   against the deleted ID — bug 4 fixed).
+4. **Delete via tab right-click ContextMenu** — same dialog, same
+   gate, same B14 path, same tab cleanup.
+5. **Cmd-K palette** — verified the previous broken Rename /
+   Delete items are gone. Recents submenu shows the user's
+   projects (alphabetical from B10's `updatedAt DESC`); click
+   navigates via the existing `handleOpenProjectById` flow.
+6. **Click-bubble fix verified** — clicking Rename/Delete items
+   no longer cascades through the card's onClick (which would
+   have navigated to project detail). `stopPropagation` on
+   DropdownMenuContent + ContextMenuContent (covers the React
+   synthetic-event bubble through portaled menu trees).
+
+**Bonus discovery during verification.** While confirming the
+rename persisted via `GET /v2/projects`, the response surfaced
+backend's `mostRecentRunThumbnailBlobUrl` field on every project
+card — meaning **backend already shipped B24 (B10 projection
+extension) AND B23 (the wire shape + B17 deterministic-sign +
+RUN_RESULT_SPEC.thumbnail)**. URLs are signed against the
+locked Path A deterministic key path
+`projects/<userId>/<projectId>/runs/<runId>/thumbnail.webp` and
+return signed-but-blob-missing 404s right now (the sidecar
+`/layout/thumbnail` endpoint isn't built yet, so no blobs have
+been PUT). The always-sign + `<img onError>` fallback contract
+is working as designed — exactly what memo v3 §10 Q1 locked.
+
+This unblocks SP1's desktop adapter work as soon as the sidecar
+endpoint ships (matplotlib reuse + Pillow WebP encoding per memo
+§5). SP4's adapter unblocks immediately — the wire field is
+already on B10 responses.
+
+**S2-02 status:** closed. Resolution path was correct
+(replace-the-surface, not patch-the-bugs). No regression smoke
+needed against the original Cmd-K bugs since the code path
+that exhibited them is gone from the codebase.
 
 ---
 
