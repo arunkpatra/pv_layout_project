@@ -637,7 +637,7 @@ extra-attention items inside flows already on the route.
 | S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
 | S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | fixed  | F4-era menu wiring | see S1-11 below           |
 | S1-12 | P1  | frontend | fe | Runs list rendering inconsistent across tab switches      | 1. Open project A; Generate Layout (run A1 created). 2. Open project B; Generate Layout (run B1 created). 3. Inspector → Runs tab on B shows **2 runs**. 4. Switch back to A, then back to B (or just switch tabs). 5. Inspector → Runs tab on B now shows **1 run**.                                                | Each project's Runs tab renders only that project's runs, consistently across tab switches. Run counts match server state (B12's runs[] / B15 if used).                                                                                                                                | fixed  | P5, P6, S2 | see S1-12 below           |
-| S1-13 | P1  | frontend | fe | Canvas shows another project's layout despite no runs (stale-mutation race) | 1. Open project A (`phaseboundary2`); Generate Layout. 2. Click `+` to open project B (`phaseboundary`) — pick KMZ; tab opens. 3. Canvas shows panels + ICR-1 + ICR-2 even though Inspector → Runs tab on B is correctly empty ("Generate a layout to see it here"). 4. Server confirms B has 0 runs.            | When user navigates away from a project before its `useOpenRunMutation` resolves, the late onSuccess must NOT write the result into the global layoutResult slice. Canvas of a runs-empty project should never display a layout.                                                       | open   | S1-08, P7 | see S1-13 below           |
+| S1-13 | P1  | frontend | fe | Canvas shows another project's layout despite no runs (stale-mutation race) | 1. Open project A (`phaseboundary2`); Generate Layout. 2. Click `+` to open project B (`phaseboundary`) — pick KMZ; tab opens. 3. Canvas shows panels + ICR-1 + ICR-2 even though Inspector → Runs tab on B is correctly empty ("Generate a layout to see it here"). 4. Server confirms B has 0 runs.            | When user navigates away from a project before its `useOpenRunMutation` resolves, the late onSuccess must NOT write the result into the global layoutResult slice. Canvas of a runs-empty project should never display a layout.                                                       | fixed  | S1-08, P7 | see S1-13 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1439,6 +1439,11 @@ post-fix repro: create A → Generate → create B → Runs tab on B
 shows 0 (not 1) → Generate on B → Runs shows 1 (not 2) → tab
 round-trip → still 1.
 
+[FE 2026-04-30 15:30] Live confirmed by user — runs list correctly
+shows 0 on freshly-created project B and stays consistent across
+tab-switch round-trips. Closed via `d046729` on
+`post-parity-v1-desktop`.
+
 ##### S1-13 thread
 
 [FE 2026-04-30 15:27] Caught while user was verifying S1-12. Same
@@ -1514,5 +1519,29 @@ that has never been run. Confusing + violates data-integrity
 expectations.
 
 Recommendation: ship inline now. Awaiting user go-ahead.
+
+[FE 2026-04-30 15:33] User said ship. Patched
+`apps/desktop/src/auth/useOpenRun.ts`:118–135: added a small
+`useProjectStore.getState().currentProject?.id` check at the top of
+the mutation's onSuccess. If `vars.projectId` doesn't match the
+current project id, the result is dropped before reaching
+`setResult`. Imported `useProjectStore` from `../state/project`.
+
+Test coverage: extended
+`apps/desktop/src/auth/useOpenRun.test.tsx` —
+- New `beforeEach` line: `useProjectStore.setState({ currentProject:
+  { id: "prj_xyz" } as never })` so all happy-path tests have a
+  matching `currentProject.id`. Existing tests now pass cleanly
+  through the guard.
+- New test "(S1-13) skips setResult when user has navigated to a
+  different project" — overrides `currentProject` to
+  `{id: "prj_other"}` while keeping `mutate({projectId: "prj_xyz"})`,
+  expects mutation to succeed but slice to stay null. Direct
+  validation of the guard.
+
+316 tests pass across 3 packages (was 315). Status → `fixed`
+pending live confirmation. Will close fully once user verifies
+the post-fix repro: sequence-A-Generate → click + → B opens →
+canvas should show only B's boundary, no panels.
 
 ---

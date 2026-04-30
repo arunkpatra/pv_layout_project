@@ -47,6 +47,7 @@ import {
   PREVIEW_LICENSE_KEY_PRO_PLUS,
 } from "./licenseKey"
 import { useLayoutResultStore } from "../state/layoutResult"
+import { useProjectStore } from "../state/project"
 
 const PREVIEW_KEYS = new Set<string>([
   PREVIEW_LICENSE_KEY,
@@ -116,6 +117,16 @@ export function useOpenRunMutation(
       return { detail, layoutResult }
     },
     onSuccess: (data, vars) => {
+      // S1-13 — guard against a stale-resolve race. If the user navigated
+      // to a different project (e.g. created a new one via P1's
+      // handleOpenKmz, or switched tabs to a runs-empty project) while
+      // this B17 was in flight, the late onSuccess must NOT poison the
+      // global layoutResult slice with the wrong project's data.
+      // S1-08's auto-select-most-recent-run made this race reachable
+      // by firing P7's effect (and thus this mutation) on every project
+      // open with runs.
+      const currentProjectId = useProjectStore.getState().currentProject?.id
+      if (currentProjectId !== vars.projectId) return
       // Capture both the result AND the runId so the App's auto-fetch
       // effect (keyed on selectedRunId vs resultRunId) skips redundant
       // re-fetches.

@@ -34,6 +34,7 @@ import { useOpenRunMutation } from "./useOpenRun"
 import { S3DownloadError } from "./s3upload"
 import { PREVIEW_LICENSE_KEY_PRO_PLUS } from "./licenseKey"
 import { useLayoutResultStore } from "../state/layoutResult"
+import { useProjectStore } from "../state/project"
 
 const REAL_KEY = "sl_live_real_key_for_test"
 
@@ -121,6 +122,15 @@ function s3JsonFetch(payload: unknown): typeof fetch {
 
 beforeEach(() => {
   useLayoutResultStore.getState().clearResult()
+  // S1-13 — useOpenRun's onSuccess guards against stale-resolve race by
+  // comparing vars.projectId against useProjectStore's currentProject.id.
+  // Tests that exercise the success path need currentProject set to the
+  // id their mutate() call passes; default to "prj_xyz" since that's
+  // what STUB_DETAIL.projectId is. Tests that explicitly verify the
+  // guard override this to a different id.
+  useProjectStore.setState({
+    currentProject: { id: "prj_xyz" } as never,
+  })
 })
 
 describe("useOpenRunMutation — happy path", () => {
@@ -145,6 +155,41 @@ describe("useOpenRunMutation — happy path", () => {
     const slice = useLayoutResultStore.getState()
     expect(slice.result).toEqual(STUB_LAYOUT_RESULT)
     expect(slice.resultRunId).toBe("run_abc")
+  })
+
+  it("(S1-13) skips setResult when user has navigated to a different project", async () => {
+    // Race scenario: B17 was kicked off when currentProject.id === "prj_xyz".
+    // While in flight, the user creates a new project; currentProject.id
+    // becomes "prj_other". The mutation's onSuccess must NOT poison the
+    // global layoutResult slice with the stale project's data.
+    const client = makeClient()
+    const { Wrapper } = makeWrapper()
+
+    const { result } = renderHook(
+      () =>
+        useOpenRunMutation(REAL_KEY, client, {
+          fetchImpl: s3JsonFetch(STUB_LAYOUT_RESULT),
+        }),
+      { wrapper: Wrapper }
+    )
+
+    // Mutate using the original project's id; before the success resolves,
+    // simulate the user navigating to a different project by overriding
+    // currentProject.id. (In practice this swap happens inside
+    // handleOpenKmz; here we just stub the state the guard reads.)
+    useProjectStore.setState({
+      currentProject: { id: "prj_other" } as never,
+    })
+    act(() => {
+      result.current.mutate({ projectId: "prj_xyz", runId: "run_abc" })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    // Mutation succeeded (B17 + S3 GET both completed) but the guard
+    // skipped the slice write — slice stays cleared.
+    const slice = useLayoutResultStore.getState()
+    expect(slice.result).toBeNull()
+    expect(slice.resultRunId).toBeNull()
   })
 
   it("hits the URL from detail.layoutResultBlobUrl with GET (no auth)", async () => {
