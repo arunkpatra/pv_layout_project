@@ -529,6 +529,100 @@ The "both repos commit" line above only applies when the desktop
 side also needs to commit a schema mirror in
 `packages/entitlements-client/src/types-v2.ts` (the lockstep pattern).
 
+### Cross-repo plan coordination
+
+Per-finding coordination flows through this SMOKE-LOG file (see the
+flow diagram + block formats above). Plan-level coordination — i.e.
+when a row in one repo's plan has a partner row in the other — uses
+the same paste-block courier model **before either side commits the
+row**, so both rows land linked from t=0 instead of catching up
+later.
+
+**When to send a cross-repo row request:**
+
+A row request is needed when adding a row whose work **requires** the
+other side. Heuristic for the FE → BE direction (BE-side rows that
+need a desktop mirror are symmetric):
+
+| Trigger                                              | Mirror? |
+|------------------------------------------------------|---------|
+| New FE row depends on a wire-shape extension         | yes     |
+| New FE row depends on a new backend endpoint         | yes     |
+| New FE row uses a new `V2ErrorCode` value            | yes     |
+| New FE row is desktop-only (UX, polish, refactor)    | no      |
+| New FE row is sidecar-only (parity port, performance)| no      |
+
+A row that "needs a partner" means the FE row's acceptance can't be
+met until the partner row ships. If the FE row is fully
+self-contained (e.g. SP2 in-place loading state, SP3 Dialog modals
+replacing `window.prompt` interims), no request needed.
+
+**Block format — FE → BE request:**
+
+````markdown
+Cross-repo row request: SP<N> ↔ B<M>
+
+| # | Feature | Tier | Cross-repo? | Source |
+|---|---------|------|-------------|--------|
+| SP<N> | <title> | T<X> | YES — needs your B<M> | <SMOKE-LOG ID or other source> |
+
+Acceptance / scope (looser pre-memo, tight if memo-locked): …
+
+Asking before I commit. Two questions:
+1. Add B<M> now (status `todo`, awaiting memo / details), or wait?
+2. Row number — B<M> OK or different?
+````
+
+**Block format — BE → FE request:**
+
+````markdown
+Cross-repo row request: B<N> ↔ <SP/P/F><M>
+
+| # | Feature | Tier | Cross-repo? | Source |
+|---|---------|------|-------------|--------|
+| B<N> | <title> | T<X> | YES — needs your <SP/P/F><M> | <source> |
+
+Acceptance / scope (looser pre-memo, tight if memo-locked): …
+
+Asking before I commit.
+````
+
+**Sequence after the receiving side acks:**
+
+1. Receiving side commits the partner row in their own plan.
+2. Receiving side reports back the SHA + branch (for downstream
+   reference).
+3. Originating side commits their row referencing the partner row's
+   SHA.
+4. Both sides push.
+5. If the row is T3 (needs a design memo), the originating side
+   drafts the memo as the row's first deliverable; backend refines
+   acceptance after the memo lands.
+
+**Mirror-or-not heuristic — BE side (provided by backend session):**
+
+- Wire-shape changes → mirror always
+  (`packages/entitlements-client/src/types-v2.ts` schema validation
+  depends on the contract being kept in sync).
+- New endpoints the desktop will consume → mirror always.
+- New `V2ErrorCode` values → mirror always (the desktop's error-
+  mapping switches need the case).
+- Schema migrations that don't change wire shape → don't mirror.
+- Backend-only refactors (helper extraction, perf optimizations,
+  internal cleanup) → don't mirror.
+- Decisions log entries / audit trail → don't mirror; backend-side
+  log is enough.
+
+**First exercise of this protocol:**
+
+`SP1 ↔ B23` — Run gallery thumbnails (server-side pipeline). FE
+sent the request before committing SP1; backend acked + committed
+B23 at `555890e` on `post-parity-v2-backend`; FE then committed
+`SP1`/`SP2`/`SP3` to `docs/PLAN.md` referencing B23. Memo in
+flight at `docs/post-parity/findings/2026-04-30-001-run-thumbnail-pipeline.md`.
+Backend logged the protocol extension as a Decisions entry in V2
+plan §9 dated 2026-04-30.
+
 ### Push cadence
 
 - **FE pushes after every smoke-log commit.** Even mid-session.
