@@ -299,12 +299,57 @@ export const runResultUploadUrlResponseSchema = v2SuccessResponseSchema(
 // ---------------------------------------------------------------------------
 
 /**
+ * SP6 / B26 — boundary GeoJSON for the muted-placeholder fallback.
+ *
+ * Backend stores this on the Project row at create-time and emits it
+ * on B10 / B12 / B11 / B13 wire responses. The desktop renders it as
+ * an inline SVG `<polyline>` in the project-card placeholder slot
+ * when no thumbnail blob exists (zero-run projects, PUT-failed runs).
+ *
+ * Structure mirrors backend's `BoundaryGeojson` discriminated union
+ * (Polygon | MultiPolygon). Loose validation here — the desktop's
+ * SVG render handles malformed shapes by skipping them (memo v3 §14
+ * + backend's "loose validation only" stance).
+ */
+export const boundaryGeojsonPolygonSchema = z.object({
+  type: z.literal("Polygon"),
+  // Outer ring only (no holes for v1; KMZ obstacles are rendered as
+  // separate features, not polygon holes). Each ring is an array of
+  // [lon, lat] pairs; rings are closed (first point === last).
+  coordinates: z.array(z.array(z.tuple([z.number(), z.number()]))),
+})
+
+export const boundaryGeojsonMultiPolygonSchema = z.object({
+  type: z.literal("MultiPolygon"),
+  coordinates: z.array(
+    z.array(z.array(z.tuple([z.number(), z.number()])))
+  ),
+})
+
+export const boundaryGeojsonSchema = z.discriminatedUnion("type", [
+  boundaryGeojsonPolygonSchema,
+  boundaryGeojsonMultiPolygonSchema,
+])
+
+export type BoundaryGeojson = z.infer<typeof boundaryGeojsonSchema>
+export type BoundaryGeojsonPolygon = z.infer<
+  typeof boundaryGeojsonPolygonSchema
+>
+export type BoundaryGeojsonMultiPolygon = z.infer<
+  typeof boundaryGeojsonMultiPolygonSchema
+>
+
+/**
  * B11 request body. Mirrors `CreateProjectSchema` in
  * `renewable_energy/apps/mvp_api/src/modules/projects/projects.routes.ts`:
  *   - `name` 1..200 chars
  *   - `kmzBlobUrl` non-empty (`s3://<bucket>/projects/<userId>/kmz/<sha>.kmz`)
  *   - `kmzSha256` 64-char lowercase hex
  *   - `edits` optional, opaque JSON; defaults to `{}` server-side
+ *   - `boundaryGeojson` optional (SP6 / B26) — desktop sends the parsed
+ *     boundary it already has in memory post-`sidecar.parseKmz`; backend
+ *     persists + emits unchanged. Pre-B26 / pre-SP6 callers omit this
+ *     field; backend stores null and the placeholder fallback applies.
  *
  * The `kmzBlobUrl` + `kmzSha256` fields come from the F6 `uploadKmzToS3`
  * orchestrator's return value; the desktop never mints these directly.
@@ -316,6 +361,7 @@ export const createProjectV2RequestSchema = z.object({
     .string()
     .regex(/^[0-9a-f]{64}$/u, "sha256 must be 64 lowercase hex chars"),
   edits: z.unknown().optional(),
+  boundaryGeojson: boundaryGeojsonSchema.optional(),
 })
 
 export type CreateProjectV2Request = z.infer<typeof createProjectV2RequestSchema>
@@ -575,6 +621,13 @@ export const projectSummaryListRowV2Schema = z.object({
   // PUT didn't land — `<RecentsView>`'s `<img onError>` falls back to
   // the existing placeholder.
   mostRecentRunThumbnailBlobUrl: z.string().url().nullable(),
+  // SP6 / B26 — boundary geometry for the placeholder-slot fallback
+  // visual. Null on legacy projects (created before B26) and on any
+  // project where the desktop didn't send the boundary at create
+  // time. ProjectCardThumbnail renders an inline SVG `<polyline>`
+  // when this is non-null AND mostRecentRunThumbnailBlobUrl is null
+  // OR the thumbnail `<img>` 404s.
+  boundaryGeojson: boundaryGeojsonSchema.nullable(),
 })
 
 export type ProjectSummaryListRowV2 = z.infer<

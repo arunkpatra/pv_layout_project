@@ -1776,6 +1776,9 @@ const successListProjects = {
       lastRunAt: "2026-04-30T11:00:00.000Z",
 
       mostRecentRunThumbnailBlobUrl: null,
+
+
+      boundaryGeojson: null,
     },
     {
       id: "prj_second",
@@ -1788,6 +1791,9 @@ const successListProjects = {
       lastRunAt: null,
 
       mostRecentRunThumbnailBlobUrl: null,
+
+
+      boundaryGeojson: null,
     },
   ],
 }

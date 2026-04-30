@@ -856,6 +856,9 @@ describe("projectSummaryListRowV2Schema", () => {
     lastRunAt: null,
 
     mostRecentRunThumbnailBlobUrl: null,
+
+
+    boundaryGeojson: null,
   }
 
   test("parses a fresh-project list row (zero runs)", () => {
@@ -869,6 +872,9 @@ describe("projectSummaryListRowV2Schema", () => {
       lastRunAt: "2026-04-30T11:00:00.000Z",
 
       mostRecentRunThumbnailBlobUrl: null,
+
+
+      boundaryGeojson: null,
     })
     expect(r.success).toBe(true)
   })
@@ -916,6 +922,9 @@ describe("listProjectsV2ResponseSchema", () => {
           lastRunAt: null,
 
           mostRecentRunThumbnailBlobUrl: null,
+
+
+          boundaryGeojson: null,
         },
         {
           id: "prj_b",
@@ -928,6 +937,9 @@ describe("listProjectsV2ResponseSchema", () => {
           lastRunAt: "2026-04-30T11:00:00.000Z",
 
           mostRecentRunThumbnailBlobUrl: null,
+
+
+          boundaryGeojson: null,
         },
       ],
     })

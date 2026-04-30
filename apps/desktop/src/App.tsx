@@ -70,6 +70,7 @@ import {
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
 import { openAndParseKmz } from "./project/kmzLoader"
+import { boundaryGeojsonFromParsed } from "./project/boundaryGeojson"
 import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
 import { layoutToGeoJson } from "./project/layoutToGeoJson"
 import { useProjectStore } from "./state/project"
@@ -571,6 +572,11 @@ export function App(): JSX.Element {
         const persisted = await createProjectMutation.mutateAsync({
           bytes: result.bytes,
           name: projectName,
+          // SP6 / B26 — send the parsed boundary so backend can persist
+          // it for the placeholder-fallback render on RecentsView cards.
+          // The desktop already has it in memory from sidecar.parseKmz
+          // a few lines above; no extra round-trip cost.
+          boundaryGeojson: boundaryGeojsonFromParsed(result.parsed),
         })
         setCurrentProject(persisted)
         // S1-12 — A freshly-created project has no runs yet. Explicitly

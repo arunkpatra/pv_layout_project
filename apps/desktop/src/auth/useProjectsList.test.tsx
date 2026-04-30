@@ -35,6 +35,7 @@ const STUB_LIST: ProjectSummaryListRowV2[] = [
     runsCount: 2,
     lastRunAt: "2026-04-30T11:00:00.000Z",
     mostRecentRunThumbnailBlobUrl: null,
+    boundaryGeojson: null,
   },
   {
     id: "prj_b",
@@ -46,6 +47,7 @@ const STUB_LIST: ProjectSummaryListRowV2[] = [
     runsCount: 0,
     lastRunAt: null,
     mostRecentRunThumbnailBlobUrl: null,
+    boundaryGeojson: null,
   },
 ]
 

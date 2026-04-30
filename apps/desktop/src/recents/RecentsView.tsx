@@ -346,20 +346,25 @@ function ProjectCard({
 }
 
 /**
- * SP4 — RecentsView project card thumbnail surface.
+ * SP4 + SP6 — RecentsView project card thumbnail surface.
  *
- * Renders the most-recent run's thumbnail when `project.most
- * RecentRunThumbnailBlobUrl` is non-null and the `<img>` loads
- * successfully. Falls back to a token-driven muted placeholder for
- * three cases: (a) project has zero runs (backend returns null),
- * (b) project's most-recent run has no thumbnail (pre-SP1 run or
- * PUT-failed run — backend always-signs the URL but S3 GET 404s),
- * (c) any rare network / decoding error during load.
+ * Render priority (memo v3 §14 + SP6):
+ *   1. `mostRecentRunThumbnailBlobUrl` non-null + `<img>` loads OK
+ *      → real run thumbnail (SP4 path).
+ *   2. Above failed (404 / network / decode) OR null
+ *      AND `boundaryGeojson` non-null
+ *      → inline SVG `<polygon>` of the project's boundary (SP6 path).
+ *   3. Both above unavailable
+ *      → muted-grey placeholder div (legacy fallback).
  *
- * Memo v3 §14: same 400×300 WebP asset for both Run gallery cards
- * and RecentsView project cards. Card width is ~260px in the auto-fill
- * grid; `aspect-[4/3]` slot at full card width yields ~195px tall
- * preview that crops nothing (matches source aspect).
+ * Path 2 covers: zero-run projects (backend returns null thumbnail
+ * URL since no run exists), post-SP1 runs whose thumbnail PUT failed
+ * (URL signs but S3 GET 404s), and pre-B26 projects with null boundary
+ * (skip path 2, fall to path 3). Memo v3 §14 anticipated this exact
+ * pattern.
+ *
+ * Card width is ~260px in the auto-fill grid; `aspect-[4/3]` slot at
+ * full card width yields ~195px tall preview.
  */
 function ProjectCardThumbnail({
   project,
@@ -368,7 +373,61 @@ function ProjectCardThumbnail({
 }): JSX.Element {
   const [errored, setErrored] = useState(false)
   const url = project.mostRecentRunThumbnailBlobUrl
-  if (!url || errored) {
+  if (url && !errored) {
+    return (
+      <img
+        src={url}
+        alt={`${project.name} most recent layout preview`}
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="aspect-[4/3] w-full object-cover border-b border-[var(--border-subtle)]"
+      />
+    )
+  }
+  if (project.boundaryGeojson) {
+    return (
+      <BoundarySvg
+        boundary={project.boundaryGeojson}
+        ariaLabel={`${project.name} boundary outline`}
+      />
+    )
+  }
+  return (
+    <div
+      aria-hidden="true"
+      className="aspect-[4/3] w-full bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]"
+    />
+  )
+}
+
+/**
+ * Inline SVG render of a `BoundaryGeojson` (Polygon | MultiPolygon).
+ *
+ * Coordinate space: WGS84 (lon, lat) treated as planar. At single-site
+ * scale this is fine for a thumbnail; same approach the sidecar's
+ * matplotlib renderer takes for SP1 thumbnails. Latitude flips to keep
+ * north up (SVG y-axis grows downward; lon/lat grows upward).
+ *
+ * viewBox is computed from the boundary's bounding box with a 4%
+ * margin so the stroke isn't clipped at the edges. `preserveAspectRatio`
+ * uses `xMidYMid meet` to letterbox into the 4:3 slot — matches how
+ * the SP1 thumbnail handles non-4:3 boundaries (whitespace on the
+ * shorter axis rather than cropping).
+ */
+function BoundarySvg({
+  boundary,
+  ariaLabel,
+}: {
+  boundary: NonNullable<ProjectSummaryListRowV2["boundaryGeojson"]>
+  ariaLabel: string
+}): JSX.Element {
+  // Flatten to a list of rings (each ring = list of [lon, lat]).
+  const rings: ReadonlyArray<ReadonlyArray<readonly [number, number]>> =
+    boundary.type === "Polygon"
+      ? boundary.coordinates
+      : boundary.coordinates.flat()
+
+  if (rings.length === 0) {
     return (
       <div
         aria-hidden="true"
@@ -376,14 +435,59 @@ function ProjectCardThumbnail({
       />
     )
   }
+
+  // Bounding box across all rings. Initialised from the first point so
+  // we don't need Infinity sentinels (which Tailwind / safelisting would
+  // never touch but are still ugly).
+  const first = rings[0]?.[0]
+  if (!first) {
+    return (
+      <div
+        aria-hidden="true"
+        className="aspect-[4/3] w-full bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]"
+      />
+    )
+  }
+  let minLon = first[0]
+  let maxLon = first[0]
+  let minLat = first[1]
+  let maxLat = first[1]
+  for (const ring of rings) {
+    for (const [lon, lat] of ring) {
+      if (lon < minLon) minLon = lon
+      if (lon > maxLon) maxLon = lon
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
+  }
+  const w = maxLon - minLon || 1e-6 // guard a degenerate ring
+  const h = maxLat - minLat || 1e-6
+  const margin = 0.04 // 4% padding so the stroke isn't clipped
+  const vbX = minLon - w * margin
+  const vbY = -maxLat - h * margin // flip lat for SVG y-down
+  const vbW = w * (1 + 2 * margin)
+  const vbH = h * (1 + 2 * margin)
+
   return (
-    <img
-      src={url}
-      alt={`${project.name} most recent layout preview`}
-      loading="lazy"
-      onError={() => setErrored(true)}
-      className="aspect-[4/3] w-full object-cover border-b border-[var(--border-subtle)]"
-    />
+    <svg
+      role="img"
+      aria-label={ariaLabel}
+      viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+      preserveAspectRatio="xMidYMid meet"
+      className="aspect-[4/3] w-full bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]"
+    >
+      {rings.map((ring, i) => (
+        <polygon
+          key={i}
+          points={ring.map(([lon, lat]) => `${lon},${-lat}`).join(" ")}
+          fill="none"
+          stroke="var(--text-secondary)"
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
   )
 }
 

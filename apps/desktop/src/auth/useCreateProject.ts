@@ -36,6 +36,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { UseMutationResult } from "@tanstack/react-query"
 import type {
+  BoundaryGeojson,
   EntitlementsClient,
   EntitlementSummaryV2,
   ProjectV2Wire,
@@ -78,6 +79,16 @@ export interface CreateProjectVars {
    * during D1–D7's project-state rehydration flow.
    */
   edits?: unknown
+  /**
+   * SP6 / B26 — boundary geometry parsed from the KMZ via
+   * `sidecar.parseKmz`. Optional; when provided, backend persists it
+   * on the Project row and emits it on B10/B12 wire so the desktop
+   * can render an inline-SVG fallback in the project-card placeholder
+   * slot for projects with no thumbnail yet.
+   *
+   * Pre-B26 servers ignore the field; pre-SP6 callers omit it.
+   */
+  boundaryGeojson?: BoundaryGeojson
 }
 
 export interface UseCreateProjectMutationOptions {
@@ -113,6 +124,9 @@ export function useCreateProjectMutation(
         kmzBlobUrl: upload.blobUrl,
         kmzSha256: upload.kmzSha256,
         ...(vars.edits !== undefined ? { edits: vars.edits } : {}),
+        ...(vars.boundaryGeojson !== undefined
+          ? { boundaryGeojson: vars.boundaryGeojson }
+          : {}),
       })
     },
     onSuccess: () => {

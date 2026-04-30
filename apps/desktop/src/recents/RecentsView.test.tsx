@@ -33,6 +33,7 @@ const sampleProjects: ProjectSummaryListRowV2[] = [
     runsCount: 3,
     lastRunAt: "2026-04-30T11:30:00.000Z",
     mostRecentRunThumbnailBlobUrl: null,
+    boundaryGeojson: null,
   },
   {
     id: "prj_b",
@@ -44,6 +45,7 @@ const sampleProjects: ProjectSummaryListRowV2[] = [
     runsCount: 0,
     lastRunAt: null,
     mostRecentRunThumbnailBlobUrl: null,
+    boundaryGeojson: null,
   },
 ]
 
