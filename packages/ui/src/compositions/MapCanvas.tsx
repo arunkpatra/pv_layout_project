@@ -176,9 +176,59 @@ export function MapCanvas({
       onMapReady?.(map)
     })
 
+    // S1-09 — ResizeObserver-driven refit. When the canvas container
+    // changes size meaningfully (e.g. the Inspector animates in/out from
+    // 0 to 320px on project open via S1-04's gate, or window resize, or
+    // ToolRail toggle), MapLibre's previously-fit zoom is now wrong for
+    // the new container width. Without this observer, fitBounds runs at
+    // the moment `boundariesGeoJson` populates — but mid-Framer-Motion-
+    // animation the container hasn't reached its final width, so the
+    // computed zoom over-zooms once the inspector finishes settling.
+    //
+    // Threshold: 50px on either axis. Smaller deltas are noise; we
+    // don't want to refit on every micro-pixel reflow.
+    //
+    // animate: false on the resize-driven refit — snapping is the right
+    // feel during a layout reflow; an additional 600ms ease would fight
+    // the inspector animation rather than complement it.
+    let lastWidth = container.clientWidth
+    let lastHeight = container.clientHeight
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const { width, height } = entry.contentRect
+      if (
+        Math.abs(width - lastWidth) < 50 &&
+        Math.abs(height - lastHeight) < 50
+      ) {
+        return
+      }
+      lastWidth = width
+      lastHeight = height
+      map.resize()
+      const bounds = propsRef.current.boundariesGeoJson
+        ? computeBounds(propsRef.current.boundariesGeoJson)
+        : null
+      if (bounds) {
+        map.fitBounds(
+          [
+            [bounds[0], bounds[1]],
+            [bounds[2], bounds[3]],
+          ],
+          {
+            padding: 60,
+            animate: false,
+            maxZoom: 18,
+          }
+        )
+      }
+    })
+    ro.observe(container)
+
     return () => {
       setMapReady(false)
       mapRef.current = null
+      ro.disconnect()
       map.remove()
     }
     // init-only — deps intentionally omitted. Theme / data effects below
