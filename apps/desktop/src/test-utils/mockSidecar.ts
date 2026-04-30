@@ -93,6 +93,12 @@ export function createMockSidecarClient(
     refreshInverters: vi.fn().mockResolvedValue(defaultLayoutResult),
     addRoad: vi.fn().mockResolvedValue(defaultLayoutResult),
     removeLastRoad: vi.fn().mockResolvedValue(defaultLayoutResult),
+    // SP1 — best-effort thumbnail render. Default: tiny placeholder
+    // bytes so callers that fire-and-forget the upload chain can spy
+    // call counts without bytecount assertions failing.
+    renderLayoutThumbnail: vi
+      .fn()
+      .mockResolvedValue(new Uint8Array([0x52, 0x49, 0x46, 0x46])),
     ...overrides,
   }
 }

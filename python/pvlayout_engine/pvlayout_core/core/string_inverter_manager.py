@@ -94,6 +94,41 @@ _vis_cache_nodes: List[Tuple[float, float]] = []
 _vis_cache_adj: List[List[Tuple[int, float]]] = []
 _vis_cache_prepared = None                   # shapely prepared geometry for fast contains
 
+# ---------------------------------------------------------------------------
+# Pattern-validation prepared-geometry cache (perf POC, 2026-04-30)
+# ---------------------------------------------------------------------------
+# ``_seg_ok`` is called thousands of times per ``place_string_inverters`` —
+# once per segment per candidate path across all patterns A through E.
+# Legacy behavior calls ``poly.intersection(line).length >= line.length *
+# 0.999`` per call, which evaluates an unprepared Shapely predicate every
+# time. Prepared geometries cache spatial indexing structures and are
+# 5–10× faster on repeated containment tests against the same polygon.
+#
+# We cache by ``id(poly)`` (object identity within a single call, just
+# like the visibility graph) and reset at the top of
+# ``place_string_inverters``. ``_seg_ok`` looks up via ``_get_prepared``;
+# unprepared fallback is preserved in a ``try/except`` so any obscure
+# Shapely 2.x geometry that doesn't prepare cleanly degrades to legacy.
+_prep_cache: dict = {}  # id(poly) -> prepared
+
+
+def _get_prepared(poly):
+    """Return a cached prepared geometry for ``poly``, building on first
+    miss. Returns ``None`` if preparation fails (caller falls back to
+    unprepared predicate).
+    """
+    if poly is None:
+        return None
+    key = id(poly)
+    p = _prep_cache.get(key)
+    if p is None:
+        try:
+            p = shapely_prep(poly)
+            _prep_cache[key] = p
+        except Exception:
+            return None
+    return p
+
 
 def _reset_vis_cache() -> None:
     global _vis_cache_key, _vis_cache_nodes, _vis_cache_adj, _vis_cache_prepared
@@ -101,6 +136,7 @@ def _reset_vis_cache() -> None:
     _vis_cache_nodes = []
     _vis_cache_adj = []
     _vis_cache_prepared = None
+    _prep_cache.clear()
 
 
 def _build_boundary_vis_graph(poly) -> None:
@@ -579,11 +615,33 @@ def _find_inverter_position(
 # ---------------------------------------------------------------------------
 
 def _seg_ok(p1: Tuple, p2: Tuple, poly) -> bool:
-    """True only if segment p1→p2 lies fully inside poly (≥99.9 % overlap)."""
+    """True only if segment p1→p2 lies fully inside poly (≥99.9 % overlap).
+
+    Fast path: prepared-geometry ``covers(line)`` (5–10× faster on
+    repeated calls against the same polygon — see ``_prep_cache``).
+    Slow-path fallback retains the legacy
+    ``poly.intersection(line).length`` tolerance check, which accepts
+    boundary-tangent floating-point edges that ``covers`` may reject by
+    epsilon. The fallback fires automatically when ``_get_prepared``
+    can't build a prepared geometry, AND on a deliberate ``False``
+    return from ``covers`` so we don't lose tangent acceptance.
+    """
     try:
         line = ShapelyLine([p1, p2])
         if line.length < 0.01:
             return True
+        prepared = _get_prepared(poly)
+        if prepared is not None:
+            # Fast accept: segment fully inside (or on boundary).
+            if prepared.covers(line):
+                return True
+            # Fast reject: segment doesn't even touch the polygon.
+            if not prepared.intersects(line):
+                return False
+            # Edge case: line intersects polygon but isn't fully covered
+            # — could be a boundary-tangent that ``covers`` rejected by
+            # floating-point epsilon, OR a true partial-outside segment.
+            # Fall through to legacy 99.9 % tolerance check.
         inter = poly.intersection(line)
         return inter.length >= line.length * 0.999
     except Exception:

@@ -27,8 +27,11 @@ import { readFileSync, existsSync } from "node:fs"
 import { resolve } from "node:path"
 import { ALL_FEATURE_KEYS } from "./feature-keys"
 
-// Seed file path, relative to this repo's root. Updated if the
-// renewable_energy repo moves or the seed file is renamed.
+// Seed-data file path, relative to this repo's root. Updated if the
+// renewable_energy repo moves or the seed-data file is renamed. As of
+// 2026-04-30 the literal feature-key strings live in the seed-data
+// module (`src/seed-data/products.ts`); the prisma seed runner
+// (`prisma/seed-products.ts`) imports the `products` array from there.
 const SEED_PATH_FROM_HERE = resolve(
   __dirname,
   "..",
@@ -38,8 +41,9 @@ const SEED_PATH_FROM_HERE = resolve(
   "renewable_energy",
   "packages",
   "mvp_db",
-  "prisma",
-  "seed-products.ts"
+  "src",
+  "seed-data",
+  "products.ts"
 )
 
 function readSeedKeys(): string[] | null {

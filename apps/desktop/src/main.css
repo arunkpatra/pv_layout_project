@@ -1,9 +1,9 @@
 /* Single import point for the design system — tokens + fonts + reset.
  *
- * @solarlayout/ui/globals.css itself imports:
+ * @solarlayout/ui-desktop/globals.css itself imports:
  *   - tailwindcss v4 core
  *   - tokens.css (semantic variables, light + dark)
  *   - fonts.css (Inter woff2)
  *   - reset + app-surface defaults
  */
-@import "@solarlayout/ui/globals.css";
+@import "@solarlayout/ui-desktop/globals.css";

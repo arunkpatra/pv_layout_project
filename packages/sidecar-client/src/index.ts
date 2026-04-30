@@ -320,6 +320,24 @@ export interface SidecarClient {
 
   /** S11: pop the most recently added obstruction (LIFO) and recompute. */
   removeLastRoad(request: RemoveRoadRequest): Promise<LayoutResult>
+
+  /**
+   * SP1 / B23 — render a single LayoutResult to a 400×300 WebP preview
+   * image. Returns the raw WebP bytes ready for PUT against the
+   * deterministic-key thumbnail S3 path.
+   *
+   * Caller responsibilities (P6 flow extension):
+   *   1. Call `renderLayoutThumbnail(result)` after `runLayout`.
+   *   2. Mint a B7 upload URL via
+   *      `entitlementsClient.getRunResultUploadUrl(key, { type: "thumbnail", projectId, runId, size })`.
+   *   3. PUT the bytes to the returned URL with `Content-Type: image/webp`.
+   *
+   * Best-effort: failure of any step (sidecar render, B7 mint, S3 PUT)
+   * MUST NOT fail the parent Generate-Layout mutation — the layout
+   * already landed successfully; the thumbnail is polish. The desktop's
+   * `<img onError>` fallback masks PUT failures invisibly to the user.
+   */
+  renderLayoutThumbnail(result: LayoutResult): Promise<Uint8Array>
 }
 
 export class SidecarError extends Error {
@@ -412,6 +430,37 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req),
       })
+    },
+
+    async renderLayoutThumbnail(
+      result: LayoutResult
+    ): Promise<Uint8Array> {
+      // Bespoke — the shared `request<T>` helper assumes a JSON body;
+      // /layout/thumbnail returns image/webp bytes. Mirrors that helper's
+      // header + error shape so a 401 / 500 / etc. surfaces as the same
+      // typed SidecarError downstream consumers already handle.
+      const response = await fetchImpl(`${baseUrl}/layout/thumbnail`, {
+        method: "POST",
+        headers: {
+          ...authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ result }),
+      })
+      if (!response.ok) {
+        let body: unknown = null
+        try {
+          body = await response.json()
+        } catch {
+          // body may be empty — swallow
+        }
+        const message =
+          extractError(body) ??
+          `Sidecar /layout/thumbnail returned ${response.status}`
+        throw new SidecarError(response.status, message, body)
+      }
+      const buf = await response.arrayBuffer()
+      return new Uint8Array(buf)
     },
   }
 }

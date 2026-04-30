@@ -56,6 +56,13 @@ jobs:
 
       - name: Build
         run: bun run build
+        env:
+          # Clerk test publishable key (public by design — embeds in client
+          # bundles). Hardcoded so CI doesn't depend on a repo-level GH var
+          # being set. Same value renewable_energy CI used pre-merge; safe
+          # to commit. The "secret" pair (CLERK_SECRET_KEY) stays in Vercel
+          # env vars and is not needed for the build step.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xhc3NpYy13YXNwLTU1LmNsZXJrLmFjY291bnRzLmRldiQ
 
   sidecar:
     name: sidecar (pytest)

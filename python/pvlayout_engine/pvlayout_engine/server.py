@@ -26,6 +26,7 @@ from pvlayout_engine.routes.kmz import router as kmz_router
 from pvlayout_engine.routes.layout import router as layout_router
 from pvlayout_engine.routes.pdf import router as pdf_router
 from pvlayout_engine.routes.session import router as session_router
+from pvlayout_engine.routes.thumbnail import router as thumbnail_router
 from pvlayout_engine.routes.water import router as water_router
 from pvlayout_engine.schemas import HealthResponse
 from pvlayout_engine.session import SessionState
@@ -131,6 +132,14 @@ def build_app(config: SidecarConfig) -> FastAPI:
     # KMZ exporter has no toggle flags — renders all layout elements
     # unconditionally.
     authed.include_router(kmz_router)
+
+    # --- Thumbnail route (SP1 / B23 cross-repo) -----------------------------
+    # /layout/thumbnail — render a single LayoutResult to a 400×300 WebP
+    # preview image. Token-gated; ungated at the entitlements layer like
+    # other render-only routes. Output bounded by memo v3 §10 Q4: q=85,
+    # 50 KB ceiling (the same cap backend's B7 RUN_RESULT_SPEC.thumbnail
+    # enforces on the upload side).
+    authed.include_router(thumbnail_router)
 
     app.include_router(authed)
 

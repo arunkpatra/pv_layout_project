@@ -527,6 +527,26 @@ class ExportKmzRequest(_Model):
     params: LayoutParameters
 
 
+class LayoutThumbnailRequest(_Model):
+    """POST /layout/thumbnail body — render a single LayoutResult to a
+    400×300 WebP preview image.
+
+    Single result (not multi) because thumbnails are per-Run, not
+    aggregated across boundaries — Run gallery cards + RecentsView
+    project cards each show one preview image. Per memo v3 §2 + §5,
+    the renderer reuses matplotlib drawing primitives + Pillow for
+    WebP encoding; output is bounded at 400×300 px / WebP q=85 /
+    50 KB max (the same ceiling backend's `RUN_RESULT_SPEC.thumbnail`
+    enforces on the PUT side).
+
+    Per ADR-0005, like other render-only routes, `/layout/thumbnail`
+    is ungated at the entitlements layer — no `require_feature`
+    dependency.
+    """
+
+    result: LayoutResult
+
+
 # ---------------------------------------------------------------------------
 # Health + error payloads (sidecar-specific, no domain twin).
 # ---------------------------------------------------------------------------

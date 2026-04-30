@@ -18,7 +18,10 @@
       "allow": [
         { "url": "http://127.0.0.1:*/*" },
         { "url": "http://localhost:*/*" },
-        { "url": "https://api.solarlayout.in/*" }
+        { "url": "https://api.solarlayout.in/*" },
+        { "url": "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/**" },
+        { "url": "https://solarlayout-dev-projects.s3.ap-south-1.amazonaws.com/**" },
+        { "url": "https://solarlayout-prod-projects.s3.ap-south-1.amazonaws.com/**" }
       ]
     },
     "dialog:default",

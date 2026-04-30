@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model DownloadRegistration {
+  id        String   @id @default("")
+  name      String
+  email     String
+  mobile    String?
+  product   String
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  @@map("download_registrations")
+}
+
+model ContactSubmission {
+  id        String   @id @default("")
+  name      String
+  email     String
+  subject   String
+  message   String
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  @@map("contact_submissions")
+}
+
+model User {
+  id               String            @id @default("")
+  clerkId          String            @unique
+  email            String            @unique
+  name             String?
+  roles            String[]          @default([])
+  status           String            @default("ACTIVE")
+  stripeCustomerId String?           @unique
+  createdAt        DateTime          @default(now())
+  licenseKeys           LicenseKey[]
+  entitlements          Entitlement[]
+  checkoutSessions      CheckoutSession[]
+  usageRecords          UsageRecord[]
+  transactions          Transaction[]    @relation("TransactionUser")
+  transactionsRecorded  Transaction[]    @relation("TransactionCreatedBy")
+  projects              Project[]
+
+  @@map("users")
+}
+
+model LicenseKey {
+  id           String        @id @default("")
+  key          String        @unique
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  createdAt    DateTime      @default(now())
+  revokedAt    DateTime?
+  usageRecords UsageRecord[]
+
+  @@map("license_keys")
+}
+
+model Product {
+  id            String           @id @default("")
+  slug          String           @unique
+  name          String
+  description   String
+  priceAmount   Int
+  priceCurrency String           @default("usd")
+  calculations  Int
+  projectQuota  Int              @default(0)
+  stripePriceId String           @unique
+  displayOrder  Int              @default(0)
+  active        Boolean          @default(true)
+  isFree        Boolean          @default(false)
+  features      ProductFeature[]
+  entitlements  Entitlement[]
+  usageRecords  UsageRecord[]
+  transactions  Transaction[]
+  createdAt     DateTime         @default(now())
+
+  @@map("products")
+}
+
+model ProductFeature {
+  id         String  @id @default("")
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  featureKey String
+  label      String
+
+  @@unique([productId, featureKey])
+  @@map("product_features")
+}
+
+model Entitlement {
+  id                String      @id @default("")
+  userId            String
+  user              User        @relation(fields: [userId], references: [id])
+  productId         String
+  product           Product     @relation(fields: [productId], references: [id])
+  transactionId     String
+  transaction       Transaction @relation(fields: [transactionId], references: [id])
+  totalCalculations Int
+  usedCalculations  Int         @default(0)
+  /// Snapshotted from Product.projectQuota at creation time so the
+  /// per-tier concurrent-project ceiling can be read off Entitlement
+  /// directly (no JOIN into Product). Backfilled for pre-B19 rows.
+  projectQuota      Int         @default(0)
+  purchasedAt       DateTime    @default(now())
+  deactivatedAt     DateTime?
+
+  @@map("entitlements")
+}
+
+model CheckoutSession {
+  id                       String       @id @default("")
+  userId                   String
+  user                     User         @relation(fields: [userId], references: [id])
+  productSlug              String
+  stripeCheckoutSessionId  String       @unique
+  stripeCheckoutSessionUrl String
+  status                   String?
+  processedAt              DateTime?
+  idempotencyKey           String?
+  createdAt                DateTime     @default(now())
+  transaction              Transaction?
+
+  @@map("checkout_sessions")
+}
+
+model UsageRecord {
+  id             String     @id @default("")
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  licenseKeyId   String
+  licenseKey     LicenseKey @relation(fields: [licenseKeyId], references: [id])
+  productId      String
+  product        Product    @relation(fields: [productId], references: [id])
+  featureKey     String
+  metadata       Json?
+  idempotencyKey String?
+  createdAt      DateTime   @default(now())
+  run            Run?
+
+  @@unique([userId, idempotencyKey])
+  @@map("usage_records")
+}
+
+model Transaction {
+  id                  String           @id @default("")
+  userId              String
+  user                User             @relation("TransactionUser", fields: [userId], references: [id])
+  productId           String
+  product             Product          @relation(fields: [productId], references: [id])
+  source              String                                              // "STRIPE" | "MANUAL" | "FREE_AUTO"
+  status              String           @default("COMPLETED")
+  amount              Int                                                 // USD cents
+  currency            String           @default("usd")
+  purchasedAt         DateTime         @default(now())
+  createdAt           DateTime         @default(now())
+  paymentMethod       String?                                             // "CASH" | "BANK_TRANSFER" | "UPI" | "CHEQUE" | "OTHER"; nullable
+  externalReference   String?
+  notes               String?
+  createdByUserId     String?
+  createdByUser       User?            @relation("TransactionCreatedBy", fields: [createdByUserId], references: [id])
+  checkoutSessionId   String?          @unique
+  checkoutSession     CheckoutSession? @relation(fields: [checkoutSessionId], references: [id])
+  entitlements        Entitlement[]
+
+  @@index([userId, purchasedAt(sort: Desc)])
+  @@index([source])
+  @@index([purchasedAt])
+  @@map("transactions")
+}
+
+model Project {
+  id               String    @id @default("")
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  name             String
+  kmzBlobUrl       String
+  kmzSha256        String
+  edits            Json      @default("{}")
+  /// GeoJSON Polygon | MultiPolygon parsed from the KMZ at create-time
+  /// (B11 request body). Used by the desktop's RecentsView to render an
+  /// SVG outline fallback when no thumbnail exists yet (memo v3 §14).
+  /// Nullable for projects predating B26.
+  boundaryGeojson  Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  runs             Run[]
+
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("projects")
+}
+
+model Run {
+  id                  String      @id @default("")
+  projectId           String
+  project             Project     @relation(fields: [projectId], references: [id])
+  name                String
+  params              Json
+  inputsSnapshot      Json
+  layoutResultBlobUrl String?
+  energyResultBlobUrl String?
+  exportsBlobUrls     Json        @default("[]")
+  billedFeatureKey    String
+  usageRecordId       String      @unique
+  usageRecord         UsageRecord @relation(fields: [usageRecordId], references: [id])
+  createdAt           DateTime    @default(now())
+  deletedAt           DateTime?
+
+  @@index([projectId])
+  @@index([deletedAt])
+  @@map("runs")
+}

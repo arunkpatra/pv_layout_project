@@ -1,24 +1,13 @@
 {
+  "extends": "@solarlayout/typescript-config/react-library.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "isolatedModules": true,
-    "types": []
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@solarlayout/ui/*": ["./src/*"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["."],
   "exclude": ["node_modules", "dist"]
 }

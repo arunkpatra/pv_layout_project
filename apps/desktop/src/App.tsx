@@ -8,23 +8,21 @@ import {
 } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
+import { open as openExternalUrl } from "@tauri-apps/plugin-shell"
 import { listen } from "@tauri-apps/api/event"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   createSidecarClient,
   type SidecarClient,
 } from "@solarlayout/sidecar-client"
-import type { Entitlements } from "@solarlayout/entitlements-client"
+import type { EntitlementSummaryV2 } from "@solarlayout/entitlements-client"
 import {
   AppShell,
   Button,
-  Chip,
-  CommandBarHint,
   CommandGroup,
   CommandItem,
   CommandPalette,
   CommandSeparator,
-  EmptyStateCard,
   InspectorRoot,
   LockedSectionCard,
   MapCanvas,
@@ -37,27 +35,48 @@ import {
   ToolRail,
   TopBar,
   type ToolId,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import {
   clearLicenseKey,
   getLicenseKey,
   saveLicenseKey,
 } from "./auth/licenseKey"
 import {
+  entitlementsClient,
   useEntitlementsQuery,
   useSyncEntitlementsToSidecar,
 } from "./auth/useEntitlements"
+import { useCreateProjectMutation } from "./auth/useCreateProject"
+import { useOpenProjectMutation } from "./auth/useOpenProject"
+import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
+import { useRenameProjectMutation } from "./auth/useRenameProject"
+import { useDeleteProjectMutation } from "./auth/useDeleteProject"
+import { useAutoSaveProject } from "./auth/useAutoSaveProject"
+import { useProjectsListQuery } from "./auth/useProjectsList"
+import { useOpenRunMutation } from "./auth/useOpenRun"
+import { useDeleteRunMutation } from "./auth/useDeleteRun"
+import { SaveIndicator } from "./auth/SaveIndicator"
+import { QuotaIndicator } from "./auth/QuotaIndicator"
+import { RecentsView } from "./recents/RecentsView"
+import { RunsList } from "./runs/RunsList"
+import { TabsBar } from "./tabs/TabsBar"
+import { useTabsStore } from "./state/tabs"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
+import { EntitlementsError } from "@solarlayout/entitlements-client"
+import {
+  editsFromUndoStack,
+  undoStackFromEdits,
+} from "./state/projectEdits"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
 import { openAndParseKmz } from "./project/kmzLoader"
+import { boundaryGeojsonFromParsed } from "./project/boundaryGeojson"
 import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
 import { layoutToGeoJson } from "./project/layoutToGeoJson"
 import { useProjectStore } from "./state/project"
 import { useLayoutParamsStore } from "./state/layoutParams"
 import { useLayoutResultStore } from "./state/layoutResult"
 import { useLayerVisibilityStore } from "./state/layerVisibility"
-import { useLayoutMutation } from "./state/useLayoutMutation"
 import { useEditingStateStore } from "./state/editingState"
 import { useRefreshInvertersMutation } from "./state/useRefreshInvertersMutation"
 import { useAddRoadMutation } from "./state/useAddRoadMutation"
@@ -100,6 +119,21 @@ interface SidecarConfig {
 const inTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
+const BUY_MORE_URL = "https://solarlayout.in/pricing"
+
+/**
+ * Mask a license key for display in the account dropdown — keeps the
+ * `sl_live_` prefix visible (so the user can confirm it's their key)
+ * and the last 4 chars (helps identify which key is in use when the
+ * user has multiple). Returns undefined when the key is null so the
+ * TopBar prop can be passed through verbatim.
+ */
+function maskLicenseKey(key: string | null): string | undefined {
+  if (!key) return undefined
+  if (key.length <= 12) return key
+  return `${key.slice(0, 8)}…${key.slice(-4)}`
+}
+
 export function App(): JSX.Element {
   const [sidecarPhase, setSidecarPhase] = useState<SidecarPhase>({ kind: "booting" })
   const [activeTool, setActiveTool] = useState<ToolId>("select")
@@ -123,8 +157,15 @@ export function App(): JSX.Element {
   // prop-drilling through this component.
   const project = useProjectStore((s) => s.project)
   const setProject = useProjectStore((s) => s.setProject)
+  const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
+  const setRuns = useProjectStore((s) => s.setRuns)
+  const selectRun = useProjectStore((s) => s.selectRun)
   const [openError, setOpenError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
+  // P1 — quota-exceeded modal triggered by 402 PAYMENT_REQUIRED from B11.
+  // Holds the human-readable detail from the backend so the modal can
+  // surface "3/3" naturally without re-deriving the numbers locally.
+  const [upsellDetail, setUpsellDetail] = useState<string | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -284,8 +325,24 @@ export function App(): JSX.Element {
     [layoutResult]
   )
 
-  // ── Layout mutation (S9). Hydrates useLayoutResultStore on success. ──────
-  const layoutMutation = useLayoutMutation(sidecarClient)
+  // ── Generate Layout mutation (P6). Replaces the parity-era
+  //    sidecar-only mutation that was here through S9–S11. Now goes
+  //    through B16 (atomic debit + Run row + presigned uploadUrl) →
+  //    sidecar /layout → S3 PUT result JSON → setLayoutResultStore +
+  //    addRun + invalidate entitlements. Single user click = 1 calc
+  //    debit + 1 persisted Run.
+  const generateLayoutMutation = useGenerateLayoutMutation(
+    activeKey,
+    entitlementsClient,
+    sidecarClient,
+    {
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    }
+  )
+  // Alias so existing canvas error-overlay branch keeps reading
+  // `.isError`/`.error`/`.reset` against the new hook without any other
+  // textual change in the JSX below.
+  const layoutMutation = generateLayoutMutation
   const clearLayoutResult = useLayoutResultStore((s) => s.clearResult)
   const resetLayoutParams = useLayoutParamsStore((s) => s.resetToDefaults)
   const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
@@ -306,13 +363,32 @@ export function App(): JSX.Element {
   // getState() reads the store synchronously, so we see the values setAll
   // just wrote. Also covers the retry path (no values in flight → last
   // submitted values are still the right ones).
+  // Pull currentProject (the backend-persisted project) for the projectId.
+  // Generate Layout requires it — without a backend project, B16 has nothing
+  // to attach the Run to. P1/P2 always set this on a successful open/create,
+  // so in normal use the gate just protects against a not-yet-loaded state.
+  const currentProject = useProjectStore((s) => s.currentProject)
   const handleGenerate = useCallback(() => {
-    if (!project) return
-    layoutMutation.mutate({
+    if (!project || !currentProject) return
+    generateLayoutMutation.mutate({
+      projectId: currentProject.id,
       parsedKmz: project.kmz,
       params: useLayoutParamsStore.getState().params,
     })
-  }, [project, layoutMutation])
+  }, [project, currentProject, generateLayoutMutation])
+
+  // Surface the upsell modal on Generate-Layout 402, mirroring the P1
+  // upload path. The B16 message contains the human-readable detail
+  // (e.g. "No remaining calculations — purchase more at solarlayout.in").
+  useEffect(() => {
+    const err = generateLayoutMutation.error
+    if (
+      err instanceof EntitlementsError &&
+      err.code === "PAYMENT_REQUIRED"
+    ) {
+      setUpsellDetail(err.message)
+    }
+  }, [generateLayoutMutation.error])
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const handleSubmitKey = useCallback((key: string) => {
@@ -340,11 +416,137 @@ export function App(): JSX.Element {
     void entQuery.refetch()
   }, [entQuery])
 
+  // ── P1 — new-project mutation (uploadKmzToS3 + createProjectV2) ──────────
+  // Bound to the active license key + module-singleton entitlements client
+  // so successful creates invalidate ["entitlements", key] and the quota
+  // chip + projectsActive update automatically. Tauri runs use the
+  // tauri-plugin-http transport so the S3 PUT bypasses CSP.
+  const createProjectMutation = useCreateProjectMutation(
+    activeKey,
+    entitlementsClient,
+    {
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    }
+  )
+
+  // ── P2 — open-existing-project mutation (B12 + S3 GET) ──────────────────
+  // Single round-trip: B12 returns ProjectDetail with embedded
+  // kmzDownloadUrl + runs[]; the hook then GETs the KMZ bytes from S3 via
+  // the presigned URL. App.tsx orchestrates the sidecar /parse-kmz +
+  // state hydration below in handleOpenProjectById.
+  const openProjectMutation = useOpenProjectMutation(
+    activeKey,
+    entitlementsClient,
+    {
+      fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+    }
+  )
+
+  // ── P3 — rename + delete project mutations ──────────────────────────────
+  // Both single-attempt (PATCH and DELETE are body-deterministic /
+  // idempotent at the wire layer, but no idempotency-key gate; the user
+  // retries via the modal). On success: rename spreads into
+  // currentProject (preserving B12 fields), delete clears the slice +
+  // invalidates entitlements (frees quota).
+  const renameProjectMutation = useRenameProjectMutation(
+    activeKey,
+    entitlementsClient
+  )
+  const deleteProjectMutation = useDeleteProjectMutation(
+    activeKey,
+    entitlementsClient
+  )
+
+  // ── P4 — auto-save edits (debounced PATCH /v2/projects/:id { edits }) ───
+  // Watches the editingState slice's undoStack (the obstructions the user
+  // has drawn through the sidecar's add-road / remove-last-road flow) and
+  // persists them as the project's `edits` field after 2s of idle. Skips
+  // entirely when no project is loaded, no key is signed in, or the key
+  // is a preview key (no real backend in preview mode).
+  const editingUndoStack = useEditingStateStore((s) => s.undoStack)
+  const projectIdForSave = currentProject?.id ?? null
+  const currentEdits = useMemo(
+    () => (projectIdForSave ? editsFromUndoStack(editingUndoStack) : null),
+    [editingUndoStack, projectIdForSave]
+  )
+  const saveStatus = useAutoSaveProject(
+    activeKey,
+    entitlementsClient,
+    projectIdForSave,
+    currentEdits
+  )
+
+  // ── S3 — recents list query (powers RecentsView when no project loaded) ─
+  // Empty for preview keys; refetches naturally when create/rename/delete
+  // mutations invalidate the cache (their hooks include
+  // ["projects", key] in onSuccess invalidations).
+  const projectsListQuery = useProjectsListQuery(activeKey, entitlementsClient)
+
+  // ── P7 — open-run mutation + auto-fetch on selectedRunId change ─────────
+  // Fires when the user clicks an older run in the P5 gallery. The
+  // dedup is via useLayoutResultStore.resultRunId — when P6 generates
+  // a new run, both selectedRunId AND resultRunId update to the same
+  // id in onSuccess, so this effect's predicate skips the redundant
+  // re-fetch.
+  const openRunMutation = useOpenRunMutation(activeKey, entitlementsClient, {
+    fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+  })
+  // P9 — delete run(s) from the gallery's multi-select toolbar.
+  const deleteRunMutation = useDeleteRunMutation(activeKey, entitlementsClient)
+  const handleDeleteRuns = useCallback(
+    async (runIds: string[]) => {
+      if (!currentProject) return
+      // Sequential — surfaces per-run errors clearly, and B18 is cheap.
+      for (const id of runIds) {
+        try {
+          await deleteRunMutation.mutateAsync({
+            projectId: currentProject.id,
+            runId: id,
+          })
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err)
+          console.error(`delete run ${id} failed:`, err)
+          setOpenError(detail)
+          return // bail on first error; user retries via the same button
+        }
+      }
+    },
+    [currentProject, deleteRunMutation]
+  )
+  const selectedRunId = useProjectStore((s) => s.selectedRunId)
+  const resultRunId = useLayoutResultStore((s) => s.resultRunId)
+  const openRunMutate = openRunMutation.mutate
+  useEffect(() => {
+    if (!selectedRunId) return
+    if (!currentProject) return
+    if (selectedRunId === resultRunId) return // already displayed
+    openRunMutate({
+      projectId: currentProject.id,
+      runId: selectedRunId,
+    })
+  }, [selectedRunId, currentProject, resultRunId, openRunMutate])
+
+  // ── S2 — multi-tab integration ──────────────────────────────────────────
+  // Tab state is metadata-only; the actual project state lives in its
+  // existing per-domain slices and is mutated by the open flow below.
+  // Switching a tab fires P2's open path (B12 + S3 GET + sidecar parse).
+  const activeTabId = useTabsStore((s) => s.activeTabId)
+  const tabsOpenTab = useTabsStore((s) => s.openTab)
+  const tabsCloseTab = useTabsStore((s) => s.closeTab)
+  const tabsSwitchTab = useTabsStore((s) => s.switchTab)
+  const tabsUpdateName = useTabsStore((s) => s.updateTabName)
+  const tabsGoHome = useTabsStore((s) => s.goHome)
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
+  // P1 wiring: parse locally for the canvas (existing behaviour) AND
+  // upload + create the persisted project via B6 → S3 → B11. The two
+  // halves share the same bytes — `openAndParseKmz` returns them so we
+  // don't re-read the file from disk for the upload step.
   const handleOpenKmz = useCallback(async () => {
     if (!sidecarClient || opening) return
     setOpening(true)
     setOpenError(null)
+    setUpsellDetail(null)
     try {
       const result = await openAndParseKmz(sidecarClient)
       if (!result) return // user cancelled the native dialog
@@ -359,7 +561,52 @@ export function App(): JSX.Element {
       resetLayerVisibility()
       resetEditingState()
       setLayoutFormKey((k) => k + 1)
+
+      // Persist via B11 BEFORE touching the parity-era project slice so a
+      // 402 (quota exceeded) leaves the canvas in its prior state — no
+      // half-loaded "ghost project" if the create fails.
+      const projectName = stripKmzExtension(result.fileName)
+      let persistedProjectId: string | null = null
+      let persistedProjectName: string | null = null
+      try {
+        const persisted = await createProjectMutation.mutateAsync({
+          bytes: result.bytes,
+          name: projectName,
+          // SP6 / B26 — send the parsed boundary so backend can persist
+          // it for the placeholder-fallback render on RecentsView cards.
+          // The desktop already has it in memory from sidecar.parseKmz
+          // a few lines above; no extra round-trip cost.
+          boundaryGeojson: boundaryGeojsonFromParsed(result.parsed),
+        })
+        setCurrentProject(persisted)
+        // S1-12 — A freshly-created project has no runs yet. Explicitly
+        // reset the runs slice so a prior project's runs don't leak into
+        // the new project's gallery until the next tab-switch round-trip
+        // overwrites them via P2's B12 fetch. (B11's ProjectV2Wire
+        // intentionally doesn't carry runs[] — only B12 does — so we
+        // must set [] here.) `setRuns([])` also drops a stale
+        // selectedRunId per the slice's setRuns invariant
+        // (state/project.ts:135–138).
+        setRuns([])
+        persistedProjectId = persisted.id
+        persistedProjectName = persisted.name
+      } catch (err) {
+        if (err instanceof EntitlementsError && err.code === "PAYMENT_REQUIRED") {
+          // Surface upsell modal; leave project state unchanged.
+          setUpsellDetail(err.message)
+          return
+        }
+        // Non-quota errors (upload failures, 401, 5xx) flow through the
+        // generic open-error overlay below.
+        throw err
+      }
+
       setProject({ kmz: result.parsed, fileName: result.fileName })
+      // S2 — register the just-created project as a tab. openTab dedupes
+      // by projectId, so re-opening is a no-op switch.
+      if (persistedProjectId && persistedProjectName) {
+        tabsOpenTab(persistedProjectId, persistedProjectName)
+      }
       setPaletteOpen(false)
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
@@ -372,28 +619,246 @@ export function App(): JSX.Element {
     sidecarClient,
     opening,
     setProject,
+    setCurrentProject,
     clearLayoutResult,
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
+    createProjectMutation,
+    tabsOpenTab,
   ])
+
+  // ── P2 / S3 — open-existing-project flow ────────────────────────────────
+  // The core open-by-ID flow is shared between two entry points:
+  //   - S3 recents grid (RecentsView card click — passes the id directly)
+  //   - Command Palette's "Open existing project…" item (interim
+  //     window.prompt() — kept for power-user keyboard access)
+  // Both call `handleOpenProjectById(id)` below; the palette wrapper just
+  // captures the id via prompt first.
+  const handleOpenProjectById = useCallback(async (projectId: string) => {
+    if (!sidecarClient || opening) return
+    if (!projectId) return
+    setOpening(true)
+    setOpenError(null)
+    setUpsellDetail(null)
+    try {
+      const opened = await openProjectMutation.mutateAsync({ projectId })
+      // Same reset as new-project — fresh canvas, fresh form, fresh
+      // visibility state. Layout result is dropped: open-existing doesn't
+      // hydrate a previous layout result yet (P7 will, when the user picks
+      // a specific run from the runs list).
+      clearLayoutResult()
+      resetLayoutParams()
+      resetLayerVisibility()
+      resetEditingState()
+      setLayoutFormKey((k) => k + 1)
+
+      // Parse the downloaded KMZ via the sidecar so the canvas can render.
+      // Mirror the kmzLoader.openAndParseKmz flow — same blob/Content-Type,
+      // filename derived from the project name.
+      const blob = new Blob([opened.bytes as BlobPart], {
+        type: "application/vnd.google-earth.kmz",
+      })
+      const fileName = `${opened.detail.name}.kmz`
+      const parsed = await sidecarClient.parseKmz(blob, fileName)
+
+      setCurrentProject(opened.detail)
+      setRuns(opened.detail.runs)
+      // S1-08 — when the project has prior runs, auto-select the most
+      // recent so the canvas hydrates with the user's last layout
+      // (matches the mental model: opening a project shows the prior
+      // work, not blank boundary + manual run pick). P7's selectedRunId
+      // effect then fires B17 → S3 GET → setLayoutResult. Fixes both
+      // the S2 tab-switch round-trip (transit through a runs-empty
+      // project nulls the selection irrecoverably) and the P2 cold-open
+      // case where the user previously had to click a run from the
+      // gallery to see anything beyond the boundary.
+      if (opened.detail.runs.length > 0) {
+        const mostRecent = [...opened.detail.runs].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt)
+        )[0]!
+        selectRun(mostRecent.id)
+      }
+      // P4 restore — hydrate the editingState slice's undoStack from
+      // `detail.edits` if the desktop schema parses it. Malformed wire
+      // data falls back to an empty stack rather than blocking the open.
+      const restoredStack = undoStackFromEdits(opened.detail.edits) ?? []
+      useEditingStateStore.getState().setUndoStack(restoredStack)
+      setProject({ kmz: parsed, fileName })
+      // S2 — register/activate the tab for this project. Dedup logic
+      // makes this a no-op when this open was triggered BY a tab
+      // switch (the tab already exists + is active).
+      tabsOpenTab(opened.detail.id, opened.detail.name)
+      setPaletteOpen(false)
+    } catch (err) {
+      // 404 NOT_FOUND → user-friendly "Project not found"; otherwise pipe
+      // through the existing error-overlay surface.
+      let detail: string
+      if (err instanceof EntitlementsError && err.code === "NOT_FOUND") {
+        detail = `Project not found: ${projectId}`
+      } else {
+        detail = err instanceof Error ? err.message : String(err)
+      }
+      console.error("open existing project failed:", err)
+      setOpenError(detail)
+    } finally {
+      setOpening(false)
+    }
+  }, [
+    sidecarClient,
+    opening,
+    openProjectMutation,
+    setCurrentProject,
+    setRuns,
+    selectRun,
+    setProject,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+    resetEditingState,
+    tabsOpenTab,
+  ])
+
+  // ── SP3 — rename / delete handlers shared by Recents card menu + tab
+  // right-click context menu. Promise-returning so each surface's local
+  // dialog state can track its own busy + error per click. Mutations are
+  // App.tsx-owned (the existing pattern); each surface invokes them
+  // through these wrappers.
+  //
+  // Tab title sync (rename): when the renamed project has an open tab,
+  // patch the tabs slice so the tab strip reflects the new name.
+  // Tab cleanup (delete): folded into useDeleteProjectMutation.onSuccess
+  // (closes any tab pointing at the deleted project BEFORE clearAll, so
+  // the tab-switch effect doesn't fire B12 against a 404). All this
+  // wrapper has to do is reset transient canvas state when the deleted
+  // project happened to be currentProject — same shape as the parity
+  // post-open reset.
+  const handleRecentsRename = useCallback(
+    async (projectId: string, newName: string) => {
+      await renameProjectMutation.mutateAsync({
+        projectId,
+        name: newName,
+      })
+      tabsUpdateName(projectId, newName)
+    },
+    [renameProjectMutation, tabsUpdateName]
+  )
+
+  const handleRecentsDelete = useCallback(
+    async (projectId: string) => {
+      await deleteProjectMutation.mutateAsync({ projectId })
+      // Hook closes any tab carrying this projectId + clears the
+      // project slice (when ids match). The transient canvas slices
+      // (layout result / layout params / layer visibility / editing
+      // state / form key) are App.tsx's responsibility — reset only
+      // when the deleted project was the active workspace.
+      if (currentProject?.id === projectId) {
+        clearLayoutResult()
+        resetLayoutParams()
+        resetLayerVisibility()
+        resetEditingState()
+        setLayoutFormKey((k) => k + 1)
+      }
+    },
+    [
+      deleteProjectMutation,
+      currentProject,
+      clearLayoutResult,
+      resetLayoutParams,
+      resetLayerVisibility,
+      resetEditingState,
+    ]
+  )
+
+  // ── S2 — tab switch effect + close handler ──────────────────────────────
+  // When activeTabId changes, sync the project state:
+  //   - null → clear all project state (back to recents view)
+  //   - new tab pointing at a different project → fire P2's open flow
+  //   - new tab matching currentProject → no-op (likely a tab-create
+  //     immediately after a successful P1/P2 open; deduped by openTab)
+  useEffect(() => {
+    if (!activeTabId) {
+      if (currentProject) {
+        useProjectStore.getState().clearAll()
+        clearLayoutResult()
+        resetLayoutParams()
+        resetLayerVisibility()
+        resetEditingState()
+        setLayoutFormKey((k) => k + 1)
+      }
+      return
+    }
+    const tab = useTabsStore.getState().tabs.find((t) => t.id === activeTabId)
+    if (!tab) return
+    if (tab.projectId === currentProject?.id) return
+    void handleOpenProjectById(tab.projectId)
+  }, [
+    activeTabId,
+    currentProject,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+    resetEditingState,
+    handleOpenProjectById,
+  ])
+
+  const handleCloseTab = useCallback(
+    (tabId: string) => {
+      // Warn if closing the active tab while autosave is mid-flight —
+      // the 2s pending edits would get lost when the slice resets in
+      // the next tick.
+      if (
+        tabId === activeTabId &&
+        saveStatus.kind === "saving"
+      ) {
+        const ok = window.confirm(
+          "Unsaved edits to this project. Close anyway? Edits will save in the background but may be cancelled mid-flight."
+        )
+        if (!ok) return
+      }
+      tabsCloseTab(tabId)
+    },
+    [activeTabId, saveStatus.kind, tabsCloseTab]
+  )
 
   // Native menu "File → Open KMZ…" fires a `menu:file/open_kmz` event
   // (the `.` in the Rust menu-item id is translated to `/` at emit time
   // because Tauri 2's event-name validator rejects dots). The command
   // palette + empty-state button call handleOpenKmz directly.
+  //
+  // S1-11 — register the listener exactly once for the App's lifetime.
+  // The previous effect re-ran on every `handleOpenKmz` change (its
+  // useCallback deps shift during normal session work) and Tauri's
+  // `listen` returns a Promise — cleanup fired before the prior promise
+  // resolved, so old listeners stayed registered. Result: N re-renders
+  // since the last successful unregister = N listeners stacked = N file
+  // pickers per menu click.
+  //
+  // The ref pattern decouples the listener from `handleOpenKmz`'s
+  // identity: the effect mounts once, the ref always points at the
+  // latest `handleOpenKmz`, and the listener invokes through the ref.
+  // The `cancelled` flag is belt-and-suspenders for the original race
+  // path on mount/unmount.
+  const handleOpenKmzRef = useRef(handleOpenKmz)
+  useEffect(() => {
+    handleOpenKmzRef.current = handleOpenKmz
+  }, [handleOpenKmz])
+
   useEffect(() => {
     if (!inTauri()) return
+    let cancelled = false
     let unlisten: (() => void) | undefined
     void listen("menu:file/open_kmz", () => {
-      void handleOpenKmz()
+      void handleOpenKmzRef.current()
     }).then((fn) => {
-      unlisten = fn
+      if (cancelled) fn()
+      else unlisten = fn
     })
     return () => {
+      cancelled = true
       unlisten?.()
     }
-  }, [handleOpenKmz])
+  }, [])
 
   const openPalette = useCallback(() => setPaletteOpen(true), [])
 
@@ -411,11 +876,26 @@ export function App(): JSX.Element {
         void handleOpenKmz()
         return
       }
+      // S2 — Cmd-T opens a new project (file picker → P1 flow). Synonym
+      // with the "+" tab-tile + Cmd-O for now; will diverge if Cmd-O
+      // gains an open-existing-project palette in a later S row.
+      if (meta && e.key.toLowerCase() === "t") {
+        e.preventDefault()
+        void handleOpenKmz()
+        return
+      }
+      // S2 — Cmd-W closes the active tab (with the same unsaved-edits
+      // warning used by the X button). No-op when no tabs open.
+      if (meta && e.key.toLowerCase() === "w") {
+        e.preventDefault()
+        if (activeTabId) handleCloseTab(activeTabId)
+        return
+      }
       if (e.key === "Escape") setPaletteOpen(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [handleOpenKmz])
+  }, [handleOpenKmz, activeTabId, handleCloseTab])
 
   // ── S11: interactive ICR drag + obstruction drawing ──────────────────────
   //
@@ -673,8 +1153,27 @@ export function App(): JSX.Element {
   }
 
   // 5) Ready — render the full shell with entitlements in context.
-  const entitlements = entQuery.data as Entitlements
-  const planName = entitlements.plans[0]?.planName ?? "Free"
+  const entitlements = entQuery.data as EntitlementSummaryV2
+
+  // S4 — account-menu data: masked license key + a compact quota summary
+  // node mirroring the QuotaIndicator chip's numbers, plus a Buy more
+  // handler that opens the marketing pricing page in an external browser.
+  const maskedLicenseKey = maskLicenseKey(savedKey)
+  const accountQuotaSummary = (
+    <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+      {entitlements.remainingCalculations} calcs ·{" "}
+      {entitlements.projectsRemaining} projects remaining
+    </span>
+  )
+  const handleBuyMore = (): void => {
+    if (inTauri()) {
+      void openExternalUrl(BUY_MORE_URL).catch((err) => {
+        console.error("openExternalUrl failed:", err)
+      })
+    } else if (typeof window !== "undefined") {
+      window.open(BUY_MORE_URL, "_blank", "noopener,noreferrer")
+    }
+  }
 
   return (
     <EntitlementsProvider
@@ -691,15 +1190,31 @@ export function App(): JSX.Element {
         topBar={
           <TopBar
             projectName={project?.fileName}
-            chip={<Chip tone="accent">{planName}</Chip>}
+            chip={<QuotaIndicator entitlements={entitlements} />}
             onCommandPaletteClick={openPalette}
             onToggleToolRail={() => setToolRailOpen((v) => !v)}
-            onToggleInspector={() => setInspectorOpen((v) => !v)}
+            onToggleInspector={
+              project ? () => setInspectorOpen((v) => !v) : undefined
+            }
             userInitials={initialsFor(entitlements.user.name) ?? "--"}
             userName={entitlements.user.name ?? undefined}
             userEmail={entitlements.user.email ?? undefined}
+            maskedLicenseKey={maskedLicenseKey}
+            quotaSummary={accountQuotaSummary}
             onViewLicense={() => setInfoDialogOpen(true)}
             onClearLicense={() => void handleClearLicense()}
+            onBuyMore={handleBuyMore}
+            onHome={tabsGoHome}
+          />
+        }
+        tabsBar={
+          <TabsBar
+            onSwitch={tabsSwitchTab}
+            onClose={handleCloseTab}
+            onNewProject={() => void handleOpenKmz()}
+            onHome={tabsGoHome}
+            onRename={handleRecentsRename}
+            onDelete={handleRecentsDelete}
           />
         }
         toolRail={<ToolRail activeTool={activeTool} onSelect={setActiveTool} />}
@@ -720,13 +1235,18 @@ export function App(): JSX.Element {
             showLas={showLas}
             onMapReady={handleMapReady}
           >
-            <CommandBarHint onClick={openPalette} />
             {!project && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="pointer-events-auto">
-                  <EmptyStateCard onOpen={() => void handleOpenKmz()} />
-                </div>
-              </div>
+              <RecentsView
+                isLoading={projectsListQuery.isLoading}
+                isError={projectsListQuery.isError}
+                errorMessage={projectsListQuery.error?.message}
+                projects={projectsListQuery.data ?? []}
+                onOpen={(id) => void handleOpenProjectById(id)}
+                onNewProject={() => void handleOpenKmz()}
+                onRetry={() => void projectsListQuery.refetch()}
+                onRename={handleRecentsRename}
+                onDelete={handleRecentsDelete}
+              />
             )}
             {opening && <OpeningOverlay />}
             {openError && (
@@ -736,6 +1256,15 @@ export function App(): JSX.Element {
                 onRetry={() => void handleOpenKmz()}
               />
             )}
+            {upsellDetail && (
+              <UpsellOverlay
+                detail={upsellDetail}
+                onDismiss={() => setUpsellDetail(null)}
+              />
+            )}
+            {/* P4 — top-right pill mirrors auto-save status. */}
+            <SaveIndicator status={saveStatus} />
+
             {layoutMutation.isError && (
               <OpenErrorOverlay
                 detail={
@@ -748,38 +1277,50 @@ export function App(): JSX.Element {
           </MapCanvas>
         }
         inspector={
-          <InspectorRoot>
-            <Tabs defaultValue="layout" className="px-[20px] pt-[18px]">
-              <TabsList>
-                <TabsTrigger value="layout">Layout</TabsTrigger>
-                <TabsTrigger value="energy">Energy yield</TabsTrigger>
-              </TabsList>
-              {/* forceMount: keep the LayoutPanel mounted across tab
-                  switches so RHF's working form state survives. Hidden
-                  via Radix's data-[state] attr + Tailwind variant. */}
-              <TabsContent
-                value="layout"
-                forceMount
-                className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
-              >
-                <LayoutPanel
-                  key={layoutFormKey}
-                  onGenerate={handleGenerate}
-                  generating={layoutMutation.isPending}
-                  noProject={!project}
-                />
-                {layoutResult && <VisibilitySection />}
-                {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
-                <SummaryPanel generating={layoutMutation.isPending} />
-              </TabsContent>
-              <TabsContent
-                value="energy"
-                className="mt-[8px] -mx-[20px]"
-              >
-                <EnergyTabContent />
-              </TabsContent>
-            </Tabs>
-          </InspectorRoot>
+          project ? (
+            <InspectorRoot>
+              <Tabs defaultValue="layout" className="px-[20px] pt-[18px]">
+                <TabsList>
+                  <TabsTrigger value="layout">Layout</TabsTrigger>
+                  <TabsTrigger value="energy">Energy yield</TabsTrigger>
+                  <TabsTrigger value="runs">Runs</TabsTrigger>
+                </TabsList>
+                {/* forceMount: keep the LayoutPanel mounted across tab
+                    switches so RHF's working form state survives. Hidden
+                    via Radix's data-[state] attr + Tailwind variant. */}
+                <TabsContent
+                  value="layout"
+                  forceMount
+                  className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+                >
+                  <LayoutPanel
+                    key={layoutFormKey}
+                    onGenerate={handleGenerate}
+                    generating={layoutMutation.isPending}
+                    noProject={!project}
+                  />
+                  {layoutResult && <VisibilitySection />}
+                  {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
+                  <SummaryPanel generating={layoutMutation.isPending} />
+                </TabsContent>
+                <TabsContent
+                  value="energy"
+                  className="mt-[8px] -mx-[20px]"
+                >
+                  <EnergyTabContent />
+                </TabsContent>
+                {/* P5 — runs gallery + list, forceMount so multi-select
+                    state survives Inspector tab switches. */}
+                <TabsContent
+                  value="runs"
+                  forceMount
+                  className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+                >
+                  <RunsList onDeleteRuns={handleDeleteRuns} />
+                </TabsContent>
+              </Tabs>
+            </InspectorRoot>
+          ) : undefined
         }
         statusBar={
           <StatusBar
@@ -787,7 +1328,19 @@ export function App(): JSX.Element {
             sidecarLabel={`Sidecar healthy · engine ${sidecarPhase.version}`}
             leftMeta={
               projectCounts
-                ? `${plural(projectCounts.boundaries, "boundary", "boundaries")} · ${plural(projectCounts.obstacles, "obstacle", "obstacles")}`
+                ? [
+                    plural(projectCounts.boundaries, "boundary", "boundaries"),
+                    plural(projectCounts.obstacles, "obstacle", "obstacles"),
+                    projectCounts.lines > 0
+                      ? plural(
+                          projectCounts.lines,
+                          "line obstruction",
+                          "line obstructions"
+                        )
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
                 : "No project loaded"
             }
             units={units}
@@ -808,6 +1361,31 @@ export function App(): JSX.Element {
           <PaletteItem label="Save project" shortcut="⌘S" />
           <PaletteItem label="Export…" shortcut="⌘E" />
         </CommandGroup>
+        {/* SP3 — Recents quick-switch. Navigation only; rename/delete live
+            on the Recents card ⋯ menu and the tab right-click ContextMenu
+            (both surfaces have unambiguous "this project" semantics that
+            Cmd-K lacks). Replaces the parity-era window.prompt("Project
+            ID:") interim and the broken Cmd-K rename/delete items. */}
+        {(projectsListQuery.data?.length ?? 0) > 0 && (
+          <>
+            <CommandSeparator className="my-[4px] h-[1px] bg-[var(--border-subtle)]" />
+            <CommandGroup
+              heading="Recents"
+              className="px-[4px] py-[4px]"
+            >
+              {(projectsListQuery.data ?? []).slice(0, 8).map((p) => (
+                <PaletteItem
+                  key={p.id}
+                  label={p.name}
+                  onSelect={() => {
+                    setPaletteOpen(false)
+                    void handleOpenProjectById(p.id)
+                  }}
+                />
+              ))}
+            </CommandGroup>
+          </>
+        )}
         <CommandSeparator className="my-[4px] h-[1px] bg-[var(--border-subtle)]" />
         <CommandGroup heading="Canvas" className="px-[4px] py-[4px]">
           <PaletteItem label="Generate layout" shortcut="G" />
@@ -917,6 +1495,48 @@ function OpeningOverlay() {
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div className="pointer-events-auto px-[16px] py-[10px] rounded-[var(--radius-md)] bg-[var(--surface-panel)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)] text-[13px] text-[var(--text-secondary)]">
         Parsing KMZ…
+      </div>
+    </div>
+  )
+}
+
+function stripKmzExtension(fileName: string): string {
+  const trimmed = fileName.trim()
+  const lower = trimmed.toLowerCase()
+  if (lower.endsWith(".kmz")) return trimmed.slice(0, -4)
+  if (lower.endsWith(".kml")) return trimmed.slice(0, -4)
+  return trimmed
+}
+
+/**
+ * P1 — quota-exceeded modal. Mirrors `OpenErrorOverlay`'s visual
+ * treatment but leans on the warning surface tokens (vs error) since
+ * over-quota isn't a failure mode — it's a deliberate ceiling. Tap
+ * "Manage projects" to open the project list (P3 lands the actual
+ * recents/manage view; for now this is a no-op placeholder so the
+ * modal isn't dead-end).
+ */
+function UpsellOverlay({
+  detail,
+  onDismiss,
+}: {
+  detail: string
+  onDismiss: () => void
+}) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto max-w-[480px] bg-[var(--surface-panel)] border border-[var(--border-default)] rounded-[var(--radius-lg)] shadow-[var(--shadow-md)] p-[20px] flex flex-col gap-[10px]">
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+          Project quota reached
+        </h2>
+        <p className="text-[12px] text-[var(--text-secondary)] leading-normal break-words">
+          {detail}
+        </p>
+        <div className="flex items-center justify-end gap-[8px]">
+          <Button type="button" variant="ghost" size="md" onClick={onDismiss}>
+            Close
+          </Button>
+        </div>
       </div>
     </div>
   )

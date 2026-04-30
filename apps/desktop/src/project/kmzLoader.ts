@@ -24,6 +24,14 @@ export interface OpenKmzResult {
   parsed: ParsedKMZ
   path: string
   fileName: string
+  /**
+   * The raw bytes read off disk. Returned alongside `parsed` so the
+   * post-parity new-project flow (P1) can hand the same bytes to
+   * `uploadKmzToS3` without re-reading the file. Always a KMZ payload —
+   * .kml inputs aren't supported by B6 (the backend caps and signs the
+   * KMZ Content-Type only).
+   */
+  bytes: Uint8Array
 }
 
 /**
@@ -41,16 +49,17 @@ export async function openAndParseKmz(
   })
   if (!picked || typeof picked !== "string") return null
 
-  const bytes = await readFile(picked)
+  const fileBytes = await readFile(picked)
+  const bytes = new Uint8Array(fileBytes)
   const fileName = basename(picked)
   const mime =
     fileName.toLowerCase().endsWith(".kml")
       ? "application/vnd.google-earth.kml+xml"
       : "application/vnd.google-earth.kmz"
-  const blob = new Blob([new Uint8Array(bytes)], { type: mime })
+  const blob = new Blob([bytes], { type: mime })
 
   const parsed = await sidecar.parseKmz(blob, fileName)
-  return { parsed, path: picked, fileName }
+  return { parsed, path: picked, fileName, bytes }
 }
 
 function basename(path: string): string {

@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": false
+  },
+  "outputDirectory": ".",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+}

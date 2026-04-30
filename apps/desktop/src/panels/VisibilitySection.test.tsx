@@ -15,14 +15,14 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
   FEATURE_KEYS,
-  type Entitlements,
+  type EntitlementSummaryV2,
   type FeatureKey,
 } from "@solarlayout/entitlements-client"
 import { EntitlementsProvider } from "../auth/EntitlementsProvider"
 import { useLayerVisibilityStore } from "../state/layerVisibility"
 import { VisibilitySection } from "./VisibilitySection"
 
-const BASE_ENT: Entitlements = {
+const BASE_ENT: EntitlementSummaryV2 = {
   user: { name: "Test User", email: "test@example.com" },
   plans: [
     {
@@ -38,6 +38,10 @@ const BASE_ENT: Entitlements = {
   totalCalculations: 100,
   usedCalculations: 0,
   remainingCalculations: 100,
+  projectQuota: 3,
+  projectsActive: 0,
+  projectsRemaining: 3,
+  entitlementsActive: true,
 }
 
 const BASIC_FEATURES: FeatureKey[] = [

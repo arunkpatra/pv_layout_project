@@ -1,0 +1,77 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LayoutArtifactsReadWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::renewable-energy-local-artifacts/*",
+        "arn:aws:s3:::renewable-energy-staging-artifacts/*",
+        "arn:aws:s3:::renewable-energy-prod-artifacts/*"
+      ]
+    },
+    {
+      "Sid": "LayoutArtifactsList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": [
+        "arn:aws:s3:::renewable-energy-local-artifacts",
+        "arn:aws:s3:::renewable-energy-staging-artifacts",
+        "arn:aws:s3:::renewable-energy-prod-artifacts"
+      ]
+    },
+    {
+      "Sid": "MvpDownloadsReadWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::solarlayout-local-downloads/*",
+        "arn:aws:s3:::solarlayout-staging-downloads/*",
+        "arn:aws:s3:::solarlayout-prod-downloads/*"
+      ]
+    },
+    {
+      "Sid": "MvpDownloadsList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": [
+        "arn:aws:s3:::solarlayout-local-downloads",
+        "arn:aws:s3:::solarlayout-staging-downloads",
+        "arn:aws:s3:::solarlayout-prod-downloads"
+      ]
+    },
+    {
+      "Sid": "V2ProjectsReadWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::solarlayout-local-projects/*",
+        "arn:aws:s3:::solarlayout-staging-projects/*",
+        "arn:aws:s3:::solarlayout-prod-projects/*"
+      ]
+    },
+    {
+      "Sid": "V2ProjectsList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": [
+        "arn:aws:s3:::solarlayout-local-projects",
+        "arn:aws:s3:::solarlayout-staging-projects",
+        "arn:aws:s3:::solarlayout-prod-projects"
+      ]
+    }
+  ]
+}
