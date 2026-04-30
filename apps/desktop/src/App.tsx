@@ -18,7 +18,6 @@ import type { EntitlementSummaryV2 } from "@solarlayout/entitlements-client"
 import {
   AppShell,
   Button,
-  Chip,
   CommandBarHint,
   CommandGroup,
   CommandItem,
@@ -57,6 +56,7 @@ import { useProjectsListQuery } from "./auth/useProjectsList"
 import { useOpenRunMutation } from "./auth/useOpenRun"
 import { useDeleteRunMutation } from "./auth/useDeleteRun"
 import { SaveIndicator } from "./auth/SaveIndicator"
+import { QuotaIndicator } from "./auth/QuotaIndicator"
 import { RecentsView } from "./recents/RecentsView"
 import { RunsList } from "./runs/RunsList"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
@@ -1010,7 +1010,6 @@ export function App(): JSX.Element {
 
   // 5) Ready — render the full shell with entitlements in context.
   const entitlements = entQuery.data as EntitlementSummaryV2
-  const planName = entitlements.plans[0]?.planName ?? "Free"
 
   return (
     <EntitlementsProvider
@@ -1027,7 +1026,7 @@ export function App(): JSX.Element {
         topBar={
           <TopBar
             projectName={project?.fileName}
-            chip={<Chip tone="accent">{planName}</Chip>}
+            chip={<QuotaIndicator entitlements={entitlements} />}
             onCommandPaletteClick={openPalette}
             onToggleToolRail={() => setToolRailOpen((v) => !v)}
             onToggleInspector={() => setInspectorOpen((v) => !v)}
