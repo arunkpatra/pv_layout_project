@@ -1189,4 +1189,36 @@ Typecheck green. Status → `fixed` pending live confirmation. Will
 close fully once user verifies a single File menu click opens
 exactly one file picker.
 
+[FE 2026-04-30 14:55] User reported the bug still reproed after the
+fix landed in dev. Diagnosis: **HMR limitation — Tauri listener
+registrations persist across hot reloads on the Rust side**. Vite's
+HMR can swap the React module but it cannot unregister listeners
+that were bound by the *old* JS module against Tauri's Rust event
+bus. Net effect after HMR: stacked listeners from before the patch
+are still alive AND a new one (from the patched module) is added
+on top. The fix can only take effect after a full Tauri process
+restart.
+
+Lesson for future smoke sessions: **patches that touch
+`@tauri-apps/api/event` listener registration always require a
+Tauri dev restart (not just HMR) to verify.** Worth adding to the
+smoke session preamble for next time.
+
+User collateral: each of the stacked file pickers fired a separate
+B11 (no idempotency key on B11 — every successful POST creates a
+row), so PRO ended up with 5–6 duplicate projects. Proposed
+cleanup: curl loop using B14 to soft-delete all of PRO's projects:
+
+```bash
+KEY="sl_live_desktop_test_PRO_stable"
+curl -sS http://localhost:3003/v2/projects -H "Authorization: Bearer $KEY" \
+| jq -r '.data[].id' | while read -r id; do
+    curl -sS -X DELETE "http://localhost:3003/v2/projects/$id" \
+      -H "Authorization: Bearer $KEY"
+  done
+```
+
+Then Tauri restart + re-sign in to verify the fix on a clean
+PRO state.
+
 ---
