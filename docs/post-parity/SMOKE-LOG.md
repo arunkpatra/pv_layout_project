@@ -513,6 +513,7 @@ extra-attention items inside flows already on the route.
 | S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded: Inspector panel is hidden entirely + the TopBar Inspector toggle button is hidden. Inspector restores on next project open with the user's prior `inspectorOpen` preference.        | fixed  | inline  | see S1-04 below           |
 | S1-05 | P3  | frontend | fe    | Redundant `Press ⌘K for commands` pill above the canvas      | 1. Sign in. 2. RecentsView (or any canvas state). 3. Floating `Press ⌘K for commands` pill renders top-left of canvas, duplicating the TopBar's palette button. | Floating hint removed; TopBar's palette button is the canonical entry point.                                                                                                                                  | fixed  | inline  | see S1-05 below           |
 | S1-06 | P3  | frontend, backend | both | Run gallery cards show empty thumbnail placeholder           | 1. Open project + Generate Layout. 2. Inspector → Runs tab. 3. Run card renders with title + type chip + timestamp but a blank gray placeholder where a layout preview thumbnail would help orient. | Thumbnail shows a recognizable preview of the run's layout. User-preferred path: server-side pipeline (Option B) subject to a detailed impact-analysis memo when the row is picked up.                       | deferred | new-row | see S1-06 below           |
+| S1-07 | P3  | frontend | fe    | No loading feedback during run-switch                        | 1. Open project + generate ≥2 runs (or open a project with multiple existing runs). 2. Inspector → Runs tab. 3. Click a non-active run card. 4. ~1–2s elapses during B17 fetch + S3 GET; canvas shows old run; no visible "loading" indication. 5. Canvas eventually updates; click felt unacknowledged. | While B17 + S3 GET are in flight: clicked card shows a subtle spinner in the thumbnail slot + StatusBar `leftMeta` reads `Loading run [timestamp]…`. Both clear when the canvas hydrates. No toast — the canvas update IS the success signal.                                       | deferred | new-row | see S1-07 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -846,5 +847,48 @@ covering at minimum:
 Status `deferred`; will revisit when Phase 4 polish bucket is
 picked up and the memo is written. The memo + the desktop-side row
 + the backend B-row will all land together (lockstep pattern).
+
+##### S1-07 thread
+
+[FE 2026-04-30 14:10] User flagged that clicking a run card with no
+canvas-state change (no-op for already-active run) felt
+unacknowledged, and suggested a toast on click. Discussed three
+feedback patterns:
+
+A) In-place loading state on the card + StatusBar reads `Loading
+   run [timestamp]…`. No toast. Recommended pick.
+B) Toast on success only ("Loaded [run name]", 2s auto-dismiss).
+C) Toast on click + no-toast for the already-active no-op case
+   (user's original suggestion).
+
+Why A wins:
+- Canvas hydration is already the success signal — the toast on B17
+  resolve is redundant once the user sees the layout change.
+- Toast spam risk under rapid run-switching (comparing 4–5 runs).
+- The actual UX gap is the 1–2s loading window where canvas hasn't
+  caught up; a card-spinner + StatusBar status is more native to the
+  existing chrome than a floating toast.
+- Toast infrastructure (`@solarlayout/ui` Radix Toast primitive)
+  stays available for events that genuinely deserve a transient
+  float (undo prompts, background errors, multi-step summaries).
+
+User chose: **defer to new row, option A**.
+
+Scope when picked up — touches three surfaces:
+- `apps/desktop/src/runs/RunsList.tsx` — card-level loading state
+  driven by `useOpenRunMutation.isPending` matched against
+  `selectedRunId`. Render a tiny spinner inside the placeholder
+  thumbnail slot when the run is loading; faint card pulse.
+- `apps/desktop/src/App.tsx` — extend StatusBar `leftMeta` to read
+  `Loading run [timestamp]…` while the open-run mutation is in
+  flight; restore the boundary/obstacle/lines string when done.
+- The no-op case (clicking the already-active run) does nothing
+  visually — by design. Confirming the active state is noise.
+
+New-row name suggestion: `RP2 — In-place loading feedback for
+run-switch`. Tier T1, depends P5 + P7, source = this S1-07 thread.
+
+Status `deferred`; will revisit when Phase 4 polish bucket is
+picked up.
 
 ---
