@@ -23,6 +23,25 @@ projectsRoutes.get("/v2/projects", async (c) => {
   return c.json(ok(projects))
 })
 
+/**
+ * Loose GeoJSON Polygon | MultiPolygon validator. We don't enforce the
+ * full spec (closed rings, right-hand rule, etc.) — just enough shape to
+ * reject obvious garbage. Desktop is the only sender; full validation is
+ * its job. The 50KB cap below catches malformed payloads independently.
+ */
+const BoundaryGeojsonSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("Polygon"),
+    coordinates: z.array(z.array(z.array(z.number()).length(2))),
+  }),
+  z.object({
+    type: z.literal("MultiPolygon"),
+    coordinates: z.array(z.array(z.array(z.array(z.number()).length(2)))),
+  }),
+])
+
+const MAX_BOUNDARY_GEOJSON_BYTES = 50 * 1024 // 50 KB
+
 const CreateProjectSchema = z.object({
   name: z.string().min(1).max(200),
   kmzBlobUrl: z.string().min(1),
@@ -30,6 +49,7 @@ const CreateProjectSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/, "must be 64-char lowercase hex"),
   edits: z.unknown().optional(),
+  boundaryGeojson: BoundaryGeojsonSchema.optional(),
 })
 
 projectsRoutes.get("/v2/projects/:id", async (c) => {
@@ -91,6 +111,17 @@ projectsRoutes.post("/v2/projects", async (c) => {
       400,
       parsed.error.flatten(),
     )
+  }
+
+  if (parsed.data.boundaryGeojson) {
+    const serialized = JSON.stringify(parsed.data.boundaryGeojson)
+    if (serialized.length > MAX_BOUNDARY_GEOJSON_BYTES) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        `boundaryGeojson must be ≤ ${MAX_BOUNDARY_GEOJSON_BYTES} bytes serialized`,
+        400,
+      )
+    }
   }
 
   const user = c.get("user")

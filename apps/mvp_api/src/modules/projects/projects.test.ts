@@ -49,6 +49,7 @@ interface MockProject {
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null
+  boundaryGeojson?: unknown
   runs: { id: string; createdAt: Date }[]
   _count: { runs: number }
 }
@@ -64,6 +65,7 @@ interface MockProjectDetail {
   kmzBlobUrl: string
   kmzSha256: string
   edits: unknown
+  boundaryGeojson?: unknown
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null
@@ -91,6 +93,7 @@ const mockProjectCreate = mock(
         kmzBlobUrl: string
         kmzSha256: string
         edits?: unknown
+        boundaryGeojson?: unknown
       }
     },
   ) => ({
@@ -100,6 +103,7 @@ const mockProjectCreate = mock(
     kmzBlobUrl: args.data.kmzBlobUrl,
     kmzSha256: args.data.kmzSha256,
     edits: args.data.edits ?? {},
+    boundaryGeojson: args.data.boundaryGeojson ?? null,
     createdAt: new Date("2026-04-30T00:00:00Z"),
     updatedAt: new Date("2026-04-30T00:00:00Z"),
     deletedAt: null,
@@ -118,6 +122,7 @@ const mockProjectUpdate = mock(async (args: MockUpdateArgs) => ({
   kmzBlobUrl: "s3://b/k.kmz",
   kmzSha256: "0".repeat(64),
   edits: args.data.edits ?? {},
+  boundaryGeojson: null,
   createdAt: new Date("2026-04-01T00:00:00Z"),
   updatedAt: new Date("2026-04-30T12:00:00Z"),
   deletedAt: args.data.deletedAt ?? null,
@@ -197,6 +202,7 @@ interface ProjectSummary {
   runsCount: number
   lastRunAt: string | null
   mostRecentRunThumbnailBlobUrl: string | null
+  boundaryGeojson: unknown
 }
 
 describe("GET /v2/projects", () => {
@@ -565,6 +571,7 @@ interface ProjectDetailWire {
   kmzBlobUrl: string
   kmzSha256: string
   edits: unknown
+  boundaryGeojson: unknown
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -1071,5 +1078,187 @@ describe("DELETE /v2/projects/:id", () => {
     expect(mockTransactionBatch).toHaveBeenCalledTimes(1)
     expect(mockProjectUpdate).toHaveBeenCalledTimes(1)
     expect(mockRunUpdateMany).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─── B26 — boundaryGeojson on B11 + B10 + B12 ────────────────────────────────
+
+const VALID_POLYGON = {
+  type: "Polygon" as const,
+  coordinates: [
+    [
+      [77.5, 12.9],
+      [77.6, 12.9],
+      [77.6, 13.0],
+      [77.5, 13.0],
+      [77.5, 12.9],
+    ],
+  ],
+}
+
+describe("B26 — Project.boundaryGeojson", () => {
+  beforeEach(() => {
+    mockProjectCount.mockReset()
+    mockProjectCount.mockImplementation(async () => 0)
+    mockProjectCreate.mockClear()
+    mockEntitlementFindMany.mockReset()
+    mockEntitlementFindMany.mockImplementation(async () => [
+      { totalCalculations: 5, usedCalculations: 0, projectQuota: 3 },
+    ])
+    mockProjectFindMany.mockReset()
+    mockProjectFindMany.mockImplementation(async () => [])
+    mockProjectFindFirst.mockReset()
+    mockProjectFindFirst.mockImplementation(async () => null)
+  })
+
+  it("B11: persists boundaryGeojson when supplied and echoes it on the response", async () => {
+    const app = makeApp()
+    const res = await app.request("/v2/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k.kmz",
+        kmzSha256: "a".repeat(64),
+        boundaryGeojson: VALID_POLYGON,
+      }),
+    })
+    expect(res.status).toBe(201)
+    const call = mockProjectCreate.mock.calls[0] as unknown as [
+      { data: { boundaryGeojson?: unknown } },
+    ]
+    expect(call?.[0]?.data?.boundaryGeojson).toEqual(VALID_POLYGON)
+    const body = (await res.json()) as { data: { boundaryGeojson: unknown } }
+    expect(body.data.boundaryGeojson).toEqual(VALID_POLYGON)
+  })
+
+  it("B11: omitting boundaryGeojson is allowed and persists nothing for that field", async () => {
+    const app = makeApp()
+    const res = await app.request("/v2/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k.kmz",
+        kmzSha256: "a".repeat(64),
+      }),
+    })
+    expect(res.status).toBe(201)
+    const call = mockProjectCreate.mock.calls[0] as unknown as [
+      { data: { boundaryGeojson?: unknown } },
+    ]
+    expect(call?.[0]?.data?.boundaryGeojson).toBeUndefined()
+    const body = (await res.json()) as { data: { boundaryGeojson: unknown } }
+    expect(body.data.boundaryGeojson).toBeNull()
+  })
+
+  it("B11: rejects malformed boundaryGeojson (wrong type) with 400", async () => {
+    const app = makeApp()
+    const res = await app.request("/v2/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k.kmz",
+        kmzSha256: "a".repeat(64),
+        boundaryGeojson: { type: "Point", coordinates: [77.5, 12.9] },
+      }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("B11: rejects boundaryGeojson larger than 50KB with 400", async () => {
+    // ~5000 vertices comfortably exceeds the 50KB cap when JSON-serialized
+    const huge = {
+      type: "Polygon" as const,
+      coordinates: [
+        Array.from({ length: 5000 }, (_, i) => [
+          77.5 + i * 0.0001,
+          12.9 + i * 0.0001,
+        ]),
+      ],
+    }
+    const app = makeApp()
+    const res = await app.request("/v2/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer sl_live_testkey",
+      },
+      body: JSON.stringify({
+        name: "Site A",
+        kmzBlobUrl: "s3://b/k.kmz",
+        kmzSha256: "a".repeat(64),
+        boundaryGeojson: huge,
+      }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("B10: emits boundaryGeojson on each ProjectSummary row (or null for legacy projects)", async () => {
+    mockProjectFindMany.mockImplementation(async () => [
+      {
+        id: "prj_with",
+        userId: "usr_test1",
+        name: "With Boundary",
+        kmzBlobUrl: "s3://b/k.kmz",
+        kmzSha256: "a".repeat(64),
+        boundaryGeojson: VALID_POLYGON,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        runs: [],
+        _count: { runs: 0 },
+      },
+      {
+        id: "prj_legacy",
+        userId: "usr_test1",
+        name: "Legacy",
+        kmzBlobUrl: "s3://b/k2.kmz",
+        kmzSha256: "b".repeat(64),
+        // no boundaryGeojson — pre-B26 row
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        runs: [],
+        _count: { runs: 0 },
+      },
+    ])
+    const app = makeApp()
+    const res = await get(app)
+    const body = (await res.json()) as { data: ProjectSummary[] }
+    expect(body.data[0]!.boundaryGeojson).toEqual(VALID_POLYGON)
+    expect(body.data[1]!.boundaryGeojson).toBeNull()
+  })
+
+  it("B12: emits boundaryGeojson on ProjectDetail (inherited from ProjectWire)", async () => {
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      userId: "usr_test1",
+      name: "X",
+      kmzBlobUrl: "s3://b/k.kmz",
+      kmzSha256: "a".repeat(64),
+      edits: {},
+      boundaryGeojson: VALID_POLYGON,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      runs: [],
+    }))
+    const app = makeApp()
+    const res = await app.request("/v2/projects/prj_x", {
+      headers: { Authorization: "Bearer sl_live_testkey" },
+    })
+    const body = (await res.json()) as { data: ProjectDetailWire }
+    expect(body.data.boundaryGeojson).toEqual(VALID_POLYGON)
   })
 })

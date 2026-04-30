@@ -27,4 +27,7 @@ export type {
   RunSummary,
   ProjectWire,
   ProjectDetail,
+  BoundaryGeojson,
+  BoundaryGeojsonPolygon,
+  BoundaryGeojsonMultiPolygon,
 } from "./types/project-v2.js"

@@ -178,17 +178,22 @@ model Transaction {
 }
 
 model Project {
-  id         String    @id @default("")
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  name       String
-  kmzBlobUrl String
-  kmzSha256  String
-  edits      Json      @default("{}")
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
-  runs       Run[]
+  id               String    @id @default("")
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  name             String
+  kmzBlobUrl       String
+  kmzSha256        String
+  edits            Json      @default("{}")
+  /// GeoJSON Polygon | MultiPolygon parsed from the KMZ at create-time
+  /// (B11 request body). Used by the desktop's RecentsView to render an
+  /// SVG outline fallback when no thumbnail exists yet (memo v3 §14).
+  /// Nullable for projects predating B26.
+  boundaryGeojson  Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  runs             Run[]
 
   @@index([userId])
   @@index([deletedAt])

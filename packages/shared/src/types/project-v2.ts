@@ -23,6 +23,24 @@ export interface RunSummary {
   thumbnailBlobUrl: string | null
 }
 
+/** GeoJSON `Polygon` or `MultiPolygon` carrying just the boundary outline
+ *  parsed from the KMZ at create-time. Used by the desktop's RecentsView
+ *  to render an SVG fallback when no thumbnail exists. Loose type so the
+ *  wire stays compatible with the GeoJSON spec without pulling a runtime
+ *  dependency. */
+export interface BoundaryGeojsonPolygon {
+  type: "Polygon"
+  /** Linear rings of [longitude, latitude] pairs. */
+  coordinates: number[][][]
+}
+export interface BoundaryGeojsonMultiPolygon {
+  type: "MultiPolygon"
+  coordinates: number[][][][]
+}
+export type BoundaryGeojson =
+  | BoundaryGeojsonPolygon
+  | BoundaryGeojsonMultiPolygon
+
 export interface ProjectWire {
   id: string
   userId: string
@@ -35,6 +53,10 @@ export interface ProjectWire {
   /** Free-form auto-save state owned by the desktop (canvas mutations,
    *  view state, etc.). Schema is desktop-side. */
   edits: unknown
+  /** Parsed KMZ boundary outline; null for projects created before B26
+   *  (the desktop's SVG fallback degrades to the existing muted
+   *  placeholder when null). */
+  boundaryGeojson: BoundaryGeojson | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null

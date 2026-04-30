@@ -4,6 +4,7 @@ import { AppError, NotFoundError } from "../../lib/errors.js"
 import { getPresignedDownloadUrl } from "../../lib/s3.js"
 import { getProjectQuotaState } from "../entitlements/entitlements.service.js"
 import type {
+  BoundaryGeojson,
   ProjectDetail,
   ProjectWire,
   RunSummary,
@@ -31,6 +32,10 @@ export interface ProjectSummary {
    *  a valid URL that 404s on read; the desktop's `<img onError>` falls
    *  back, mirroring the B17 RunDetail pattern. */
   mostRecentRunThumbnailBlobUrl: string | null
+  /** Parsed KMZ boundary outline; null for projects created before B26 or
+   *  when the desktop didn't supply it on B11. Lets the desktop render an
+   *  SVG fallback on RecentsView cards when no thumbnail exists. */
+  boundaryGeojson: BoundaryGeojson | null
 }
 
 const LIST_CAP = 100
@@ -88,6 +93,8 @@ export async function listProjects(userId: string): Promise<ProjectSummary[]> {
         runsCount: p._count.runs,
         lastRunAt: latestRun?.createdAt.toISOString() ?? null,
         mostRecentRunThumbnailBlobUrl,
+        boundaryGeojson:
+          (p.boundaryGeojson as BoundaryGeojson | null) ?? null,
       }
     }),
   )
@@ -98,6 +105,7 @@ export interface CreateProjectInput {
   kmzBlobUrl: string
   kmzSha256: string
   edits?: unknown
+  boundaryGeojson?: BoundaryGeojson
 }
 
 /**
@@ -133,6 +141,9 @@ export async function createProject(
       ...(input.edits !== undefined
         ? { edits: input.edits as object }
         : {}),
+      ...(input.boundaryGeojson !== undefined
+        ? { boundaryGeojson: input.boundaryGeojson as object }
+        : {}),
     },
   })
 
@@ -143,6 +154,8 @@ export async function createProject(
     kmzBlobUrl: project.kmzBlobUrl,
     kmzSha256: project.kmzSha256,
     edits: project.edits,
+    boundaryGeojson:
+      (project.boundaryGeojson as BoundaryGeojson | null) ?? null,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
@@ -223,6 +236,8 @@ export async function getProject(
     kmzBlobUrl: project.kmzBlobUrl,
     kmzSha256: project.kmzSha256,
     edits: project.edits,
+    boundaryGeojson:
+      (project.boundaryGeojson as BoundaryGeojson | null) ?? null,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
@@ -277,6 +292,8 @@ export async function patchProject(
     kmzBlobUrl: updated.kmzBlobUrl,
     kmzSha256: updated.kmzSha256,
     edits: updated.edits,
+    boundaryGeojson:
+      (updated.boundaryGeojson as BoundaryGeojson | null) ?? null,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
     deletedAt: updated.deletedAt?.toISOString() ?? null,
