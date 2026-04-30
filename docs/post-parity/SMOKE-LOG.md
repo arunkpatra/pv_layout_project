@@ -508,6 +508,7 @@ extra-attention items inside flows already on the route.
 | ID    | Sev | Surface  | Owner | Title                                                       | Repro                                                                                                | Acceptance                                                              | Status | Linked | Thread (see below per ID) |
 |-------|-----|----------|-------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|--------|--------|---------------------------|
 | S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Decision deferred — revisit at end of session.                          | deferred | F1     | see S1-01 below           |
+| S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | open   | F6     | see S1-02 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -544,5 +545,82 @@ Roughly P3-inline.
 
 [FE 2026-04-30 13:20] User opted to defer. Status → `deferred`. Will
 revisit at end of session alongside other P3 polish items.
+
+##### S1-02 thread
+
+[FE 2026-04-30 13:30] First user-facing regression caught by smoke.
+Tauri's HTTP capability scope at
+`apps/desktop/src-tauri/capabilities/default.json` allowlists exactly
+three URL patterns:
+
+```
+http://127.0.0.1:*/*
+http://localhost:*/*
+https://api.solarlayout.in/*
+```
+
+S3 endpoints are absent. `tauriFetch` (delegating to native Rust
+HTTP under the hood) refuses any URL outside the allowlist with the
+exact "url not allowed on the configured scope" error. So every flow
+that PUTs or GETs against the presigned S3 URL fails:
+
+- B6 + S3 PUT (new-project KMZ upload — what we hit)
+- B7 + S3 PUT (run-result upload — P6 Generate Layout)
+- B12 + S3 GET (open-existing-project download)
+- B17 + S3 GET (open-run download)
+
+**Why fixture-session.ts didn't catch this:** the script runs under
+Bun's native fetch — no Tauri capability layer between the request
+and the network. Wire-contract harness, not runtime-environment
+harness. This gap is structural; no fixture-session assertion can
+catch it without launching Tauri.
+
+**Why F6 didn't catch this:** F6 covered the upload helpers + S3
+upload status-code matrix via mocked fetch. The capability scope is
+a runtime/security boundary that's invisible to unit tests. The
+deferral note from F6 ("end-to-end runtime verification rolls into
+the P1 fixture session") was where this was supposed to surface —
+the fixture session ran under Bun (not Tauri) so it slipped through
+to the smoke session here.
+
+**Fix (proposed):** add three explicit S3 bucket hosts to the
+`http:default` allowlist. Tighter than `*.s3.*.amazonaws.com` (which
+would let any compromised presigned URL outside our bucket family
+exfiltrate through the desktop) but covers our three envs:
+
+```diff
+ {
+   "identifier": "http:default",
+   "allow": [
+     { "url": "http://127.0.0.1:*/*" },
+     { "url": "http://localhost:*/*" },
+-    { "url": "https://api.solarlayout.in/*" }
++    { "url": "https://api.solarlayout.in/*" },
++    { "url": "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/**" },
++    { "url": "https://solarlayout-dev-projects.s3.ap-south-1.amazonaws.com/**" },
++    { "url": "https://solarlayout-prod-projects.s3.ap-south-1.amazonaws.com/**" }
+   ]
+ }
+```
+
+Note: capability changes require restarting `bun run tauri dev` —
+the Rust shell reads capabilities once at startup.
+
+**Regression-debt note:** fixture-session can't catch this (no Tauri
+in the loop). Considered options:
+1. Pre-launch lint that scans the capability JSON for required hosts
+2. Playwright-on-Tauri smoke (heavyweight)
+3. Document the capability rule in F6's notes + this smoke log entry
+
+Picking option 3 for now — the smoke session itself is the
+authoritative runtime check, and the rule "all S3 hosts the desktop
+talks to must appear in capabilities/default.json" is a single
+sentence to remember. If we add a fourth env or rotate buckets,
+we'll touch this file anyway. Revisit if a different surface
+introduces this class of bug.
+
+Recommendation: **inline-fix now** — restart Tauri dev after the edit
++ patch lands, repeat the new-project step. This is a P0 block, fix
+takes ~1 minute, restart is fine since smoke is fresh.
 
 ---
