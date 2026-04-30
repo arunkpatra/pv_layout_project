@@ -74,6 +74,18 @@ interface TabsSlice {
   updateTabName: (projectId: string, name: string) => void
 
   /**
+   * S1-10 — leave the active workspace and land on Home (RecentsView).
+   * Sets `activeTabId = null` without removing any tabs, so the strip
+   * still shows them de-highlighted and the user can click back into
+   * any. The App.tsx tab-switch effect picks up the `null` and clears
+   * project state via `useProjectStore.clearAll()` + the per-domain
+   * resets (matches the existing closeTab-of-last-tab path).
+   *
+   * No-op when already home.
+   */
+  goHome: () => void
+
+  /**
    * Reset to empty (sign-out, clear-license, etc.). Mirrors the slice
    * reset patterns elsewhere.
    */
@@ -137,6 +149,11 @@ export const useTabsStore = create<TabsSlice>()((set, get) => ({
         t.projectId === projectId ? { ...t, projectName: name } : t
       ),
     }))
+  },
+
+  goHome: () => {
+    if (get().activeTabId === null) return
+    set({ activeTabId: null })
   },
 
   reset: () => set({ ...INITIAL }),

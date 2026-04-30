@@ -29,12 +29,21 @@ export interface TabsBarProps {
   onClose: (tabId: string) => void
   /** Click handler for the "+" tile. Fires P1's new-project flow. */
   onNewProject: () => void
+  /**
+   * S1-10 — click handler for the leading Home tab. Fires the tabs
+   * slice's `goHome()` which sets `activeTabId = null`, sending the
+   * user back to RecentsView. Tabs are preserved (not removed). When
+   * undefined, the Home tab is hidden — keeps the component reusable
+   * for tests / contexts that don't have the home navigation flow.
+   */
+  onHome?: () => void
 }
 
 export function TabsBar({
   onSwitch,
   onClose,
   onNewProject,
+  onHome,
 }: TabsBarProps): JSX.Element {
   const tabs = useTabsStore((s) => s.tabs)
   const activeTabId = useTabsStore((s) => s.activeTabId)
@@ -50,6 +59,12 @@ export function TabsBar({
       role="tablist"
       aria-label="Open projects"
     >
+      {onHome && (
+        <HomeTab
+          active={activeTabId === null}
+          onClick={onHome}
+        />
+      )}
       {tabs.map((t) => (
         <TabButton
           key={t.id}
@@ -61,6 +76,64 @@ export function TabsBar({
       ))}
       <NewProjectTile onClick={onNewProject} />
     </div>
+  )
+}
+
+/**
+ * Home tab — leading, fixed, no close button, persistent. Active when
+ * `activeTabId === null` (no project workspace selected; canvas shows
+ * RecentsView). Visually separated from project tabs by a thin trailing
+ * divider so users don't expect a `×` on it.
+ */
+function HomeTab({
+  active,
+  onClick,
+}: {
+  active: boolean
+  onClick: () => void
+}): JSX.Element {
+  return (
+    <>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active}
+        aria-label="Home — Recent projects"
+        onClick={onClick}
+        className={`
+          inline-flex items-center gap-[6px]
+          px-[10px] my-[4px]
+          rounded-[var(--radius-sm)]
+          text-[12px]
+          cursor-pointer
+          transition-colors duration-[120ms]
+          ${
+            active
+              ? "bg-[var(--surface-panel)] text-[var(--text-primary)] border border-[var(--border-default)]"
+              : "text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] border border-transparent"
+          }
+        `}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-[12px] h-[12px] shrink-0"
+          aria-hidden="true"
+        >
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+        <span>Projects</span>
+      </button>
+      <div
+        aria-hidden="true"
+        className="self-center w-px h-[16px] mx-[4px] bg-[var(--border-subtle)]"
+      />
+    </>
   )
 }
 

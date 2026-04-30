@@ -135,6 +135,27 @@ describe("tabs slice — updateTabName", () => {
   })
 })
 
+describe("tabs slice — goHome (S1-10)", () => {
+  it("sets activeTabId to null without removing any tabs", () => {
+    const idA = useTabsStore.getState().openTab("prj_a", "A")
+    useTabsStore.getState().openTab("prj_b", "B")
+    expect(useTabsStore.getState().activeTabId).not.toBeNull()
+    useTabsStore.getState().goHome()
+    const s = useTabsStore.getState()
+    expect(s.activeTabId).toBeNull()
+    expect(s.tabs.length).toBe(2)
+    expect(s.tabs.map((t) => t.id)).toContain(idA)
+  })
+
+  it("is a no-op when already home (activeTabId null)", () => {
+    useTabsStore.getState().goHome()
+    expect(useTabsStore.getState().activeTabId).toBeNull()
+    // Should remain null without throwing or otherwise changing state.
+    useTabsStore.getState().goHome()
+    expect(useTabsStore.getState().activeTabId).toBeNull()
+  })
+})
+
 describe("tabs slice — reset", () => {
   it("clears tabs + activeTabId", () => {
     useTabsStore.getState().openTab("prj_a", "A")

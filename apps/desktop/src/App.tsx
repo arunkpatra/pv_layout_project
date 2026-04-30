@@ -534,6 +534,7 @@ export function App(): JSX.Element {
   const tabsCloseTab = useTabsStore((s) => s.closeTab)
   const tabsSwitchTab = useTabsStore((s) => s.switchTab)
   const tabsUpdateName = useTabsStore((s) => s.updateTabName)
+  const tabsGoHome = useTabsStore((s) => s.goHome)
 
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
@@ -1225,6 +1226,7 @@ export function App(): JSX.Element {
             onViewLicense={() => setInfoDialogOpen(true)}
             onClearLicense={() => void handleClearLicense()}
             onBuyMore={handleBuyMore}
+            onHome={tabsGoHome}
           />
         }
         tabsBar={
@@ -1232,6 +1234,7 @@ export function App(): JSX.Element {
             onSwitch={tabsSwitchTab}
             onClose={handleCloseTab}
             onNewProject={() => void handleOpenKmz()}
+            onHome={tabsGoHome}
           />
         }
         toolRail={<ToolRail activeTool={activeTool} onSelect={setActiveTool} />}

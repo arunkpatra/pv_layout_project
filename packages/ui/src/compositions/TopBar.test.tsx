@@ -197,6 +197,24 @@ describe("<TopBar>", () => {
     expect(screen.queryByText(/sl_live_/)).toBeNull()
   })
 
+  it("(S1-10) wordmark click fires onHome when handler is supplied", async () => {
+    const onHome = vi.fn()
+    const user = userEvent.setup()
+    render(<TopBar onHome={onHome} />)
+    await user.click(
+      screen.getByRole("button", { name: "Home — Recent projects" })
+    )
+    expect(onHome).toHaveBeenCalledTimes(1)
+  })
+
+  it("(S1-10) wordmark stays a non-interactive span when onHome is absent", () => {
+    render(<TopBar />)
+    // No "Home — Recent projects" button when onHome isn't passed.
+    expect(
+      screen.queryByRole("button", { name: "Home — Recent projects" })
+    ).toBeNull()
+  })
+
   it("root container carries data-tauri-drag-region for native window dragging", () => {
     const { container } = render(<TopBar />)
     const root = container.querySelector("[data-tauri-drag-region]")

@@ -675,8 +675,9 @@ P10 quota chip on PRO (licensed=true branch only).
 **Held / queued for the next code task (no smoke needed)**
 - S1-09 P2 — camera over-zoom (Inspector-animation race) → ship the
   ResizeObserver fix in MapCanvas, ~30–50 lines.
-- S1-10 P2 — wordmark click-to-home → ship the small TopBar `onHome`
-  prop + tabs-slice `goHome()` action + App.tsx wiring, ~15–20 lines.
+- ~~S1-10 P2 — wordmark click-to-home~~ → **shipped post-close as a
+  Home tab + bonus wordmark click (v2; user redesign call)**. See
+  S1-10 thread for the v2 design discussion + commit reference.
 
 **Deferred to new rows (when polish phase opens)**
 - RP1 — Run thumbnail previews (Option B server-side; cross-repo
@@ -704,7 +705,7 @@ the smoke-reset doc. Pushed to `origin/post-parity-v1-desktop`.
 | S1-07 | P3  | frontend | fe    | No loading feedback during run-switch                        | 1. Open project + generate ≥2 runs (or open a project with multiple existing runs). 2. Inspector → Runs tab. 3. Click a non-active run card. 4. ~1–2s elapses during B17 fetch + S3 GET; canvas shows old run; no visible "loading" indication. 5. Canvas eventually updates; click felt unacknowledged. | While B17 + S3 GET are in flight: clicked card shows a subtle spinner in the thumbnail slot + StatusBar `leftMeta` reads `Loading run [timestamp]…`. Both clear when the canvas hydrates. No toast — the canvas update IS the success signal.                                       | deferred | new-row | see S1-07 below           |
 | S1-08 | P1  | frontend | fe    | Layout state lost on tab-switch round-trip (S2 regression)   | 1. Open project A; Generate Layout (run_A produced + canvas shows panels/ICRs). 2. Open a second project B (with no runs). Tab opens; canvas shows just B's boundary. 3. Click back on tab A. 4. Canvas shows only A's boundary — no panels, no ICRs. The previously-generated run is gone visually but still exists in `runs[]` (visible in Inspector → Runs tab if you check). | Switching back to a tab whose project has runs auto-restores the most-recent run on canvas. The P7 selectedRunId-driven effect fires B17 + S3 GET + setLayoutResult during the B12-driven hydration. Mental model: opening a project shows the prior work, not blank boundary + manual click. | fixed  | S2, P2  | see S1-08 below           |
 | S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
-| S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
+| S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. v2: persistent leading Home tab in TabsBar (icon + "Projects" label) + bonus wordmark-click in TopBar — both fire `tabs.goHome()`.        | fixed  | inline  | see S1-10 below           |
 | S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | fixed  | F4-era menu wiring | see S1-11 below           |
 | S1-12 | P1  | frontend | fe | Runs list rendering inconsistent across tab switches      | 1. Open project A; Generate Layout (run A1 created). 2. Open project B; Generate Layout (run B1 created). 3. Inspector → Runs tab on B shows **2 runs**. 4. Switch back to A, then back to B (or just switch tabs). 5. Inspector → Runs tab on B now shows **1 run**.                                                | Each project's Runs tab renders only that project's runs, consistently across tab switches. Run counts match server state (B12's runs[] / B15 if used).                                                                                                                                | fixed  | P5, P6, S2 | see S1-12 below           |
 | S1-13 | P1  | frontend | fe | Canvas shows another project's layout despite no runs (stale-mutation race) | 1. Open project A (`phaseboundary2`); Generate Layout. 2. Click `+` to open project B (`phaseboundary`) — pick KMZ; tab opens. 3. Canvas shows panels + ICR-1 + ICR-2 even though Inspector → Runs tab on B is correctly empty ("Generate a layout to see it here"). 4. Server confirms B has 0 runs.            | When user navigates away from a project before its `useOpenRunMutation` resolves, the late onSuccess must NOT write the result into the global layoutResult slice. Canvas of a runs-empty project should never display a layout.                                                       | fixed  | S1-08, P7 | see S1-13 below           |
@@ -1290,6 +1291,59 @@ flow.
 
 Awaiting user go-ahead on #1: ship inline / defer / drop. (#2 stays
 deferred regardless.)
+
+[FE 2026-04-30 15:59] Post-Session-1-close design discussion + ship.
+
+User pushed back on the wordmark-click-only v1 design as
+non-intuitive for SolarLayout's audience (solar engineers, not
+power-users of design tools). Counter-proposal: a persistent leading
+**Home tab** (icon + "Projects" label) at the start of the tabs bar
+— mobile-pattern-familiar, no user training needed. Wordmark click
+kept as a bonus secondary affordance for power users.
+
+Design call: both ship together (belt + suspenders, no real
+downside; ~5 extra lines for the wordmark path on top of the Home
+tab build).
+
+**v2 design specifics:**
+- Home tab: leftmost, fixed position, not in `tabs[]` array.
+  Lucide-style inline `<svg>` home icon + "Projects" label. Active
+  when `activeTabId === null`. No close button. 1px divider after it
+  (visual separation from project tabs).
+- Wordmark: becomes a `<button type="button">` with `onHome` prop
+  supplied; subtle hover (text-primary → text-secondary), focus
+  ring, `aria-label="Home — Recent projects"`.
+- Wiring: both `TopBar.onHome` and `TabsBar.onHome` point at the
+  tabs slice's new `goHome()` action.
+- New tabs slice action: `goHome()` sets `activeTabId = null`
+  without touching `tabs[]`. Existing App.tsx tab-switch effect at
+  line 801–810 already handles `activeTabId === null` correctly
+  (clears project + layoutResult + per-domain transient state),
+  so no App.tsx state-handling changes needed.
+
+**Files touched:**
+- `apps/desktop/src/state/tabs.ts` — `goHome` action + interface.
+- `apps/desktop/src/state/tabs.test.ts` — 2 new tests for the
+  action (sets null, preserves tabs[]; no-op when already home).
+- `apps/desktop/src/tabs/TabsBar.tsx` — `onHome` prop, leading
+  `<HomeTab>` component (active-state via aria-selected, no close
+  button, divider).
+- `apps/desktop/src/tabs/TabsBar.test.tsx` — 6 new tests covering
+  Home tab rendering, conditional render, aria-selected on null
+  activeTabId, click fires onHome, no close button.
+- `packages/ui/src/compositions/TopBar.tsx` — `onHome` prop,
+  conditional wordmark-as-button render. Drag-region attribute
+  drops from the wordmark when interactive (Tauri auto-excludes
+  buttons anyway); plenty of drag surface in the rest of the
+  TopBar.
+- `packages/ui/src/compositions/TopBar.test.tsx` — 2 new tests
+  (wordmark click fires onHome, plain span when onHome absent).
+- `apps/desktop/src/App.tsx` — pulled in `tabsGoHome` from store,
+  passed to `TopBar.onHome` + `TabsBar.onHome`.
+
+Gates: typecheck + lint + test green. 324 desktop tests (was 316,
++8 from S1-10 v2). 36 ui tests (was 34, +2). Status → `fixed`
+pending live verification of the Home tab UX.
 
 ##### S1-11 thread
 

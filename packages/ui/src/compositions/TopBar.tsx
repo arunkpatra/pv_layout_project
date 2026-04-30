@@ -43,6 +43,18 @@ export interface TopBarProps {
    * provided.
    */
   onBuyMore?: () => void
+  /**
+   * S1-10 — click handler for the SolarLayout wordmark. When supplied,
+   * the wordmark becomes a button that fires this callback (typically
+   * "go home" → RecentsView). Bonus path alongside the persistent Home
+   * tab in TabsBar — power users reach for the wordmark, mobile-pattern
+   * users reach for the Home tab; both land in the same place.
+   *
+   * When undefined, the wordmark stays a plain non-interactive span (the
+   * pre-S1-10 behavior, kept for back-compat with any contexts that
+   * don't expose home navigation).
+   */
+  onHome?: () => void
 }
 
 /**
@@ -84,6 +96,7 @@ export function TopBar({
   onClearLicense,
   onSettings,
   onBuyMore,
+  onHome,
 }: TopBarProps) {
   const isMac = useIsMac()
   return (
@@ -103,18 +116,46 @@ export function TopBar({
         </IconButton>
       )}
 
-      <div
-        data-tauri-drag-region
-        className="flex items-center gap-[8px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]"
-      >
-        <span
-          data-tauri-drag-region
-          className="w-[16px] h-[16px] flex items-center justify-center text-[var(--accent-default)]"
+      {onHome ? (
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Home — Recent projects"
+          title="Home"
+          className="
+            flex items-center gap-[8px]
+            font-semibold tracking-[-0.02em]
+            text-[var(--text-primary)]
+            hover:text-[var(--text-secondary)]
+            transition-colors duration-[120ms]
+            cursor-pointer
+            focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]
+            rounded-[var(--radius-sm)]
+            -my-[2px] py-[2px] px-[2px]
+          "
         >
-          <SunMark />
-        </span>
-        <span data-tauri-drag-region>SolarLayout</span>
-      </div>
+          <span
+            aria-hidden="true"
+            className="w-[16px] h-[16px] flex items-center justify-center text-[var(--accent-default)]"
+          >
+            <SunMark />
+          </span>
+          <span>SolarLayout</span>
+        </button>
+      ) : (
+        <div
+          data-tauri-drag-region
+          className="flex items-center gap-[8px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]"
+        >
+          <span
+            data-tauri-drag-region
+            className="w-[16px] h-[16px] flex items-center justify-center text-[var(--accent-default)]"
+          >
+            <SunMark />
+          </span>
+          <span data-tauri-drag-region>SolarLayout</span>
+        </div>
+      )}
 
       <span data-tauri-drag-region className="text-[var(--text-muted)]">
         /

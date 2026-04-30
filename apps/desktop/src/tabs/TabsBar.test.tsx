@@ -108,4 +108,90 @@ describe("TabsBar", () => {
     expect(screen.getByLabelText("New project")).toBeInTheDocument()
     expect(screen.queryAllByRole("tab")).toHaveLength(0)
   })
+
+  describe("Home tab (S1-10)", () => {
+    it("renders the Home tab when onHome is provided", () => {
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onHome={vi.fn()}
+        />
+      )
+      expect(
+        screen.getByLabelText("Home — Recent projects")
+      ).toBeInTheDocument()
+    })
+
+    it("hides the Home tab when onHome is not provided", () => {
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+        />
+      )
+      expect(
+        screen.queryByLabelText("Home — Recent projects")
+      ).toBeNull()
+    })
+
+    it("Home tab is active (aria-selected=true) when activeTabId is null", () => {
+      // Default state: no tabs opened → activeTabId already null.
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onHome={vi.fn()}
+        />
+      )
+      const home = screen.getByLabelText("Home — Recent projects")
+      expect(home.getAttribute("aria-selected")).toBe("true")
+    })
+
+    it("Home tab is inactive when a project tab is active", () => {
+      useTabsStore.getState().openTab("prj_a", "A")
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onHome={vi.fn()}
+        />
+      )
+      const home = screen.getByLabelText("Home — Recent projects")
+      expect(home.getAttribute("aria-selected")).toBe("false")
+    })
+
+    it("clicking Home tab fires onHome", () => {
+      const onHome = vi.fn()
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onHome={onHome}
+        />
+      )
+      fireEvent.click(screen.getByLabelText("Home — Recent projects"))
+      expect(onHome).toHaveBeenCalledTimes(1)
+    })
+
+    it("Home tab has no close button (visual + a11y guarantee)", () => {
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onHome={vi.fn()}
+        />
+      )
+      // No `Close Home` or similar accessible name.
+      expect(
+        screen.queryByLabelText(/^Close Home/i)
+      ).toBeNull()
+    })
+  })
 })
