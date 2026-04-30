@@ -104,7 +104,7 @@ const FIXTURES: FixtureSpec[] = [
     projectCount: 0,
     withB7Fixture: true,
     description:
-      "Free 0/5 + Pro Plus 50/50 remaining; 1 Project + 1 Run with stable IDs (FIXTURE_IDS) for B7 verification across all 5 result types",
+      "Free 0/5 + Pro Plus 50/50 remaining; 1 Project + 1 Run with stable IDs (FIXTURE_IDS) for B7 run-result-upload verification. NOTE: the seeded Project has a DB row but no KMZ blob in S3 — B12 GET → S3 GET will 404. For B12 download tests, chain off P1 (create-project) so a real KMZ exists in S3 first.",
   },
   {
     scenario: "MULTI",
