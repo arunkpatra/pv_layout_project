@@ -2126,3 +2126,78 @@ Home visit.
 
 ---
 
+#### Session 2 — final closeout (2026-04-30)
+
+The Session 2 chapter is **closed**. Original session scope was a
+single P0/P1 smoke pass after S4; that pass surfaced S2-02's Cmd-K
+bug, which paused the smoke and turned the chapter into a build-
+out chapter for the SP1/SP3/SP4/SP6 cross-repo thumbnail and
+rename/delete pipelines. All in-scope rows resolved or explicitly
+deferred. Fresh smoke work resumes as Session 3.
+
+**Phase 6 row outcomes (final):**
+
+| Row | Outcome |
+|---|---|
+| SP1 — Run gallery thumbnails | **done** (live-verified via Generate → S3 PUT 200 → Inspector Runs gallery card renders WebP) |
+| SP2 — In-place run-switch loading feedback | **todo** (not picked up in this chapter) |
+| SP3 — Project rename / delete proper UX | **done** (live-verified all 5 surfaces; backend persistence confirmed via B12 curl) |
+| SP4 — RecentsView project card thumbnails | **done** (live-verified Generate → B10 always-signed URL → 4:3 card thumbnail) |
+| SP5 — Dark-theme thumbnail polish | **deferred to S13.5** (per CLAUDE.md §6 dark-as-preview through S13.5) |
+| SP6 — Boundary GeoJSON fallback | **done** (live-verified zero-run project shows boundary outline; WebKit precision fix landed) |
+
+**Cross-repo backend partner SHAs (all on origin):**
+- B23 at `649a5ff` — Run thumbnails wire + B17 deterministic-sign
+- B24 at `a2339c9` — B10 `mostRecentRunThumbnailBlobUrl` projection
+- B25 at `98b5a75` — RunSummary `thumbnailBlobUrl` extension
+- B26 (latest) — Project `boundaryGeojson` column + B11/B10 wire
+
+**Polish commits shipped during this chapter (not row-level):**
+- `0b834a7` — cache invalidation fix: useGenerateLayout +
+  useDeleteRun + useAutoSaveProject now invalidate
+  `["projects", licenseKey]` so post-mutation Home visits show
+  fresh data within `useProjectsListQuery`'s 30s staleTime window.
+  Surfaced live during SP1+SP4 verification (user reported
+  "run had occurred but homepage was showing 'No runs yet'
+  sometimes").
+- `0da04a6` — TopBar breadcrumb drop + MapCanvas scale-bar hide.
+  Bare "SolarLayout" wordmark when no project loaded (drops the
+  "/ No project open" stub); breadcrumb separator switched from
+  `/` to lucide ChevronRight when a project is open. MapLibre
+  ScaleControl hidden via Tailwind arbitrary-descendant selector
+  when there are no boundary features (was rendering a misleading
+  "3000 km" reading on the empty world view that bleeds through
+  RecentsView).
+
+**Carry-forward to Session 3:**
+
+- **S2-01 — calc-pill display semantics** revisit during MULTI
+  scenario testing (`sl_live_desktop_test_MULTI_stable`, Free 3/5
+  + Pro 8/10) where the multi-wallet case will be more meaningful
+  than PRO_PLUS's single-wallet "50/50" display.
+- **Tier-switching across 8 fixture keys** — FREE / BASIC / PRO /
+  PRO_PLUS / MULTI / EXHAUSTED / DEACTIVATED / QUOTA_EDGE. None
+  exercised live in this chapter beyond PRO_PLUS.
+- **S1 regression sweep** — verify all 13 S1-row fixes still hold
+  after Session 2's feature set landed (especially S1-08 auto-
+  select-most-recent-run, S1-12 runs-slice reset on Open, S1-13
+  stale-mutation guard, S1-09 ResizeObserver refit).
+- **SP2 implementation** — in-place run-switch loading feedback;
+  T1 desktop-only; touches `RunsList` + `App.tsx` `StatusBar`
+  leftMeta. Per the SP2 row in `docs/PLAN.md`.
+
+**Pre-demo cleanup operation (2026-04-30):**
+
+Before a Prasanta demo, deleted all non-fixture PRO_PLUS projects
+via direct B14 curl loop (preserves the B7 fixture per Session 2
+guardrails — fixture-session sweep depends on it). Final state:
+PRO_PLUS user has only the B7 fixture in B10's listing. Demo flow
+recommended for showcasing SP1/SP3/SP4/SP6 in one continuous pass:
+new project → SP6 boundary fallback on the empty card → Generate
+→ SP1+SP4 thumbnails surface → tab right-click + Recents card ⋯
+→ SP3 rename/delete affordances.
+
+**Session 2 status: closed.** Next chapter = Session 3.
+
+---
+
