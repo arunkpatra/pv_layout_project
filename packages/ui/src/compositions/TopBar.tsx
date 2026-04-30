@@ -1,4 +1,4 @@
-import { Search, PanelLeft, PanelRight } from "lucide-react"
+import { ChevronRight, Search, PanelLeft, PanelRight } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 import { SunMark } from "../components/Icon"
 import { Kbd } from "../components/Kbd"
@@ -12,7 +12,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../components/DropdownMenu"
-import { cn } from "../lib/cn"
 
 export interface TopBarProps {
   projectName?: ReactNode
@@ -157,18 +156,21 @@ export function TopBar({
         </div>
       )}
 
-      <span data-tauri-drag-region className="text-[var(--text-muted)]">
-        /
-      </span>
-      <span
-        data-tauri-drag-region
-        className={cn(
-          "truncate",
-          projectName ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] font-normal"
-        )}
-      >
-        {projectName ?? "No project open"}
-      </span>
+      {projectName != null && (
+        <>
+          <ChevronRight
+            data-tauri-drag-region
+            aria-hidden="true"
+            className="w-[12px] h-[12px] text-[var(--text-muted)] shrink-0"
+          />
+          <span
+            data-tauri-drag-region
+            className="truncate text-[var(--text-primary)]"
+          >
+            {projectName}
+          </span>
+        </>
+      )}
       {chip && (
         <span data-tauri-drag-region className="ml-[2px]">
           {chip}

@@ -300,8 +300,24 @@ export function MapCanvas({
     applyVisibility(map, { showAcCables, showLas })
   }, [mapReady, showAcCables, showLas])
 
+  // The MapLibre ScaleControl lives in the `.maplibregl-ctrl-bottom-left`
+  // container that MapLibre injects on init. When there's no boundary
+  // loaded the scale has nothing meaningful to measure (it would show
+  // a global-zoom "3000 km" reading on the empty world view) — hide it
+  // until a project's boundary populates. Same gate as the parent's
+  // `!project && <RecentsView/>` overlay; staying gated on boundary
+  // presence keeps this component standalone-testable.
+  const hasBoundaries =
+    !!boundariesGeoJson && (boundariesGeoJson.features?.length ?? 0) > 0
+
   return (
-    <div className={cn("relative w-full h-full overflow-hidden", className)}>
+    <div
+      className={cn(
+        "relative w-full h-full overflow-hidden",
+        !hasBoundaries && "[&_.maplibregl-ctrl-bottom-left]:hidden",
+        className
+      )}
+    >
       {/* Intentional `w-full h-full` (not `absolute inset-0`).
        * MapLibre adds the `.maplibregl-map` class to this div on init,
        * which sets `position: relative`. That class lives outside any

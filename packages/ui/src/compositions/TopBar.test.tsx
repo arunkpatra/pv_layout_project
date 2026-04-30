@@ -30,20 +30,25 @@ import userEvent from "@testing-library/user-event"
 import { TopBar } from "./TopBar"
 
 describe("<TopBar>", () => {
-  it("renders the SolarLayout wordmark and breadcrumb separator", () => {
-    render(<TopBar />)
+  it("renders the SolarLayout wordmark on its own when no project is open", () => {
+    const { container } = render(<TopBar />)
     expect(screen.getByText("SolarLayout")).toBeInTheDocument()
-    expect(screen.getByText("/")).toBeInTheDocument()
+    // No breadcrumb separator + no project-leaf when projectName is
+    // absent — the bare wordmark is the entire left-of-chip surface.
+    expect(container.querySelector('[aria-hidden="true"].lucide-chevron-right')).toBeNull()
   })
 
-  it("shows 'No project open' when projectName is absent", () => {
+  it("hides the breadcrumb entirely when projectName is absent", () => {
     render(<TopBar />)
-    expect(screen.getByText("No project open")).toBeInTheDocument()
+    expect(screen.queryByText("No project open")).toBeNull()
+    expect(screen.queryByText("/")).toBeNull()
   })
 
-  it("renders projectName in the breadcrumb leaf when provided", () => {
-    render(<TopBar projectName="phaseboundary2.kmz" />)
+  it("renders the chevron breadcrumb + projectName leaf when provided", () => {
+    const { container } = render(<TopBar projectName="phaseboundary2.kmz" />)
     expect(screen.getByText("phaseboundary2.kmz")).toBeInTheDocument()
+    // Chevron separator is present (aria-hidden lucide icon).
+    expect(container.querySelector('svg.lucide-chevron-right')).toBeInTheDocument()
     expect(screen.queryByText("No project open")).toBeNull()
   })
 
