@@ -507,7 +507,7 @@ extra-attention items inside flows already on the route.
 
 | ID    | Sev | Surface  | Owner | Title                                                       | Repro                                                                                                | Acceptance                                                              | Status | Linked | Thread (see below per ID) |
 |-------|-----|----------|-------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|--------|--------|---------------------------|
-| S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Depends on chosen path — see Thread.                                    | open   | F1     | see S1-01 below           |
+| S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Decision deferred — revisit at end of session.                          | deferred | F1     | see S1-01 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -541,5 +541,8 @@ narration should match the code, not the other way round.
 If you'd rather move to gate-by-shape: it's a one-line change at
 line 154 (`disabled={submitting || !isPlausibleLicenseKey(value.trim())}`).
 Roughly P3-inline.
+
+[FE 2026-04-30 13:20] User opted to defer. Status → `deferred`. Will
+revisit at end of session alongside other P3 polish items.
 
 ---
