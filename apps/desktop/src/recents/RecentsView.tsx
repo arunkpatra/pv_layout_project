@@ -272,7 +272,7 @@ function ProjectCard({
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] pt-[4px] border-t border-[var(--border-subtle)]">
+        <div className="-mx-[20px] -mb-[16px] px-[20px] py-[6px] flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-[var(--border-subtle)]">
           <span>Updated {relativeTimeFrom(project.updatedAt)}</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -283,7 +283,7 @@ function ProjectCard({
                 onKeyDown={(e) => e.stopPropagation()}
                 className="
                   inline-flex items-center justify-center
-                  w-[24px] h-[24px]
+                  w-[20px] h-[20px]
                   rounded-[var(--radius-sm)]
                   text-[var(--text-muted)]
                   opacity-60
