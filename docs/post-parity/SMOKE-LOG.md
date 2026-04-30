@@ -510,6 +510,7 @@ extra-attention items inside flows already on the route.
 | S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Decision deferred — revisit at end of session.                          | deferred | F1     | see S1-01 below           |
 | S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | fixed  | F6     | see S1-02 below           |
 | S1-03 | P3  | frontend | fe    | StatusBar drops the line-obstruction count                  | 1. Open `phaseboundary2.kmz` (which contains a TL line obstruction). 2. StatusBar reads `1 boundary · 0 obstacles` despite the TL being clearly rendered as a red dashed polyline on the canvas. | StatusBar text includes the line-obstructions count when non-zero (or shows it always for symmetry).                          | fixed  | F4     | see S1-03 below           |
+| S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded, the Inspector either (a) shows an empty-state "Open a project to configure layout" message, or (b) is auto-collapsed, or (c) keeps the tabs but disables form inputs visually. Pick a design.   | open   | new-row | see S1-04 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -667,5 +668,56 @@ the line-obstructions segment conditionally included only when
 `lines > 0` (keeps the bar tidy for KMZs without TL/road
 obstructions). Typecheck green; will refresh via HMR. Status →
 `fixed` pending live confirmation in the next visual check.
+
+[FE 2026-04-30 13:48] Live confirmed — user reports the StatusBar
+now reads "1 line obstruction" for `phaseboundary2.kmz`. Closed via
+`edb9876` on `post-parity-v1-desktop`.
+
+##### S1-04 thread
+
+[FE 2026-04-30 13:48] User noticed during the post-S1-03 verify
+screenshot. After closing the active project (also reproducible on
+fresh app start with zero open projects), the Inspector panel still
+renders all three tabs (Layout / Energy yield / Runs) with the Layout
+tab's full parameter form populated by defaults from the
+`useLayoutParamsStore` Zustand slice (`Module 2.38m × 1.13m / 580Wp`,
+`Modules per row: 28`, `Rows per table: 2`, etc.). Breadcrumb
+correctly reads "No project open" — only the Inspector hasn't gated
+on `project !== null`.
+
+Code path: `apps/desktop/src/App.tsx:1246` renders the Inspector
+unconditionally. `panels/LayoutPanel.tsx` already takes a `noProject`
+prop (line 54), but currently uses it only to disable the Generate
+button + change its label to "Open a KMZ to generate" (line 288).
+The form fields themselves stay editable.
+
+The form writes to a **global** layoutParams Zustand slice — values
+typed with no project loaded would persist into whatever project
+opens next, which conflicts with the multi-tab + per-project params
+model.
+
+**Why this isn't a 1-line fix:** the right answer requires a design
+call across three options:
+1. Empty-state — Layout tab body renders an "Open a project to
+   configure layout" hint when no project. Cleanest UX, mirrors the
+   RecentsView empty state on the canvas side.
+2. Auto-collapse — `inspectorOpen` forced to `false` when no
+   project. Simpler but flaps if the user manually toggles it.
+3. Disabled-but-visible — gray-out all form inputs. Familiar but
+   loud (lots of disabled state).
+
+Each has design implications around per-project params, params
+hydration when a project finally opens, and how the Inspector
+behaves during the project-switch transition.
+
+**Recommendation: defer to a new Phase 4 polish row.** Reason: the
+fix is design-shaped, not bug-shaped — the parity-era inspector
+predates the project/run model, and the gap is a structural one that
+deserves a proper row + acceptance criterion in PLAN.md, not an
+inline patch during smoke. New-row name suggestion: `IP1 — Inspector
+empty state when no project loaded` (`IP` for Inspector Polish).
+Tier T1, depends F4, source = this S1-04 thread.
+
+Awaiting user pick: defer-to-new-row / inline-fix / drop.
 
 ---
