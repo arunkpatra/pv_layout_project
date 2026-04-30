@@ -637,6 +637,7 @@ extra-attention items inside flows already on the route.
 | S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
 | S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | fixed  | F4-era menu wiring | see S1-11 below           |
 | S1-12 | P1  | frontend | fe | Runs list rendering inconsistent across tab switches      | 1. Open project A; Generate Layout (run A1 created). 2. Open project B; Generate Layout (run B1 created). 3. Inspector → Runs tab on B shows **2 runs**. 4. Switch back to A, then back to B (or just switch tabs). 5. Inspector → Runs tab on B now shows **1 run**.                                                | Each project's Runs tab renders only that project's runs, consistently across tab switches. Run counts match server state (B12's runs[] / B15 if used).                                                                                                                                | fixed  | P5, P6, S2 | see S1-12 below           |
+| S1-13 | P1  | frontend | fe | Canvas shows another project's layout despite no runs (stale-mutation race) | 1. Open project A (`phaseboundary2`); Generate Layout. 2. Click `+` to open project B (`phaseboundary`) — pick KMZ; tab opens. 3. Canvas shows panels + ICR-1 + ICR-2 even though Inspector → Runs tab on B is correctly empty ("Generate a layout to see it here"). 4. Server confirms B has 0 runs.            | When user navigates away from a project before its `useOpenRunMutation` resolves, the late onSuccess must NOT write the result into the global layoutResult slice. Canvas of a runs-empty project should never display a layout.                                                       | open   | S1-08, P7 | see S1-13 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1437,5 +1438,81 @@ pending live confirmation. Will close fully once user verifies the
 post-fix repro: create A → Generate → create B → Runs tab on B
 shows 0 (not 1) → Generate on B → Runs shows 1 (not 2) → tab
 round-trip → still 1.
+
+##### S1-13 thread
+
+[FE 2026-04-30 15:27] Caught while user was verifying S1-12. Same
+class of state-leak but in a different code path —
+`useOpenRunMutation`'s onSuccess at
+`apps/desktop/src/auth/useOpenRun.ts:118–123` blindly calls
+`setResult(layoutResult, vars.runId)` without checking whether
+the user is still on the project that owns the run. Stale-resolve
+race that S1-08's auto-select-most-recent-run made reachable.
+
+**Sequence (verified against backend state at 15:25):**
+
+Backend snapshot at the time of bug:
+- `phaseboundary` (active project): `runsCount: 0`
+- `phaseboundary2` (inactive tab): `runsCount: 1`
+- Inspector → Runs tab on `phaseboundary` correctly shows empty
+- Canvas on `phaseboundary` incorrectly shows `phaseboundary2`'s
+  layout (panels + ICR-1 + ICR-2)
+
+State-mutation trace:
+
+1. User on `phaseboundary2` with `selectedRunId = pb2_run` (set by
+   S1-08's auto-select after open).
+2. P7's effect at `App.tsx:518` fires on `selectedRunId` change →
+   `openRunMutate({ projectId: pb2, runId: pb2_run })` → B17 +
+   S3 GET begins (~500ms–1s round-trip).
+3. **While B17 is in flight**, user clicks `+` to create
+   `phaseboundary` → `handleOpenKmz` fires.
+4. `clearLayoutResult()` (App.tsx:557) → layoutResult=null.
+5. `setRuns([])` (App.tsx:583, the S1-12 fix) → selectedRunId=null
+   via slice invariant.
+6. `setCurrentProject(pb)` → currentProject=pb.
+7. `tabsOpenTab(pb)` → activeTabId=pb's tab. Tab-switch effect
+   dedupes on `tab.projectId === currentProject.id` → no-op.
+8. **B17 from step 2 resolves.** `useOpenRunMutation`'s onSuccess
+   blindly calls `setResult(pb2_layout, pb2_run.id)` —
+   rehydrating layoutResult with the wrong project's data.
+9. Canvas re-renders pb's boundary + pb2's panels overlaid.
+
+Why this only surfaced now: pre-S1-08, project-open didn't
+auto-fire B17 — runs were only loaded when the user clicked one in
+the gallery, which the user wouldn't do before navigating away.
+S1-08's auto-select-most-recent-run kicks off B17 on every project
+open with runs, creating the in-flight window where the race can
+land.
+
+**Fix proposed:** guard the onSuccess against stale project
+identity. In `useOpenRun.ts`:
+
+```ts
+onSuccess: (data, vars) => {
+  // Guard against a stale-resolve race: if the user navigated to a
+  // different project while B17 was in flight, drop the result
+  // rather than poisoning the global layoutResult slice.
+  const currentProjectId = useProjectStore.getState().currentProject?.id
+  if (currentProjectId !== vars.projectId) return
+  setResult(data.layoutResult, vars.runId)
+},
+```
+
+Adds a small import of `useProjectStore` (vanilla `getState()`
+access — no subscription needed).
+
+**Companion concern (not in this fix's scope):** the same race
+class might bite `useGenerateLayoutMutation`'s onSuccess (P6) if
+the user clicks `+` between Generate-click and result. Less
+likely (user typically waits for solver) but worth a similar
+guard if it ever surfaces. Logged but not patched here. If a
+future smoke session catches it, it gets its own row + fix.
+
+Severity: P1 — functional bug; user sees a layout for a project
+that has never been run. Confusing + violates data-integrity
+expectations.
+
+Recommendation: ship inline now. Awaiting user go-ahead.
 
 ---
