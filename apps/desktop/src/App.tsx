@@ -1293,7 +1293,19 @@ export function App(): JSX.Element {
             sidecarLabel={`Sidecar healthy · engine ${sidecarPhase.version}`}
             leftMeta={
               projectCounts
-                ? `${plural(projectCounts.boundaries, "boundary", "boundaries")} · ${plural(projectCounts.obstacles, "obstacle", "obstacles")}`
+                ? [
+                    plural(projectCounts.boundaries, "boundary", "boundaries"),
+                    plural(projectCounts.obstacles, "obstacle", "obstacles"),
+                    projectCounts.lines > 0
+                      ? plural(
+                          projectCounts.lines,
+                          "line obstruction",
+                          "line obstructions"
+                        )
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
                 : "No project loaded"
             }
             units={units}
