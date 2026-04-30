@@ -512,6 +512,7 @@ extra-attention items inside flows already on the route.
 | S1-03 | P3  | frontend | fe    | StatusBar drops the line-obstruction count                  | 1. Open `phaseboundary2.kmz` (which contains a TL line obstruction). 2. StatusBar reads `1 boundary · 0 obstacles` despite the TL being clearly rendered as a red dashed polyline on the canvas. | StatusBar text includes the line-obstructions count when non-zero (or shows it always for symmetry).                          | fixed  | F4     | see S1-03 below           |
 | S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded: Inspector panel is hidden entirely + the TopBar Inspector toggle button is hidden. Inspector restores on next project open with the user's prior `inspectorOpen` preference.        | fixed  | inline  | see S1-04 below           |
 | S1-05 | P3  | frontend | fe    | Redundant `Press ⌘K for commands` pill above the canvas      | 1. Sign in. 2. RecentsView (or any canvas state). 3. Floating `Press ⌘K for commands` pill renders top-left of canvas, duplicating the TopBar's palette button. | Floating hint removed; TopBar's palette button is the canonical entry point.                                                                                                                                  | fixed  | inline  | see S1-05 below           |
+| S1-06 | P3  | frontend | fe    | Run gallery cards show empty thumbnail placeholder           | 1. Open project + Generate Layout. 2. Inspector → Runs tab. 3. Run card renders with title + type chip + timestamp but a blank gray placeholder where a layout preview thumbnail would help orient. | Thumbnail shows a recognizable preview of the run's layout. Two implementation paths considered (see Thread); pick one + ship as a new Phase 4 polish row.                                                   | open   | new-row | see S1-06 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -762,5 +763,50 @@ Typecheck green; HMR refresh. Status → `fixed` pending live confirm.
 
 [FE 2026-04-30 13:57] Live confirmed by user — pill gone. Closed via
 `abe3290` on `post-parity-v1-desktop`.
+
+##### S1-06 thread
+
+[FE 2026-04-30 14:03] User flagged the empty placeholder thumbnail
+on run gallery cards. Already a known gap from P5 (locked decision:
+"thumbnail-as-placeholder; real pipeline later — P-row or polish
+phase"). User explicitly asked whether previews are worth the cost.
+
+Two implementation paths:
+
+**A) Client-side capture (cheap, partial coverage):**
+After canvas hydrates a run (P6 generate / P7 open), capture the
+deck.gl/MapLibre composite via `map.getCanvas().toDataURL()`,
+cache as base64 in the run slice (or IndexedDB for persistence
+across reloads). Render in the gallery card via plain `<img>`.
+Cost: ~half a day. Covers runs the user has rendered at least
+once; older runs stay placeholder until next open. No backend
+changes.
+
+**B) Server-side pipeline (proper, full coverage):**
+Backend generates a PNG thumbnail at run creation (e.g. headless
+matplotlib render or sidecar-generated PNG); stores in S3
+alongside the result JSON; B17 returns a `thumbnailBlobUrl: string
+| null`; desktop fetches via S3 GET. Cost: backend B-row + S3
+storage + sidecar work + desktop adapter — probably 1–2 days
+across both repos. Covers all runs immediately, including ones
+not yet opened.
+
+**Recommendation: defer to a new Phase 4 polish row, pick option
+A.** Reasoning:
+- P3 nit, no functional gap.
+- Option A unblocks the common case (user revisits runs they've
+  recently opened) at a fraction of the cost.
+- The "older runs show placeholder" gap is acceptable because
+  runs are typically opened-then-revisited; the cache hits the
+  common case.
+- Option B's server-side work earns a real B-row in the V2 plan
+  if/when user demand surfaces.
+
+New-row name suggestion: `RP1 — Run thumbnail previews
+(client-side capture)`. Tier T1, depends P6 + P7, source = this
+S1-06 thread.
+
+Awaiting user pick: defer-to-new-row / inline-fix / drop / pick
+option B over A.
 
 ---
