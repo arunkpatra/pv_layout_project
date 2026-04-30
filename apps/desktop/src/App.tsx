@@ -572,6 +572,15 @@ export function App(): JSX.Element {
           name: projectName,
         })
         setCurrentProject(persisted)
+        // S1-12 — A freshly-created project has no runs yet. Explicitly
+        // reset the runs slice so a prior project's runs don't leak into
+        // the new project's gallery until the next tab-switch round-trip
+        // overwrites them via P2's B12 fetch. (B11's ProjectV2Wire
+        // intentionally doesn't carry runs[] — only B12 does — so we
+        // must set [] here.) `setRuns([])` also drops a stale
+        // selectedRunId per the slice's setRuns invariant
+        // (state/project.ts:135–138).
+        setRuns([])
         persistedProjectId = persisted.id
         persistedProjectName = persisted.name
       } catch (err) {

@@ -636,7 +636,7 @@ extra-attention items inside flows already on the route.
 | S1-09 | P2  | frontend | fe    | Camera over-zooms on first project open (Inspector-animation race) | 1. Tauri restart with a key already in keychain. 2. RecentsView shows 2 projects. 3. Click `complex-plant-layout` (multi-plot KMZ). 4. KMZ parses + canvas hydrates, but camera fits to a sub-region — only ~half the plots visible at ~500m scale. 5. Manual zoom-out shows full extent (~1km scale, 6 plots). | First-open camera fits to encompass all boundaries regardless of Inspector animation timing.                                                                                                                                                                       | open   | P2, S1-04 | see S1-09 below           |
 | S1-10 | P2  | frontend | fe    | No in-app navigation back to RecentsView when a project is open | 1. Sign in with a key that has ≥2 projects. 2. Open project A from RecentsView. 3. Try to switch to project B without going through "new project from KMZ." | A clear in-chrome affordance returns the user to RecentsView (tabs preserved); from there they can pick the other project. Recommended: clickable `SolarLayout` wordmark → home/RecentsView.                                                                  | open   | new-row | see S1-10 below           |
 | S1-11 | P0  | frontend | fe    | OS File menu → "Open KMZ…" stacks 5–6 file pickers          | 1. Open a project (any). 2. Click OS-level menu `File → Open KMZ…`. 3. File picker opens; multiple OS-click sounds heard. 4. Click `Cancel` on the picker; another picker pops in. 5. Repeat: 5–6 pickers stacked, dismissed one-by-one with Cancel.                                                                     | Single menu click opens exactly one file picker. Cancelling closes it cleanly with no further pickers queued.                                                                                                                                                                          | fixed  | F4-era menu wiring | see S1-11 below           |
-| S1-12 | P1  | frontend (likely) | fe | Runs list rendering inconsistent across tab switches      | 1. Open project A; Generate Layout (run A1 created). 2. Open project B; Generate Layout (run B1 created). 3. Inspector → Runs tab on B shows **2 runs**. 4. Switch back to A, then back to B (or just switch tabs). 5. Inspector → Runs tab on B now shows **1 run**.                                                | Each project's Runs tab renders only that project's runs, consistently across tab switches. Run counts match server state (B12's runs[] / B15 if used).                                                                                                                                | open   | P5, P6, S2 | see S1-12 below — sub-agent investigating          |
+| S1-12 | P1  | frontend | fe | Runs list rendering inconsistent across tab switches      | 1. Open project A; Generate Layout (run A1 created). 2. Open project B; Generate Layout (run B1 created). 3. Inspector → Runs tab on B shows **2 runs**. 4. Switch back to A, then back to B (or just switch tabs). 5. Inspector → Runs tab on B now shows **1 run**.                                                | Each project's Runs tab renders only that project's runs, consistently across tab switches. Run counts match server state (B12's runs[] / B15 if used).                                                                                                                                | fixed  | P5, P6, S2 | see S1-12 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -1388,5 +1388,54 @@ Sub-agent dispatched 2026-04-30 15:15 to investigate end-to-end
 across P1, P5, P6, S2's tab-switch effect, and the project slice's
 runs-management invariants. Awaiting findings before proposing a
 fix.
+
+[FE 2026-04-30 15:18] Sub-agent confirmed H1 with bit-exact
+reproduction trace. Root cause:
+
+`handleOpenKmz` at `apps/desktop/src/App.tsx:574` calls
+`setCurrentProject(persisted)` but never resets `runs[]`. B11's
+`ProjectV2Wire` deliberately doesn't carry `runs` (only B12's
+`ProjectDetailV2Wire` does), so the create-project flow has no
+source of `[]` runs to set. Slice keeps the prior project's
+runs[] until something else overwrites it.
+
+Tab-switch effect at `App.tsx:805` dedupes when
+`tab.projectId === currentProject?.id` — exactly true after the
+just-completed create, so no B12 re-fetch fires. First Generate on
+B then `addRun(B1)` appends to slice's `[A1]` → gallery shows 2.
+The next tab-switch round-trip eventually re-fetches via B12 and
+overwrites with the authoritative `[B1]` from server, masking the
+issue.
+
+**Fix shipped:** one-line addition in `App.tsx`:
+
+```ts
+setCurrentProject(persisted)
+setRuns([])  // S1-12 — explicit reset; B11 doesn't carry runs[]
+```
+
+`setRuns([])` also drops a stale `selectedRunId` per the slice
+invariant at `state/project.ts:135–138`, so no separate
+`selectRun(null)` call needed.
+
+Defensive opportunities the agent flagged (NOT shipping with this
+fix; logged for future):
+
+- `addRun(projectId, run)` with assertion → would catch any
+  future `addRun` that fires while a tab switch is in flight.
+- Atomic `enterProject(persistedProject, runs?)` slice action →
+  eliminates the "set one but forget the other" class of bug.
+- Tab-switch effect always re-fetches when `tab.projectId !==
+  prior currentProject.id`, removing the dedupe fast-path.
+
+Worth shipping the `enterProject` action as a follow-up Phase 4
+polish row if more entry points appear. For S1-12 itself, the
+one-line fix is sufficient.
+
+Gates green: typecheck + 525 tests still pass. Status → `fixed`
+pending live confirmation. Will close fully once user verifies the
+post-fix repro: create A → Generate → create B → Runs tab on B
+shows 0 (not 1) → Generate on B → Runs shows 1 (not 2) → tab
+round-trip → still 1.
 
 ---
