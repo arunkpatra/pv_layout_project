@@ -150,6 +150,124 @@ rm -rf ~/Library/Application\ Support/com.solarlayout.app/
 
 ---
 
+## Smoke reset
+
+When backend state has been polluted mid-session — most commonly a
+stuck listener that created N duplicate projects, an over-debited
+quota from a runaway loop, or a soft-deleted project you want truly
+gone — use one of the two paths below. Pick the smallest path that
+gets the state you need.
+
+### Quick reset — current user only (~5s)
+
+Use when **only** projects/runs for the active fixture user are
+stale and entitlements + quota are still where you want them.
+Doesn't touch S3 (orphans are harmless; see "Note on S3" below).
+Doesn't bounce `mvp_api`.
+
+```bash
+KEY="sl_live_desktop_test_PRO_stable"   # or whichever fixture you're on
+API="http://localhost:3003"
+
+# List, then DELETE each. B14 is soft-delete + cascade to runs.
+curl -sS "$API/v2/projects" -H "Authorization: Bearer $KEY" \
+  | jq -r '.data[].id' \
+  | while read -r id; do
+      code=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
+        "$API/v2/projects/$id" -H "Authorization: Bearer $KEY")
+      echo "  deleted $id → $code"
+    done
+
+# Verify list is empty:
+curl -sS "$API/v2/projects" -H "Authorization: Bearer $KEY" | jq '.data | length'
+```
+
+(zsh-safe: avoid `$status` as a variable name — it's reserved.)
+
+### Full reset — re-seed all 8 fixture users (~3s)
+
+Use when entitlements/quota are wrong (over-debited, deactivated
+state stuck), or when more than one fixture user is dirty, or "I
+just want to know everything's pristine." The seed script wipes
+and recreates rows scoped to `clerkId LIKE '_desktop_test_%'` only
+— **non-fixture data is untouched**.
+
+```bash
+cd /Users/arunkpatra/codebase/renewable_energy
+bun run packages/mvp_db/prisma/seed-desktop-test-fixtures.ts
+```
+
+The script prints a markdown table of the 8 license keys + seeded
+state. License keys are stable across re-runs (suffix `stable`),
+so any hardcoded test fixtures keep working. PRO_PLUS gets its B7
+Project + Run re-created with the hardcoded IDs.
+
+### Post-reset verification
+
+Sanity-check both halves of the contract — entitlements and project
+list — before resuming the smoke. If either looks wrong, the reset
+didn't take and a deeper issue is in play (`mvp_api` not pointed at
+the right DB; stale Prisma client; etc.).
+
+```bash
+KEY="sl_live_desktop_test_PRO_stable"
+API="http://localhost:3003"
+
+curl -sS "$API/v2/entitlements" -H "Authorization: Bearer $KEY" \
+  | jq '{licensed, entitlementsActive, remainingCalculations, projectsRemaining}'
+# Expected for PRO post-reset: licensed=true, entitlementsActive=true,
+# remainingCalculations=10, projectsRemaining=10.
+
+curl -sS "$API/v2/projects" -H "Authorization: Bearer $KEY" | jq '.data | length'
+# Expected: 0 after either reset path.
+```
+
+### Tauri restart requirement (read first when fixing event-listener bugs)
+
+Vite HMR replaces JS modules but **cannot** unregister listeners
+that the old module bound on the Rust-side event bus. After **any**
+patch that touches `@tauri-apps/api/event` (`listen` / `once` /
+`emit`) or files that register such listeners (currently only
+`apps/desktop/src/App.tsx`'s `menu:file/open_kmz` wiring), HMR-
+verified behavior is meaningless. The Rust event plugin keeps the
+prior listener entries live until the process restarts.
+
+Restart with **full** Tauri dev cycle:
+
+```bash
+# Ctrl-C the dev tab, then:
+cd apps/desktop && bun run tauri dev
+```
+
+The bug appears fixed only after the restart drains the Rust event
+plugin's listener table. The listener-stacking bug fixed in commit
+`4d10004` (S1-11) was rediscovered three times in one session
+because HMR-after-fix kept the old listeners alive.
+
+### Note on S3 orphans
+
+B14 `DELETE /v2/projects/:id` is **soft-delete only** —
+`Project.deletedAt` + cascade to `Run.deletedAt`, no S3 calls. KMZ
+blobs at `projects/<userId>/kmz/<sha>.kmz` and run-result blobs at
+`projects/<userId>/runs/<runId>/…` are orphaned in
+`solarlayout-local-projects` (ap-south-1, account `378240665051`).
+
+This is intentional: KMZs are content-addressed by sha256, so
+re-creating a project from the same KMZ silently re-uses (or
+no-op-overwrites) the orphan blob. No functional impact during
+smoke.
+
+If you want truly-clean S3 (rare; e.g. before recording a
+screencast):
+
+```bash
+USER_ID="<get from mvp_db for the fixture user>"
+aws s3 rm "s3://solarlayout-local-projects/projects/${USER_ID}/" \
+  --recursive --profile renewable-energy-app
+```
+
+---
+
 ## Test license keys (stable, seeded by backend)
 
 Re-seed in the backend repo if any key is missing or has stale state:
