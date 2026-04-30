@@ -5,11 +5,12 @@
 **Source:** SMOKE-LOG `S1-06` (Session 1, 2026-04-30 — run gallery cards render empty thumbnail placeholders)
 **Tier:** T3 (cross-repo design memo)
 **Author:** FE session, 2026-04-30
-**Status:** **v2 — Path A locked, §14 added for SP4 (project card thumbnails)**
+**Status:** **v3 — locked. All §10 questions answered; backend executing.**
 
 **Revision history:**
 - **v1 (2026-04-30):** initial draft locking format/dimensions/render strategy/storage. Recommended Path B (explicit `Run.thumbnailBlobUrl` column + PATCH register endpoint) for the B7-mint-vs-S3-PUT sequence question.
 - **v2 (2026-04-30):** flipped to **Path A** (deterministic-key approach, no DB column) per backend's pushback — cleaner overall, same edge-case shape but handled entirely by `<img onError>` instead of via DB null checks. Added **§14 — Project card thumbnails (SP4)** covering the RecentsView surface that leverages the same per-run thumbnail asset via a B10 projection extension.
+- **v3 (2026-04-30):** locked. Backend confirmed Q1 → **always-sign (option a)**; Q2–Q6 unchanged from v1. Folded two backend-supplied reinforcing points into §2 (negative-cache amortization) and §4 (backfill stays additive). §13 flipped from "draft for backend review" → "locked; backend executing B23 4-step sequence".
 
 ---
 
@@ -32,9 +33,9 @@ This memo locks the design before any code work starts, per the user's request: 
 | **Render strategy** | **On-Generate (always)** | Hidden behind the solver's existing ~5-15s latency. ~500ms-1s additional for matplotlib PNG render is noise for the user. Simpler than on-demand caching; eliminates first-view latency; predictable. On-demand would add a generate-now-cache code path the desktop has to handle (loading state, race against rapid run-card clicks) that doesn't pay back. |
 | **Compression / quality** | **WebP quality=85, method=4** (default speed/size balance) | Standard "good visual quality, reasonable file size" Pillow defaults. Tested empirically: 400×300 layout renders compress to 5-15KB at q=85, indistinguishable from q=100 at gallery thumbnail scale. |
 | **Storage layout** | `projects/<userId>/<projectId>/runs/<runId>/thumbnail.webp` | Matches B23's preliminary scope. `RUN_RESULT_SPEC.thumbnail` alongside the existing `layout` and `energy` types in `blobs.service.ts`. `image/webp` Content-Type. |
-| **Wire shape** | `RunDetailV2Wire.thumbnailBlobUrl: string \| null` (presigned-GET, 1h TTL, mirrors `layoutResultBlobUrl`) | Backend's preliminary B23 scope. URL is **derived** from the deterministic key `projects/<userId>/<projectId>/runs/<runId>/thumbnail.webp` — backend signs it on every B17 call regardless of whether the S3 PUT actually succeeded. Null for **pre-SP1 runs** only (when SP1 ships, every new run gets a deterministic-key URL signed; PUT failures are masked behind the `<img onError>` fallback at render time). |
-| **Persistence model — Path A** | **No `Run.thumbnailBlobUrl` column.** Thumbnail key is content-addressed by `runId` (deterministic). Backend mints presigned-GET on every B17 call against the derived key path. | Cleaner than Path B (explicit DB column + PATCH register endpoint). Saves an extra round-trip on every Generate, eliminates a schema migration, eliminates a register endpoint. Edge case (S3 PUT failed → presigned-GET 404s) is naturally handled by `<img onError>` falling back to placeholder. The orphan-blob risk is symmetric: under Path B the DB column would point to a non-existent key; under Path A the URL signs but 404s. Path A's failure mode is invisible to users via the `<img>` fallback. |
-| **Backwards compat** | Pre-SP1 runs: backend explicitly returns `null` (since no PUT happened, the deterministic URL would 404 on every load). Post-SP1 runs: deterministic URL signed; `<img onError>` falls back if the PUT didn't land. | No migration data move. **Path A bonus:** if we later want retroactive thumbnails for legacy runs, a one-shot batch job (re-render from each run's stored `layoutResultBlobUrl`) just PUTs into the deterministic keys — no DB column to update, no register call to make. Cleanest possible backfill story. |
+| **Wire shape** | `RunDetailV2Wire.thumbnailBlobUrl: string \| null` (presigned-GET, 1h TTL, mirrors `layoutResultBlobUrl`) | Backend's preliminary B23 scope. URL is **derived** from the deterministic key `projects/<userId>/<projectId>/runs/<runId>/thumbnail.webp` — backend signs it on every B17 call regardless of whether the S3 PUT actually succeeded. **Locked per §10 Q1 → option (a) always-sign:** B17 returns a string for every run at runtime; pre-SP1 runs and post-SP1 runs whose PUT didn't land both render placeholder via the desktop's `<img onError>` 404 fallback. The `string \| null` schema shape is preserved for symmetry with sibling fields (`layoutResultBlobUrl`, `energyResultBlobUrl`) and forward-compat headroom; it is not exercised at runtime under SP1. |
+| **Persistence model — Path A** | **No `Run.thumbnailBlobUrl` column.** Thumbnail key is content-addressed by `runId` (deterministic). Backend mints presigned-GET on every B17 call against the derived key path. | Cleaner than Path B (explicit DB column + PATCH register endpoint). Saves an extra round-trip on every Generate, eliminates a schema migration, eliminates a register endpoint. Edge case (S3 PUT failed → presigned-GET 404s) is naturally handled by `<img onError>` falling back to placeholder. The orphan-blob risk is symmetric: under Path B the DB column would point to a non-existent key; under Path A the URL signs but 404s. Path A's failure mode is invisible to users via the `<img>` fallback. **Negative-cache amortization:** browsers negative-cache 404 responses (~5–60 min typical). Re-renders of RecentsView / Inspector within the same session don't re-hit S3 for cards whose thumbnails 404'd once — the "extra round-trip per pre-SP1 card" cost is one round-trip per card per *session*, not per render. S3 GET cost is also negligible at $0.0004/1000 requests. |
+| **Backwards compat** | Pre-SP1 runs: B17 always-signs the deterministic URL (per §10 Q1 → option (a)). The URL 404s on GET; `<img onError>` falls back to placeholder. Post-SP1 runs: same code path; if the thumbnail PUT failed for any reason, the URL still 404s and the same fallback engages. | No migration data move. **Path A bonus — backfill stays purely additive:** if we later want retroactive thumbnails for legacy runs, a one-shot batch job (re-render from each run's stored `layoutResultBlobUrl`) just PUTs into the deterministic keys — no DB column to update, no register call to make, no "cutoff timestamp" to revise. Pre-SP1 cards transparently flip from placeholder to real thumbnail as the script PUTs each blob. Cleanest possible backfill story; door stays open as a "if asked" follow-up. |
 
 ---
 
@@ -81,9 +82,9 @@ P6 useGenerateLayoutMutation (extended):
   setLayoutResult(result, runId) + addRun + selectRun + invalidate entitlements
 ```
 
-The thumbnail PUT happens BEFORE the slice mutations and entitlement-cache invalidation. Reasoning: if the thumbnail PUT fails (transient S3 issue, expired URL race), the user's perception is "Generate failed" — they retry, the idempotency key replays, both blobs land. Better than a partial-state where the slice shows a run that has no thumbnail yet. Trade-off: ~500ms-1s additional latency on every Generate, hidden inside the existing 5-15s solver window.
+**Thumbnail PUT is best-effort.** The chain runs: B16 → sidecar /layout → result PUT → sidecar /layout/thumbnail → B7 thumb mint → thumbnail PUT → slice mutations + entitlement-cache invalidation. If the thumbnail PUT fails (transient S3 issue, expired URL race), the failure is **logged + swallowed** and the slice mutations proceed normally. The user got their layout; the thumbnail is polish. The `<img onError>` fallback at render time covers the gap. **Trade-off:** ~500ms–1s additional latency on every Generate, hidden inside the existing 5–15s solver window. **Why not fail the whole mutation on thumbnail PUT failure?** Because the layout-result PUT already landed and the slice has the result in memory — failing the mutation would force the user to re-Generate (re-debit the calc-quota) just to retry a thumbnail. The fallback path is invisible.
 
-Idempotency: the same Generate-Layout idempotency key threads through B16 + sidecar + result PUT + thumbnail PUT (same single key, all stages). If the user clicks Generate twice on the same project + params, the backend's `@@unique([userId, idempotencyKey])` makes the whole chain a no-op replay.
+Idempotency: the same Generate-Layout idempotency key threads through B16 + sidecar /layout + result PUT + sidecar /layout/thumbnail + B7 thumb mint + thumbnail PUT (same single key, all stages). If the user clicks Generate twice on the same project + params, the backend's `@@unique([userId, idempotencyKey])` makes the whole chain a no-op replay; on retry the previously-failed thumbnail PUT can also re-attempt against a fresh B7-minted URL.
 
 ### Open-Run flow (P7) — extended for thumbnail eviction
 
@@ -134,21 +135,17 @@ export interface RunDetailWire extends RunSummaryWire {
 
 Mirrored in `pv_layout_project/packages/entitlements-client/src/types-v2.ts` as the desktop's lockstep schema mirror (per the existing pattern for `layoutResultBlobUrl`).
 
-`null` is returned for **pre-SP1 runs only** (runs created before this row ships — backend can detect via `Run.createdAt < SP1_DEPLOY_TIMESTAMP` or by checking whether `RUN_RESULT_SPEC.thumbnail` was a known type at creation time). Post-SP1 runs always get a signed URL even if the underlying PUT 404s; that fallback path is owned by the desktop's `<img onError>`.
+**Always-signed (locked per §10 Q1).** B17 mints a presigned-GET against the deterministic key path on **every** call, for every run, regardless of when it was created. Pre-SP1 runs and post-SP1 runs whose PUT didn't land both render placeholder via the desktop's `<img onError>` fallback. No cutoff-timestamp tracking on the backend; no `isPreSP1(run)` branch. The wire schema stays `string | null` for shape symmetry with sibling fields (`layoutResultBlobUrl`, `energyResultBlobUrl`); at runtime B17 always returns a string. The `null` branch is reserved as forward-compat headroom only.
 
 ### B17 endpoint (`mvp_api/src/modules/runs/runs.service.ts` `getRunDetail`)
 
 ```ts
-const thumbnailKey = isPreSP1(run)
-  ? null
-  : `projects/${run.userId}/${run.projectId}/runs/${run.id}/thumbnail.webp`
-const thumbnailBlobUrl = thumbnailKey
-  ? await getPresignedDownloadUrl({
-      bucket: env.S3_BUCKET,
-      key: thumbnailKey,
-      expiresIn: 3600,
-    })
-  : null
+const thumbnailKey = `projects/${run.userId}/${run.projectId}/runs/${run.id}/thumbnail.webp`
+const thumbnailBlobUrl = await getPresignedDownloadUrl({
+  bucket: env.S3_BUCKET,
+  key: thumbnailKey,
+  expiresIn: 3600,
+})
 
 return {
   ...existingFields,
@@ -156,7 +153,7 @@ return {
 }
 ```
 
-`isPreSP1(run)` is the backend-side determinism choice — could be a `createdAt` timestamp comparison against the deploy time, or a simpler "always sign post-deploy, null pre-deploy" cutoff. **Open question for backend (§10 Q1):** does the backend prefer to sign-and-let-onError-fallback for ALL runs (simplest, most uniform), or carry a cutoff timestamp / feature flag?
+Locked per §10 Q1 → option (a) always-sign. No conditional, no `isPreSP1` branch, no deploy-time tracking. URL signs deterministically; desktop's `<img onError>` handles 404s for pre-SP1 runs and post-SP1 runs whose PUT didn't land. Browsers negative-cache the 404, so re-renders within a session don't re-hit S3.
 
 ### B7 endpoint (`mvp_api/src/modules/blobs/blobs.service.ts` `RUN_RESULT_SPEC`)
 
@@ -171,7 +168,7 @@ export const RUN_RESULT_SPEC = {
     contentType: "image/webp",
     keyTemplate: ({ userId, projectId, runId }) =>
       `projects/${userId}/${projectId}/runs/${runId}/thumbnail.webp`,
-    maxBytes: 100_000, // 100 KB ceiling — well above projected 5-15KB; defends against accidentally PUTting a full-resolution PNG
+    maxBytes: 50_000, // 50 KB ceiling (locked per §10 Q4) — tight enough to catch accidentally-uncompressed PNG PUTs (which hit 80–150KB easily for 400×300 layouts); loose enough that q=95 quality bumps don't trip it.
   },
 }
 ```
@@ -316,9 +313,9 @@ Tauri webview's HTTP scope already permits S3 origins (S1-02 fix at `f6cab16`). 
 
 ### Test coverage
 
-- Mock sidecar client's `renderLayoutThumbnail` to return Uint8Array; verify P6 mutation calls B7 with `type: "thumbnail"` + PUTs the bytes + (if explicit path) calls `registerRunThumbnail`.
+- Mock sidecar client's `renderLayoutThumbnail` to return Uint8Array; verify P6 mutation calls B7 with `type: "thumbnail"` + PUTs the bytes (Path A — no register call).
 - Verify single idempotency key threads through all stages.
-- Verify thumbnail PUT failure causes the whole mutation to fail (no half-state where the run exists without a thumbnail in slice).
+- Verify thumbnail PUT failure does NOT fail the whole mutation — the failure is logged + swallowed, slice mutations proceed, run lands in gallery rendering placeholder via `<img onError>` (different from layout-result PUT failure, which DOES fail the mutation).
 - Verify RunsList renders `<img>` when `thumbnailBlobUrl !== null`, placeholder div when null.
 - Verify `<img onError>` falls back to placeholder.
 
@@ -347,10 +344,10 @@ Tauri webview's HTTP scope already permits S3 origins (S1-02 fix at `f6cab16`). 
 
 | Surface | Behavior |
 |---|---|
-| Pre-pipeline runs | `Run.thumbnailBlobUrl = null` (DB default after migration). B17 returns `null`. Desktop renders existing placeholder. **No data move.** |
-| Pre-pipeline runs that user opens via P7 | Open-run flow doesn't depend on thumbnails (canvas hydrate uses `layoutResultBlobUrl` only). No change. |
-| Post-pipeline runs created by old desktop client | Backend ships first; old desktop won't PUT thumbnails. `Run.thumbnailBlobUrl` stays null. Same as pre-pipeline. |
-| Post-pipeline runs created by new desktop client | Full chain — thumbnail PUT post-Generate. Gallery shows preview. |
+| Pre-SP1 runs | No DB column. B17 always-signs the deterministic URL (per §10 Q1 → option (a)); URL 404s on GET; `<img onError>` falls back to placeholder. **No data move, no schema change.** |
+| Pre-SP1 runs that user opens via P7 | Open-run flow doesn't depend on thumbnails (canvas hydrate uses `layoutResultBlobUrl` only). No change. |
+| Post-SP1 runs created by old desktop client | Backend ships first; old desktop won't PUT thumbnails. B17 still signs the deterministic URL; `<img onError>` falls back. Same path as pre-SP1 runs. |
+| Post-SP1 runs created by new desktop client | Full chain — thumbnail PUT post-Generate. Gallery + RecentsView show preview. |
 | Old desktop client opening new run | B17 returns `thumbnailBlobUrl: string`, but old client doesn't read it. No regression. |
 
 The version skew is invisible because the new field is additive on the wire and old clients ignore unknown fields. Lockstep is on the FE side: new desktop clients should mirror the new wire field promptly, but it's safe if they don't (just skips the thumbnail render until they update).
@@ -395,18 +392,18 @@ The version skew is invisible because the new field is additive on the wire and 
 
 ---
 
-## 10. Open questions for backend
+## 10. Locked answers (was: open questions for backend)
 
-1. **Pre-SP1 run handling — null cutoff vs always-sign?** Under Path A, B17 signs a deterministic URL on every call. Two flavors:
-   - **(a) Always sign** — even for pre-SP1 runs. URL 404s on GET; `<img onError>` falls back. Simplest backend-side; desktop already handles 404 fallback for post-SP1 runs that PUT-failed, so this is uniform.
-   - **(b) Null cutoff** — backend returns `thumbnailBlobUrl: null` for runs created before SP1 ships, deterministic URL otherwise. Slightly more complex on the backend (needs a deploy-timestamp or feature-flag check) but slightly cleaner on the desktop (null → placeholder, never 404 → fallback).
+All six questions from v2 are answered. Backend confirmed via direct review on 2026-04-30. Recorded here as the authoritative answer set; no further iteration expected.
 
-   **Recommend (a) — always sign.** The desktop's `<img onError>` is already mandatory for the post-SP1 PUT-failure case; carrying the same fallback for pre-SP1 runs costs nothing and removes the cutoff tracking from the backend. Pre-SP1 runs render placeholder via 404 → onError → fallback, identical UX to post-SP1 PUT-failed runs.
-2. **`/layout/thumbnail` vs extending `/layout`:** prefer the new endpoint (Section 5) for cleanliness. Confirm or push back.
-3. **Idempotency of `/layout/thumbnail`:** the sidecar should produce identical bytes for identical input (matplotlib + Pillow with fixed quality params is deterministic). Confirm this is acceptable, or do we want explicit idempotency keys on the thumbnail render path too?
-4. **Max thumbnail size ceiling:** 100KB feels generous; is that the right defensive ceiling for the B7 `RUN_RESULT_SPEC.thumbnail.maxBytes` field, or should we tighten to 50KB to catch accidentally-uncompressed PNG PUTs early?
-5. **Migration ordering:** is there any reason for the backend to NOT ship Path A's 4 steps (wire shape → RUN_RESULT_SPEC.thumbnail → B17 → B7) immediately after this memo lands? Sidecar + desktop are gated on backend's wire shape, so backend-first is the natural order.
-6. **WebP support in mvp_admin's UI:** if the admin portal ever lists runs with thumbnails (a future feature), confirm the admin webview is also Chromium-based (or has WebP fallback). Not blocking for SP1; just flagging.
+| # | Question | Answer | Notes |
+|---|---|---|---|
+| Q1 | Pre-SP1 run handling: null cutoff vs always-sign? | **(a) Always sign.** | B17 signs the deterministic URL for every run unconditionally. Desktop's `<img onError>` handles 404 for pre-SP1 + PUT-failed runs uniformly. See §2 row "Persistence model — Path A" for negative-cache amortization rationale and §2 row "Backwards compat" for backfill-stays-additive rationale. |
+| Q2 | `/layout/thumbnail` separate endpoint vs multipart on `/layout`? | **Separate endpoint.** | Multipart would force both sides to handle `Content-Type: multipart/mixed` parsing. A standalone endpoint also keeps the door open for "thumbnail-only re-render" use cases (e.g., the future backfill script — see §2 backwards-compat row). |
+| Q3 | Idempotency on `/layout/thumbnail`? | **No idempotency key on the thumbnail render path.** | Semantic determinism (same `LayoutResult` input → valid WebP that looks the same) is sufficient. matplotlib + Pillow gives us that at the pixel level even without strict byte-determinism. The desktop's idempotency key already threads through B16; thumbnail render is a downstream stateless side-effect. |
+| Q4 | Max thumbnail size ceiling? | **50 KB** (`RUN_RESULT_SPEC.thumbnail.maxBytes: 50_000`). | Tight enough to catch accidentally-uncompressed PNG PUTs (which can hit 80–150KB easily for a 400×300 layout); loose enough that q=95 quality bumps don't trip it. Tightened from v2's 100KB proposal. |
+| Q5 | Migration ordering — backend ships first? | **Yes. Backend executes Path A's 4 steps immediately after this memo locks.** | Backend ETA: half a day for steps 1–3 (wire shape → `RUN_RESULT_SPEC.thumbnail` → B17 deterministic-mint) + their tests + integration smoke. B24's B10 projection extension is another ~1 hour follow-up commit. Sidecar + desktop pick up after backend wire ships. |
+| Q6 | WebP support in mvp_admin? | **Non-blocking for SP1.** | mvp_admin is Next.js + Chromium → WebP renders natively. Re-flag only if a non-Chromium admin context appears. |
 
 ---
 
@@ -444,16 +441,18 @@ The version skew is invisible because the new field is additive on the wire and 
 
 ## 13. Approval / next steps
 
-This memo is **draft for backend review**. Once backend reviews + answers the open questions in §10:
+This memo is **locked at v3**. Backend reviewed v2 on 2026-04-30 and confirmed Q1 → option (a) always-sign + Q2–Q6 unchanged from v1 stances. v3 folds the locked answers into §2/§4/§10 and tightens the maxBytes ceiling to 50KB.
 
-1. Backend refines B23 row's acceptance criteria to match the locked decisions in §2.
-2. Backend ships steps 1-5 in §9 (schema → wire → B17 → B7 thumbnail mint → register endpoint if chosen).
-3. Sidecar work picks up at §9 step 6 (paralellisable with backend after wire shape stabilizes).
-4. Desktop adapter picks up at §9 step 9 once both backend wire and sidecar `/layout/thumbnail` are live.
-5. Live verification in a focused mini-smoke (or fold into Session 2) at §9 step 14.
-6. SP1 row in `docs/PLAN.md` flips to `done`; B23 in V2 plan flips to `done`; SMOKE-LOG `S1-06` thread closes with the SP1 + B23 commit SHAs.
+Execution sequence — currently in flight:
 
-Estimated total elapsed: **3-5 days** depending on backend / sidecar / desktop ship cadence + smoke availability.
+1. **Backend (B23, in flight)** — refines acceptance criteria against §2 + ships Path A's 4 steps from §9: wire shape (`thumbnailBlobUrl: string | null` on `RunDetailWire`) → `RUN_RESULT_SPEC.thumbnail` extension → B17 deterministic-sign → B7 mint. ETA half a day for steps 1–3 + tests + integration smoke; B24's B10 projection extension is another ~1h follow-up.
+2. **Sidecar (this repo)** — picks up after backend wire shape stabilizes: `/layout/thumbnail` endpoint via matplotlib reuse + Pillow WebP encoding (§5). Parallelisable with backend's later steps.
+3. **Desktop adapter (SP1)** — gated on both backend wire + sidecar endpoint: schema mirror → `renderLayoutThumbnail` sidecar-client method → P6 flow extension → RunsList card render swap with `<img onError>` fallback (§6).
+4. **Desktop adapter (SP4)** — gated on B24 + SP1: schema mirror in `projectSummaryListRowV2Schema` + RecentsView card edit (§14).
+5. **Live verification** — focused mini-smoke or fold into Session 2 (§11 row "Smoke").
+6. **Close-out** — SP1 + SP4 rows in `docs/PLAN.md` flip to `done`; B23 + B24 in V2 plan flip to `done`; SMOKE-LOG `S1-06` thread closes with the SP1 + B23 commit SHAs.
+
+Estimated total elapsed: **3–5 days** depending on backend / sidecar / desktop ship cadence + smoke availability.
 
 ---
 
@@ -597,7 +596,7 @@ If user demand surfaces for a non-placeholder visual on empty projects (just-cre
 
 ### Approval
 
-§14 is **draft for backend review** alongside the rest of memo v2. No new open questions on the SP4 surface specifically; backend's B24 preview at `dfd0c48` is the right implementation under Path A.
+§14 is **locked at v3** alongside the rest of the memo. Backend confirmed B24's `dfd0c48` preview is the right implementation under Path A; B24 ships as a ~1h follow-up commit after B23 lands (§13 step 1).
 
 ---
 
