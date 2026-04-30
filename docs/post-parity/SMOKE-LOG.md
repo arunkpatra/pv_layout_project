@@ -2063,3 +2063,60 @@ that exhibited them is gone from the codebase.
 
 ---
 
+#### SP1 + SP4 closed — full thumbnail pipeline live (2026-04-30)
+
+End-to-end thumbnail flow verified live on PRO_PLUS:
+
+1. **Sidecar `/layout/thumbnail`** (`4859a3f`) — produces 5–15 KB
+   WebP at 400×300 q=85 from any wire LayoutResult. 9 integration
+   tests green.
+2. **Backend B23 + B24** (on origin) — `RunDetailWire.thumbnailBlobUrl`
+   + `ProjectSummary.mostRecentRunThumbnailBlobUrl` always-signed
+   against the deterministic key path; `RUN_RESULT_SPEC.thumbnail`
+   + B7 type=thumbnail mint with 50KB cap.
+3. **Backend B25** (`98b5a75` on origin) — `RunSummary.thumbnailBlobUrl`
+   added to B12's embedded `runs[]` and B15's listing. Required a
+   live mvp_api restart to pick up the new code; once running, the
+   field surfaces correctly.
+4. **Desktop adapter** (`7bce97c`) — schema mirrors, sidecar-client
+   `renderLayoutThumbnail`, P6 Stage 4 best-effort upload chain
+   (sidecar render → B7 mint → S3 PUT, fire-and-forget),
+   `RunThumbnail` + `ProjectCardThumbnail` components with
+   `<img onError>` placeholder fallback.
+5. **Cache invalidation** (`0b834a7`) — three mutations
+   (useGenerateLayout / useDeleteRun / useAutoSaveProject) now
+   invalidate `["projects", licenseKey]` so post-Generate Home
+   visits show fresh data within `useProjectsListQuery`'s 30s
+   staleTime window.
+
+Live verification flow:
+
+- Generate a layout from `phaseboundary2.kmz` → canvas renders +
+  Run row appears in the Inspector Runs gallery.
+- `curl B10 → mostRecentRunThumbnailBlobUrl` returned a signed URL.
+- `curl <signed URL>` against S3 → 200 OK + 9.4 KB body + valid
+  `RIFF…WEBP` magic bytes.
+- Click Home (Projects tab) → project card on RecentsView shows the
+  4:3 thumbnail at the top; B7 fixture (no PUT ever happened) →
+  S3 GET 404 → placeholder fallback ✓.
+- Click back into the project tab → Inspector Runs gallery card
+  shows the same thumbnail (after refresh from B25's RunSummary
+  extension landing on origin) ✓.
+
+Both SP1 and SP4 close as **done**. Delete-existing-project
+verification rounded out the cache-fix proof: deleting a project
+from RecentsView's ⋯ menu drops it from the grid immediately
+(invalidation works); deleting a run from the gallery's "Delete N"
+button drops it from runs[] + flips `lastRunAt` /
+`mostRecentRunThumbnailBlobUrl` to the new most-recent run on next
+Home visit.
+
+**Pending follow-ups logged:**
+- SP6 — boundary GeoJSON fallback for zero-run / PUT-failed projects.
+  Backend's B26 (Project.boundaryGeojson + B11/B10 wire) shipped
+  locally + green-lit for push; desktop SVG render (~30 LOC) lands
+  once on origin.
+- SP5 — dark-theme thumbnail polish, deferred to S13.5 dark phase.
+
+---
+
