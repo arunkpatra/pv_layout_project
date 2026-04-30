@@ -509,6 +509,7 @@ extra-attention items inside flows already on the route.
 |-------|-----|----------|-------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|--------|--------|---------------------------|
 | S1-01 | P3  | frontend | fe    | License submit button enables on any non-empty input        | 1. Clean launch → F1 splash. 2. Type `test` (any non-empty value). 3. Submit button is enabled.       | Decision deferred — revisit at end of session.                          | deferred | F1     | see S1-01 below           |
 | S1-02 | P0  | frontend | fe    | Tauri HTTP capability scope blocks all S3 origins           | 1. Sign in with PRO. 2. Click "+ New project". 3. Pick any KMZ. 4. Tauri shows error popup: "Couldn't open KMZ — url not allowed on the configured scope: https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/…" | tauriFetch PUT/GET against `solarlayout-{local,dev,prod}-projects.s3.ap-south-1.amazonaws.com` succeeds; new-project / open-project / generate-layout / open-run flows complete. | fixed  | F6     | see S1-02 below           |
+| S1-03 | P3  | frontend | fe    | StatusBar drops the line-obstruction count                  | 1. Open `phaseboundary2.kmz` (which contains a TL line obstruction). 2. StatusBar reads `1 boundary · 0 obstacles` despite the TL being clearly rendered as a red dashed polyline on the canvas. | StatusBar text includes the line-obstructions count when non-zero (or shows it always for symmetry).                          | open   | F4     | see S1-03 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -636,5 +637,28 @@ S3 (B6 mint + PUT), project created (B11), tab opened with project
 name `phaseboundary2` in the new S2 tabs bar, canvas hydrated.
 Status → `fixed`. Closed via `f6cab16` on
 `post-parity-v1-desktop`.
+
+##### S1-03 thread
+
+[FE 2026-04-30 13:42] User flagged a red dashed line on canvas;
+verified in Google Earth as a transmission-line ("TL") layer in
+`phaseboundary2.kmz`. The KMZ parser correctly extracts it as a
+`lineObstruction` and `countKmzFeatures` at
+`apps/desktop/src/project/kmzToGeoJson.ts:92` already returns a
+`lines` count alongside `boundaries` + `obstacles`. The StatusBar
+string in `apps/desktop/src/App.tsx:1296` only renders
+`boundaries` + `obstacles` — drops `lines` entirely. So the data is
+computed but never displayed.
+
+Visible inconsistency: canvas shows the TL polyline, status text
+reads `0 obstacles`. A user glancing at the count to verify KMZ
+parse-completeness will think the TL was missed. P3 polish nit.
+
+Fix is one line in App.tsx — add `· ${plural(projectCounts.lines,
+"line obstruction", "line obstructions")}` to the status string.
+
+Recommendation: **inline-fix now**. ~30s edit, no restart needed
+(Vite HMR picks up App.tsx). Closes the visible inconsistency before
+moving to the next P1 acceptance check.
 
 ---
