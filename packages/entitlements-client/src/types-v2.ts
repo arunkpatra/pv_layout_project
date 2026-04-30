@@ -259,6 +259,7 @@ export const runResultTypes = [
   "dxf",
   "pdf",
   "kmz",
+  "thumbnail",
 ] as const
 
 export type RunResultType = (typeof runResultTypes)[number]
@@ -283,6 +284,7 @@ export const RUN_RESULT_CONTENT_TYPES: Record<RunResultType, string> = {
   dxf: "application/dxf",
   pdf: "application/pdf",
   kmz: "application/vnd.google-earth.kmz",
+  thumbnail: "image/webp",
 }
 
 /** KMZ Content-Type the desktop MUST send on PUT for B6 uploads. */
@@ -353,6 +355,13 @@ export const createProjectV2ResponseSchema =
  * Heavy run fields (inputsSnapshot, blob URLs, exports) live on B17's
  * RunDetailWire and aren't part of this summary. Mirrors `RunSummary`
  * in `renewable_energy/packages/shared/src/types/project-v2.ts`.
+ *
+ * **SP1 forward-compat field** — `thumbnailBlobUrl` is `.optional()` +
+ * `.nullable()` here. Backend hasn't extended RunSummary yet (memo v3
+ * §4 only added the field to RunDetail). Once backend amends to
+ * always-sign on every embedded run (Path A pattern, mirrors B24's
+ * B10 projection), this schema accepts it without a desktop change
+ * and RunsList lights up its `<img>` swap automatically.
  */
 export const runSummaryV2WireSchema = z.object({
   id: z.string().min(1),
@@ -362,6 +371,7 @@ export const runSummaryV2WireSchema = z.object({
   /** Feature key billed for this run (e.g. "plant_layout"). */
   billedFeatureKey: z.string().min(1),
   createdAt: z.string(),
+  thumbnailBlobUrl: z.string().url().nullable().optional(),
 })
 
 export type RunSummaryV2Wire = z.infer<typeof runSummaryV2WireSchema>
@@ -558,6 +568,13 @@ export const projectSummaryListRowV2Schema = z.object({
   updatedAt: z.string(),
   runsCount: z.number().int().nonnegative(),
   lastRunAt: z.string().nullable(),
+  // SP4 / B24 — presigned-GET (1h TTL) for the project's most-recent
+  // non-soft-deleted Run's thumbnail.webp, signed against the same Path
+  // A deterministic key path B17 uses (memo v3 §14). Null when the
+  // project has zero runs; on read the URL may 404 if the underlying
+  // PUT didn't land — `<RecentsView>`'s `<img onError>` falls back to
+  // the existing placeholder.
+  mostRecentRunThumbnailBlobUrl: z.string().url().nullable(),
 })
 
 export type ProjectSummaryListRowV2 = z.infer<
@@ -594,11 +611,19 @@ export const listProjectsV2ResponseSchema = v2SuccessResponseSchema(
  *   exportsBlobUrls — v1 always `[]` per backend's contract. Reserved
  *     for a future register-export endpoint; the desktop currently
  *     calls B7 directly for DXF/PDF/KMZ exports.
+ *   thumbnailBlobUrl — presigned-GET for `thumbnail.webp` (SP1 / B23).
+ *     Backend always-signs the deterministic key path on every call
+ *     (memo v3 §10 Q1 lock). Schema is `string | null` for symmetry
+ *     with sibling fields and forward-compat headroom; at runtime
+ *     under SP1 backend always returns a string. The URL may 404 on
+ *     read if the upstream sidecar render or S3 PUT didn't land —
+ *     RunsList's `<img onError>` falls back to the placeholder div.
  */
 export const runDetailV2WireSchema = runWireV2Schema.extend({
   layoutResultBlobUrl: z.string().url().nullable(),
   energyResultBlobUrl: z.string().url().nullable(),
   exportsBlobUrls: z.array(z.unknown()),
+  thumbnailBlobUrl: z.string().url().nullable(),
 })
 
 export type RunDetailV2Wire = z.infer<typeof runDetailV2WireSchema>

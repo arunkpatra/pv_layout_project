@@ -854,6 +854,8 @@ describe("projectSummaryListRowV2Schema", () => {
     updatedAt: "2026-04-30T10:00:00.000Z",
     runsCount: 0,
     lastRunAt: null,
+
+    mostRecentRunThumbnailBlobUrl: null,
   }
 
   test("parses a fresh-project list row (zero runs)", () => {
@@ -865,6 +867,8 @@ describe("projectSummaryListRowV2Schema", () => {
       ...sample,
       runsCount: 3,
       lastRunAt: "2026-04-30T11:00:00.000Z",
+
+      mostRecentRunThumbnailBlobUrl: null,
     })
     expect(r.success).toBe(true)
   })
@@ -910,6 +914,8 @@ describe("listProjectsV2ResponseSchema", () => {
           updatedAt: "2026-04-30T10:00:00.000Z",
           runsCount: 0,
           lastRunAt: null,
+
+          mostRecentRunThumbnailBlobUrl: null,
         },
         {
           id: "prj_b",
@@ -920,6 +926,8 @@ describe("listProjectsV2ResponseSchema", () => {
           updatedAt: "2026-04-30T11:00:00.000Z",
           runsCount: 2,
           lastRunAt: "2026-04-30T11:00:00.000Z",
+
+          mostRecentRunThumbnailBlobUrl: null,
         },
       ],
     })
@@ -950,6 +958,7 @@ describe("runDetailV2WireSchema", () => {
       layoutResultBlobUrl: "https://s3.example/presigned-layout",
       energyResultBlobUrl: null,
       exportsBlobUrls: [],
+      thumbnailBlobUrl: null,
     })
     expect(r.success).toBe(true)
   })
@@ -961,6 +970,7 @@ describe("runDetailV2WireSchema", () => {
       layoutResultBlobUrl: "https://s3.example/layout",
       energyResultBlobUrl: "https://s3.example/energy",
       exportsBlobUrls: [],
+      thumbnailBlobUrl: null,
     })
     expect(r.success).toBe(true)
   })
@@ -971,6 +981,7 @@ describe("runDetailV2WireSchema", () => {
       layoutResultBlobUrl: null,
       energyResultBlobUrl: null,
       exportsBlobUrls: [],
+      thumbnailBlobUrl: null,
     })
     expect(r.success).toBe(true)
   })
@@ -989,6 +1000,7 @@ describe("runDetailV2WireSchema", () => {
       ...baseRun,
       energyResultBlobUrl: null,
       exportsBlobUrls: [],
+      thumbnailBlobUrl: null,
     }
     expect(runDetailV2WireSchema.safeParse(v).success).toBe(false)
   })
@@ -1011,6 +1023,7 @@ describe("getRunV2ResponseSchema", () => {
         layoutResultBlobUrl: "https://s3.example/url",
         energyResultBlobUrl: null,
         exportsBlobUrls: [],
+        thumbnailBlobUrl: null,
       },
     })
     expect(r.success).toBe(true)

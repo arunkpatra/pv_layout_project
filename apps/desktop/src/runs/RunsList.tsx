@@ -221,7 +221,7 @@ function RunsGallery({
               />
               <RunTypeChip billedFeatureKey={r.billedFeatureKey} />
             </div>
-            <ThumbPlaceholder />
+            <RunThumbnail run={r} />
             <RunCardMeta run={r} />
           </div>
         )
@@ -281,13 +281,40 @@ function RunsTable({
 }
 
 function ThumbPlaceholder(): JSX.Element {
-  // V1 placeholder. Real rendered-layout previews depend on a thumbnail
-  // pipeline (server-side render or client-side canvas → PNG) — outside
-  // P5's scope. Token-driven slot keeps height stable across rows.
+  // Token-driven slot. Used as the v1 default + the `<img onError>`
+  // fallback under SP1 (thumbnail S3 GET 404 → placeholder takes over).
   return (
     <div
       aria-hidden="true"
       className="h-[60px] rounded-[var(--radius-sm)] bg-[var(--surface-muted)] border border-[var(--border-subtle)]"
+    />
+  )
+}
+
+/**
+ * SP1 thumbnail surface. Renders the `<img>` when the run carries a
+ * `thumbnailBlobUrl`, otherwise renders the placeholder. On `<img>`
+ * load failure (404 from S3 — pre-SP1 runs, PUT-failed runs, expired
+ * URL race) the local error state flips and the placeholder takes over
+ * — matches memo v3 §6's locked behavior.
+ *
+ * The `thumbnailBlobUrl` field is currently `.optional()` on
+ * `runSummaryV2WireSchema` because backend hasn't yet extended
+ * RunSummary to carry it (memo v3 §4 only added it to RunDetail). Once
+ * backend amends to always-sign on embedded runs, this surface lights
+ * up automatically with no desktop change required.
+ */
+function RunThumbnail({ run }: { run: Run }): JSX.Element {
+  const [errored, setErrored] = useState(false)
+  const url = run.thumbnailBlobUrl
+  if (!url || errored) return <ThumbPlaceholder />
+  return (
+    <img
+      src={url}
+      alt={`Layout preview for ${run.name}`}
+      loading="lazy"
+      onError={() => setErrored(true)}
+      className="h-[60px] w-full object-cover rounded-[var(--radius-sm)] border border-[var(--border-subtle)]"
     />
   )
 }

@@ -32,6 +32,7 @@ const sampleProjects: ProjectSummaryListRowV2[] = [
     updatedAt: "2026-04-30T11:30:00.000Z",
     runsCount: 3,
     lastRunAt: "2026-04-30T11:30:00.000Z",
+    mostRecentRunThumbnailBlobUrl: null,
   },
   {
     id: "prj_b",
@@ -42,6 +43,7 @@ const sampleProjects: ProjectSummaryListRowV2[] = [
     updatedAt: "2026-04-29T08:00:00.000Z",
     runsCount: 0,
     lastRunAt: null,
+    mostRecentRunThumbnailBlobUrl: null,
   },
 ]
 

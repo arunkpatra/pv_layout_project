@@ -34,6 +34,7 @@ const STUB_LIST: ProjectSummaryListRowV2[] = [
     updatedAt: "2026-04-30T11:00:00.000Z",
     runsCount: 2,
     lastRunAt: "2026-04-30T11:00:00.000Z",
+    mostRecentRunThumbnailBlobUrl: null,
   },
   {
     id: "prj_b",
@@ -44,6 +45,7 @@ const STUB_LIST: ProjectSummaryListRowV2[] = [
     updatedAt: "2026-04-30T08:00:00.000Z",
     runsCount: 0,
     lastRunAt: null,
+    mostRecentRunThumbnailBlobUrl: null,
   },
 ]
 

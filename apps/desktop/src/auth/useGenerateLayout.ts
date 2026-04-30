@@ -185,6 +185,29 @@ export function useGenerateLayoutMutation(
         fetchImpl: options.fetchImpl,
       })
 
+      // Stage 4 (SP1 / B23 — best-effort): sidecar render → B7 thumb
+      // mint → S3 PUT. Failure of ANY step here MUST NOT fail the
+      // mutation — the layout already landed, the thumbnail is polish,
+      // and `<img onError>` handles the 404 fallback at render time.
+      // Per memo v3 §6 + Q3, the thumbnail render path has no
+      // idempotency key (sidecar produces deterministic bytes; backend
+      // PUT is content-addressed by deterministic key — replays
+      // overwrite cleanly).
+      //
+      // Multi-boundary projects: take layoutResult[0] (first valid
+      // boundary). Composition across plots is deferred polish — when a
+      // user has a multi-plot project, the first plot's thumbnail is a
+      // reasonable representative for the gallery card.
+      void renderAndUploadThumbnail({
+        layoutResult: layoutResult[0],
+        projectId: vars.projectId,
+        runId: b16.run.id,
+        licenseKey,
+        client,
+        sidecar,
+        fetchImpl: options.fetchImpl,
+      })
+
       return {
         run: b16.run,
         layoutResult,
@@ -220,3 +243,77 @@ export function useGenerateLayoutMutation(
     },
   })
 }
+
+// ---------------------------------------------------------------------------
+// SP1 / B23 — best-effort thumbnail upload helper.
+// ---------------------------------------------------------------------------
+//
+// Deliberately fire-and-forget from the mutation's perspective: the parent
+// `mutationFn` calls this with `void` and returns immediately after the
+// layout-result PUT lands. If the user's network is slow or the sidecar
+// chokes on render, the layout still appears on canvas + in the gallery
+// without delay — the thumbnail just doesn't show until a future Generate
+// (or backfill) PUTs the blob, at which point B17's always-signed URL
+// stops 404'ing and the next RecentsView / RunsList render picks it up.
+
+interface RenderAndUploadThumbnailArgs {
+  layoutResult: LayoutResult | undefined
+  projectId: string
+  runId: string
+  licenseKey: string
+  client: EntitlementsClient
+  sidecar: SidecarClient
+  fetchImpl?: FetchLike
+}
+
+async function renderAndUploadThumbnail(
+  args: RenderAndUploadThumbnailArgs
+): Promise<void> {
+  const {
+    layoutResult,
+    projectId,
+    runId,
+    licenseKey,
+    client,
+    sidecar,
+    fetchImpl,
+  } = args
+  if (!layoutResult) {
+    // Multi-boundary input that produced an empty array — extremely
+    // rare (would mean the solver ran but found no valid boundaries).
+    // No bytes to upload; bail silently.
+    return
+  }
+  try {
+    const bytes = await sidecar.renderLayoutThumbnail(layoutResult)
+    if (bytes.byteLength > THUMBNAIL_MAX_BYTES) {
+      // Sidecar produced a blob over the B7 ceiling — backend would
+      // 400 the PUT anyway. Surfaces as a sidecar-side regression
+      // rather than a transient hiccup; log + bail.
+      console.warn(
+        `[SP1] sidecar produced thumbnail of ${bytes.byteLength} bytes (>${THUMBNAIL_MAX_BYTES}); skipping upload`
+      )
+      return
+    }
+    const upload = await client.getRunResultUploadUrl(licenseKey, {
+      type: "thumbnail",
+      projectId,
+      runId,
+      size: bytes.byteLength,
+    })
+    await putToS3({
+      url: upload.uploadUrl,
+      bytes,
+      contentType: "image/webp",
+      contentLength: bytes.byteLength,
+      fetchImpl,
+    })
+  } catch (err) {
+    // Best-effort: the layout already landed; thumbnail is polish.
+    // Log for diagnostic discoverability + carry on.
+    console.warn("[SP1] thumbnail upload failed (best-effort):", err)
+  }
+}
+
+/** B7 RUN_RESULT_SPEC.thumbnail.maxBytes — kept in sync with backend. */
+const THUMBNAIL_MAX_BYTES = 50_000

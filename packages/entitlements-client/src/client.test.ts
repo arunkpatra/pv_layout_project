@@ -1774,6 +1774,8 @@ const successListProjects = {
       updatedAt: "2026-04-30T11:30:00.000Z",
       runsCount: 2,
       lastRunAt: "2026-04-30T11:00:00.000Z",
+
+      mostRecentRunThumbnailBlobUrl: null,
     },
     {
       id: "prj_second",
@@ -1784,6 +1786,8 @@ const successListProjects = {
       updatedAt: "2026-04-30T08:00:00.000Z",
       runsCount: 0,
       lastRunAt: null,
+
+      mostRecentRunThumbnailBlobUrl: null,
     },
   ],
 }
@@ -1917,6 +1921,7 @@ const successRunDetail = {
       "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/u/p/runs/r/layout.json?X-Amz-Signature=...",
     energyResultBlobUrl: null,
     exportsBlobUrls: [],
+    thumbnailBlobUrl: null,
   },
 }
 

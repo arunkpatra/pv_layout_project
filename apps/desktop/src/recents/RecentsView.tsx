@@ -249,9 +249,9 @@ function ProjectCard({
           bg-[var(--surface-panel)]
           border border-[var(--border-subtle)]
           rounded-[var(--radius-lg)]
-          px-[20px] py-[16px]
-          flex flex-col gap-[8px]
+          flex flex-col
           min-h-[140px]
+          overflow-hidden
           text-left
           transition-all duration-150
           hover:border-[var(--border-default)]
@@ -261,7 +261,8 @@ function ProjectCard({
         "
         title={project.name}
       >
-        <div className="flex-1 min-h-0">
+        <ProjectCardThumbnail project={project} />
+        <div className="flex-1 min-h-0 px-[20px] pt-[16px]">
           <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate pr-[24px]">
             {project.name}
           </div>
@@ -272,7 +273,7 @@ function ProjectCard({
             )}
           </div>
         </div>
-        <div className="-mx-[20px] -mb-[16px] px-[20px] py-[6px] flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-[var(--border-subtle)]">
+        <div className="mt-[8px] px-[20px] py-[6px] flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-[var(--border-subtle)]">
           <span>Updated {relativeTimeFrom(project.updatedAt)}</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -341,6 +342,48 @@ function ProjectCard({
         error={error}
       />
     </>
+  )
+}
+
+/**
+ * SP4 — RecentsView project card thumbnail surface.
+ *
+ * Renders the most-recent run's thumbnail when `project.most
+ * RecentRunThumbnailBlobUrl` is non-null and the `<img>` loads
+ * successfully. Falls back to a token-driven muted placeholder for
+ * three cases: (a) project has zero runs (backend returns null),
+ * (b) project's most-recent run has no thumbnail (pre-SP1 run or
+ * PUT-failed run — backend always-signs the URL but S3 GET 404s),
+ * (c) any rare network / decoding error during load.
+ *
+ * Memo v3 §14: same 400×300 WebP asset for both Run gallery cards
+ * and RecentsView project cards. Card width is ~260px in the auto-fill
+ * grid; `aspect-[4/3]` slot at full card width yields ~195px tall
+ * preview that crops nothing (matches source aspect).
+ */
+function ProjectCardThumbnail({
+  project,
+}: {
+  project: ProjectSummaryListRowV2
+}): JSX.Element {
+  const [errored, setErrored] = useState(false)
+  const url = project.mostRecentRunThumbnailBlobUrl
+  if (!url || errored) {
+    return (
+      <div
+        aria-hidden="true"
+        className="aspect-[4/3] w-full bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]"
+      />
+    )
+  }
+  return (
+    <img
+      src={url}
+      alt={`${project.name} most recent layout preview`}
+      loading="lazy"
+      onError={() => setErrored(true)}
+      className="aspect-[4/3] w-full object-cover border-b border-[var(--border-subtle)]"
+    />
   )
 }
 

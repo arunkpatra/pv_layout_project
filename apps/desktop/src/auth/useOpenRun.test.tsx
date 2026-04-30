@@ -51,6 +51,7 @@ const STUB_DETAIL: RunDetailV2Wire = {
   layoutResultBlobUrl: "https://s3.example/presigned-layout",
   energyResultBlobUrl: null,
   exportsBlobUrls: [],
+  thumbnailBlobUrl: null,
 }
 
 const STUB_LAYOUT_RESULT: LayoutResult[] = [
