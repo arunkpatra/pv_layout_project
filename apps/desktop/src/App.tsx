@@ -53,8 +53,14 @@ import { useOpenProjectMutation } from "./auth/useOpenProject"
 import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
 import { useRenameProjectMutation } from "./auth/useRenameProject"
 import { useDeleteProjectMutation } from "./auth/useDeleteProject"
+import { useAutoSaveProject } from "./auth/useAutoSaveProject"
+import { SaveIndicator } from "./auth/SaveIndicator"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
+import {
+  editsFromUndoStack,
+  undoStackFromEdits,
+} from "./state/projectEdits"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
 import { openAndParseKmz } from "./project/kmzLoader"
@@ -428,6 +434,25 @@ export function App(): JSX.Element {
     entitlementsClient
   )
 
+  // ── P4 — auto-save edits (debounced PATCH /v2/projects/:id { edits }) ───
+  // Watches the editingState slice's undoStack (the obstructions the user
+  // has drawn through the sidecar's add-road / remove-last-road flow) and
+  // persists them as the project's `edits` field after 2s of idle. Skips
+  // entirely when no project is loaded, no key is signed in, or the key
+  // is a preview key (no real backend in preview mode).
+  const editingUndoStack = useEditingStateStore((s) => s.undoStack)
+  const projectIdForSave = currentProject?.id ?? null
+  const currentEdits = useMemo(
+    () => (projectIdForSave ? editsFromUndoStack(editingUndoStack) : null),
+    [editingUndoStack, projectIdForSave]
+  )
+  const saveStatus = useAutoSaveProject(
+    activeKey,
+    entitlementsClient,
+    projectIdForSave,
+    currentEdits
+  )
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
   // upload + create the persisted project via B6 → S3 → B11. The two
@@ -532,6 +557,11 @@ export function App(): JSX.Element {
 
       setCurrentProject(opened.detail)
       setRuns(opened.detail.runs)
+      // P4 restore — hydrate the editingState slice's undoStack from
+      // `detail.edits` if the desktop schema parses it. Malformed wire
+      // data falls back to an empty stack rather than blocking the open.
+      const restoredStack = undoStackFromEdits(opened.detail.edits) ?? []
+      useEditingStateStore.getState().setUndoStack(restoredStack)
       setProject({ kmz: parsed, fileName })
       setPaletteOpen(false)
     } catch (err) {
@@ -986,6 +1016,9 @@ export function App(): JSX.Element {
                 onDismiss={() => setUpsellDetail(null)}
               />
             )}
+            {/* P4 — top-right pill mirrors auto-save status. */}
+            <SaveIndicator status={saveStatus} />
+
             {layoutMutation.isError && (
               <OpenErrorOverlay
                 detail={

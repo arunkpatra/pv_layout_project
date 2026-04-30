@@ -609,6 +609,51 @@ async function createProjectForKey(
   }
 }
 
+async function checkB13EditsRoundTrip(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // P4 contract: PATCH { edits } persists; B12 round-trip returns the
+  // same edits payload byte-for-byte. The desktop's autosave hook
+  // depends on this — if backend re-orders / re-shapes the JSON, the
+  // hook's hash-based dedup breaks (would re-save on every refetch).
+  try {
+    const editsPayload = {
+      version: 1,
+      obstructions: [
+        {
+          roadType: "rectangle",
+          coordsWgs84: [
+            [77.5, 12.9],
+            [77.6, 12.9],
+            [77.6, 13.0],
+            [77.5, 13.0],
+          ],
+        },
+      ],
+    }
+    await client.patchProjectV2(FIXTURE_KEYS.FREE, projectId, {
+      edits: editsPayload,
+    })
+    const detail = await client.getProjectV2(FIXTURE_KEYS.FREE, projectId)
+    if (JSON.stringify(detail.edits) !== JSON.stringify(editsPayload)) {
+      record(
+        "B13 edits round-trip",
+        "warn",
+        `payload mismatch: sent ${JSON.stringify(editsPayload)} got ${JSON.stringify(detail.edits)}`
+      )
+      return
+    }
+    record(
+      "B13 edits round-trip",
+      "pass",
+      `edits persisted byte-identically through B12 fetch`
+    )
+  } catch (err) {
+    record("B13 edits round-trip", "fail", fmtErr(err))
+  }
+}
+
 async function checkB13Rename(
   client: EntitlementsClient,
   projectId: string
@@ -935,6 +980,9 @@ async function main(): Promise<void> {
   if (p3ProjectId !== null) {
     await checkB13Rename(client, p3ProjectId)
     await checkB13EmptyBody400(client, p3ProjectId)
+    // P4 — edits autosave round-trip. Run BEFORE delete (delete kills
+    // the project so subsequent B12 fetches would 404 regardless).
+    await checkB13EditsRoundTrip(client, p3ProjectId)
     await checkB14Delete(client, p3ProjectId)
     await checkB14DoubleDelete(client, p3ProjectId)
   } else {

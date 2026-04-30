@@ -93,6 +93,13 @@ interface EditingStateSlice {
   pushObstruction: (o: CommittedObstruction) => void
   popLastObstruction: () => CommittedObstruction | null
   clearUndoStack: () => void
+  /**
+   * Replace the entire undo stack with a hydrated set — used by the P2
+   * open-existing-project flow to restore obstructions from the
+   * backend's `edits` field. Every entry must already carry
+   * `serverAck: true` (the schema constructs them that way).
+   */
+  setUndoStack: (stack: CommittedObstruction[]) => void
   /** Invoked on new KMZ load — mirrors layoutParams / layerVisibility resets. */
   reset: () => void
 }
@@ -159,6 +166,11 @@ export const useEditingStateStore = create<EditingStateSlice>()((set, get) => ({
     const depth = get().undoStack.length
     log("state", "clearUndoStack", { prevDepth: depth })
     set({ undoStack: [] })
+  },
+
+  setUndoStack: (stack) => {
+    log("state", "setUndoStack", { depth: stack.length })
+    set({ undoStack: stack })
   },
 
   reset: () => {
