@@ -485,3 +485,44 @@ export type CreateRunV2Result = z.infer<typeof createRunV2ResultSchema>
 export const createRunV2ResponseSchema = v2SuccessResponseSchema(
   createRunV2ResultSchema
 )
+
+// ---------------------------------------------------------------------------
+// /v2/projects/:id — B13 (PATCH = rename + edits auto-save target)
+// ---------------------------------------------------------------------------
+
+/**
+ * B13 request body. Mirrors `PatchProjectSchema` in
+ * `renewable_energy/apps/mvp_api/src/modules/projects/projects.routes.ts`:
+ *   - `.strict()` — kmzBlobUrl + kmzSha256 are immutable post-create; any
+ *     extra key fails. Mirror enforces the same to catch typos before
+ *     the wire round-trip.
+ *   - `.refine()` — at least one of `name` or `edits` must be present;
+ *     an empty body is meaningless and the backend 400s on it.
+ *   - 200-char name cap matches B11.
+ *
+ * Two consumers in the desktop:
+ *   - P3 rename UX → `{ name }`-only patch.
+ *   - P4 auto-save → `{ edits }`-only patch.
+ */
+export const patchProjectV2RequestSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    edits: z.unknown().optional(),
+  })
+  .strict()
+  .refine((v) => v.name !== undefined || v.edits !== undefined, {
+    message: "At least one of `name` or `edits` is required",
+  })
+
+export type PatchProjectV2Request = z.infer<typeof patchProjectV2RequestSchema>
+
+/**
+ * B13 response — the updated `ProjectV2Wire` row. Distinct from B12's
+ * `ProjectDetailV2Wire`: PATCH only echoes the fields that *can* change
+ * (no kmzDownloadUrl mint, no embedded runs[]). The desktop's slice
+ * stores both shapes — P3/P4 update from this lighter response by
+ * spreading into the existing `currentProject` (so kmzDownloadUrl from
+ * the original B12 fetch stays put if still valid).
+ */
+export const patchProjectV2ResponseSchema =
+  v2SuccessResponseSchema(projectV2WireSchema)

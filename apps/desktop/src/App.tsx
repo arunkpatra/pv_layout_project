@@ -51,6 +51,8 @@ import {
 import { useCreateProjectMutation } from "./auth/useCreateProject"
 import { useOpenProjectMutation } from "./auth/useOpenProject"
 import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
+import { useRenameProjectMutation } from "./auth/useRenameProject"
+import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
@@ -411,6 +413,21 @@ export function App(): JSX.Element {
     }
   )
 
+  // ── P3 — rename + delete project mutations ──────────────────────────────
+  // Both single-attempt (PATCH and DELETE are body-deterministic /
+  // idempotent at the wire layer, but no idempotency-key gate; the user
+  // retries via the modal). On success: rename spreads into
+  // currentProject (preserving B12 fields), delete clears the slice +
+  // invalidates entitlements (frees quota).
+  const renameProjectMutation = useRenameProjectMutation(
+    activeKey,
+    entitlementsClient
+  )
+  const deleteProjectMutation = useDeleteProjectMutation(
+    activeKey,
+    entitlementsClient
+  )
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
   // upload + create the persisted project via B6 → S3 → B11. The two
@@ -538,6 +555,67 @@ export function App(): JSX.Element {
     setCurrentProject,
     setRuns,
     setProject,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+    resetEditingState,
+  ])
+
+  // ── P3 — rename / delete handlers ───────────────────────────────────────
+  // Interim entry points: native window.prompt() / window.confirm() for
+  // the rename and delete confirms. Project header inline-rename + Dialog-
+  // based confirm modal land alongside S3 (recents view) since the same
+  // visual surfaces house both flows.
+  const handleRenameProject = useCallback(async () => {
+    if (!currentProject) return
+    const next = window.prompt("Rename project:", currentProject.name)
+    if (next === null) return
+    const trimmed = next.trim()
+    if (trimmed === "" || trimmed === currentProject.name) return
+    setOpenError(null)
+    try {
+      await renameProjectMutation.mutateAsync({
+        projectId: currentProject.id,
+        name: trimmed,
+      })
+      setPaletteOpen(false)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      console.error("rename project failed:", err)
+      setOpenError(detail)
+    }
+  }, [currentProject, renameProjectMutation])
+
+  const handleDeleteProject = useCallback(async () => {
+    if (!currentProject) return
+    const ok = window.confirm(
+      `Delete "${currentProject.name}"?\n\n` +
+        `This soft-deletes the project and all its runs. ` +
+        `One project quota slot is freed. Cannot be undone from the desktop UI.`
+    )
+    if (!ok) return
+    setOpenError(null)
+    try {
+      await deleteProjectMutation.mutateAsync({
+        projectId: currentProject.id,
+      })
+      // Reset transient canvas state too — same surface as a fresh session.
+      // The hook clears the project slice; these reset everything else
+      // so the user lands back on the empty-state EmptyStateCard.
+      clearLayoutResult()
+      resetLayoutParams()
+      resetLayerVisibility()
+      resetEditingState()
+      setLayoutFormKey((k) => k + 1)
+      setPaletteOpen(false)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      console.error("delete project failed:", err)
+      setOpenError(detail)
+    }
+  }, [
+    currentProject,
+    deleteProjectMutation,
     clearLayoutResult,
     resetLayoutParams,
     resetLayerVisibility,
@@ -977,11 +1055,24 @@ export function App(): JSX.Element {
             shortcut="⌘O"
             onSelect={() => void handleOpenKmz()}
           />
-          {/* P2 interim — recents UI lands at P3 and replaces this. */}
+          {/* P2 interim — recents UI lands at S3 and replaces this. */}
           <PaletteItem
             label="Open existing project…"
             onSelect={() => void handleOpenExistingProject()}
           />
+          {/* P3 — only enabled when a backend-persisted project is loaded. */}
+          {currentProject && (
+            <>
+              <PaletteItem
+                label="Rename project…"
+                onSelect={() => void handleRenameProject()}
+              />
+              <PaletteItem
+                label="Delete project…"
+                onSelect={() => void handleDeleteProject()}
+              />
+            </>
+          )}
           <PaletteItem label="Save project" shortcut="⌘S" />
           <PaletteItem label="Export…" shortcut="⌘E" />
         </CommandGroup>

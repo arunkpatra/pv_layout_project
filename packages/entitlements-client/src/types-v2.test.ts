@@ -30,6 +30,8 @@ import {
   createRunV2RequestSchema,
   createRunV2ResultSchema,
   createRunV2ResponseSchema,
+  patchProjectV2RequestSchema,
+  patchProjectV2ResponseSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
 } from "./types-v2"
@@ -753,6 +755,84 @@ describe("createRunV2ResponseSchema", () => {
       },
     })
     expect(r.success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B13 — PATCH /v2/projects/:id (rename / edits update — auto-save target)
+// ---------------------------------------------------------------------------
+
+describe("patchProjectV2RequestSchema", () => {
+  test("parses a name-only patch (rename UX)", () => {
+    expect(
+      patchProjectV2RequestSchema.safeParse({ name: "Renamed site" }).success
+    ).toBe(true)
+  })
+
+  test("parses an edits-only patch (auto-save / P4)", () => {
+    expect(
+      patchProjectV2RequestSchema.safeParse({ edits: { obstructions: [] } })
+        .success
+    ).toBe(true)
+  })
+
+  test("parses both fields together", () => {
+    expect(
+      patchProjectV2RequestSchema.safeParse({
+        name: "New name",
+        edits: { obstructions: [] },
+      }).success
+    ).toBe(true)
+  })
+
+  test("rejects an empty body (backend requires at least one field)", () => {
+    expect(patchProjectV2RequestSchema.safeParse({}).success).toBe(false)
+  })
+
+  test("rejects empty name", () => {
+    expect(
+      patchProjectV2RequestSchema.safeParse({ name: "" }).success
+    ).toBe(false)
+  })
+
+  test("rejects name longer than 200 chars", () => {
+    expect(
+      patchProjectV2RequestSchema.safeParse({ name: "x".repeat(201) }).success
+    ).toBe(false)
+  })
+
+  test("rejects forbidden fields (kmzBlobUrl, kmzSha256 are immutable post-create)", () => {
+    // Backend uses `.strict()` so any extra key fails. The mirror does the
+    // same to catch typos before the wire round-trip.
+    expect(
+      patchProjectV2RequestSchema.safeParse({
+        name: "ok",
+        kmzBlobUrl: "s3://b/k",
+      }).success
+    ).toBe(false)
+  })
+})
+
+describe("patchProjectV2ResponseSchema", () => {
+  // Response is the lighter ProjectV2Wire shape (no kmzDownloadUrl, no
+  // runs[]) — those live on B12's ProjectDetail. PATCH only echoes what
+  // can change.
+  test("parses a successful rename response", () => {
+    const r = patchProjectV2ResponseSchema.safeParse({
+      success: true,
+      data: {
+        id: "prj_abc",
+        userId: "usr_x",
+        name: "Renamed site",
+        kmzBlobUrl: "s3://b/k",
+        kmzSha256: "a".repeat(64),
+        edits: {},
+        createdAt: "2026-04-30T12:00:00.000Z",
+        updatedAt: "2026-04-30T12:30:00.000Z",
+        deletedAt: null,
+      },
+    })
+    expect(r.success).toBe(true)
   })
 })
 

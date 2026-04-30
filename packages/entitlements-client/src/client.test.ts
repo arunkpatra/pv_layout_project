@@ -1501,3 +1501,259 @@ describe("createRunV2", () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — patchProjectV2 (B13) + deleteProjectV2 (B14)
+// ---------------------------------------------------------------------------
+
+const successPatchProject = {
+  success: true,
+  data: {
+    id: "prj_abc",
+    userId: "usr_test1",
+    name: "Renamed site",
+    kmzBlobUrl: `s3://solarlayout-local-projects/projects/u/kmz/${SAMPLE_KMZ_SHA}.kmz`,
+    kmzSha256: SAMPLE_KMZ_SHA,
+    edits: {},
+    createdAt: "2026-04-30T10:00:00.000Z",
+    updatedAt: "2026-04-30T12:30:00.000Z",
+    deletedAt: null,
+  },
+}
+
+describe("patchProjectV2", () => {
+  test("PATCHes /v2/projects/:id with the body and returns the updated row", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successPatchProject)
+      },
+    })
+    const updated = await client.patchProjectV2(KEY, "prj_abc", {
+      name: "Renamed site",
+    })
+    expect(seenUrl).toBe("https://api.solarlayout.in/v2/projects/prj_abc")
+    expect(seenMethod).toBe("PATCH")
+    expect(JSON.parse(seenBody)).toEqual({ name: "Renamed site" })
+    expect(updated.id).toBe("prj_abc")
+    expect(updated.name).toBe("Renamed site")
+  })
+
+  test("URL-encodes the projectId path segment", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return jsonResponse(successPatchProject)
+      },
+    })
+    await client.patchProjectV2(KEY, "prj_with spaces", { name: "x" })
+    expect(seenUrl).toContain("/v2/projects/prj_with%20spaces")
+  })
+
+  test("forwards an edits-only patch (P4 auto-save shape)", async () => {
+    let seenBody = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenBody = (init?.body as string) ?? ""
+        return jsonResponse(successPatchProject)
+      },
+    })
+    const edits = { obstructions: [{ kind: "rectangle" }] }
+    await client.patchProjectV2(KEY, "prj_abc", { edits })
+    expect(JSON.parse(seenBody)).toEqual({ edits })
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successPatchProject)
+      },
+    })
+    await client.patchProjectV2(KEY, "prj_abc", { name: "x" })
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 404 NOT_FOUND (cross-user / soft-deleted / missing)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: 'Project "prj_missing" not found',
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.patchProjectV2(KEY, "prj_missing", { name: "x" })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("maps 400 VALIDATION_ERROR (e.g. empty body / forbidden field)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "At least one of `name` or `edits` is required",
+            },
+          },
+          400
+        ),
+    })
+    try {
+      // Empty patch — backend 400s. Cast to skip our Zod refine, since
+      // the schema-side guard catches this first; we want to verify the
+      // client's wire-error mapping when the backend itself rejects.
+      await client.patchProjectV2(KEY, "prj_x", {} as never)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(400)
+      expect(e.code).toBe("VALIDATION_ERROR")
+    }
+  })
+
+  test("rejects malformed success body (schema guard)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            id: "prj_abc",
+            // missing userId, kmzBlobUrl, etc.
+          },
+        }),
+    })
+    try {
+      await client.patchProjectV2(KEY, "prj_abc", { name: "x" })
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+})
+
+describe("deleteProjectV2", () => {
+  test("DELETEs /v2/projects/:id and resolves on 204 (no body)", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        return new Response("", { status: 204 })
+      },
+    })
+    await client.deleteProjectV2(KEY, "prj_abc")
+    expect(seenUrl).toBe("https://api.solarlayout.in/v2/projects/prj_abc")
+    expect(seenMethod).toBe("DELETE")
+  })
+
+  test("URL-encodes the projectId path segment", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return new Response("", { status: 204 })
+      },
+    })
+    await client.deleteProjectV2(KEY, "prj_with spaces")
+    expect(seenUrl).toContain("/v2/projects/prj_with%20spaces")
+  })
+
+  test("sends Bearer auth (no Content-Type body but auth still required)", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return new Response("", { status: 204 })
+      },
+    })
+    await client.deleteProjectV2(KEY, "prj_abc")
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 404 NOT_FOUND when project doesn't exist (or already deleted)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: 'Project "prj_missing" not found',
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.deleteProjectV2(KEY, "prj_missing")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("maps 401 UNAUTHORIZED on bad key", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "License key not recognised.",
+            },
+          },
+          401
+        ),
+    })
+    try {
+      await client.deleteProjectV2(KEY, "prj_abc")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(401)
+      expect(e.code).toBe("UNAUTHORIZED")
+    }
+  })
+
+  test("maps network error to status=0", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () => {
+        throw new TypeError("Failed to fetch")
+      },
+    })
+    try {
+      await client.deleteProjectV2(KEY, "prj_abc")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+    }
+  })
+})

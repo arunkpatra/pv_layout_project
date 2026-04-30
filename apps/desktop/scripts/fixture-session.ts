@@ -609,6 +609,134 @@ async function createProjectForKey(
   }
 }
 
+async function checkB13Rename(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // B13 rename: PATCH with { name } returns the updated row. Verify the
+  // server actually changed the name (not just echoed our request body).
+  try {
+    const newName = `renamed-${Date.now()}`
+    const updated = await client.patchProjectV2(
+      FIXTURE_KEYS.FREE,
+      projectId,
+      { name: newName }
+    )
+    if (updated.name !== newName) {
+      record(
+        "B13 rename",
+        "fail",
+        `expected name="${newName}", got "${updated.name}"`
+      )
+      return
+    }
+    if (updated.id !== projectId) {
+      record(
+        "B13 rename",
+        "fail",
+        `id mismatch: expected ${projectId}, got ${updated.id}`
+      )
+      return
+    }
+    record("B13 rename", "pass", `name="${updated.name}"`)
+  } catch (err) {
+    record("B13 rename", "fail", fmtErr(err))
+  }
+}
+
+async function checkB13EmptyBody400(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // Backend's .refine() requires at least one of `name` / `edits`.
+  try {
+    // Cast through unknown — the Zod schema rejects empty body too,
+    // but here we want to test the wire-level 400.
+    await client.patchProjectV2(
+      FIXTURE_KEYS.FREE,
+      projectId,
+      {} as unknown as { name: string }
+    )
+    record(
+      "B13 empty body → 400",
+      "fail",
+      "expected VALIDATION_ERROR, got success"
+    )
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 400 &&
+      err.code === "VALIDATION_ERROR"
+    ) {
+      record("B13 empty body → 400", "pass", "status=400 code=VALIDATION_ERROR")
+    } else {
+      record("B13 empty body → 400", "fail", fmtErr(err))
+    }
+  }
+}
+
+async function checkB14Delete(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // Soft-delete + verify B12 returns 404 afterward.
+  try {
+    await client.deleteProjectV2(FIXTURE_KEYS.FREE, projectId)
+  } catch (err) {
+    record("B14 delete", "fail", fmtErr(err))
+    return
+  }
+  // Verify it's gone — B12 must 404.
+  try {
+    await client.getProjectV2(FIXTURE_KEYS.FREE, projectId)
+    record(
+      "B14 delete",
+      "fail",
+      "B12 returned the project after delete (soft-delete should 404)"
+    )
+    return
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 404 &&
+      err.code === "NOT_FOUND"
+    ) {
+      record(
+        "B14 delete",
+        "pass",
+        `deleted; B12 follow-up returns 404 NOT_FOUND`
+      )
+    } else {
+      record("B14 delete", "fail", `B12 follow-up: ${fmtErr(err)}`)
+    }
+  }
+}
+
+async function checkB14DoubleDelete(
+  client: EntitlementsClient,
+  projectId: string
+): Promise<void> {
+  // Re-deleting an already-deleted project must 404, not 204.
+  try {
+    await client.deleteProjectV2(FIXTURE_KEYS.FREE, projectId)
+    record(
+      "B14 double-delete → 404",
+      "fail",
+      "expected 404 NOT_FOUND on re-delete, got success"
+    )
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 404 &&
+      err.code === "NOT_FOUND"
+    ) {
+      record("B14 double-delete → 404", "pass", "status=404 code=NOT_FOUND")
+    } else {
+      record("B14 double-delete → 404", "fail", fmtErr(err))
+    }
+  }
+}
+
 async function checkB9HappyFree(client: EntitlementsClient): Promise<void> {
   // FREE starts with 5/5 calcs. One usage/report should succeed; running it
   // again with the SAME idempotency key should NOT double-debit. We
@@ -794,7 +922,33 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 9. B9 idempotency ───────────────────────────────────────────────────
+  // ── 9. B13 rename + B14 delete (P3) ─────────────────────────────────────
+  // Create a dedicated project for the rename/delete chain so we don't
+  // tamper with the one P2/B16 used (those tests already mutated state
+  // on it; mixing in a delete would invalidate downstream assertions).
+  console.log("\n--- B13 rename + B14 delete (P3) ---")
+  const p3ProjectId = await createProjectForKey(
+    client,
+    FIXTURE_KEYS.FREE,
+    new Uint8Array(await readFile(KMZ_PATH))
+  )
+  if (p3ProjectId !== null) {
+    await checkB13Rename(client, p3ProjectId)
+    await checkB13EmptyBody400(client, p3ProjectId)
+    await checkB14Delete(client, p3ProjectId)
+    await checkB14DoubleDelete(client, p3ProjectId)
+  } else {
+    record(
+      "B13 rename",
+      "warn",
+      "skipped — couldn't pre-create a project for the P3 chain (FREE quota exhausted?)"
+    )
+    record("B13 empty body → 400", "warn", "skipped (same reason)")
+    record("B14 delete", "warn", "skipped (same reason)")
+    record("B14 double-delete → 404", "warn", "skipped (same reason)")
+  }
+
+  // ── 10. B9 idempotency ──────────────────────────────────────────────────
   console.log("\n--- B9 idempotency ---")
   await checkB9HappyFree(client)
 

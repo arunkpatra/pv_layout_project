@@ -34,6 +34,7 @@ import {
   entitlementSummaryV2ResponseSchema,
   getProjectV2ResponseSchema,
   kmzUploadUrlResponseSchema,
+  patchProjectV2ResponseSchema,
   runResultUploadUrlResponseSchema,
   usageReportV2ResponseSchema,
   v2ErrorResponseSchema,
@@ -41,6 +42,7 @@ import {
   type CreateRunV2Request,
   type CreateRunV2Result,
   type EntitlementSummaryV2,
+  type PatchProjectV2Request,
   type PresignedUploadUrlResult,
   type ProjectDetailV2Wire,
   type ProjectV2Wire,
@@ -180,6 +182,35 @@ export interface EntitlementsClient {
     projectId: string,
     body: CreateRunV2Request
   ): Promise<CreateRunV2Result>
+  /**
+   * V2 — `PATCH /v2/projects/:id` (B13). Updates `name` and/or `edits`.
+   * Used by the desktop's P3 rename UX (`{name}`-only patch) and P4
+   * auto-save flow (`{edits}`-only patch). At least one field is
+   * required; backend rejects an empty body with VALIDATION_ERROR. The
+   * response is the lighter `ProjectV2Wire` shape (no kmzDownloadUrl,
+   * no embedded runs[]) — callers spread it into the existing
+   * `currentProject` state to keep B12-fetched fields intact.
+   */
+  patchProjectV2(
+    key: string,
+    projectId: string,
+    body: PatchProjectV2Request
+  ): Promise<ProjectV2Wire>
+  /**
+   * V2 — `DELETE /v2/projects/:id` (B14). Soft-delete: cascades to all
+   * non-deleted runs (single transaction so a partial state is never
+   * observable). Backend returns 204 No Content; resolves on success.
+   *
+   * 404 NOT_FOUND if project doesn't exist, was already deleted, or
+   * isn't owned by the caller — cross-user existence is never leaked.
+   * Calc count is unaffected; runs delete is independent of debit
+   * (refunds aren't a desktop concern at v1).
+   *
+   * Frees a project quota slot (`projectsActive` decrements server-
+   * side); the desktop's hook invalidates `["entitlements", key]` so
+   * the quota chip refreshes.
+   */
+  deleteProjectV2(key: string, projectId: string): Promise<void>
 }
 
 /**
@@ -280,6 +311,13 @@ export function createEntitlementsClient(
       throw new EntitlementsError(response.status, message, body)
     }
 
+    // 204 No Content — backend uses this for B14 delete, B18 run-delete,
+    // and any other "fire-and-forget" mutation. Return null so callers
+    // that don't validate a response shape (delete, primarily) get a
+    // typed null instead of a JSON-parse error.
+    if (response.status === 204) {
+      return null
+    }
     return response.json()
   }
 
@@ -436,6 +474,30 @@ export function createEntitlementsClient(
         )
       }
       return parsed.data.data
+    },
+
+    async patchProjectV2(key, projectId, body) {
+      const path = `/v2/projects/${encodeURIComponent(projectId)}`
+      const raw = await request(
+        path,
+        { method: "PATCH", body: JSON.stringify(body) },
+        key
+      )
+      const parsed = patchProjectV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Patch-project response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async deleteProjectV2(key, projectId) {
+      const path = `/v2/projects/${encodeURIComponent(projectId)}`
+      // 204 No Content → request() returns null; nothing to validate.
+      await request(path, { method: "DELETE" }, key)
     },
   }
 }
