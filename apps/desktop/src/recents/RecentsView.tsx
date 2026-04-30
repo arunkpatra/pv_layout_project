@@ -460,34 +460,57 @@ function BoundarySvg({
       if (lat > maxLat) maxLat = lat
     }
   }
-  const w = maxLon - minLon || 1e-6 // guard a degenerate ring
-  const h = maxLat - minLat || 1e-6
-  const margin = 0.04 // 4% padding so the stroke isn't clipped
-  const vbX = minLon - w * margin
-  const vbY = -maxLat - h * margin // flip lat for SVG y-down
-  const vbW = w * (1 + 2 * margin)
-  const vbH = h * (1 + 2 * margin)
+  const lonSpan = maxLon - minLon || 1e-9
+  const latSpan = maxLat - minLat || 1e-9
+
+  // Normalize geographic coords to a 0..VB_RANGE viewBox. Geographic
+  // values like lon=81.4866, lat=21.7084 with spans of ~0.002 are below
+  // WebKit's reliable SVG-precision threshold; rendering silently fails
+  // (mounted SVG, no visible content). Translating to origin + scaling
+  // to 0..1000 dodges that entirely.
+  //
+  // Keep aspect ratio: scale lon and lat by the SAME factor (the larger
+  // of the two spans), so square plant boundaries stay square.
+  const VB_RANGE = 1000
+  const scale = VB_RANGE / Math.max(lonSpan, latSpan)
+  const margin = VB_RANGE * 0.04
+  const projectedRings = rings.map((ring) =>
+    ring.map(([lon, lat]) => {
+      // x grows east (+lon), y grows south in SVG so we negate lat.
+      const x = (lon - minLon) * scale
+      const y = (maxLat - lat) * scale
+      return [x, y] as const
+    })
+  )
+  const vbX = -margin
+  const vbY = -margin
+  const vbW = lonSpan * scale + margin * 2
+  const vbH = latSpan * scale + margin * 2
 
   return (
-    <svg
+    <div
       role="img"
       aria-label={ariaLabel}
-      viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="aspect-[4/3] w-full bg-[var(--surface-muted)] border-b border-[var(--border-subtle)]"
+      className="aspect-[4/3] w-full bg-[var(--surface-muted)] border-b border-[var(--border-subtle)] relative overflow-hidden"
     >
-      {rings.map((ring, i) => (
-        <polygon
-          key={i}
-          points={ring.map(([lon, lat]) => `${lon},${-lat}`).join(" ")}
-          fill="none"
-          stroke="var(--text-secondary)"
-          strokeWidth={1.5}
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      ))}
-    </svg>
+      <svg
+        viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="absolute inset-0 w-full h-full"
+      >
+        {projectedRings.map((ring, i) => (
+          <polygon
+            key={i}
+            points={ring.map(([x, y]) => `${x},${y}`).join(" ")}
+            fill="none"
+            stroke="#60605d"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
+    </div>
   )
 }
 

@@ -2112,10 +2112,16 @@ button drops it from runs[] + flips `lastRunAt` /
 Home visit.
 
 **Pending follow-ups logged:**
-- SP6 — boundary GeoJSON fallback for zero-run / PUT-failed projects.
-  Backend's B26 (Project.boundaryGeojson + B11/B10 wire) shipped
-  locally + green-lit for push; desktop SVG render (~30 LOC) lands
-  once on origin.
+- SP6 — boundary GeoJSON fallback. **Closed same day 2026-04-30.**
+  Backend B26 pushed to origin; desktop adapter shipped; live-verified
+  on a fresh `phaseboundary` project with zero runs (boundary outline
+  visible). One real bug surfaced + fixed during live-test: WebKit's
+  SVG renderer silently fails on tiny viewBox dimensions (lon/lat
+  spans ~0.002–0.005). Fix: normalize coords to a 0..1000 unit
+  viewBox before rendering. Diagnosed via debug-stripe technique
+  (bright-pink slot + blue SVG border + yellow viewBox-fill rect)
+  which isolated the bug to "SVG mounts but viewBox content is
+  invisible," ruling out schema / data-flow issues.
 - SP5 — dark-theme thumbnail polish, deferred to S13.5 dark phase.
 
 ---
