@@ -514,6 +514,7 @@ extra-attention items inside flows already on the route.
 | S1-05 | P3  | frontend | fe    | Redundant `Press ⌘K for commands` pill above the canvas      | 1. Sign in. 2. RecentsView (or any canvas state). 3. Floating `Press ⌘K for commands` pill renders top-left of canvas, duplicating the TopBar's palette button. | Floating hint removed; TopBar's palette button is the canonical entry point.                                                                                                                                  | fixed  | inline  | see S1-05 below           |
 | S1-06 | P3  | frontend, backend | both | Run gallery cards show empty thumbnail placeholder           | 1. Open project + Generate Layout. 2. Inspector → Runs tab. 3. Run card renders with title + type chip + timestamp but a blank gray placeholder where a layout preview thumbnail would help orient. | Thumbnail shows a recognizable preview of the run's layout. User-preferred path: server-side pipeline (Option B) subject to a detailed impact-analysis memo when the row is picked up.                       | deferred | new-row | see S1-06 below           |
 | S1-07 | P3  | frontend | fe    | No loading feedback during run-switch                        | 1. Open project + generate ≥2 runs (or open a project with multiple existing runs). 2. Inspector → Runs tab. 3. Click a non-active run card. 4. ~1–2s elapses during B17 fetch + S3 GET; canvas shows old run; no visible "loading" indication. 5. Canvas eventually updates; click felt unacknowledged. | While B17 + S3 GET are in flight: clicked card shows a subtle spinner in the thumbnail slot + StatusBar `leftMeta` reads `Loading run [timestamp]…`. Both clear when the canvas hydrates. No toast — the canvas update IS the success signal.                                       | deferred | new-row | see S1-07 below           |
+| S1-08 | P1  | frontend | fe    | Layout state lost on tab-switch round-trip (S2 regression)   | 1. Open project A; Generate Layout (run_A produced + canvas shows panels/ICRs). 2. Open a second project B (with no runs). Tab opens; canvas shows just B's boundary. 3. Click back on tab A. 4. Canvas shows only A's boundary — no panels, no ICRs. The previously-generated run is gone visually but still exists in `runs[]` (visible in Inspector → Runs tab if you check). | Switching back to a tab whose project has runs auto-restores the most-recent run on canvas. The P7 selectedRunId-driven effect fires B17 + S3 GET + setLayoutResult during the B12-driven hydration. Mental model: opening a project shows the prior work, not blank boundary + manual click. | open   | S2, P2  | see S1-08 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -890,5 +891,83 @@ run-switch`. Tier T1, depends P5 + P7, source = this S1-07 thread.
 
 Status `deferred`; will revisit when Phase 4 polish bucket is
 picked up.
+
+##### S1-08 thread
+
+[FE 2026-04-30 14:18] Real P1 bug — confirmed via code trace. Tab
+switch round-trip loses canvas layout state. Root cause is a contract
+mismatch between P2 (open-existing-project) and S2 (multi-tab):
+
+State flow that creates the bug:
+
+1. User on `phaseboundary2` with `selectedRunId=run_A`,
+   `runs=[run_A]`, layoutResult populated.
+2. User switches to `complex` —
+   `apps/desktop/src/App.tsx:621` `handleOpenProjectById` fires:
+   - `clearLayoutResult()` wipes layoutResult slice (line 633).
+   - `setRuns(complex.runs)` where `complex.runs=[]`. The slice's
+     `setRuns` at `apps/desktop/src/state/project.ts:129` drops
+     `selectedRunId` to `null` because the prior run_A isn't in the
+     new (empty) array.
+3. User switches back to `phaseboundary2` — same
+   `handleOpenProjectById`:
+   - `setRuns([run_A])` with current `selectedRunId=null`. `null`
+     doesn't match anything, so it stays null.
+   - P7's effect at `App.tsx:518` bails on null
+     (`if (!selectedRunId) return`) → never fires B17 → layout never
+     restores.
+
+Why this didn't repro the first time the user switched back: that
+switch happened immediately after P6 generate, where `selectRun(run.id)`
+had just fired. `selectedRunId` carried through that round-trip.
+Going via a runs-empty tab is what nulls it.
+
+Why this is the wrong contract for S2:
+`handleOpenProjectById`'s comment at App.tsx:629–632 explicitly notes
+"open-existing doesn't hydrate a previous layout result yet (P7 will,
+when the user picks a specific run from the runs list)." That contract
+was set by P2 *before* S2 landed. With multi-tab in scope, the user's
+mental model is "tab = workspace state restored on switch," not
+"tab = blank canvas + manual run pick."
+
+**Fix proposed:** auto-select the most-recent run when opening a
+project that has any. One block in `handleOpenProjectById` after
+`setRuns`:
+
+```ts
+if (opened.detail.runs.length > 0) {
+  const mostRecent = [...opened.detail.runs].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  )[0]!
+  selectRun(mostRecent.id)
+}
+```
+
+The sort uses `createdAt` (ISO string) descending → pick first.
+Fires P7's effect → B17 + S3 GET + `setLayoutResult(result, runId)`.
+
+This fixes both:
+
+- The S2 tab-switch round-trip case (this bug).
+- The P2 cold-open case (currently: click project from RecentsView →
+  see boundary only → manually click a run from the gallery; should:
+  see prior layout immediately).
+
+Edge cases handled by the existing code:
+
+- Empty `runs[]` → block skipped → canvas stays empty boundary.
+  Correct.
+- `createdAt` is required by the wire schema (RunSummaryV2Wire), so
+  no null-handling needed.
+- If user explicitly cleared selection via P9 (delete run), the
+  most-recent remaining run becomes active automatically — feels
+  natural.
+
+Ship-or-defer: **recommend ship inline now.** This is a P1 — breaks
+S2's core promise. ~2 minute fix. Will require the existing P2 unit
+tests + add a new "auto-selects most-recent run when runs present"
+test case. Then tab-switch round-trip should pass cleanly.
+
+Awaiting user go-ahead per their explicit pause.
 
 ---
