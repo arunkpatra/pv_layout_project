@@ -1832,3 +1832,171 @@ project B's canvas shows only its boundary, no panels leaked from
 A. Closed via `8e8f481` on `post-parity-v1-desktop`.
 
 ---
+
+### Session 2 — post-S1 polish + tier-edge coverage
+
+**Date:** 2026-04-30
+**App HEAD:** `e45c253` on `post-parity-v1-desktop`
+**Backend HEAD:** `dfd0c48` on `post-parity-v2-backend` (B23 + B24
+rows live; backend just started B23 4-step execution against
+locked memo v3)
+**Sidecar build:** dev (`uv run`)
+
+Pre-flight (per resume doc procedure): fixtures re-seeded clean
+via `seed-desktop-test-fixtures.ts` (all 8 stable keys); full
+Tauri restart (not HMR — drains Rust event listeners per S1-11
+post-mortem).
+
+Coverage targets:
+
+- **Desktop polish rows from PLAN.md:** P3 rename/delete project
+  (interim window.prompt UX → SP3 replaces with Dialog later),
+  P4 auto-save edits (debounced PATCH), P9 delete run
+  (multi-select).
+- **Tier-switching across all 8 fixture keys:** FREE quota,
+  BASIC, PRO, PRO_PLUS, MULTI cheapest-first, EXHAUSTED → P10
+  upsell, DEACTIVATED → P10 contact-support, QUOTA_EDGE → B11 402.
+- **Backend spot-check anchors (carried forward from Session 1):**
+  projectQuota per-tier, kmzDownloadUrl past-1h-expiry, B16
+  idempotency replay, B17 `exportsBlobUrls=[]`.
+- **S1 regression sweep:** verify all 13 S1-row fixes still hold
+  after Session 2 features land — especially S1-08 auto-select,
+  S1-12 runs reset on Open, S1-13 stale-mutation guard, S1-09
+  ResizeObserver refit.
+
+#### Guardrails — fixtures we DO NOT touch in this session
+
+- **B7 fixture project / run** (`prj_b7fixturePROPLUS…` /
+  `run_b7fixturePROPLUS…`) — soft-deleting via P3 forces a re-seed
+  and breaks the next fixture-session sweep. Do NOT delete.
+  Clicking it as P7 → B12 → S3 GET will 404 (fixture seed has DB
+  row but no S3 KMZ blob); that's expected behavior, not a bug.
+- **DEACTIVATED key** — its state IS the test (`deactivatedAt` set,
+  `licensed=false`, `entitlementsActive=false`). Switching to it is
+  fine; mutating it is not.
+- **QUOTA_EDGE key** — at 3/3 by design. Use it to verify B11 → 402
+  only. Deleting any of its projects flips the fixture below quota.
+
+#### Observations
+
+| ID | Surface | Severity | Owner | Status |
+|---|---|---|---|---|
+| S2-01 | TopBar calc pill display | P3 (defer) | FE | open |
+| S2-02 | P3 rename / delete via Cmd-K — UX broken on three counts | P1 | FE | resolved-by-SP3 |
+
+---
+
+**S2-01** — Calc pill display: top-bar shows `50/50 calcs` for the
+PRO_PLUS fixture, which has `Free 0/5 + Pro Plus 50/50 remaining`
+seeded. The displayed value reflects the highest-tier wallet only,
+not the sum across active wallets (`50/55` would also be a
+defensible read). Current behavior is plausibly intentional (only
+surface wallets with remaining calcs, suppress the 0/5 Free wallet
+to reduce visual noise) and not a blocker for any flow today —
+the underlying entitlements summary still drives quota gating
+correctly. Logged for revisit during MULTI scenario testing
+(`sl_live_desktop_test_MULTI_stable` has Free 3/5 + Pro 8/10, both
+non-zero), where the display semantics will be more meaningful.
+
+[FE 2026-04-30] Logged. No fix proposed; user said "current
+behaviour seems ok, but we will revisit this in detail later."
+Status `open` to surface during MULTI scenario testing later in
+this session.
+
+---
+
+**P1 verified clean (S2-baseline)** — From the Recents view,
+`+ New project` opened native file picker; user selected
+`phaseboundary2.kmz`; project loaded, canvas rendered, inspector
+appeared with Layout / Energy yield / Runs tabs. Same path as
+Session 1's canonical project-open.
+
+---
+
+**S2-02** — P3 rename / delete via Cmd-K palette is broken on
+three counts; the affordance is itself the wrong surface
+regardless of whether the bugs are fixed.
+
+When the user tried to drive P3 verification (rename + delete the
+freshly-created `phaseboundary2` project) through Cmd-K (the only
+documented entry point per PLAN.md row P3 notes), three failures
+surfaced in succession:
+
+1. **Cmd-K discoverability gap.** With no project in the user's
+   prior mental model and no on-screen affordance pointing to the
+   palette, the user couldn't locate the rename/delete entry
+   points at all. Cmd-K being the sole path is itself a P1 UX
+   bug — discoverability against a non-power-user is essentially
+   zero. Tab-bar context menu and Recents card menu would both
+   solve this; SP3 ships both.
+
+2. **Rename palette item not firing.** Once located, the "Rename
+   project…" item doesn't surface its `window.prompt` (or the
+   prompt fires but the PATCH silently fails). Root cause unknown
+   — diagnosis deferred since SP3 deletes this code path entirely.
+   Coding it twice (fix → delete) is wasted work.
+
+3. **Delete palette item skips confirmation.** PLAN.md row P3's
+   notes specify `window.confirm()` as the interim guard, but
+   live behavior triggers B14 immediately on click without any
+   confirmation dialog. Either a regression or the confirm was
+   never wired in the first place. Same diagnosis-deferred
+   reasoning as bug 2.
+
+4. **Post-delete fallback shows 404.** When the deleted project
+   was the active tab, the tab is NOT dropped from the `tabs[]`
+   slice. After `currentProject` clears and the user lands on
+   Recents, the tab-switch effect re-fires B12 against the
+   now-deleted project ID → backend returns 404 → user sees a
+   "project not found" overlay on what should be a clean Recents
+   view. **This is a real bug that lives in the delete *handler*,
+   not the trigger surface** — SP3 has to fix it because both new
+   affordances (Recents card ⋯ menu, tab right-click ContextMenu)
+   would inherit the same problem otherwise.
+
+**Resolution: SP3.** Bugs 1-3 are deleted along with the Cmd-K
+palette items in SP3's "remove existing palette items" step.
+Bug 4 (post-delete tab cleanup) is fixed inside SP3's shared
+delete-handler refactor. No standalone bug-fix row warranted —
+SP3 is the proper fix for the entire surface.
+
+[FE 2026-04-30] Logged. SP3 row in PLAN.md to be expanded with
+locked design (5-surface table + 2 shared Dialog modals + delete-
+handler tab cleanup). Implementation begins after SP3 row update
+is committed.
+
+---
+
+#### Session 2 — paused (inconclusive)
+
+**Reason:** P3's interim Cmd-K affordance is unusable in three
+distinct ways (S2-02 above). Driving smoke through a broken
+trigger surface generates false signals — a "rename failed" smoke
+note doesn't distinguish "B13 wire is broken" from "the palette
+item never opened the prompt." Without confidence in the trigger,
+the smoke produces noise instead of evidence.
+
+**Decision (FE + user, 2026-04-30):** pause Session 2; complete
+SP3 (which deletes the broken Cmd-K affordance, ships the proper
+Recents-card-⋯ + tab-context-menu UX, fixes the post-delete tab
+cleanup); resume smoke as **Session 3** against an actually-
+complete feature surface.
+
+**Coverage carry-forward to Session 3:**
+- P3 rename / delete (via SP3's new Dialog modal flow) — primary
+- P4 auto-save edits (debounced PATCH)
+- P9 delete run (multi-select via "Delete N" button)
+- Tier-switching across all 8 fixture keys: FREE / BASIC / PRO /
+  PRO_PLUS / MULTI / EXHAUSTED / DEACTIVATED / QUOTA_EDGE
+- Backend spot-check anchors (carried from Session 1):
+  projectQuota per-tier, kmzDownloadUrl past-1h-expiry, B16
+  idempotency replay, B17 `exportsBlobUrls=[]`
+- S1 regression sweep (13 row-fixes from Session 1)
+- S2-01 calc-pill display semantics revisit during MULTI scenario
+
+**Session 2 status: closed inconclusive.** No fixes flowed from
+this session; the only artifact is S2-02's diagnostic + the
+Session 3 coverage list above.
+
+---
+
