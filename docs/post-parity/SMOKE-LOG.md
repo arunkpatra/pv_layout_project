@@ -1544,4 +1544,8 @@ pending live confirmation. Will close fully once user verifies
 the post-fix repro: sequence-A-Generate → click + → B opens →
 canvas should show only B's boundary, no panels.
 
+[FE 2026-04-30 15:38] Live confirmed by user — newly-created
+project B's canvas shows only its boundary, no panels leaked from
+A. Closed via `8e8f481` on `post-parity-v1-desktop`.
+
 ---
