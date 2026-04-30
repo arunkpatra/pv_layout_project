@@ -1339,4 +1339,11 @@ curl -sS http://localhost:3003/v2/projects -H "Authorization: Bearer $KEY" \
 Then Tauri restart + re-sign in to verify the fix on a clean
 PRO state.
 
+[FE 2026-04-30 15:11] Live confirmed by user after full Tauri
+restart on a clean PRO state. File menu opens exactly one picker
+per click, no stacking, no further pickers queued after Cancel.
+S1-11 closed via `4d10004` on `post-parity-v1-desktop`. The
+HMR-cannot-verify-event-listener-fixes lesson is now captured in
+the new `## Smoke reset` section of this doc (`ca09243`).
+
 ---
