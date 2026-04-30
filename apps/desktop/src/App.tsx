@@ -158,6 +158,7 @@ export function App(): JSX.Element {
   const setProject = useProjectStore((s) => s.setProject)
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
   const setRuns = useProjectStore((s) => s.setRuns)
+  const selectRun = useProjectStore((s) => s.selectRun)
   const [openError, setOpenError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
   // P1 — quota-exceeded modal triggered by 402 PAYMENT_REQUIRED from B11.
@@ -647,6 +648,21 @@ export function App(): JSX.Element {
 
       setCurrentProject(opened.detail)
       setRuns(opened.detail.runs)
+      // S1-08 — when the project has prior runs, auto-select the most
+      // recent so the canvas hydrates with the user's last layout
+      // (matches the mental model: opening a project shows the prior
+      // work, not blank boundary + manual run pick). P7's selectedRunId
+      // effect then fires B17 → S3 GET → setLayoutResult. Fixes both
+      // the S2 tab-switch round-trip (transit through a runs-empty
+      // project nulls the selection irrecoverably) and the P2 cold-open
+      // case where the user previously had to click a run from the
+      // gallery to see anything beyond the boundary.
+      if (opened.detail.runs.length > 0) {
+        const mostRecent = [...opened.detail.runs].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt)
+        )[0]!
+        selectRun(mostRecent.id)
+      }
       // P4 restore — hydrate the editingState slice's undoStack from
       // `detail.edits` if the desktop schema parses it. Malformed wire
       // data falls back to an empty stack rather than blocking the open.
@@ -678,6 +694,7 @@ export function App(): JSX.Element {
     openProjectMutation,
     setCurrentProject,
     setRuns,
+    selectRun,
     setProject,
     clearLayoutResult,
     resetLayoutParams,
