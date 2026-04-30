@@ -512,7 +512,7 @@ extra-attention items inside flows already on the route.
 | S1-03 | P3  | frontend | fe    | StatusBar drops the line-obstruction count                  | 1. Open `phaseboundary2.kmz` (which contains a TL line obstruction). 2. StatusBar reads `1 boundary · 0 obstacles` despite the TL being clearly rendered as a red dashed polyline on the canvas. | StatusBar text includes the line-obstructions count when non-zero (or shows it always for symmetry).                          | fixed  | F4     | see S1-03 below           |
 | S1-04 | P2  | frontend | fe    | Inspector renders project-shape forms when no project loaded | 1. Sign in. 2. Close active project (or land on RecentsView fresh). 3. Right-side Inspector still shows Layout/Energy yield/Runs tabs + populated Module/Table/Spacing/Site/Inverter forms with editable defaults. Breadcrumb correctly reads "No project open." | When no project is loaded: Inspector panel is hidden entirely + the TopBar Inspector toggle button is hidden. Inspector restores on next project open with the user's prior `inspectorOpen` preference.        | fixed  | inline  | see S1-04 below           |
 | S1-05 | P3  | frontend | fe    | Redundant `Press ⌘K for commands` pill above the canvas      | 1. Sign in. 2. RecentsView (or any canvas state). 3. Floating `Press ⌘K for commands` pill renders top-left of canvas, duplicating the TopBar's palette button. | Floating hint removed; TopBar's palette button is the canonical entry point.                                                                                                                                  | fixed  | inline  | see S1-05 below           |
-| S1-06 | P3  | frontend | fe    | Run gallery cards show empty thumbnail placeholder           | 1. Open project + Generate Layout. 2. Inspector → Runs tab. 3. Run card renders with title + type chip + timestamp but a blank gray placeholder where a layout preview thumbnail would help orient. | Thumbnail shows a recognizable preview of the run's layout. Two implementation paths considered (see Thread); pick one + ship as a new Phase 4 polish row.                                                   | open   | new-row | see S1-06 below           |
+| S1-06 | P3  | frontend, backend | both | Run gallery cards show empty thumbnail placeholder           | 1. Open project + Generate Layout. 2. Inspector → Runs tab. 3. Run card renders with title + type chip + timestamp but a blank gray placeholder where a layout preview thumbnail would help orient. | Thumbnail shows a recognizable preview of the run's layout. User-preferred path: server-side pipeline (Option B) subject to a detailed impact-analysis memo when the row is picked up.                       | deferred | new-row | see S1-06 below           |
 
 _Fill in observations during the session; triage at the end. Use the
 **Coordination protocol** section above for any row whose Owner
@@ -808,5 +808,43 @@ S1-06 thread.
 
 Awaiting user pick: defer-to-new-row / inline-fix / drop / pick
 option B over A.
+
+[FE 2026-04-30 14:05] User chose: **defer with strong inclination
+toward Option B**, subject to a detailed analysis on product
+complexity before locking the path. Surface flipped to
+`frontend, backend` + Owner to `both` to reflect Option B's
+cross-repo footprint.
+
+When picked up, the row should produce a T3 design memo at
+`docs/post-parity/findings/YYYY-MM-DD-NNN-run-thumbnail-pipeline.md`
+covering at minimum:
+
+- **Backend impact** — new B-row in `renewable_energy/docs/initiatives/post-parity-v2-backend-plan.md`:
+  schema extension on B17 (`thumbnailBlobUrl: string | null`),
+  PUT-on-create flow, S3 storage cost projection for thumbnail blobs
+  at projected run volume, backfill strategy for runs that predate
+  the pipeline (null is fine; placeholder remains for those).
+- **Sidecar impact** — render-layout-to-PNG capability. Legacy
+  matplotlib PDF renderer (`pvlayout_core`) already produces a 2D
+  drawing of the layout; a reduced-resolution PNG export reuses the
+  same primitives. Image size ~5–20KB per run.
+- **Desktop impact** — schema mirror in
+  `packages/entitlements-client/src/types-v2.ts`; new S3 GET helper
+  reuse via `downloadBytesFromS3GetUrl`; `RunsList` card swaps the
+  placeholder div for an `<img>` with the placeholder as fallback.
+- **Generate-flow impact** — P6's `useGenerateLayoutMutation`
+  becomes B16 → sidecar `/layout` → S3 PUT (result JSON) → sidecar
+  `/layout/thumbnail` → S3 PUT (thumbnail PNG) → return. Two PUTs
+  per run; idempotency key threads through both.
+- **S3 storage / cost** — additional `thumbnails/` prefix in the
+  bucket; ap-south-1 storage cost is ~$0.025/GB/mo, so 100k runs
+  × 10KB avg = ~1GB = ~$0.30/mo. Negligible.
+- **Backwards compat** — runs created before the pipeline ships
+  get `thumbnailBlobUrl: null` from B17; the desktop's `<img>`
+  fallback handles null cleanly via the existing placeholder.
+
+Status `deferred`; will revisit when Phase 4 polish bucket is
+picked up and the memo is written. The memo + the desktop-side row
++ the backend B-row will all land together (lockstep pattern).
 
 ---
