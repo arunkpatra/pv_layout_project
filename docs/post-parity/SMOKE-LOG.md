@@ -1345,6 +1345,11 @@ Gates: typecheck + lint + test green. 324 desktop tests (was 316,
 +8 from S1-10 v2). 36 ui tests (was 34, +2). Status → `fixed`
 pending live verification of the Home tab UX.
 
+[FE 2026-04-30 16:01] Live verified by user — Home tab renders
+cleanly, divider weight is right, "Projects" label reads correctly,
+hover/active states + click navigation all work. Wordmark click
+also confirmed. Closed via `d973274` on `post-parity-v1-desktop`.
+
 ##### S1-11 thread
 
 [FE 2026-04-30 14:47] Devastating P0 confirmed via code trace.
