@@ -7,13 +7,26 @@
  * KMZ picker (P1's flow). Active tab is highlighted with a subtle
  * underline + accent border.
  *
+ * **SP3** — right-click on a project tab opens a ContextMenu with
+ * Rename + Delete actions (same Dialog modals as the Recents card ⋯
+ * menu). HomeTab is excluded — it isn't a real project, just a
+ * navigation primitive.
+ *
  * Scroll: when there are too many tabs to fit, the strip overflows
  * horizontally with token-driven scrollbars. No fancy "scroll buttons"
  * yet — the OS-native horizontal scroll (trackpad / shift+wheel) is
  * sufficient for the v1 ceiling of 15 projects.
  */
-import { type JSX } from "react"
+import { useState, type JSX } from "react"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@solarlayout/ui"
 import { useTabsStore, type Tab } from "../state/tabs"
+import { RenameProjectDialog } from "../dialogs/RenameProjectDialog"
+import { DeleteProjectConfirmDialog } from "../dialogs/DeleteProjectConfirmDialog"
 
 export interface TabsBarProps {
   /**
@@ -37,6 +50,20 @@ export interface TabsBarProps {
    * for tests / contexts that don't have the home navigation flow.
    */
   onHome?: () => void
+  /**
+   * SP3 — fire B13 PATCH for the given project (right-click → Rename).
+   * Resolves on success (closes dialog), rejects with a string-coerced
+   * error message that the dialog surfaces inline. When undefined, the
+   * tab's right-click context menu is suppressed entirely (test /
+   * preview-only contexts don't need rename / delete affordances).
+   */
+  onRename?: (projectId: string, newName: string) => Promise<void>
+  /**
+   * SP3 — fire B14 DELETE for the given project (right-click → Delete).
+   * Same Promise contract as onRename. When undefined, the context
+   * menu is suppressed.
+   */
+  onDelete?: (projectId: string) => Promise<void>
 }
 
 export function TabsBar({
@@ -44,6 +71,8 @@ export function TabsBar({
   onClose,
   onNewProject,
   onHome,
+  onRename,
+  onDelete,
 }: TabsBarProps): JSX.Element {
   const tabs = useTabsStore((s) => s.tabs)
   const activeTabId = useTabsStore((s) => s.activeTabId)
@@ -72,6 +101,8 @@ export function TabsBar({
           active={t.id === activeTabId}
           onSwitch={onSwitch}
           onClose={onClose}
+          onRename={onRename}
+          onDelete={onDelete}
         />
       ))}
       <NewProjectTile onClick={onNewProject} />
@@ -142,13 +173,65 @@ function TabButton({
   active,
   onSwitch,
   onClose,
+  onRename,
+  onDelete,
 }: {
   tab: Tab
   active: boolean
   onSwitch: (id: string) => void
   onClose: (id: string) => void
+  onRename?: (projectId: string, newName: string) => Promise<void>
+  onDelete?: (projectId: string) => Promise<void>
 }): JSX.Element {
-  return (
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleRenameSubmit = async (newName: string) => {
+    if (!onRename) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onRename(tab.projectId, newName)
+      setRenameOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!onDelete) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onDelete(tab.projectId)
+      setDeleteOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRenameOpenChange = (next: boolean) => {
+    if (!next) {
+      setBusy(false)
+      setError(null)
+    }
+    setRenameOpen(next)
+  }
+  const handleDeleteOpenChange = (next: boolean) => {
+    if (!next) {
+      setBusy(false)
+      setError(null)
+    }
+    setDeleteOpen(next)
+  }
+
+  const tabBody = (
     <div
       role="tab"
       aria-selected={active}
@@ -205,6 +288,56 @@ function TabButton({
         </span>
       </button>
     </div>
+  )
+
+  // When neither rename nor delete is wired (test / preview contexts),
+  // skip the ContextMenu wrapper — saves a Radix portal mount per tab.
+  if (!onRename && !onDelete) return tabBody
+
+  const project = { id: tab.projectId, name: tab.projectName }
+
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{tabBody}</ContextMenuTrigger>
+        <ContextMenuContent>
+          {onRename && (
+            <ContextMenuItem onSelect={() => setRenameOpen(true)}>
+              Rename…
+            </ContextMenuItem>
+          )}
+          {onDelete && (
+            <ContextMenuItem
+              onSelect={() => setDeleteOpen(true)}
+              className="text-[var(--error-default)] data-[highlighted]:bg-[var(--error-subtle)] data-[highlighted]:text-[var(--error-default)]"
+            >
+              Delete…
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+
+      {onRename && (
+        <RenameProjectDialog
+          open={renameOpen}
+          onOpenChange={handleRenameOpenChange}
+          project={project}
+          onSubmit={handleRenameSubmit}
+          busy={busy}
+          error={error}
+        />
+      )}
+      {onDelete && (
+        <DeleteProjectConfirmDialog
+          open={deleteOpen}
+          onOpenChange={handleDeleteOpenChange}
+          project={project}
+          onConfirm={handleDeleteConfirm}
+          busy={busy}
+          error={error}
+        />
+      )}
+    </>
   )
 }
 

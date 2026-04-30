@@ -15,20 +15,33 @@
  *   - Project name (truncated to one line; full name on hover via title)
  *   - Runs count + last-run relative time (e.g. "3 runs · 2h ago")
  *   - Updated relative time (footer)
+ *   - **SP3 — bottom-right ⋯ icon (always-visible muted, hover-brighten)
+ *     opening a Rename / Delete DropdownMenu**
  *
  * Click → fires `onOpen(project.id)` which delegates to the parent's
- * P2 open flow. The "+" tile fires `onNewProject()` — same handler the
- * old EmptyStateCard's button used.
+ * P2 open flow. The "+" tile fires `onNewProject()`. The ⋯ menu calls
+ * `onRename(projectId, newName)` / `onDelete(projectId)` — both
+ * return Promises so the per-card dialog can track its own busy and
+ * error state without sharing a mutation instance across cards.
  *
- * NOTE on visual scope: matches the Claude-Desktop / Linear quality bar
- * (token-driven, hover surfaces, motion-safe transitions). When S2
- * (multi-tab) lands, the "Open" click will create-or-focus a tab; for
- * v1 it just replaces the current canvas state via the same handler
- * P2's interim window.prompt() flow uses today.
+ * NOTE on card interactivity: the card is `<div role="button">` rather
+ * than `<button>` because nesting an interactive ⋯ trigger inside a
+ * native button is invalid HTML. The div carries `tabIndex=0`,
+ * `onKeyDown` for Enter/Space activation, and the same focus-ring
+ * styling so accessibility parity is preserved.
  */
-import { useMemo, type JSX } from "react"
+import { useMemo, useState, type JSX, type KeyboardEvent } from "react"
 import type { ProjectSummaryListRowV2 } from "@solarlayout/entitlements-client"
-import { Button } from "@solarlayout/ui"
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  MoreHorizontal,
+} from "@solarlayout/ui"
+import { RenameProjectDialog } from "../dialogs/RenameProjectDialog"
+import { DeleteProjectConfirmDialog } from "../dialogs/DeleteProjectConfirmDialog"
 
 export interface RecentsViewProps {
   isLoading: boolean
@@ -38,6 +51,18 @@ export interface RecentsViewProps {
   onOpen: (projectId: string) => void
   onNewProject: () => void
   onRetry?: () => void
+  /**
+   * Fire B13 PATCH for the given project. Resolves on success (closes
+   * the dialog), rejects with a string-coerced error message that the
+   * dialog surfaces inline.
+   */
+  onRename: (projectId: string, newName: string) => Promise<void>
+  /**
+   * Fire B14 DELETE for the given project. Resolves on success (closes
+   * the dialog), rejects with a string-coerced error message that the
+   * dialog surfaces inline.
+   */
+  onDelete: (projectId: string) => Promise<void>
 }
 
 const NUM_SKELETONS = 4
@@ -50,6 +75,8 @@ export function RecentsView({
   onOpen,
   onNewProject,
   onRetry,
+  onRename,
+  onDelete,
 }: RecentsViewProps): JSX.Element {
   return (
     <div className="absolute inset-0 overflow-y-auto pointer-events-auto">
@@ -73,7 +100,13 @@ export function RecentsView({
                   <SkeletonCard key={i} />
                 ))
               : projects.map((p) => (
-                  <ProjectCard key={p.id} project={p} onClick={onOpen} />
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    onOpen={onOpen}
+                    onRename={onRename}
+                    onDelete={onDelete}
+                  />
                 ))}
           </div>
         )}
@@ -121,11 +154,20 @@ function NewProjectTile({ onClick }: { onClick: () => void }): JSX.Element {
 
 function ProjectCard({
   project,
-  onClick,
+  onOpen,
+  onRename,
+  onDelete,
 }: {
   project: ProjectSummaryListRowV2
-  onClick: (id: string) => void
+  onOpen: (id: string) => void
+  onRename: (projectId: string, newName: string) => Promise<void>
+  onDelete: (projectId: string) => Promise<void>
 }): JSX.Element {
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const runsLabel = useMemo(() => {
     if (project.runsCount === 0) return "No runs yet"
     if (project.runsCount === 1) return "1 run"
@@ -137,41 +179,154 @@ function ProjectCard({
     return relativeTimeFrom(ts)
   }, [project.lastRunAt, project.updatedAt])
 
+  const handleCardActivate = () => {
+    onOpen(project.id)
+  }
+
+  const handleCardKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      onOpen(project.id)
+    }
+  }
+
+  const handleRenameSubmit = async (newName: string) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onRename(project.id, newName)
+      setRenameOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onDelete(project.id)
+      setDeleteOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Reset busy/error when either dialog closes (Esc/Cancel/outside).
+  // Lets a re-open of the dialog start from a clean state.
+  const handleRenameOpenChange = (next: boolean) => {
+    if (!next) {
+      setBusy(false)
+      setError(null)
+    }
+    setRenameOpen(next)
+  }
+  const handleDeleteOpenChange = (next: boolean) => {
+    if (!next) {
+      setBusy(false)
+      setError(null)
+    }
+    setDeleteOpen(next)
+  }
+
   return (
-    <button
-      type="button"
-      onClick={() => onClick(project.id)}
-      className="
-        bg-[var(--surface-panel)]
-        border border-[var(--border-subtle)]
-        rounded-[var(--radius-lg)]
-        px-[20px] py-[16px]
-        flex flex-col gap-[8px]
-        min-h-[140px]
-        text-left
-        transition-all duration-150
-        hover:border-[var(--border-default)]
-        hover:shadow-[var(--shadow-sm)]
-        focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]
-        cursor-pointer
-      "
-      title={project.name}
-    >
-      <div className="flex-1 min-h-0">
-        <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
-          {project.name}
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${project.name}`}
+        onClick={handleCardActivate}
+        onKeyDown={handleCardKeyDown}
+        className="
+          group
+          relative
+          bg-[var(--surface-panel)]
+          border border-[var(--border-subtle)]
+          rounded-[var(--radius-lg)]
+          px-[20px] py-[16px]
+          flex flex-col gap-[8px]
+          min-h-[140px]
+          text-left
+          transition-all duration-150
+          hover:border-[var(--border-default)]
+          hover:shadow-[var(--shadow-sm)]
+          focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]
+          cursor-pointer
+        "
+        title={project.name}
+      >
+        <div className="flex-1 min-h-0">
+          <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate pr-[24px]">
+            {project.name}
+          </div>
+          <div className="text-[12px] text-[var(--text-secondary)] mt-[6px]">
+            {runsLabel}
+            {project.lastRunAt && (
+              <span className="text-[var(--text-muted)]"> · {lastActivity}</span>
+            )}
+          </div>
         </div>
-        <div className="text-[12px] text-[var(--text-secondary)] mt-[6px]">
-          {runsLabel}
-          {project.lastRunAt && (
-            <span className="text-[var(--text-muted)]"> · {lastActivity}</span>
-          )}
+        <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] pt-[4px] border-t border-[var(--border-subtle)]">
+          <span>Updated {relativeTimeFrom(project.updatedAt)}</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`More actions for ${project.name}`}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                className="
+                  inline-flex items-center justify-center
+                  w-[24px] h-[24px]
+                  rounded-[var(--radius-sm)]
+                  text-[var(--text-muted)]
+                  opacity-60
+                  hover:opacity-100 hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]
+                  group-hover:opacity-100
+                  focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]
+                  transition-opacity duration-150
+                  cursor-pointer
+                "
+              >
+                <MoreHorizontal className="w-[14px] h-[14px]" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
+                Rename…
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => setDeleteOpen(true)}
+                className="text-[var(--error-default)] data-[highlighted]:bg-[var(--error-subtle)] data-[highlighted]:text-[var(--error-default)]"
+              >
+                Delete…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-      <div className="text-[11px] text-[var(--text-muted)] pt-[4px] border-t border-[var(--border-subtle)]">
-        Updated {relativeTimeFrom(project.updatedAt)}
-      </div>
-    </button>
+
+      <RenameProjectDialog
+        open={renameOpen}
+        onOpenChange={handleRenameOpenChange}
+        project={project}
+        onSubmit={handleRenameSubmit}
+        busy={busy}
+        error={error}
+      />
+      <DeleteProjectConfirmDialog
+        open={deleteOpen}
+        onOpenChange={handleDeleteOpenChange}
+        project={project}
+        onConfirm={handleDeleteConfirm}
+        busy={busy}
+        error={error}
+      />
+    </>
   )
 }
 

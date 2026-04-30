@@ -194,4 +194,154 @@ describe("TabsBar", () => {
       ).toBeNull()
     })
   })
+
+  // ── SP3 — right-click context menu (Rename / Delete) ─────────────────
+
+  describe("SP3 — right-click context menu", () => {
+    const noopRename = () => Promise.resolve()
+    const noopDelete = () => Promise.resolve()
+
+    it("right-click on a project tab opens the context menu with Rename + Delete", async () => {
+      useTabsStore.getState().openTab("prj_a", "Site A")
+      const user = (await import("@testing-library/user-event")).default.setup()
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onRename={noopRename}
+          onDelete={noopDelete}
+        />
+      )
+      const tab = screen.getByText("Site A").closest("[role='tab']")!
+      // Radix ContextMenu listens for the native `contextmenu` event.
+      fireEvent.contextMenu(tab)
+      // Menu item names use ellipsis to match the Recents card menu.
+      expect(
+        await screen.findByRole("menuitem", { name: /Rename/i })
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole("menuitem", { name: /Delete/i })
+      ).toBeInTheDocument()
+      void user
+    })
+
+    it("Rename menu item opens RenameProjectDialog pre-filled with the tab's projectName", async () => {
+      useTabsStore.getState().openTab("prj_a", "Site A")
+      const user = (await import("@testing-library/user-event")).default.setup()
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onRename={noopRename}
+          onDelete={noopDelete}
+        />
+      )
+      const tab = screen.getByText("Site A").closest("[role='tab']")!
+      fireEvent.contextMenu(tab)
+      const renameItem = await screen.findByRole("menuitem", {
+        name: /Rename/i,
+      })
+      await user.click(renameItem)
+      expect(screen.getByText("Rename project")).toBeInTheDocument()
+      expect(
+        (screen.getByLabelText("New name") as HTMLInputElement).value
+      ).toBe("Site A")
+    })
+
+    it("Rename Save invokes onRename with the right (projectId, name) tuple", async () => {
+      const onRename = vi.fn().mockResolvedValue(undefined)
+      useTabsStore.getState().openTab("prj_a", "Site A")
+      const user = (await import("@testing-library/user-event")).default.setup()
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onRename={onRename}
+          onDelete={noopDelete}
+        />
+      )
+      const tab = screen.getByText("Site A").closest("[role='tab']")!
+      fireEvent.contextMenu(tab)
+      await user.click(
+        await screen.findByRole("menuitem", { name: /Rename/i })
+      )
+      const input = screen.getByLabelText("New name")
+      await user.clear(input)
+      await user.type(input, "Renamed Site A")
+      await user.click(screen.getByRole("button", { name: "Save" }))
+      expect(onRename).toHaveBeenCalledWith("prj_a", "Renamed Site A")
+    })
+
+    it("Delete menu item opens DeleteProjectConfirmDialog; confirm invokes onDelete", async () => {
+      const onDelete = vi.fn().mockResolvedValue(undefined)
+      useTabsStore.getState().openTab("prj_a", "Site A")
+      const user = (await import("@testing-library/user-event")).default.setup()
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onRename={noopRename}
+          onDelete={onDelete}
+        />
+      )
+      const tab = screen.getByText("Site A").closest("[role='tab']")!
+      fireEvent.contextMenu(tab)
+      await user.click(
+        await screen.findByRole("menuitem", { name: /Delete/i })
+      )
+      expect(screen.getByText("Delete project")).toBeInTheDocument()
+      await user.click(screen.getByRole("button", { name: "Delete" }))
+      expect(onDelete).toHaveBeenCalledWith("prj_a")
+    })
+
+    it("Rename error surfaces inline + dialog stays open", async () => {
+      const onRename = vi
+        .fn()
+        .mockRejectedValue(new Error("VALIDATION_ERROR: name in use"))
+      useTabsStore.getState().openTab("prj_a", "Site A")
+      const user = (await import("@testing-library/user-event")).default.setup()
+      render(
+        <TabsBar
+          onSwitch={vi.fn()}
+          onClose={vi.fn()}
+          onNewProject={vi.fn()}
+          onRename={onRename}
+          onDelete={noopDelete}
+        />
+      )
+      const tab = screen.getByText("Site A").closest("[role='tab']")!
+      fireEvent.contextMenu(tab)
+      await user.click(
+        await screen.findByRole("menuitem", { name: /Rename/i })
+      )
+      const input = screen.getByLabelText("New name")
+      await user.clear(input)
+      await user.type(input, "another name")
+      await user.click(screen.getByRole("button", { name: "Save" }))
+      expect(
+        screen.getByText(/VALIDATION_ERROR: name in use/)
+      ).toBeInTheDocument()
+      expect(screen.getByText("Rename project")).toBeInTheDocument()
+    })
+
+    it("when neither onRename nor onDelete is supplied, right-click does NOT open a menu (preview/test contexts)", () => {
+      useTabsStore.getState().openTab("prj_a", "Site A")
+      render(
+        <TabsBar onSwitch={vi.fn()} onClose={vi.fn()} onNewProject={vi.fn()} />
+      )
+      const tab = screen.getByText("Site A").closest("[role='tab']")!
+      fireEvent.contextMenu(tab)
+      // No menu items rendered.
+      expect(
+        screen.queryByRole("menuitem", { name: /Rename/i })
+      ).toBeNull()
+      expect(
+        screen.queryByRole("menuitem", { name: /Delete/i })
+      ).toBeNull()
+    })
+  })
 })

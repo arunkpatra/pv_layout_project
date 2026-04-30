@@ -25,6 +25,7 @@ import {
 import { useDeleteProjectMutation } from "./useDeleteProject"
 import { PREVIEW_LICENSE_KEY_PRO_PLUS } from "./licenseKey"
 import { useProjectStore } from "../state/project"
+import { useTabsStore } from "../state/tabs"
 
 const REAL_KEY = "sl_live_real_key_for_test"
 
@@ -82,6 +83,7 @@ function makeWrapper(): {
 
 beforeEach(() => {
   useProjectStore.getState().clearAll()
+  useTabsStore.getState().reset()
 })
 
 describe("useDeleteProjectMutation — happy path", () => {
@@ -166,6 +168,118 @@ describe("useDeleteProjectMutation — happy path", () => {
     expect(useProjectStore.getState().currentProject?.id).toBe(
       "prj_DIFFERENT"
     )
+  })
+})
+
+describe("useDeleteProjectMutation — tab cleanup (SP3 / S2-02 bug 4)", () => {
+  it("closes the tab carrying the deleted project's id BEFORE clearAll", async () => {
+    // The race that motivated this fix: clearAll() flips currentProject
+    // to null, App.tsx's tab-switch effect sees activeTabId still set
+    // pointing at the deleted project, fires B12 → 404. Closing the
+    // tab inside the hook before clearAll prevents the race.
+    const client = makeClient()
+    const { Wrapper } = makeWrapper()
+
+    useProjectStore.getState().setCurrentProject(STUB_PROJECT)
+    const tabId = useTabsStore.getState().openTab(STUB_PROJECT.id, "Site A")
+
+    const events: string[] = []
+    const unsubProject = useProjectStore.subscribe((state, prev) => {
+      if (prev.currentProject !== null && state.currentProject === null) {
+        events.push("currentProject-cleared")
+      }
+    })
+    const unsubTabs = useTabsStore.subscribe((state, prev) => {
+      const wasOpen = prev.tabs.some((t) => t.id === tabId)
+      const stillOpen = state.tabs.some((t) => t.id === tabId)
+      if (wasOpen && !stillOpen) events.push("tab-closed")
+    })
+
+    const { result } = renderHook(
+      () => useDeleteProjectMutation(REAL_KEY, client),
+      { wrapper: Wrapper }
+    )
+
+    act(() => {
+      result.current.mutate({ projectId: STUB_PROJECT.id })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    unsubProject()
+    unsubTabs()
+
+    // Both events fired; tab-closed must come first.
+    expect(events).toEqual(["tab-closed", "currentProject-cleared"])
+    // Tabs slice has no orphan tab pointing at the deleted project.
+    expect(
+      useTabsStore.getState().tabs.find((t) => t.projectId === STUB_PROJECT.id)
+    ).toBeUndefined()
+  })
+
+  it("closes orphan tabs even when currentProject is a DIFFERENT project (stale-delete case)", async () => {
+    // User has projects A + B open as tabs, currently focused on B,
+    // deletes A from the Recents card menu. A's tab must close even
+    // though A isn't currentProject; otherwise A's tab leaks and
+    // becomes a 404 magnet on next click.
+    const client = makeClient()
+    const { Wrapper } = makeWrapper()
+
+    useProjectStore.getState().setCurrentProject({
+      ...STUB_PROJECT,
+      id: "prj_B",
+      name: "Project B",
+    })
+    const tabAId = useTabsStore.getState().openTab("prj_A", "Project A")
+    useTabsStore.getState().openTab("prj_B", "Project B")
+
+    const { result } = renderHook(
+      () => useDeleteProjectMutation(REAL_KEY, client),
+      { wrapper: Wrapper }
+    )
+
+    act(() => {
+      result.current.mutate({ projectId: "prj_A" })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    // A's tab is gone.
+    expect(
+      useTabsStore.getState().tabs.find((t) => t.id === tabAId)
+    ).toBeUndefined()
+    // B's tab is preserved.
+    expect(
+      useTabsStore.getState().tabs.find((t) => t.projectId === "prj_B")
+    ).toBeDefined()
+    // currentProject (B) untouched by stale-delete guard.
+    expect(useProjectStore.getState().currentProject?.id).toBe("prj_B")
+  })
+
+  it("no-op on tabs slice when no tab carries the deleted project's id", async () => {
+    // User deletes a project from RecentsView that they never opened
+    // as a tab in this session. Tabs slice should be untouched.
+    const client = makeClient()
+    const { Wrapper } = makeWrapper()
+
+    useProjectStore.getState().setCurrentProject({
+      ...STUB_PROJECT,
+      id: "prj_OPEN",
+    })
+    const openTabId = useTabsStore.getState().openTab("prj_OPEN", "Open")
+
+    const { result } = renderHook(
+      () => useDeleteProjectMutation(REAL_KEY, client),
+      { wrapper: Wrapper }
+    )
+
+    act(() => {
+      result.current.mutate({ projectId: "prj_NEVER_OPENED" })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    // Open tab survives — wasn't pointing at the deleted project.
+    expect(
+      useTabsStore.getState().tabs.find((t) => t.id === openTabId)
+    ).toBeDefined()
   })
 })
 

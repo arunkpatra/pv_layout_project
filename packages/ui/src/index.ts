@@ -22,6 +22,11 @@ export { Kbd } from "./components/Kbd"
 export { Chip, type ChipProps } from "./components/Chip"
 export { Badge, type BadgeProps } from "./components/Badge"
 export { SunMark } from "./components/Icon"
+// Lucide icons re-exported here so consuming apps don't take a direct
+// `lucide-react` dependency. Add new exports as new surfaces need them
+// rather than re-exporting the whole package (small subset = small
+// bundle slice).
+export { MoreHorizontal } from "lucide-react"
 export {
   ModuleIcon,
   TableIcon,
@@ -87,6 +92,21 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "./components/DropdownMenu"
+export {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuRadioGroup,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "./components/ContextMenu"
 export {
   CommandPalette,
   CommandGroup,

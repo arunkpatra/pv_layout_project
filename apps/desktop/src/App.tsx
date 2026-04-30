@@ -432,7 +432,7 @@ export function App(): JSX.Element {
   // Single round-trip: B12 returns ProjectDetail with embedded
   // kmzDownloadUrl + runs[]; the hook then GETs the KMZ bytes from S3 via
   // the presigned URL. App.tsx orchestrates the sidecar /parse-kmz +
-  // state hydration below in handleOpenExistingProject.
+  // state hydration below in handleOpenProjectById.
   const openProjectMutation = useOpenProjectMutation(
     activeKey,
     entitlementsClient,
@@ -713,84 +713,56 @@ export function App(): JSX.Element {
     tabsOpenTab,
   ])
 
-  // Palette wrapper — interim, kept alongside S3's RecentsView card click
-  // for keyboard-driven access. Will retire when the palette grows a
-  // proper "Recents" submenu in S3+.
-  const handleOpenExistingProject = useCallback(async () => {
-    const raw = window.prompt("Project ID:")
-    if (!raw) return
-    await handleOpenProjectById(raw.trim())
-  }, [handleOpenProjectById])
-
-  // ── P3 — rename / delete handlers ───────────────────────────────────────
-  // Interim entry points: native window.prompt() / window.confirm() for
-  // the rename and delete confirms. Project header inline-rename + Dialog-
-  // based confirm modal land alongside S3 (recents view) since the same
-  // visual surfaces house both flows.
-  const handleRenameProject = useCallback(async () => {
-    if (!currentProject) return
-    const next = window.prompt("Rename project:", currentProject.name)
-    if (next === null) return
-    const trimmed = next.trim()
-    if (trimmed === "" || trimmed === currentProject.name) return
-    setOpenError(null)
-    try {
+  // ── SP3 — rename / delete handlers shared by Recents card menu + tab
+  // right-click context menu. Promise-returning so each surface's local
+  // dialog state can track its own busy + error per click. Mutations are
+  // App.tsx-owned (the existing pattern); each surface invokes them
+  // through these wrappers.
+  //
+  // Tab title sync (rename): when the renamed project has an open tab,
+  // patch the tabs slice so the tab strip reflects the new name.
+  // Tab cleanup (delete): folded into useDeleteProjectMutation.onSuccess
+  // (closes any tab pointing at the deleted project BEFORE clearAll, so
+  // the tab-switch effect doesn't fire B12 against a 404). All this
+  // wrapper has to do is reset transient canvas state when the deleted
+  // project happened to be currentProject — same shape as the parity
+  // post-open reset.
+  const handleRecentsRename = useCallback(
+    async (projectId: string, newName: string) => {
       await renameProjectMutation.mutateAsync({
-        projectId: currentProject.id,
-        name: trimmed,
+        projectId,
+        name: newName,
       })
-      // S2 — keep the tab title in sync with the renamed project.
-      tabsUpdateName(currentProject.id, trimmed)
-      setPaletteOpen(false)
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err)
-      console.error("rename project failed:", err)
-      setOpenError(detail)
-    }
-  }, [currentProject, renameProjectMutation, tabsUpdateName])
+      tabsUpdateName(projectId, newName)
+    },
+    [renameProjectMutation, tabsUpdateName]
+  )
 
-  const handleDeleteProject = useCallback(async () => {
-    if (!currentProject) return
-    const ok = window.confirm(
-      `Delete "${currentProject.name}"?\n\n` +
-        `This soft-deletes the project and all its runs. ` +
-        `One project quota slot is freed. Cannot be undone from the desktop UI.`
-    )
-    if (!ok) return
-    setOpenError(null)
-    try {
-      await deleteProjectMutation.mutateAsync({
-        projectId: currentProject.id,
-      })
-      // Reset transient canvas state too — same surface as a fresh session.
-      // The hook clears the project slice; these reset everything else
-      // so the user lands back on the recents view (S3).
-      clearLayoutResult()
-      resetLayoutParams()
-      resetLayerVisibility()
-      resetEditingState()
-      setLayoutFormKey((k) => k + 1)
-      // S2 — close the tab for the deleted project. tabs.closeTab finds
-      // it by tab.id; we look up the tab carrying this projectId.
-      const tab = useTabsStore
-        .getState()
-        .tabs.find((t) => t.projectId === currentProject.id)
-      if (tab) tabsCloseTab(tab.id)
-      setPaletteOpen(false)
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err)
-      console.error("delete project failed:", err)
-      setOpenError(detail)
-    }
-  }, [
-    currentProject,
-    deleteProjectMutation,
-    clearLayoutResult,
-    resetLayoutParams,
-    resetLayerVisibility,
-    resetEditingState,
-    tabsCloseTab,
-  ])
+  const handleRecentsDelete = useCallback(
+    async (projectId: string) => {
+      await deleteProjectMutation.mutateAsync({ projectId })
+      // Hook closes any tab carrying this projectId + clears the
+      // project slice (when ids match). The transient canvas slices
+      // (layout result / layout params / layer visibility / editing
+      // state / form key) are App.tsx's responsibility — reset only
+      // when the deleted project was the active workspace.
+      if (currentProject?.id === projectId) {
+        clearLayoutResult()
+        resetLayoutParams()
+        resetLayerVisibility()
+        resetEditingState()
+        setLayoutFormKey((k) => k + 1)
+      }
+    },
+    [
+      deleteProjectMutation,
+      currentProject,
+      clearLayoutResult,
+      resetLayoutParams,
+      resetLayerVisibility,
+      resetEditingState,
+    ]
+  )
 
   // ── S2 — tab switch effect + close handler ──────────────────────────────
   // When activeTabId changes, sync the project state:
@@ -1235,6 +1207,8 @@ export function App(): JSX.Element {
             onClose={handleCloseTab}
             onNewProject={() => void handleOpenKmz()}
             onHome={tabsGoHome}
+            onRename={handleRecentsRename}
+            onDelete={handleRecentsDelete}
           />
         }
         toolRail={<ToolRail activeTool={activeTool} onSelect={setActiveTool} />}
@@ -1264,6 +1238,8 @@ export function App(): JSX.Element {
                 onOpen={(id) => void handleOpenProjectById(id)}
                 onNewProject={() => void handleOpenKmz()}
                 onRetry={() => void projectsListQuery.refetch()}
+                onRename={handleRecentsRename}
+                onDelete={handleRecentsDelete}
               />
             )}
             {opening && <OpeningOverlay />}
@@ -1376,27 +1352,34 @@ export function App(): JSX.Element {
             shortcut="⌘O"
             onSelect={() => void handleOpenKmz()}
           />
-          {/* P2 interim — recents UI lands at S3 and replaces this. */}
-          <PaletteItem
-            label="Open existing project…"
-            onSelect={() => void handleOpenExistingProject()}
-          />
-          {/* P3 — only enabled when a backend-persisted project is loaded. */}
-          {currentProject && (
-            <>
-              <PaletteItem
-                label="Rename project…"
-                onSelect={() => void handleRenameProject()}
-              />
-              <PaletteItem
-                label="Delete project…"
-                onSelect={() => void handleDeleteProject()}
-              />
-            </>
-          )}
           <PaletteItem label="Save project" shortcut="⌘S" />
           <PaletteItem label="Export…" shortcut="⌘E" />
         </CommandGroup>
+        {/* SP3 — Recents quick-switch. Navigation only; rename/delete live
+            on the Recents card ⋯ menu and the tab right-click ContextMenu
+            (both surfaces have unambiguous "this project" semantics that
+            Cmd-K lacks). Replaces the parity-era window.prompt("Project
+            ID:") interim and the broken Cmd-K rename/delete items. */}
+        {(projectsListQuery.data?.length ?? 0) > 0 && (
+          <>
+            <CommandSeparator className="my-[4px] h-[1px] bg-[var(--border-subtle)]" />
+            <CommandGroup
+              heading="Recents"
+              className="px-[4px] py-[4px]"
+            >
+              {(projectsListQuery.data ?? []).slice(0, 8).map((p) => (
+                <PaletteItem
+                  key={p.id}
+                  label={p.name}
+                  onSelect={() => {
+                    setPaletteOpen(false)
+                    void handleOpenProjectById(p.id)
+                  }}
+                />
+              ))}
+            </CommandGroup>
+          </>
+        )}
         <CommandSeparator className="my-[4px] h-[1px] bg-[var(--border-subtle)]" />
         <CommandGroup heading="Canvas" className="px-[4px] py-[4px]">
           <PaletteItem label="Generate layout" shortcut="G" />
