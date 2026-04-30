@@ -161,11 +161,11 @@ bun run packages/mvp_db/prisma/seed-desktop-test-fixtures.ts
 
 | Scenario     | License key                                   | Expected behavior                                      |
 |--------------|-----------------------------------------------|--------------------------------------------------------|
-| FREE         | `sl_live_desktop_test_FREE_stable`            | Free tier, 3 calcs, 3-project quota                    |
+| FREE         | `sl_live_desktop_test_FREE_stable`            | Free tier, 5 calcs, 3-project quota                    |
 | BASIC        | `sl_live_desktop_test_BASIC_stable`           | Basic plan, 5-project quota                            |
 | PRO          | `sl_live_desktop_test_PRO_stable`             | Pro plan, 10-project quota                             |
 | PRO_PLUS     | `sl_live_desktop_test_PRO_PLUS_stable`        | Pro Plus plan, 15-project quota, energy-yield gated on |
-| MULTI        | `sl_live_desktop_test_MULTI_stable`           | Multiple stacked plans                                 |
+| MULTI        | `sl_live_desktop_test_MULTI_stable`           | Free 3/5 + Pro 8/10 (cheapest-first wallet fixture)    |
 | EXHAUSTED    | `sl_live_desktop_test_EXHAUSTED_stable`       | `licensed=false`, `entitlementsActive=true` → "Buy more" chip + dropdown gating |
 | DEACTIVATED  | `sl_live_desktop_test_DEACTIVATED_stable`     | `licensed=false`, `entitlementsActive=false` → "Contact support" |
 | QUOTA_EDGE   | `sl_live_desktop_test_QUOTA_EDGE_stable`      | Project quota exhausted; B11 returns 402 PAYMENT_REQUIRED |
@@ -176,8 +176,10 @@ bun run packages/mvp_db/prisma/seed-desktop-test-fixtures.ts
 - `runId = run_b7fixturePROPLUS00000000000000000000`
 
 These are the canonical IDs the fixture-session script chains against.
-Useful to verify a specific cross-user 404 or to test "open existing
-project" flows without first creating one.
+Useful for cross-user 404 verification (FREE asking for the PRO_PLUS
+project). **NOT for P2 (open-existing-project) tests** — the fixture
+has DB rows but no S3 KMZ blob, so B12 → S3 GET will 404. For P2,
+chain off a fresh P1 the way `fixture-session.ts` does.
 
 ---
 
@@ -374,6 +376,41 @@ repro.
 - **Contract / wire-shape changes** — both repos commit. The smoke
   row's Thread captures both SHAs.
 
+### When a finding spawns a row in the BE plan
+
+If a smoke observation surfaces something larger than a one-shot fix
+(new endpoint, schema migration, refactor across modules), the
+backend session may add a new row to
+`renewable_energy/docs/initiatives/post-parity-v2-backend-plan.md`
+(e.g. B23) rather than absorb it as an inline fix.
+
+Mechanics:
+
+- BE adds the row to the V2 plan and references the SMOKE-LOG ID
+  (`S1-04`) in the row's Files / Notes column.
+- BE's `[BE date]` thread entry on the SMOKE-LOG row says: "Spawned
+  as B23 in V2 plan. Status stays `open`, Owner=be, until B23 lands."
+- When B23 commits, BE's final thread entry includes the B23-commit
+  SHA + the row reference: "Closed via B23 (SHA `9a3b1c2` on
+  `post-parity-v2-backend`)."
+- The SMOKE-LOG row flips to `fixed` in that final entry.
+
+Why: keeps SMOKE-LOG as the human-readable conversation timeline and
+the V2 plan as the canonical row tracker. Avoids duplicate trackers;
+either repo's git log can resolve the other.
+
+### SHA & branch reference convention
+
+Backend thread entries use **7-char short SHAs + branch name** (e.g.
+`9a3b1c2 on post-parity-v2-backend`) so a future reader can resolve
+the ref even after a rebase. Frontend follows the same convention
+(`d11163b on post-parity-v1-desktop`). Contract changes that touch
+both `apps/mvp_api` and `packages/shared` in the `renewable_energy`
+monorepo are still one commit, one SHA — no special syntax needed.
+The "both repos commit" line above only applies when the desktop
+side also needs to commit a schema mirror in
+`packages/entitlements-client/src/types-v2.ts` (the lockstep pattern).
+
 ### Push cadence
 
 - **FE pushes after every smoke-log commit.** Even mid-session.
@@ -447,6 +484,11 @@ extra-attention items inside flows already on the route.
   and breaks the test contract.
 - **EXHAUSTED key** — already at 0 calcs; further reports just 402.
   Don't try to "exhaust further."
+- **MULTI key** — Free 3/5 + Pro 8/10 is the cheapest-first wallet
+  fixture. Don't deliberately drain its remaining Free calcs (3) via
+  Generate Layout — usage reports debit Free first, and consuming all
+  3 flips the wallet test state. One Generate-on-MULTI is fine; four+
+  starts mutating the fixture.
 
 #### Things to NOT log as findings
 
@@ -455,6 +497,11 @@ extra-attention items inside flows already on the route.
 - **mvp_admin Transaction ledger empty during smoke** — fixtures land
   via `adminPrisma`, not Stripe checkout. Real-purchase flows are a
   separate test track.
+- **No `/v2/usage/history` endpoint exists yet.** V1 `/usage/history`
+  serves the legacy desktop's account view; V2 doesn't replicate it
+  because the new desktop's account menu reads `/v2/entitlements`
+  instead. Don't log "no V2 history endpoint" as a finding — it's by
+  design.
 
 #### Observations
 
