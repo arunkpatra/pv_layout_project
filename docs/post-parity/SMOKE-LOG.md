@@ -41,10 +41,13 @@ session that:
 - `mvp_api` dev server is running on `http://localhost:3003`
 - Postgres + `mvp_db` is up; migrations current
 - Desktop test fixtures are seeded (see "Test license keys" below)
-- The S3 dev bucket (`solarlayout-dev-projects` or equivalent) is
-  reachable from the IAM user
+- The S3 local bucket `solarlayout-local-projects` (ap-south-1,
+  account `378240665051`) is reachable; IAM user
+  `renewable-energy-app` has put/get/delete via the V2 read-write
+  policies
 - B12's `kmzDownloadUrl` extension + B8's `entitlementsActive` field
-  are live on the running branch
+  + B19's `Entitlement.projectQuota` propagation are live on the
+  running branch
 
 Spot-check:
 
@@ -103,8 +106,11 @@ bun run apps/desktop/scripts/fixture-session.ts
 ```
 
 Expected (as of 2026-04-30): ~28 pass / 0 fail / 2 carry-over warns
-(AWS SigV4 determinism + EXHAUSTED-can't-create-project gap — both
-documented; not bugs).
+(B16 idempotency-replay URL shape + EXHAUSTED-can't-create-project
+gap — both documented as intentional by the backend session). Treat
+any **hard fail** as P0 (surface to backend immediately). If the
+**carry-over warns change shape** vs the previous run, surface to
+backend — that's a contract drift signal, not steady state.
 
 ### 6. Launch the desktop app
 
@@ -246,12 +252,67 @@ When unsure, err one severity higher and demote during triage.
 
 ## Sessions
 
-### Session 1 — TBD (first smoke after S4)
+### Session 1 — first smoke after S4
 
 **Date:** _to fill_
 **App HEAD:** _to fill (`git rev-parse --short HEAD`)_
-**Backend HEAD:** _to fill (ask backend session)_
+**Backend HEAD:** `3ee6f05` on `post-parity-v2-backend`
 **Sidecar build:** _dev (`uv run`) / packaged_
+
+#### Backend-supplied spot-check anchors (this session only)
+
+The backend session flagged these as "things naturally exercised by
+the smoke flow that I'd value a human eye on." Not new flows — just
+extra-attention items inside flows already on the route.
+
+1. **`projectQuota` per-tier matches the snapshot.** When each fixture
+   key creates projects, the ceiling enforced by B11 must match:
+   `FREE=3 / BASIC=5 / PRO=10 / PRO_PLUS=15`. Sourced from
+   `Entitlement.projectQuota` (snapshotted at creation since B19).
+   **Wrong ceiling = backend regression** → P0/P1 backend.
+
+2. **`kmzDownloadUrl` past-expiry behavior.** Presigned URL has
+   `X-Amz-Expires=3600` (1h). A re-attempt past 1h should 403 →
+   desktop's `EXPIRED_URL` branch should re-call B12 for a fresh URL.
+   **A retry that "just works" without re-calling B12 = contract
+   bug** → P1 contract.
+
+3. **B16 idempotency replay.** Same `idempotencyKey` (Generate Layout
+   retry on the same project + intent) must return the **same Run row**
+   with a **fresh upload URL**, **no double-debit**.
+   - Two debits = **P0 backend**
+   - Two Run rows = **P0 backend**
+   - Same upload URL bytes (no fresh sig) = **P1 contract** (backend
+     clarified: SigV4 should produce fresh signatures per call;
+     observably-identical URLs across replays = drift to surface)
+
+4. **B17 `exportsBlobUrls: []`.** Unused at v1. Desktop must not
+   render anything from it. Non-empty in the response = drift to
+   surface (P2 contract).
+
+#### Guardrails — fixtures we DO NOT touch in this session
+
+- **B7 fixture project / run** (`prj_b7fixturePROPLUS…` /
+  `run_b7fixturePROPLUS…`) — soft-deleting via P3 forces a re-seed
+  and breaks the next fixture-session sweep.
+- **DEACTIVATED key** — its state IS the test (`deactivatedAt` set,
+  `licensed=false`, `entitlementsActive=false`). Switching to it is
+  fine; mutating it is not.
+- **QUOTA_EDGE key** — at 3/3 by design. Use it to verify B11 → 402
+  only. Deleting any of its projects flips the fixture below quota
+  and breaks the test contract.
+- **EXHAUSTED key** — already at 0 calcs; further reports just 402.
+  Don't try to "exhaust further."
+
+#### Things to NOT log as findings
+
+- **mvp_web download path still works** (B20 held by design until V2
+  launch — legacy install still needs the route).
+- **mvp_admin Transaction ledger empty during smoke** — fixtures land
+  via `adminPrisma`, not Stripe checkout. Real-purchase flows are a
+  separate test track.
+
+#### Observations
 
 | ID    | Sev | Surface | Title | Repro | Acceptance | Status | Linked | Notes |
 |-------|-----|---------|-------|-------|------------|--------|--------|-------|
