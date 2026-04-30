@@ -526,3 +526,49 @@ export type PatchProjectV2Request = z.infer<typeof patchProjectV2RequestSchema>
  */
 export const patchProjectV2ResponseSchema =
   v2SuccessResponseSchema(projectV2WireSchema)
+
+// ---------------------------------------------------------------------------
+// /v2/projects — B10 (GET = list — recents view source)
+// ---------------------------------------------------------------------------
+
+/**
+ * B10 list-row shape — leaner than B12's `ProjectDetail` and distinct
+ * from B11/B13's `ProjectWire`. Built for the S3 recents grid:
+ *
+ *   - `runsCount` — non-soft-deleted run count, shown on each card.
+ *   - `lastRunAt` — latest non-soft-deleted Run.createdAt (or null for
+ *     a project with no runs yet); used for "last opened / last
+ *     generated" relative-time labels.
+ *   - No `userId` (single-user-per-key on the desktop), no `edits` (heavy
+ *     payload — fetched only on B12 open), no `kmzBlobUrl/Sha` would be
+ *     useful for cache lookup but backend includes them anyway. No
+ *     `kmzDownloadUrl` (would re-mint per row — only B12 mints).
+ *
+ * Mirrors `ProjectSummary` in
+ * `renewable_energy/apps/mvp_api/src/modules/projects/projects.service.ts`
+ * (still service-local; backend offered to move to shared/types/project-v2.ts
+ * on request — not asked yet).
+ */
+export const projectSummaryListRowV2Schema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  kmzBlobUrl: z.string().min(1),
+  kmzSha256: z.string().regex(/^[0-9a-f]{64}$/u),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  runsCount: z.number().int().nonnegative(),
+  lastRunAt: z.string().nullable(),
+})
+
+export type ProjectSummaryListRowV2 = z.infer<
+  typeof projectSummaryListRowV2Schema
+>
+
+/**
+ * Backend caps the list at 100 items (LIST_CAP — "desktop ceiling is 15
+ * quota concurrent so 100 is comfortable headroom"). The desktop relies
+ * on this to avoid pagination machinery at v1.
+ */
+export const listProjectsV2ResponseSchema = v2SuccessResponseSchema(
+  z.array(projectSummaryListRowV2Schema)
+)

@@ -125,6 +125,11 @@ export function useCreateProjectMutation(
       void queryClient.invalidateQueries({
         queryKey: [ENTITLEMENTS_QUERY_KEY, licenseKey],
       })
+      // S3 recents grid: drop cached list so the new project appears
+      // when the user navigates back to the recents view.
+      void queryClient.invalidateQueries({
+        queryKey: ["projects", licenseKey],
+      })
     },
   })
 }

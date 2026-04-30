@@ -34,6 +34,7 @@ import {
   entitlementSummaryV2ResponseSchema,
   getProjectV2ResponseSchema,
   kmzUploadUrlResponseSchema,
+  listProjectsV2ResponseSchema,
   patchProjectV2ResponseSchema,
   runResultUploadUrlResponseSchema,
   usageReportV2ResponseSchema,
@@ -45,6 +46,7 @@ import {
   type PatchProjectV2Request,
   type PresignedUploadUrlResult,
   type ProjectDetailV2Wire,
+  type ProjectSummaryListRowV2,
   type ProjectV2Wire,
   type RunResultType,
   type UsageReportV2Result,
@@ -211,6 +213,13 @@ export interface EntitlementsClient {
    * the quota chip refreshes.
    */
   deleteProjectV2(key: string, projectId: string): Promise<void>
+  /**
+   * V2 — `GET /v2/projects` (B10). Returns the user's non-soft-deleted
+   * projects sorted by `updatedAt` DESC, capped at 100. Powers the S3
+   * recents grid. Each row is a `ProjectSummaryListRowV2` with
+   * `runsCount` + `lastRunAt` for the gallery card UX.
+   */
+  listProjectsV2(key: string): Promise<ProjectSummaryListRowV2[]>
 }
 
 /**
@@ -498,6 +507,19 @@ export function createEntitlementsClient(
       const path = `/v2/projects/${encodeURIComponent(projectId)}`
       // 204 No Content → request() returns null; nothing to validate.
       await request(path, { method: "DELETE" }, key)
+    },
+
+    async listProjectsV2(key) {
+      const raw = await request("/v2/projects", { method: "GET" }, key)
+      const parsed = listProjectsV2ResponseSchema.safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `List-projects response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
     },
   }
 }

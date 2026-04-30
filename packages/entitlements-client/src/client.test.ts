@@ -1757,3 +1757,142 @@ describe("deleteProjectV2", () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — listProjectsV2 (B10)
+// ---------------------------------------------------------------------------
+
+const successListProjects = {
+  success: true,
+  data: [
+    {
+      id: "prj_first",
+      name: "Newest",
+      kmzBlobUrl: `s3://b/projects/u/kmz/${SAMPLE_KMZ_SHA}.kmz`,
+      kmzSha256: SAMPLE_KMZ_SHA,
+      createdAt: "2026-04-30T09:00:00.000Z",
+      updatedAt: "2026-04-30T11:30:00.000Z",
+      runsCount: 2,
+      lastRunAt: "2026-04-30T11:00:00.000Z",
+    },
+    {
+      id: "prj_second",
+      name: "Older",
+      kmzBlobUrl: `s3://b/projects/u/kmz/${SAMPLE_KMZ_SHA}.kmz`,
+      kmzSha256: SAMPLE_KMZ_SHA,
+      createdAt: "2026-04-30T08:00:00.000Z",
+      updatedAt: "2026-04-30T08:00:00.000Z",
+      runsCount: 0,
+      lastRunAt: null,
+    },
+  ],
+}
+
+describe("listProjectsV2", () => {
+  test("GETs /v2/projects and returns the array", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        return jsonResponse(successListProjects)
+      },
+    })
+    const projects = await client.listProjectsV2(KEY)
+    expect(seenUrl).toBe("https://api.solarlayout.in/v2/projects")
+    expect(seenMethod).toBe("GET")
+    expect(projects).toHaveLength(2)
+    expect(projects[0]?.id).toBe("prj_first")
+    expect(projects[0]?.runsCount).toBe(2)
+    expect(projects[1]?.lastRunAt).toBeNull()
+  })
+
+  test("returns an empty array for a new user with no projects", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({ success: true, data: [] }),
+    })
+    const projects = await client.listProjectsV2(KEY)
+    expect(projects).toEqual([])
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successListProjects)
+      },
+    })
+    await client.listProjectsV2(KEY)
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 401 UNAUTHORIZED via V2 envelope", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "License key not recognised.",
+            },
+          },
+          401
+        ),
+    })
+    try {
+      await client.listProjectsV2(KEY)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(401)
+      expect(e.code).toBe("UNAUTHORIZED")
+    }
+  })
+
+  test("rejects malformed success body (schema guard — non-array data)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({ success: true, data: { not: "an array" } }),
+    })
+    try {
+      await client.listProjectsV2(KEY)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+
+  test("rejects malformed success body (schema guard — row missing runsCount)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          success: true,
+          data: [
+            {
+              id: "prj_x",
+              name: "x",
+              kmzBlobUrl: "s3://b/k",
+              kmzSha256: SAMPLE_KMZ_SHA,
+              createdAt: "2026-04-30T10:00:00.000Z",
+              updatedAt: "2026-04-30T10:00:00.000Z",
+              // missing runsCount + lastRunAt
+            },
+          ],
+        }),
+    })
+    try {
+      await client.listProjectsV2(KEY)
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
+  })
+})

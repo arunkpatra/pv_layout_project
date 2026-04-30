@@ -24,7 +24,6 @@ import {
   CommandItem,
   CommandPalette,
   CommandSeparator,
-  EmptyStateCard,
   InspectorRoot,
   LockedSectionCard,
   MapCanvas,
@@ -54,7 +53,9 @@ import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
 import { useRenameProjectMutation } from "./auth/useRenameProject"
 import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { useAutoSaveProject } from "./auth/useAutoSaveProject"
+import { useProjectsListQuery } from "./auth/useProjectsList"
 import { SaveIndicator } from "./auth/SaveIndicator"
+import { RecentsView } from "./recents/RecentsView"
 import { EntitlementsProvider } from "./auth/EntitlementsProvider"
 import { EntitlementsError } from "@solarlayout/entitlements-client"
 import {
@@ -453,6 +454,12 @@ export function App(): JSX.Element {
     currentEdits
   )
 
+  // ── S3 — recents list query (powers RecentsView when no project loaded) ─
+  // Empty for preview keys; refetches naturally when create/rename/delete
+  // mutations invalidate the cache (their hooks include
+  // ["projects", key] in onSuccess invalidations).
+  const projectsListQuery = useProjectsListQuery(activeKey, entitlementsClient)
+
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
   // upload + create the persisted project via B6 → S3 → B11. The two
@@ -520,16 +527,15 @@ export function App(): JSX.Element {
     createProjectMutation,
   ])
 
-  // ── P2 — open-existing-project flow ─────────────────────────────────────
-  // Interim entry point: a window.prompt() captures a project ID. The
-  // proper recents-grid + tab-aware "Open existing…" UI lands at P3; this
-  // is enough to drive the round-trip end-to-end (and validate via the
-  // fixture-session smoke). Replace with the recents picker at P3.
-  const handleOpenExistingProject = useCallback(async () => {
+  // ── P2 / S3 — open-existing-project flow ────────────────────────────────
+  // The core open-by-ID flow is shared between two entry points:
+  //   - S3 recents grid (RecentsView card click — passes the id directly)
+  //   - Command Palette's "Open existing project…" item (interim
+  //     window.prompt() — kept for power-user keyboard access)
+  // Both call `handleOpenProjectById(id)` below; the palette wrapper just
+  // captures the id via prompt first.
+  const handleOpenProjectById = useCallback(async (projectId: string) => {
     if (!sidecarClient || opening) return
-    const raw = window.prompt("Project ID:")
-    if (!raw) return
-    const projectId = raw.trim()
     if (!projectId) return
     setOpening(true)
     setOpenError(null)
@@ -591,6 +597,15 @@ export function App(): JSX.Element {
     resetEditingState,
   ])
 
+  // Palette wrapper — interim, kept alongside S3's RecentsView card click
+  // for keyboard-driven access. Will retire when the palette grows a
+  // proper "Recents" submenu in S3+.
+  const handleOpenExistingProject = useCallback(async () => {
+    const raw = window.prompt("Project ID:")
+    if (!raw) return
+    await handleOpenProjectById(raw.trim())
+  }, [handleOpenProjectById])
+
   // ── P3 — rename / delete handlers ───────────────────────────────────────
   // Interim entry points: native window.prompt() / window.confirm() for
   // the rename and delete confirms. Project header inline-rename + Dialog-
@@ -631,7 +646,7 @@ export function App(): JSX.Element {
       })
       // Reset transient canvas state too — same surface as a fresh session.
       // The hook clears the project slice; these reset everything else
-      // so the user lands back on the empty-state EmptyStateCard.
+      // so the user lands back on the recents view (S3).
       clearLayoutResult()
       resetLayoutParams()
       resetLayerVisibility()
@@ -996,11 +1011,15 @@ export function App(): JSX.Element {
           >
             <CommandBarHint onClick={openPalette} />
             {!project && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="pointer-events-auto">
-                  <EmptyStateCard onOpen={() => void handleOpenKmz()} />
-                </div>
-              </div>
+              <RecentsView
+                isLoading={projectsListQuery.isLoading}
+                isError={projectsListQuery.isError}
+                errorMessage={projectsListQuery.error?.message}
+                projects={projectsListQuery.data ?? []}
+                onOpen={(id) => void handleOpenProjectById(id)}
+                onNewProject={() => void handleOpenKmz()}
+                onRetry={() => void projectsListQuery.refetch()}
+              />
             )}
             {opening && <OpeningOverlay />}
             {openError && (

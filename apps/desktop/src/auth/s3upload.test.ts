@@ -44,6 +44,7 @@ function makeClient(
     createRunV2: vi.fn(),
     patchProjectV2: vi.fn(),
     deleteProjectV2: vi.fn(),
+    listProjectsV2: vi.fn(),
     ...overrides,
   }
 }

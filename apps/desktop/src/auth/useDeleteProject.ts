@@ -85,6 +85,10 @@ export function useDeleteProjectMutation(
         void queryClient.invalidateQueries({
           queryKey: [ENTITLEMENTS_QUERY_KEY, licenseKey],
         })
+        // S3 recents grid drops the deleted project from the list.
+        void queryClient.invalidateQueries({
+          queryKey: ["projects", licenseKey],
+        })
       }
     },
   })

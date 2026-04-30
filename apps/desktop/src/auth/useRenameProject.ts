@@ -19,7 +19,7 @@
  * Preview keys: rename in-memory only (mirror the same UX without a
  * backend round-trip; design previews can exercise rename without S3).
  */
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { UseMutationResult } from "@tanstack/react-query"
 import {
   EntitlementsError,
@@ -56,6 +56,7 @@ export function useRenameProjectMutation(
   licenseKey: string | null,
   client: EntitlementsClient
 ): UseMutationResult<ProjectV2Wire, Error, RenameProjectVars> {
+  const queryClient = useQueryClient()
   return useMutation<ProjectV2Wire, Error, RenameProjectVars>({
     mutationFn: async (vars) => {
       if (!licenseKey) {
@@ -89,10 +90,20 @@ export function useRenameProjectMutation(
       const cur = useProjectStore.getState().currentProject
       // Stale-rename guard: only update if the response is for the
       // project still in focus. Mid-flight tab switches happen.
-      if (cur?.id !== vars.projectId) return
-      // Spread on top of the existing slice value so any B12-only fields
-      // (kmzDownloadUrl, runs[]) survive the lighter PATCH response.
-      useProjectStore.getState().setCurrentProject({ ...cur, ...updated })
+      if (cur?.id === vars.projectId) {
+        // Spread on top of the existing slice value so any B12-only
+        // fields (kmzDownloadUrl, runs[]) survive the lighter PATCH
+        // response.
+        useProjectStore.getState().setCurrentProject({ ...cur, ...updated })
+      }
+      // S3 recents grid surfaces the new name when the user navigates
+      // back to it. Invalidate regardless of stale-rename outcome —
+      // backend's row was renamed, the cached list should reflect it.
+      if (licenseKey) {
+        void queryClient.invalidateQueries({
+          queryKey: ["projects", licenseKey],
+        })
+      }
     },
   })
 }

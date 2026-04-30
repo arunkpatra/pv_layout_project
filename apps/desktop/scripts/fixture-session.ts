@@ -609,6 +609,38 @@ async function createProjectForKey(
   }
 }
 
+async function checkB10List(
+  client: EntitlementsClient,
+  expectAtLeast: number
+): Promise<void> {
+  // S3 contract: GET /v2/projects returns the user's non-soft-deleted
+  // projects sorted updatedAt DESC. We just verify the list is non-empty
+  // (we created at least one above) + the most-recent row is well-formed.
+  try {
+    const list = await client.listProjectsV2(FIXTURE_KEYS.FREE)
+    if (list.length < expectAtLeast) {
+      record(
+        "B10 FREE recents",
+        "warn",
+        `expected at least ${expectAtLeast} project(s); got ${list.length}`
+      )
+      return
+    }
+    const first = list[0]
+    if (!first || !first.id.startsWith("prj_")) {
+      record("B10 FREE recents", "warn", `unexpected first row: ${JSON.stringify(first)}`)
+      return
+    }
+    record(
+      "B10 FREE recents",
+      "pass",
+      `${list.length} project(s); newest=${first.id} (${first.runsCount} run(s))`
+    )
+  } catch (err) {
+    record("B10 FREE recents", "fail", fmtErr(err))
+  }
+}
+
 async function checkB13EditsRoundTrip(
   client: EntitlementsClient,
   projectId: string
@@ -967,7 +999,14 @@ async function main(): Promise<void> {
     )
   }
 
-  // ── 9. B13 rename + B14 delete (P3) ─────────────────────────────────────
+  // ── 9. B10 recents list (S3) ────────────────────────────────────────────
+  // After P1 above, FREE has at least one project. Verify the list endpoint
+  // returns it. Run BEFORE the P3 chain (which deletes one) so the count
+  // is predictable.
+  console.log("\n--- B10 recents list (S3) ---")
+  await checkB10List(client, 1)
+
+  // ── 10. B13 rename + B14 delete (P3) ────────────────────────────────────
   // Create a dedicated project for the rename/delete chain so we don't
   // tamper with the one P2/B16 used (those tests already mutated state
   // on it; mixing in a delete would invalidate downstream assertions).
@@ -996,7 +1035,7 @@ async function main(): Promise<void> {
     record("B14 double-delete → 404", "warn", "skipped (same reason)")
   }
 
-  // ── 10. B9 idempotency ──────────────────────────────────────────────────
+  // ── 11. B9 idempotency ──────────────────────────────────────────────────
   console.log("\n--- B9 idempotency ---")
   await checkB9HappyFree(client)
 

@@ -32,6 +32,8 @@ import {
   createRunV2ResponseSchema,
   patchProjectV2RequestSchema,
   patchProjectV2ResponseSchema,
+  projectSummaryListRowV2Schema,
+  listProjectsV2ResponseSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
 } from "./types-v2"
@@ -831,6 +833,93 @@ describe("patchProjectV2ResponseSchema", () => {
         updatedAt: "2026-04-30T12:30:00.000Z",
         deletedAt: null,
       },
+    })
+    expect(r.success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B10 — GET /v2/projects (recents list)
+// ---------------------------------------------------------------------------
+
+describe("projectSummaryListRowV2Schema", () => {
+  const sample = {
+    id: "prj_abc",
+    name: "Site A",
+    kmzBlobUrl: `s3://b/projects/u/kmz/${VALID_SHA}.kmz`,
+    kmzSha256: VALID_SHA,
+    createdAt: "2026-04-30T10:00:00.000Z",
+    updatedAt: "2026-04-30T10:00:00.000Z",
+    runsCount: 0,
+    lastRunAt: null,
+  }
+
+  test("parses a fresh-project list row (zero runs)", () => {
+    expect(projectSummaryListRowV2Schema.safeParse(sample).success).toBe(true)
+  })
+
+  test("parses a project with runs (lastRunAt populated)", () => {
+    const r = projectSummaryListRowV2Schema.safeParse({
+      ...sample,
+      runsCount: 3,
+      lastRunAt: "2026-04-30T11:00:00.000Z",
+    })
+    expect(r.success).toBe(true)
+  })
+
+  test("rejects when runsCount is missing", () => {
+    const v: Record<string, unknown> = { ...sample }
+    delete v.runsCount
+    expect(projectSummaryListRowV2Schema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects when lastRunAt is missing entirely (must be string|null)", () => {
+    const v: Record<string, unknown> = { ...sample }
+    delete v.lastRunAt
+    expect(projectSummaryListRowV2Schema.safeParse(v).success).toBe(false)
+  })
+
+  test("rejects negative runsCount", () => {
+    expect(
+      projectSummaryListRowV2Schema.safeParse({ ...sample, runsCount: -1 })
+        .success
+    ).toBe(false)
+  })
+})
+
+describe("listProjectsV2ResponseSchema", () => {
+  test("parses an empty list (new user, no projects yet)", () => {
+    expect(
+      listProjectsV2ResponseSchema.safeParse({ success: true, data: [] })
+        .success
+    ).toBe(true)
+  })
+
+  test("parses a populated list", () => {
+    const r = listProjectsV2ResponseSchema.safeParse({
+      success: true,
+      data: [
+        {
+          id: "prj_a",
+          name: "A",
+          kmzBlobUrl: "s3://b/k",
+          kmzSha256: VALID_SHA,
+          createdAt: "2026-04-30T10:00:00.000Z",
+          updatedAt: "2026-04-30T10:00:00.000Z",
+          runsCount: 0,
+          lastRunAt: null,
+        },
+        {
+          id: "prj_b",
+          name: "B",
+          kmzBlobUrl: "s3://b/k2",
+          kmzSha256: VALID_SHA,
+          createdAt: "2026-04-30T09:00:00.000Z",
+          updatedAt: "2026-04-30T11:00:00.000Z",
+          runsCount: 2,
+          lastRunAt: "2026-04-30T11:00:00.000Z",
+        },
+      ],
     })
     expect(r.success).toBe(true)
   })
