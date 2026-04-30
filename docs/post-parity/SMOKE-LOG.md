@@ -630,4 +630,11 @@ restart + new-project retry. Status → `fixed` pending live retry.
 Will close fully once user confirms the new-project flow completes
 through to canvas hydration.
 
+[FE 2026-04-30 13:34] Live retry confirmed. After Tauri restart, user
+re-ran new-project flow with `phaseboundary2.kmz`: KMZ uploaded to
+S3 (B6 mint + PUT), project created (B11), tab opened with project
+name `phaseboundary2` in the new S2 tabs bar, canvas hydrated.
+Status → `fixed`. Closed via `f6cab16` on
+`post-parity-v1-desktop`.
+
 ---
