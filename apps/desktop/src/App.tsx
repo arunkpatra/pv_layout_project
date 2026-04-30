@@ -55,6 +55,7 @@ import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { useAutoSaveProject } from "./auth/useAutoSaveProject"
 import { useProjectsListQuery } from "./auth/useProjectsList"
 import { useOpenRunMutation } from "./auth/useOpenRun"
+import { useDeleteRunMutation } from "./auth/useDeleteRun"
 import { SaveIndicator } from "./auth/SaveIndicator"
 import { RecentsView } from "./recents/RecentsView"
 import { RunsList } from "./runs/RunsList"
@@ -471,6 +472,28 @@ export function App(): JSX.Element {
   const openRunMutation = useOpenRunMutation(activeKey, entitlementsClient, {
     fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
   })
+  // P9 — delete run(s) from the gallery's multi-select toolbar.
+  const deleteRunMutation = useDeleteRunMutation(activeKey, entitlementsClient)
+  const handleDeleteRuns = useCallback(
+    async (runIds: string[]) => {
+      if (!currentProject) return
+      // Sequential — surfaces per-run errors clearly, and B18 is cheap.
+      for (const id of runIds) {
+        try {
+          await deleteRunMutation.mutateAsync({
+            projectId: currentProject.id,
+            runId: id,
+          })
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err)
+          console.error(`delete run ${id} failed:`, err)
+          setOpenError(detail)
+          return // bail on first error; user retries via the same button
+        }
+      }
+    },
+    [currentProject, deleteRunMutation]
+  )
   const selectedRunId = useProjectStore((s) => s.selectedRunId)
   const resultRunId = useLayoutResultStore((s) => s.resultRunId)
   const openRunMutate = openRunMutation.mutate
@@ -1112,7 +1135,7 @@ export function App(): JSX.Element {
                 forceMount
                 className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
               >
-                <RunsList />
+                <RunsList onDeleteRuns={handleDeleteRuns} />
               </TabsContent>
             </Tabs>
           </InspectorRoot>

@@ -240,6 +240,21 @@ export interface EntitlementsClient {
     projectId: string,
     runId: string
   ): Promise<RunDetailV2Wire>
+  /**
+   * V2 — `DELETE /v2/projects/:id/runs/:runId` (B18). Soft-delete a
+   * run. Calc count is NOT refunded — the original UsageRecord stays
+   * intact (audit trail), the Run row is just hidden from list/detail
+   * fetches. Returns 204 No Content on success.
+   *
+   * 404 NOT_FOUND if the run doesn't exist, was already deleted, or
+   * isn't owned by the caller. Same cross-user existence safeguard
+   * as B14 (cross-user existence is never leaked).
+   */
+  deleteRunV2(
+    key: string,
+    projectId: string,
+    runId: string
+  ): Promise<void>
 }
 
 /**
@@ -554,6 +569,12 @@ export function createEntitlementsClient(
         )
       }
       return parsed.data.data
+    },
+
+    async deleteRunV2(key, projectId, runId) {
+      const path = `/v2/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}`
+      // 204 No Content → request() returns null; nothing to validate.
+      await request(path, { method: "DELETE" }, key)
     },
   }
 }

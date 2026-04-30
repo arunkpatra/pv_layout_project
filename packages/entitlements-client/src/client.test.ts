@@ -2020,3 +2020,76 @@ describe("getRunV2", () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// V2 — deleteRunV2 (B18)
+// ---------------------------------------------------------------------------
+
+describe("deleteRunV2", () => {
+  test("DELETEs /v2/projects/:id/runs/:runId and resolves on 204", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        return new Response("", { status: 204 })
+      },
+    })
+    await client.deleteRunV2(KEY, "prj_xyz", "run_abc")
+    expect(seenUrl).toBe(
+      "https://api.solarlayout.in/v2/projects/prj_xyz/runs/run_abc"
+    )
+    expect(seenMethod).toBe("DELETE")
+  })
+
+  test("URL-encodes both path segments", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return new Response("", { status: 204 })
+      },
+    })
+    await client.deleteRunV2(KEY, "prj_with spaces", "run_odd/chars")
+    expect(seenUrl).toContain(
+      "/v2/projects/prj_with%20spaces/runs/run_odd%2Fchars"
+    )
+  })
+
+  test("sends Bearer auth", async () => {
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (_input, init) => {
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return new Response("", { status: 204 })
+      },
+    })
+    await client.deleteRunV2(KEY, "prj_x", "run_a")
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+  })
+
+  test("maps 404 NOT_FOUND when run doesn't exist (or already deleted)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: 'Run "run_missing" not found',
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.deleteRunV2(KEY, "prj_x", "run_missing")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+})

@@ -46,6 +46,7 @@ function makeClient(
     deleteProjectV2: vi.fn(),
     listProjectsV2: vi.fn(),
     getRunV2: vi.fn(),
+    deleteRunV2: vi.fn(),
     ...overrides,
   }
 }

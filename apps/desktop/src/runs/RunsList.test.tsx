@@ -11,7 +11,7 @@
  *   - Run-type chip renders Layout vs Energy from billedFeatureKey
  *   - "1 run" / "N runs" pluralization in the count header
  */
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { render, screen, fireEvent, within } from "@testing-library/react"
 import { RunsList } from "./RunsList"
 import { useProjectStore } from "../state/project"
@@ -117,5 +117,63 @@ describe("RunsList — single-run pluralization", () => {
     useProjectStore.getState().setRuns([layoutRun])
     render(<RunsList />)
     expect(screen.getByText(/1 run$/)).toBeInTheDocument()
+  })
+})
+
+describe("RunsList — delete flow (P9)", () => {
+  beforeEach(() => {
+    useProjectStore.getState().clearAll()
+    useProjectStore.getState().setRuns([layoutRun, energyRun])
+  })
+
+  it("does not show the Delete button when no rows are selected", () => {
+    const onDeleteRuns = vi.fn()
+    render(<RunsList onDeleteRuns={onDeleteRuns} />)
+    expect(screen.queryByText(/Delete /)).not.toBeInTheDocument()
+  })
+
+  it("shows the Delete button when one row is selected", () => {
+    const onDeleteRuns = vi.fn()
+    render(<RunsList onDeleteRuns={onDeleteRuns} />)
+    fireEvent.click(screen.getByLabelText("Select run Layout @ A"))
+    expect(screen.getByRole("button", { name: /Delete 1/i })).toBeInTheDocument()
+  })
+
+  it("calls onDeleteRuns with selected ids after window.confirm = true", async () => {
+    const original = window.confirm
+    const confirmFn = vi.fn().mockReturnValue(true)
+    window.confirm = confirmFn as unknown as typeof window.confirm
+    const onDeleteRuns = vi.fn().mockResolvedValue(undefined)
+    try {
+      render(<RunsList onDeleteRuns={onDeleteRuns} />)
+      fireEvent.click(screen.getByLabelText("Select run Layout @ A"))
+      fireEvent.click(screen.getByLabelText("Select run Energy @ B"))
+      fireEvent.click(screen.getByRole("button", { name: /Delete 2/i }))
+
+      expect(confirmFn).toHaveBeenCalled()
+      await vi.waitFor(() => {
+        expect(onDeleteRuns).toHaveBeenCalledWith([
+          "run_layout_a",
+          "run_energy_b",
+        ])
+      })
+    } finally {
+      window.confirm = original
+    }
+  })
+
+  it("does NOT call onDeleteRuns when the user cancels the confirm", () => {
+    const original = window.confirm
+    const confirmFn = vi.fn().mockReturnValue(false)
+    window.confirm = confirmFn as unknown as typeof window.confirm
+    const onDeleteRuns = vi.fn()
+    try {
+      render(<RunsList onDeleteRuns={onDeleteRuns} />)
+      fireEvent.click(screen.getByLabelText("Select run Layout @ A"))
+      fireEvent.click(screen.getByRole("button", { name: /Delete 1/i }))
+      expect(onDeleteRuns).not.toHaveBeenCalled()
+    } finally {
+      window.confirm = original
+    }
   })
 })

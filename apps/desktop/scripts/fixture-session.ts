@@ -534,6 +534,66 @@ async function checkB17NotFound(
   }
 }
 
+async function checkB18Delete(
+  client: EntitlementsClient,
+  projectId: string,
+  runId: string
+): Promise<void> {
+  // P9 contract: DELETE soft-deletes. Verify B17 follow-up returns 404
+  // (run is hidden) AND B18 second call also 404s (idempotent in the
+  // GET-after-DELETE sense; not in the "POST-twice == once" sense).
+  try {
+    await client.deleteRunV2(FIXTURE_KEYS.FREE, projectId, runId)
+  } catch (err) {
+    record("B18 delete run", "fail", fmtErr(err))
+    return
+  }
+  // B17 follow-up must 404
+  try {
+    await client.getRunV2(FIXTURE_KEYS.FREE, projectId, runId)
+    record(
+      "B18 delete run",
+      "fail",
+      "B17 follow-up returned the run after delete (soft-delete should 404)"
+    )
+    return
+  } catch (err) {
+    if (
+      !(
+        err instanceof EntitlementsError &&
+        err.status === 404 &&
+        err.code === "NOT_FOUND"
+      )
+    ) {
+      record("B18 delete run", "fail", `B17 follow-up: ${fmtErr(err)}`)
+      return
+    }
+  }
+  // Re-delete must also 404
+  try {
+    await client.deleteRunV2(FIXTURE_KEYS.FREE, projectId, runId)
+    record(
+      "B18 delete run",
+      "fail",
+      "expected 404 NOT_FOUND on re-delete, got success"
+    )
+  } catch (err) {
+    if (
+      err instanceof EntitlementsError &&
+      err.status === 404 &&
+      err.code === "NOT_FOUND"
+    ) {
+      record(
+        "B18 delete run",
+        "pass",
+        "deleted; B17 follow-up + re-delete both 404"
+      )
+    } else {
+      record("B18 delete run", "fail", `re-delete: ${fmtErr(err)}`)
+    }
+  }
+}
+
 async function checkB16HappyFree(
   client: EntitlementsClient,
   projectId: string
@@ -1095,13 +1155,34 @@ async function main(): Promise<void> {
   // RunDetail (presigned URLs etc); actual S3 GET of the result blob
   // would 404 because the sidecar isn't running to upload it. P7 unit
   // tests cover the bytes path with mocked fetch.
-  console.log("\n--- B17 run detail (P7) ---")
+  console.log("\n--- B17 run detail (P7) + B18 delete run (P9) ---")
   if (createdProjectId !== null && createdRunId !== null) {
     await checkB17Detail(client, createdProjectId, createdRunId)
     await checkB17NotFound(client, createdProjectId)
+    // P9 — needs a fresh runId since B18 soft-deletes the one we use.
+    // Mint a second run, then delete it. Doesn't disturb earlier checks
+    // because they read createdRunId, which stays alive.
+    const idem = crypto.randomUUID()
+    let p9RunId: string | null = null
+    try {
+      const r = await client.createRunV2(FIXTURE_KEYS.FREE, createdProjectId, {
+        name: "p9 delete-target",
+        params: {},
+        inputsSnapshot: {},
+        billedFeatureKey: "plant_layout",
+        idempotencyKey: idem,
+      })
+      p9RunId = r.run.id
+    } catch (err) {
+      record("B18 delete run", "warn", `couldn't pre-create target: ${fmtErr(err)}`)
+    }
+    if (p9RunId) {
+      await checkB18Delete(client, createdProjectId, p9RunId)
+    }
   } else {
     record("B17 run detail", "warn", "skipped — no project + run from above")
     record("B17 missing run → 404", "warn", "skipped — no project from above")
+    record("B18 delete run", "warn", "skipped — no project from above")
   }
 
   // ── 10. B10 recents list (S3) ───────────────────────────────────────────

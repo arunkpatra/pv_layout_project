@@ -32,12 +32,21 @@ import {
   FEATURE_KEYS,
   type FeatureKey,
 } from "@solarlayout/entitlements-client"
-import { Segmented, SegmentedItem } from "@solarlayout/ui"
+import { Button, Segmented, SegmentedItem } from "@solarlayout/ui"
 import {
   useProjectStore,
   type Run,
   type RunId,
 } from "../state/project"
+
+export interface RunsListProps {
+  /**
+   * Caller-provided handler for deleting one or more runs. Called once
+   * per selected run, sequentially. RunsList prompts for confirmation
+   * before invoking. App.tsx wires this to `useDeleteRunMutation`.
+   */
+  onDeleteRuns?: (runIds: RunId[]) => Promise<void>
+}
 
 type RunView = "gallery" | "list"
 
@@ -50,15 +59,38 @@ function isEnergyRun(billedFeatureKey: string): boolean {
   return (ENERGY_FEATURES as string[]).includes(billedFeatureKey)
 }
 
-export function RunsList(): JSX.Element {
+export function RunsList({ onDeleteRuns }: RunsListProps = {}): JSX.Element {
   const runs = useProjectStore((s) => s.runs)
   const selectedRunId = useProjectStore((s) => s.selectedRunId)
   const selectRun = useProjectStore((s) => s.selectRun)
 
   const [view, setView] = useState<RunView>("gallery")
-  // Multi-select for P8 compare. Local-component for now (lifts to a
-  // slice when P8 needs to read it from outside the tab).
+  // Multi-select for P8 compare + P9 delete. Local-component for now
+  // (lifts to a slice when P8 needs to read it from outside the tab).
   const [multiSelect, setMultiSelect] = useState<Set<RunId>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteSelected = async () => {
+    if (!onDeleteRuns) return
+    if (multiSelect.size === 0) return
+    const ids = Array.from(multiSelect)
+    const ok = window.confirm(
+      ids.length === 1
+        ? `Delete this run?\n\nThe run is soft-deleted server-side. Calc count is preserved (no refund). Cannot be undone from the desktop UI.`
+        : `Delete ${ids.length} runs?\n\nEach run is soft-deleted server-side. Calc counts are preserved (no refund). Cannot be undone from the desktop UI.`
+    )
+    if (!ok) return
+    setDeleting(true)
+    try {
+      await onDeleteRuns(ids)
+      // Clear selection — the deleted runs are gone from the slice;
+      // surviving selections (if any) wouldn't have hit our deleted
+      // ids. Simpler to reset.
+      setMultiSelect(new Set())
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const hasRuns = runs.length > 0
 
@@ -75,7 +107,7 @@ export function RunsList(): JSX.Element {
 
   return (
     <div className="px-[20px] pt-[16px] pb-[24px] flex flex-col gap-[12px]">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-[8px]">
         <span className="text-[12px] text-[var(--text-secondary)]">
           {runs.length} {runs.length === 1 ? "run" : "runs"}
           {multiSelect.size > 0 && (
@@ -84,14 +116,27 @@ export function RunsList(): JSX.Element {
             </span>
           )}
         </span>
-        <Segmented
-          value={view}
-          onValueChange={(v) => v && setView(v as RunView)}
-          aria-label="Runs view mode"
-        >
-          <SegmentedItem value="gallery">Gallery</SegmentedItem>
-          <SegmentedItem value="list">List</SegmentedItem>
-        </Segmented>
+        <div className="flex items-center gap-[8px]">
+          {multiSelect.size > 0 && onDeleteRuns && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={deleting}
+              onClick={() => void handleDeleteSelected()}
+            >
+              {deleting ? "Deleting…" : `Delete ${multiSelect.size}`}
+            </Button>
+          )}
+          <Segmented
+            value={view}
+            onValueChange={(v) => v && setView(v as RunView)}
+            aria-label="Runs view mode"
+          >
+            <SegmentedItem value="gallery">Gallery</SegmentedItem>
+            <SegmentedItem value="list">List</SegmentedItem>
+          </Segmented>
+        </div>
       </header>
 
       {view === "gallery" ? (
