@@ -613,15 +613,30 @@ Asking before I commit.
 - Decisions log entries / audit trail → don't mirror; backend-side
   log is enough.
 
-**First exercise of this protocol:**
+**First two exercises of this protocol:**
 
-`SP1 ↔ B23` — Run gallery thumbnails (server-side pipeline). FE
-sent the request before committing SP1; backend acked + committed
-B23 at `555890e` on `post-parity-v2-backend`; FE then committed
-`SP1`/`SP2`/`SP3` to `docs/PLAN.md` referencing B23. Memo in
-flight at `docs/post-parity/findings/2026-04-30-001-run-thumbnail-pipeline.md`.
-Backend logged the protocol extension as a Decisions entry in V2
-plan §9 dated 2026-04-30.
+1. **`SP1 ↔ B23`** — Run gallery thumbnails (server-side pipeline,
+   the larger T3 design-memo work). FE sent the request before
+   committing SP1; backend acked + committed B23 at `555890e` on
+   `post-parity-v2-backend`; FE then committed
+   `SP1`/`SP2`/`SP3` to `docs/PLAN.md` referencing B23. Memo at
+   `docs/post-parity/findings/2026-04-30-001-run-thumbnail-pipeline.md`
+   — v1 recommended Path B (DB column + register endpoint);
+   backend pushed back; v2 flipped to Path A (deterministic key,
+   no DB column). Path A locked.
+2. **`SP4 ↔ B24`** — RecentsView project card thumbnails (T1
+   follow-on to SP1, leverages the same per-run thumbnail asset
+   at a different visual surface). FE sent the request mid-memo
+   draft after the user observed the symmetric UX gap on
+   project cards; backend acked + committed B24 at `dfd0c48` on
+   `post-parity-v2-backend`; FE added SP4 to PLAN.md alongside
+   the memo v2 update (§14 covers the SP4 surface).
+
+Both exercises validated the paste-block format end-to-end: ~5s
+turnaround per ack, no merge conflicts, both repos' plans linked
+from t=0. Backend logged the protocol extension as a Decisions
+entry in V2 plan §9 dated 2026-04-30; this subsection is the
+FE-side mirror.
 
 ### Push cadence
 
