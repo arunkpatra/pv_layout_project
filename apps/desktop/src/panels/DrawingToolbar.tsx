@@ -14,7 +14,7 @@
  * text. User can't start a new interaction while a previous commit is
  * in flight. Mode returns to idle on mutation onSettle (in App.tsx).
  */
-import { Button, InspectorSection } from "@solarlayout/ui"
+import { Button, InspectorSection } from "@solarlayout/ui-desktop"
 import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import {
   useEditingStateStore,

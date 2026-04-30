@@ -21,7 +21,7 @@ import type {
   LineString,
   Polygon,
 } from "geojson"
-import type { IcrLabel } from "@solarlayout/ui"
+import type { IcrLabel } from "@solarlayout/ui-desktop"
 import type { LayoutResult } from "@solarlayout/sidecar-client"
 
 export interface LayoutGeoJson {

@@ -30,7 +30,7 @@ import {
   DialogTitle,
   Input,
   Label,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 
 const CONFIRM_PHRASE = "delete"
 

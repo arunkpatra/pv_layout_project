@@ -25,7 +25,7 @@ import {
   DialogTitle,
   Input,
   Label,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import { isPlausibleLicenseKey } from "@solarlayout/entitlements-client"
 
 const SIGNUP_URL = "https://solarlayout.in/sign-up"

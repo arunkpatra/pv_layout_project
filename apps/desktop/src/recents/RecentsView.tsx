@@ -41,7 +41,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-} from "@solarlayout/ui"
+} from "@solarlayout/ui-desktop"
 import { RenameProjectDialog } from "../dialogs/RenameProjectDialog"
 import { DeleteProjectConfirmDialog } from "../dialogs/DeleteProjectConfirmDialog"
 

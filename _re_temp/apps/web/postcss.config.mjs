@@ -1,1 +1,0 @@
-export { default } from "@renewable-energy/ui/postcss.config";
