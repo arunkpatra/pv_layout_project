@@ -2256,6 +2256,7 @@ Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`
 | S3-01 | Tabs row (Layout / Energy / Runs) scrolled out of view; only Generate button stayed sticky | P2 | FE | **fixed** (live) |
 | S3-02 | Cancel mid-run leaves orphan backend Run + debited calc with no UI cleanup | **P0** | FE + BE | open (cleanup landing this commit; refund policy decision still open) |
 | S3-04 | Steps 10-12 (KMZ / PDF / DXF export) untestable from UI — no export buttons | P2 | FE | **blocked on E1** in PLAN.md (todo). Sidecar relabel work (Spike 1 Phase 7) shipped + unit-tested via pytest; UI wiring is row E1's scope. Steps 10-12 deferred until E1 lands. |
+| S3-05 | License-key swap leaves previous user's project / runs / cached fetches in place — cascade of "unauthorized" overlays + privacy leak across the auth boundary | **P0** | FE | **fixed** — desktop `clearAllPerUserSession` wipes every per-user slice + cached query on swap (commit `3cce241`); sidecar `DELETE /layout/jobs` defense-in-depth flush wired alongside (this commit). Spike 2 retires the sidecar's in-process job table entirely; the desktop-side wipe stays canonical. |
 
 ---
 
@@ -2339,5 +2340,69 @@ Per the V2 backend plan §49 (*"Run delete does not refund the calc"*) and the c
 | FE — `App.tsx` | suppress OpenErrorOverlay for LayoutJobCancelledError | **fixed** (this commit) |
 | FE — `LayoutPanel.tsx` PlotList | terminal-mode rendering for stuck-running plots | **fixed** (this commit) |
 | BE — refund policy | new endpoint + Run/UsageRecord linkage | **open**, P0, owned by BE next |
+
+---
+
+**S3-05** — License-key swap leaves previous user's project state + cached fetches in place; cascade of "unauthorized" overlays + privacy leak across the auth boundary.
+
+#### What the user saw
+
+User had `complex-plant-layout` open with a successful run. Opened License Info → Change Key → entered `sl_live_desktop_test_BASIC_stable`. After the new key's entitlements landed:
+
+1. The inspector + canvas continued rendering the OLD project (different user's data).
+2. A cascade of error overlays for every background fetch that had been keyed off the old project ID (B7 thumbnails, B12 project detail, B17 run detail, B15 runs list, B10 recents) — each returning 401/404 because the new key's user doesn't own that project ID.
+
+#### Root cause — desktop side
+
+`apps/desktop/src/App.tsx` license-success effect (was at line 261-272) on a successful key swap did exactly two things: persist the new key to keyring + setSavedKey(pendingKey). **No per-user state was cleared.** The slices (project, currentProject, runs, layoutResult, layoutParams, layerVisibility, editingState, currentLayoutJob, tabs, layoutFormKey) and the TanStack queryClient cache continued to hold the previous user's data, scoped to the OLD key, but now the new key's Bearer token was being sent on every refetch.
+
+Same gap on `handleClearLicense` ("Sign out") at line 457-465 — only the entitlements query was removed, every other slice survived.
+
+#### Root cause — sidecar side
+
+The sidecar's in-memory layout-job table (`_JOBS: dict[str, _Job]` in `routes/layout_jobs.py`) carries each job's full `LayoutResult` for the entire process lifetime — there's no TTL, no GC. On license-key swap, those jobs were in principle reachable via their job_id. Practical risk was bounded (localhost-only sidecar + per-Tauri-process bearer + UUID job_ids unguessable) but not zero — the property "no per-user data on either side of the auth boundary" was clearer to defend than relying on UUID unguessability.
+
+#### Fix — desktop
+
+New `clearAllPerUserSession()` helper in App.tsx centralises the wipe:
+
+- `useProjectStore.clearAll()` (project + currentProject + runs + selectedRunId)
+- `useLayoutResultStore.clearResult()`
+- `useLayoutParamsStore.resetToDefaults()`
+- `useLayerVisibilityStore.resetToDefaults()`
+- `useEditingStateStore.reset()`
+- `useCurrentLayoutJobStore.clearJobState()`
+- `useTabsStore.reset()`
+- `setLayoutFormKey((k) => k + 1)` — RHF remount
+- `queryClient.clear()` — drops every cached query (including stale per-user data)
+- `sidecarClient.flushLayoutJobs()` — defense-in-depth (see below)
+
+Called from:
+1. The license-success effect, ONLY when this is a real swap (`savedKey !== null` going to a different value); first-launch is a no-op for the wipe.
+2. `handleClearLicense` unconditionally.
+
+Both flows then land on the `RecentsView` render branch (`!project`); the new key's entitlements query refetches in that blank context.
+
+#### Fix — sidecar
+
+New `DELETE /layout/jobs` route at `routes/layout_jobs.py:flush_layout_jobs()`:
+
+- Iterates `_JOBS`, marks each as cancelled (so any in-flight workers cooperatively stop), then `_JOBS.clear()`.
+- Returns `{status: "flushed", jobs_flushed: N}` (`schemas.LayoutJobsFlushResponse`).
+- Wired through `sidecar-client` as `flushLayoutJobs()` and called best-effort from `clearAllPerUserSession`. Failures don't block the desktop-side wipe.
+
+#### Spike 2 hygiene principle
+
+Spike 2 retires the sidecar's in-process job table by moving compute to RDS-backed Job/Slice rows scoped by `userId`. The sidecar-side hygiene endpoint becomes obsolete and can be removed alongside that migration. **The desktop-side `clearAllPerUserSession` stays canonical** — any new per-user state added in Spike 2 (UI slices, IndexedDB caches, TanStack queries) must register itself with that wipe to preserve the auth-boundary invariant. Documented in `docs/post-parity/PRD-cable-compute-strategy.md` §2 hygiene principle.
+
+#### Status
+
+| Layer | Fix | Status |
+|---|---|---|
+| FE — `App.tsx` | `clearAllPerUserSession` helper + wired into license-swap success branch + handleClearLicense | **fixed** (commit `3cce241`) |
+| Sidecar — `routes/layout_jobs.py` | `DELETE /layout/jobs` defense-in-depth flush + pytest coverage | **fixed** (this commit) |
+| `packages/sidecar-client` | `flushLayoutJobs()` adapter | **fixed** (this commit) |
+| Desktop wiring | best-effort `sidecarClient.flushLayoutJobs()` from `clearAllPerUserSession` | **fixed** (this commit) |
+| Spike 2 PRD note | hygiene principle codified | **fixed** (this commit) |
 
 

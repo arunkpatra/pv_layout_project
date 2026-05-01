@@ -468,6 +468,17 @@ export function App(): JSX.Element {
     tabsReset()
     setLayoutFormKey((k) => k + 1)
     queryClient.clear()
+    // Sidecar-side hygiene: flush every in-memory layout job so the
+    // previous user's job table doesn't survive the auth-boundary
+    // transition (S3-05 defense-in-depth — see PRD-cable-compute-
+    // strategy.md hygiene principle). Best-effort; the desktop
+    // doesn't render anything dependent on this call's success and
+    // the orphaned entries are unreachable from the UI either way.
+    if (sidecarClient) {
+      void sidecarClient.flushLayoutJobs().catch((err) => {
+        console.warn("[license-swap] sidecar flushLayoutJobs failed:", err)
+      })
+    }
   }, [
     clearAllProjectState,
     clearLayoutResult,
@@ -477,6 +488,7 @@ export function App(): JSX.Element {
     clearCurrentJobState,
     tabsReset,
     queryClient,
+    sidecarClient,
   ])
 
   // S3-05 — license-key swap success branch. Relocated here from

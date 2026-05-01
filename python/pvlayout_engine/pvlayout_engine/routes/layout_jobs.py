@@ -74,6 +74,7 @@ from pvlayout_engine.routes.layout import _boundaries_to_core, _run_per_plot_pip
 from pvlayout_engine.schemas import (
     JobStatus,
     LayoutJobCancelResponse,
+    LayoutJobsFlushResponse,
     LayoutJobStartResponse,
     LayoutJobState,
     LayoutRequest,
@@ -225,6 +226,48 @@ def cancel_layout_job(job_id: str) -> LayoutJobCancelResponse:
             job.status = JobStatus.CANCELLED
         plots_done = sum(1 for p in job.plots if p.status == PlotStatus.DONE)
     return LayoutJobCancelResponse(status="cancelled", plots_done=plots_done)
+
+
+@router.delete(
+    "/layout/jobs",
+    response_model=LayoutJobsFlushResponse,
+    summary="Flush every in-memory layout job (auth-boundary hygiene)",
+)
+def flush_layout_jobs() -> LayoutJobsFlushResponse:
+    """Wipe the entire in-memory job table.
+
+    Called by the desktop's `clearAllPerUserSession` on license-key
+    swap (S3-05) so no per-user job state survives the auth-boundary
+    transition. Each in-flight job is first marked cancelled so its
+    workers can cooperatively stop, then the entire `_JOBS` dict is
+    cleared. New Generate clicks mint fresh job_ids; previously-known
+    job_ids return 404 from this point.
+
+    This is defense-in-depth — the localhost-only sidecar already
+    requires the per-Tauri-process bearer token + a known UUID to
+    fetch a job, so the practical leak surface is small. But the
+    property "no per-user data on either side of the swap" is much
+    cleaner to state and defend than "we relied on UUID
+    unguessability + localhost." Spike 2 retires this entire
+    in-process job table by moving compute to RDS-backed Job/Slice
+    rows scoped by userId, so this endpoint can be removed alongside
+    that migration (or kept as a no-op stub for transition
+    compatibility — see PRD §2 hygiene principle).
+    """
+    with _JOBS_LOCK:
+        n = len(_JOBS)
+        # Best-effort cooperative cancel on each in-flight job before
+        # wiping membership. Workers may still write to their (now
+        # detached) `_Job` objects briefly; that's fine — they hold
+        # the only remaining reference and Python GCs them when their
+        # frame returns.
+        for job in _JOBS.values():
+            with job.lock:
+                job.cancelled = True
+                if job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                    job.status = JobStatus.CANCELLED
+        _JOBS.clear()
+    return LayoutJobsFlushResponse(status="flushed", jobs_flushed=n)
 
 
 # ---------------------------------------------------------------------------

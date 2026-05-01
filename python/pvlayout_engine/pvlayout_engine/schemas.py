@@ -450,6 +450,16 @@ class LayoutJobCancelResponse(_Model):
     plots_done: int
 
 
+class LayoutJobsFlushResponse(_Model):
+    """DELETE /layout/jobs response — defense-in-depth wipe used by the
+    desktop's `clearAllPerUserSession` on license-key swap (S3-05) so
+    no per-user job state survives the auth-boundary transition.
+    """
+
+    status: str  # always "flushed"
+    jobs_flushed: int
+
+
 # ---------------------------------------------------------------------------
 # Water-body detection (POST /detect-water) — Row #5
 # ---------------------------------------------------------------------------

@@ -172,3 +172,37 @@ def test_cancel_returns_cancelled_state(client: TestClient) -> None:
     # states. The contract is: cancel call returns cancelled-shape, job
     # reaches a terminal state without hanging.
     assert final["status"] in ("cancelled", "done"), final
+
+
+def test_flush_layout_jobs_wipes_table(client: TestClient) -> None:
+    """S3-05 defense-in-depth — DELETE /layout/jobs flushes every entry
+    in the in-memory job table so the previous user's job state does
+    not survive a license-key swap. Verifies: (1) the response shape
+    matches LayoutJobsFlushResponse; (2) jobs_flushed counts the
+    pre-flush size; (3) post-flush GET on a previously-known job_id
+    returns 404; (4) re-flushing on an empty table returns 0.
+    """
+    parsed = _parse(client)
+    job_a = _start_job(client, parsed)
+    job_b = _start_job(client, parsed)
+
+    resp = client.delete("/layout/jobs", headers=auth())
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "flushed"
+    assert body["jobs_flushed"] >= 2  # could be more if other tests left jobs
+    flushed_count = body["jobs_flushed"]
+
+    # Both previously-known job_ids now 404.
+    for job_id in (job_a, job_b):
+        gone = client.get(f"/layout/jobs/{job_id}", headers=auth())
+        assert gone.status_code == 404
+
+    # Re-flushing an empty table returns 0 cleanly.
+    resp2 = client.delete("/layout/jobs", headers=auth())
+    assert resp2.status_code == 200
+    body2 = resp2.json()
+    assert body2["status"] == "flushed"
+    assert body2["jobs_flushed"] == 0
+    # And the first flush actually freed at least the two we created.
+    assert flushed_count >= 2

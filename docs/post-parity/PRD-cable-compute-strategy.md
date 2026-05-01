@@ -13,6 +13,11 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Industry-Correctness Baseline (non-negotiable)](#2-industry-correctness-baseline-non-negotiable)
+   - 2.1 BoM correctness
+   - 2.2 EPC labelling — "AC cable trench"
+   - 2.3 Geometry & layer fidelity
+   - 2.4 Cross-engine consistency (Spike 2)
+   - 2.5 Auth-boundary state hygiene (license-key swap) — added 2026-05-01
 3. [Spike 1 — Local Perf Wins + UX Hygiene + Relabel (week 1)](#3-spike-1--local-perf-wins--ux-hygiene--relabel-week-1)
 4. [Spike 2 — Cloud Offload Framework (weeks 2–6)](#4-spike-2--cloud-offload-framework-weeks-26)
 5. [Cross-Repo Dependency Map](#5-cross-repo-dependency-map)
@@ -114,6 +119,29 @@ Under Spike 2, the same input fixture must produce **bit-identical output** whet
 
 - Both consumers pin the same `pvlayout_core` wheel version.
 - A CI test in `pvlayout_core` runs the same fixture as N sequential single-plot calls and as one multi-plot call, asserting byte-equal `LayoutResponse`. (Backend report §8 risk #12 calls this out as a gating week-1 deliverable.)
+
+### 2.5 Auth-boundary state hygiene (license-key swap)
+
+Origin: SMOKE-LOG.md S3-05 (Session 3, 2026-05-01). License-key swap is the closest the desktop comes to a multi-tenant boundary in production — the same OS user can hold multiple license keys (their own + a colleague's, fixture keys for testing, free-tier + paid). When a swap happens, **no per-user state from the previous key may survive**. This is both a UX requirement (no cascade of 401/404 overlays from stale fetches keyed off the previous user's project IDs) and a privacy requirement (the previous user's project geometry must not be visible to the new user, even briefly).
+
+**Canonical wipe point:** `clearAllPerUserSession()` in `apps/desktop/src/App.tsx`. Called from the license-success effect (when this is a real swap — `savedKey !== null` going to a different value) and from `handleClearLicense`. Today it wipes:
+
+- Every per-user Zustand slice (project, currentProject, runs, selectedRunId, layoutResult, layoutParams, layerVisibility, editingState, currentLayoutJob, tabs)
+- TanStack `queryClient.clear()` (drops every cached query, including stale per-user data)
+- `layoutFormKey` bump (forces RHF remount)
+- Sidecar `DELETE /layout/jobs` (defense-in-depth — the in-process job table holds the previous user's full LayoutResult and has no TTL)
+
+**Spike 2 implications:**
+
+1. **The sidecar's in-process job table goes away in Spike 2** — compute moves to RDS-backed `Job` + `Slice` rows scoped by `userId` with license-key Bearer auth on every read. The `DELETE /layout/jobs` hygiene endpoint becomes obsolete and can be removed (or kept as a no-op stub for transition compatibility) when the sidecar is retired or reduced to thin parser duties.
+
+2. **Backend Job lookup is auto-isolated** — license-key-A cannot fetch license-key-B's Jobs because the API filter is `userId`-scoped. This is a stronger property than localhost-only isolation.
+
+3. **Desktop-side `clearAllPerUserSession` stays canonical.** Any new per-user state introduced by Spike 2 work — UI slices, IndexedDB / OS-file caches, additional TanStack queries, Tauri shell-state — **must register itself with that wipe** (or be naturally covered by `queryClient.clear()` if it's a TanStack query). The maintenance discipline is "one wipe point; if you add per-user state, add it to the wipe." Reviewers should reject Spike 2 PRs that add per-user state without updating the helper.
+
+4. **Spike 2 should NOT introduce a per-license-key bearer scoped to anything outside `useEntitlementsQuery(activeKey)` and the cancel-flush path.** Today's pattern (license key flows through TanStack-cached `entitlementsClient` calls + sidecar's per-Tauri-process token) is already correct; the temptation to "stash the active license key in a singleton" must be resisted because it makes the wipe point harder to reason about.
+
+CI gate (suggested when Spike 2 lands a license-swap test fixture): a Vitest test that mounts App with a non-null saved key + a populated project state, dispatches a key-change event with a different valid key, and asserts every slice listed above is back to its initial state, the queryClient is empty, and the form-key has incremented.
 
 ---
 

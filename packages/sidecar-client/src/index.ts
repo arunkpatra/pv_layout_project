@@ -332,6 +332,14 @@ export interface LayoutJobCancelResponse {
   plots_done: number
 }
 
+/** DELETE /layout/jobs response — defense-in-depth wipe used by the
+ * desktop's `clearAllPerUserSession` on license-key swap (S3-05) so no
+ * per-user job state survives the auth-boundary transition. */
+export interface LayoutJobsFlushResponse {
+  status: "flushed"
+  jobs_flushed: number
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // S11: per-ICR move overrides and obstruction add/remove
 // ─────────────────────────────────────────────────────────────────────
@@ -424,6 +432,15 @@ export interface SidecarClient {
    * preserves whatever finished as a partial result.
    */
   cancelLayoutJob(jobId: string): Promise<LayoutJobCancelResponse>
+
+  /**
+   * Flush every in-memory layout job (auth-boundary hygiene). Called
+   * by the desktop's `clearAllPerUserSession` on license-key swap
+   * (S3-05) so no per-user job state survives the swap. Best-effort —
+   * errors are caught at the call site; the worst case is one
+   * orphaned in-memory job that remains unreachable from the UI.
+   */
+  flushLayoutJobs(): Promise<LayoutJobsFlushResponse>
 
   /**
    * SP1 / B23 — render a single LayoutResult to a 400×300 WebP preview
@@ -559,6 +576,12 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
         `/layout/jobs/${encodeURIComponent(jobId)}`,
         { method: "DELETE" }
       )
+    },
+
+    flushLayoutJobs(): Promise<LayoutJobsFlushResponse> {
+      return request<LayoutJobsFlushResponse>("/layout/jobs", {
+        method: "DELETE",
+      })
     },
 
     async renderLayoutThumbnail(

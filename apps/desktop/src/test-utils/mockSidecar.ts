@@ -119,6 +119,10 @@ export function createMockSidecarClient(
       status: "cancelled" as const,
       plots_done: 0,
     }),
+    flushLayoutJobs: vi.fn().mockResolvedValue({
+      status: "flushed" as const,
+      jobs_flushed: 0,
+    }),
     // SP1 — best-effort thumbnail render. Default: tiny placeholder
     // bytes so callers that fire-and-forget the upload chain can spy
     // call counts without bytecount assertions failing.
