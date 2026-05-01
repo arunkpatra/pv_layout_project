@@ -44,7 +44,7 @@ export function InspectorSection({
   if (!collapsible) {
     return (
       <section className={cn("px-[20px] py-[18px] border-b border-[var(--border-subtle)]", className)}>
-        <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-muted)] mb-[12px]">
+        <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-primary)] mb-[12px]">
           {title}
         </h3>
         {children}
@@ -69,7 +69,7 @@ export function InspectorSection({
           expanded ? "mb-[12px]" : "mb-0"
         )}
       >
-        <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-muted)] m-0">
+        <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-primary)] m-0">
           {title}
         </h3>
         <button

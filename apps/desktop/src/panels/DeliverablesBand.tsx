@@ -189,12 +189,9 @@ export function DeliverablesBand({
   const exportsDisabled = generating || sidecarClient === null
 
   return (
-    <div
-      className="px-[20px] py-[10px] flex flex-col gap-[6px]
-        bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
-    >
+    <div className="flex flex-col gap-[6px] border-b border-(--border-subtle) bg-(--surface-ground) px-[20px] py-[10px]">
       <div className="flex items-center gap-[8px]">
-        <span className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-muted)] mr-[4px]">
+        <span className="mr-[4px] text-[11px] font-semibold tracking-[0.04em] text-(--text-primary) uppercase">
           Export
         </span>
         {FORMATS.map((spec) => (
@@ -209,10 +206,7 @@ export function DeliverablesBand({
             aria-label={`Export ${spec.label}`}
           >
             {inFlight === spec.format ? (
-              <Loader2
-                className="size-[12px] animate-spin"
-                aria-hidden
-              />
+              <Loader2 className="size-[12px] animate-spin" aria-hidden />
             ) : (
               <Download className="size-[12px]" aria-hidden />
             )}
@@ -221,13 +215,13 @@ export function DeliverablesBand({
         ))}
       </div>
       {status && (
-        <p className="text-[11px] leading-normal flex items-center gap-[6px]">
+        <p className="flex items-center gap-[6px] text-[11px] leading-normal">
           {status.kind === "saved" ? (
             <>
-              <span className="text-[var(--text-secondary)]">
+              <span className="text-(--text-secondary)">
                 Saved {status.format.toUpperCase()} —{" "}
                 <span
-                  className="text-[var(--text-muted)] truncate inline-block max-w-[280px] align-bottom"
+                  className="inline-block max-w-[280px] truncate align-bottom text-(--text-muted)"
                   title={status.path}
                 >
                   {basename(status.path)}
@@ -236,13 +230,13 @@ export function DeliverablesBand({
               <button
                 type="button"
                 onClick={() => void handleReveal(status.path)}
-                className="text-[var(--accent-default)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-default)] rounded-[2px]"
+                className="rounded-[2px] text-(--accent-default) hover:underline focus-visible:ring-2 focus-visible:ring-(--accent-default) focus-visible:outline-none"
               >
                 Reveal
               </button>
             </>
           ) : (
-            <span className="text-[var(--error-default)]" title={status.message}>
+            <span className="text-(--error-default)" title={status.message}>
               {status.format.toUpperCase()} export failed: {status.message}
             </span>
           )}
