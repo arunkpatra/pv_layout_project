@@ -74,6 +74,7 @@ import { boundaryGeojsonFromParsed } from "./project/boundaryGeojson"
 import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
 import { layoutToGeoJson } from "./project/layoutToGeoJson"
 import { useProjectStore } from "./state/project"
+import { useCurrentLayoutJobStore } from "./state/currentLayoutJob"
 import { useLayoutParamsStore } from "./state/layoutParams"
 import { useLayoutResultStore } from "./state/layoutResult"
 import { useLayerVisibilityStore } from "./state/layerVisibility"
@@ -345,6 +346,14 @@ export function App(): JSX.Element {
   const layoutMutation = generateLayoutMutation
   const clearLayoutResult = useLayoutResultStore((s) => s.clearResult)
   const resetLayoutParams = useLayoutParamsStore((s) => s.resetToDefaults)
+  // Spike 1 Phase 6 — current async layout-job state. Read by
+  // LayoutPanel's pinned area to render running / post-run states;
+  // cleared on KMZ load + project switch so a stale "All 6 done in
+  // 3m 42s" summary from another project doesn't leak across.
+  const currentJobState = useCurrentLayoutJobStore((s) => s.jobState)
+  const clearCurrentJobState = useCurrentLayoutJobStore(
+    (s) => s.clearJobState
+  )
   const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
   const showAcCables = useLayerVisibilityStore((s) => s.showAcCables)
   const showLas = useLayerVisibilityStore((s) => s.showLas)
@@ -376,6 +385,29 @@ export function App(): JSX.Element {
       params: useLayoutParamsStore.getState().params,
     })
   }, [project, currentProject, generateLayoutMutation])
+
+  // Spike 1 Phase 6 — cooperative cancel for the in-flight async layout
+  // job. Reads the current job_id from the slice and DELETEs it on the
+  // sidecar; the next polling tick observes status=cancelled and the
+  // mutation throws LayoutJobCancelledError. No-op when no job is in
+  // flight (e.g. user hammers the button).
+  const handleCancelLayout = useCallback(() => {
+    if (!sidecarClient) return
+    const jobId = currentJobState?.job_id
+    if (!jobId) return
+    if (
+      currentJobState.status !== "queued" &&
+      currentJobState.status !== "running"
+    ) {
+      return
+    }
+    void sidecarClient.cancelLayoutJob(jobId).catch((err) => {
+      // Best-effort — if the DELETE itself fails, the polling loop
+      // still sees the eventual server state, and the user can click
+      // Generate again to start fresh.
+      console.warn("[layout] cancelLayoutJob failed:", err)
+    })
+  }, [sidecarClient, currentJobState])
 
   // Surface the upsell modal on Generate-Layout 402, mirroring the P1
   // upload path. The B16 message contains the human-readable detail
@@ -557,6 +589,7 @@ export function App(): JSX.Element {
       // (RHF's `defaultValues` is captured at mount — an in-place reset
       // wouldn't propagate to the visible form fields).
       clearLayoutResult()
+      clearCurrentJobState()
       resetLayoutParams()
       resetLayerVisibility()
       resetEditingState()
@@ -621,6 +654,7 @@ export function App(): JSX.Element {
     setProject,
     setCurrentProject,
     clearLayoutResult,
+    clearCurrentJobState,
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
@@ -648,6 +682,7 @@ export function App(): JSX.Element {
       // hydrate a previous layout result yet (P7 will, when the user picks
       // a specific run from the runs list).
       clearLayoutResult()
+      clearCurrentJobState()
       resetLayoutParams()
       resetLayerVisibility()
       resetEditingState()
@@ -713,6 +748,7 @@ export function App(): JSX.Element {
     selectRun,
     setProject,
     clearLayoutResult,
+    clearCurrentJobState,
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
@@ -764,6 +800,7 @@ export function App(): JSX.Element {
       deleteProjectMutation,
       currentProject,
       clearLayoutResult,
+      clearCurrentJobState,
       resetLayoutParams,
       resetLayerVisibility,
       resetEditingState,
@@ -796,6 +833,7 @@ export function App(): JSX.Element {
     activeTabId,
     currentProject,
     clearLayoutResult,
+    clearCurrentJobState,
     resetLayoutParams,
     resetLayerVisibility,
     resetEditingState,
@@ -1296,8 +1334,10 @@ export function App(): JSX.Element {
                   <LayoutPanel
                     key={layoutFormKey}
                     onGenerate={handleGenerate}
+                    onCancel={handleCancelLayout}
                     generating={layoutMutation.isPending}
                     noProject={!project}
+                    boundaryCount={projectCounts?.boundaries ?? null}
                   />
                   {layoutResult && <VisibilitySection />}
                   {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}

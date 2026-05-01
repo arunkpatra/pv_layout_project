@@ -28,6 +28,16 @@
  * machine via `localStorage` so the user's chosen layout survives
  * reloads. Multi-open by design (not a true accordion).
  */
+import {
+  AlertTriangle,
+  Ban,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  X,
+} from "lucide-react"
+import { useEffect, useState } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
@@ -44,25 +54,43 @@ import {
 } from "@solarlayout/ui-desktop"
 import {
   DEFAULT_LAYOUT_PARAMETERS,
+  type LayoutJobState,
   type LayoutParameters,
+  type PlotState,
+  type PlotStatus,
 } from "@solarlayout/sidecar-client"
 import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
+import { useCurrentLayoutJobStore } from "../state/currentLayoutJob"
 import { useLayoutParamsStore } from "../state/layoutParams"
 import { layoutParametersSchema } from "../state/layoutParams"
 import { useHasFeature } from "../auth/FeatureGate"
 
 interface LayoutPanelProps {
   onGenerate: (params: LayoutParameters) => void
+  /**
+   * Cancel an in-flight layout job. Wired by App.tsx — calls
+   * `sidecar.cancelLayoutJob(currentJobId)`. The slice update happens
+   * via the polling loop's next tick (cooperative cancel).
+   */
+  onCancel: () => void
   /** True while the layout mutation is in flight. */
   generating: boolean
   /** True when no project is loaded — disables the Generate button. */
   noProject: boolean
+  /**
+   * Boundary count from the parsed KMZ (computed by App.tsx via
+   * `countKmzFeatures`). Drives the pre-flight time-estimate chip.
+   * `null` when no project is loaded.
+   */
+  boundaryCount: number | null
 }
 
 export function LayoutPanel({
   onGenerate,
+  onCancel,
   generating,
   noProject,
+  boundaryCount,
 }: LayoutPanelProps) {
   // RHF owns the working form state; Zustand holds the *saved* params
   // (defaults at mount + last-submitted snapshot). Don't auto-sync on
@@ -109,34 +137,22 @@ export function LayoutPanel({
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       {/* ── Pinned action area ─────────────────────────────────────────
-          Sticks to the top of the inspector scroll container. Phase 6
-          will swap this between idle / running / post-run states; for
-          Phase 5 only the idle (Generate button) state is rendered.
-          The bottom border separates it visually from the form below
-          while scrolled. */}
-      <div
-        className="sticky top-0 z-10 px-[20px] py-[14px] flex flex-col gap-[8px]
-          bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
-      >
-        <Button
-          type="submit"
-          variant="primary"
-          size="md"
-          disabled={generating || noProject}
-          className="w-full"
-        >
-          {generating
-            ? "Generating…"
-            : noProject
-              ? "Open a KMZ to generate"
-              : "Generate layout"}
-        </Button>
-        {Object.keys(errors).length > 0 && (
-          <p className="text-[12px] text-[var(--error-default)] leading-normal">
-            Fix the validation errors above before generating.
-          </p>
-        )}
-      </div>
+          Sticks to the top of the inspector scroll container. Three
+          states swap in based on the live JobState from the
+          `currentLayoutJob` slice:
+            - idle (no job yet OR terminal job displayed as summary)
+            - running (per-plot progress list + Cancel)
+            - post-run (terminal summary line + Generate)
+          */}
+      <PinnedActionArea
+        generating={generating}
+        noProject={noProject}
+        boundaryCount={boundaryCount}
+        formHasErrors={Object.keys(errors).length > 0}
+        enableCableCalc={watch("enable_cable_calc")}
+        hasCableRouting={hasCableRouting}
+        onCancel={onCancel}
+      />
 
       {/* ── Module ──────────────────────────────────────────────────── */}
       <InspectorSection
@@ -405,6 +421,383 @@ function CableCalcFieldRow({
       </div>
     </div>
   )
+}
+
+/**
+ * PinnedActionArea — the sticky band at the top of the LayoutPanel.
+ *
+ * Three states:
+ *   - running: per-plot progress list + Cancel button
+ *   - post-run (terminal job snapshot present): summary line + Generate
+ *     (with caret-expand on partial outcomes)
+ *   - idle (no terminal snapshot): optional pre-flight chip + Generate
+ */
+function PinnedActionArea({
+  generating,
+  noProject,
+  boundaryCount,
+  formHasErrors,
+  enableCableCalc,
+  hasCableRouting,
+  onCancel,
+}: {
+  generating: boolean
+  noProject: boolean
+  boundaryCount: number | null
+  formHasErrors: boolean
+  enableCableCalc: boolean
+  hasCableRouting: boolean
+  onCancel: () => void
+}) {
+  const jobState = useCurrentLayoutJobStore((s) => s.jobState)
+  const isInflight =
+    jobState !== null &&
+    (jobState.status === "queued" || jobState.status === "running")
+
+  return (
+    <div
+      className="sticky top-0 z-10 px-[20px] py-[14px] flex flex-col gap-[10px]
+        bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
+    >
+      {isInflight ? (
+        <RunningPin jobState={jobState} onCancel={onCancel} />
+      ) : (
+        <IdlePin
+          jobState={jobState}
+          generating={generating}
+          noProject={noProject}
+          boundaryCount={boundaryCount}
+          formHasErrors={formHasErrors}
+          showPreflightChip={
+            !generating &&
+            !noProject &&
+            hasCableRouting &&
+            enableCableCalc &&
+            (boundaryCount ?? 0) > 1
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Idle / post-run pin — Generate button + optional last-run summary
+ * (when a terminal `jobState` is present) + optional pre-flight chip
+ * (when entitled + cable_calc=true + multi-plot).
+ */
+function IdlePin({
+  jobState,
+  generating,
+  noProject,
+  boundaryCount,
+  formHasErrors,
+  showPreflightChip,
+}: {
+  jobState: LayoutJobState | null
+  generating: boolean
+  noProject: boolean
+  boundaryCount: number | null
+  formHasErrors: boolean
+  showPreflightChip: boolean
+}) {
+  const isTerminal =
+    jobState !== null &&
+    (jobState.status === "done" ||
+      jobState.status === "failed" ||
+      jobState.status === "cancelled")
+
+  return (
+    <>
+      {isTerminal && jobState && <PostRunSummary jobState={jobState} />}
+      {!isTerminal && showPreflightChip && (
+        <PreflightChip boundaryCount={boundaryCount ?? 0} />
+      )}
+      <Button
+        type="submit"
+        variant="primary"
+        size="md"
+        disabled={generating || noProject}
+        className="w-full"
+      >
+        {generating
+          ? "Generating…"
+          : noProject
+            ? "Open a KMZ to generate"
+            : "Generate layout"}
+      </Button>
+      {formHasErrors && (
+        <p className="text-[12px] text-[var(--error-default)] leading-normal">
+          Fix the validation errors above before generating.
+        </p>
+      )}
+    </>
+  )
+}
+
+/**
+ * In-flight pin — header counter ("Generating layout — 2 of 6 done")
+ * plus the per-plot progress list and a Cancel button. Re-renders
+ * once a second to keep the running plot's elapsed counter live.
+ */
+function RunningPin({
+  jobState,
+  onCancel,
+}: {
+  jobState: LayoutJobState
+  onCancel: () => void
+}) {
+  // Lightweight 1-Hz tick to keep the live "(1m 14s)" counter ticking
+  // between the 2-second poll cadence. Stops automatically when the
+  // pin unmounts (job reaches terminal state).
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  return (
+    <>
+      <p className="text-[13px] text-[var(--text-primary)] font-medium">
+        Generating layout — {jobState.plots_done} of {jobState.plots_total}{" "}
+        {jobState.plots_total === 1 ? "boundary" : "boundaries"} done
+      </p>
+      <PlotList plots={jobState.plots} />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onCancel}
+        className="self-center"
+      >
+        Cancel
+      </Button>
+    </>
+  )
+}
+
+/**
+ * Terminal-state summary line. Click the caret on a partial/cancelled
+ * outcome to reveal the per-plot list with errors inline.
+ */
+function PostRunSummary({ jobState }: { jobState: LayoutJobState }) {
+  const [expanded, setExpanded] = useState(false)
+  const elapsed = totalJobElapsed(jobState)
+  const elapsedText = elapsed !== null ? ` in ${formatElapsed(elapsed)}` : ""
+
+  // Choose icon + line text + expand-affordance per outcome.
+  const isPartial =
+    jobState.status === "done" && jobState.plots_failed > 0
+  const isCancelled = jobState.status === "cancelled"
+  const isFailedJob = jobState.status === "failed"
+  const isAllDone =
+    jobState.status === "done" && jobState.plots_failed === 0
+  const canExpand = isPartial || isCancelled || isFailedJob
+
+  let line: React.ReactNode
+  if (isAllDone) {
+    line = (
+      <span className="flex items-center gap-[6px]">
+        <Check className="size-[14px] text-[var(--success-default,#22c55e)] shrink-0" />
+        All {jobState.plots_total}{" "}
+        {jobState.plots_total === 1 ? "boundary" : "boundaries"} done
+        {elapsedText}
+      </span>
+    )
+  } else if (isPartial) {
+    line = (
+      <span className="flex items-center gap-[6px]">
+        <AlertTriangle className="size-[14px] text-[var(--warning-default,#f59e0b)] shrink-0" />
+        {jobState.plots_done} of {jobState.plots_total} done{elapsedText} —{" "}
+        {summariseFailedNames(jobState.plots)} failed
+      </span>
+    )
+  } else if (isCancelled) {
+    line = (
+      <span className="flex items-center gap-[6px]">
+        <Ban className="size-[14px] text-[var(--text-muted)] shrink-0" />
+        Cancelled — {jobState.plots_done} of {jobState.plots_total} done
+        before stop
+      </span>
+    )
+  } else {
+    line = (
+      <span className="flex items-center gap-[6px]">
+        <X className="size-[14px] text-[var(--error-default)] shrink-0" />
+        Layout failed — see sidecar logs
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-[6px]">
+      <div className="flex items-center justify-between gap-[8px]">
+        <div className="text-[13px] text-[var(--text-primary)] min-w-0 flex-1 truncate">
+          {line}
+        </div>
+        {canExpand && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="shrink-0 p-[2px] -m-[2px] rounded-[4px]
+              text-[var(--text-muted)] hover:text-[var(--text-primary)]
+              hover:bg-[var(--surface-muted)] transition-colors"
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse run details" : "Expand run details"}
+          >
+            {expanded ? (
+              <ChevronDown className="size-[14px]" />
+            ) : (
+              <ChevronRight className="size-[14px]" />
+            )}
+          </button>
+        )}
+      </div>
+      {expanded && canExpand && <PlotList plots={jobState.plots} />}
+    </div>
+  )
+}
+
+/**
+ * Per-plot status list — boundary name, status icon, elapsed counter
+ * (or final elapsed for done plots, or error message for failed).
+ * Used in both the running pin and the expanded post-run summary.
+ */
+function PlotList({ plots }: { plots: PlotState[] }) {
+  return (
+    <ul className="flex flex-col gap-[2px] -mx-[4px] px-[4px] py-[6px]
+      bg-[var(--surface-muted)] rounded-[6px] text-[12px]">
+      {plots.map((p) => (
+        <li
+          key={p.index}
+          className="flex items-center gap-[8px] py-[2px] min-w-0"
+        >
+          <PlotStatusIcon status={p.status} />
+          <span
+            className="text-[var(--text-primary)] truncate min-w-0 flex-1"
+            title={p.name}
+          >
+            {p.name}
+          </span>
+          <span className="text-[var(--text-muted)] tabular-nums shrink-0">
+            {plotTimingText(p)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function PlotStatusIcon({ status }: { status: PlotStatus }) {
+  switch (status) {
+    case "running":
+      return (
+        <Loader2
+          className="size-[12px] text-[var(--accent-default)] animate-spin shrink-0"
+          aria-label="running"
+        />
+      )
+    case "done":
+      return (
+        <Check
+          className="size-[12px] text-[var(--success-default,#22c55e)] shrink-0"
+          aria-label="done"
+        />
+      )
+    case "failed":
+      return (
+        <X
+          className="size-[12px] text-[var(--error-default)] shrink-0"
+          aria-label="failed"
+        />
+      )
+    case "cancelled":
+      return (
+        <Ban
+          className="size-[12px] text-[var(--text-muted)] shrink-0"
+          aria-label="cancelled"
+        />
+      )
+    case "queued":
+    default:
+      return (
+        <span
+          className="inline-block size-[6px] rounded-full bg-[var(--text-muted)] mx-[3px] shrink-0"
+          aria-label="queued"
+        />
+      )
+  }
+}
+
+function plotTimingText(p: PlotState): string {
+  if (p.status === "queued") return "queued"
+  if (p.status === "cancelled") return "skipped"
+  if (p.status === "failed") {
+    return p.error ?? "failed"
+  }
+  if (p.status === "running" && p.started_at !== null) {
+    return `running (${formatElapsed(Date.now() / 1000 - p.started_at)})`
+  }
+  if (p.status === "done" && p.started_at !== null && p.ended_at !== null) {
+    return `done (${formatElapsed(p.ended_at - p.started_at)})`
+  }
+  return p.status
+}
+
+function formatElapsed(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds))
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  const rem = s % 60
+  return rem === 0 ? `${m}m` : `${m}m ${rem}s`
+}
+
+function totalJobElapsed(jobState: LayoutJobState): number | null {
+  // Sum of per-plot durations isn't right for parallel runs (overlap).
+  // Use min(started_at) → max(ended_at) for an honest wall-clock.
+  const starts = jobState.plots
+    .map((p) => p.started_at)
+    .filter((v): v is number => v !== null)
+  const ends = jobState.plots
+    .map((p) => p.ended_at)
+    .filter((v): v is number => v !== null)
+  if (starts.length === 0 || ends.length === 0) return null
+  return Math.max(...ends) - Math.min(...starts)
+}
+
+function summariseFailedNames(plots: PlotState[]): string {
+  const failed = plots.filter((p) => p.status === "failed")
+  const first = failed[0]
+  if (!first) return ""
+  if (failed.length === 1) return first.name
+  const second = failed[1]
+  if (failed.length === 2 && second) return `${first.name} + ${second.name}`
+  return `${first.name} + ${failed.length - 1} others`
+}
+
+/**
+ * Pre-flight expectation chip — shown when entitled + cable_calc=true +
+ * multi-plot. Sets expectations before the user clicks Generate. Skips
+ * the chip for jobs we expect to finish in <~15 s.
+ */
+function PreflightChip({ boundaryCount }: { boundaryCount: number }) {
+  return (
+    <Chip tone="neutral" className="self-start">
+      Multi-plot cable calc — {boundaryCount} boundaries.{" "}
+      {estimatedTimeRangeText(boundaryCount)}
+    </Chip>
+  )
+}
+
+function estimatedTimeRangeText(boundaryCount: number): string {
+  // Heuristic — calibrated against POC numbers from
+  // docs/post-parity/findings/2026-04-30-002-cable-perf-poc.md. The
+  // bands are intentionally wide because the per-plot time is
+  // dominated by the largest plot (Amdahl's Law), not the count.
+  if (boundaryCount <= 2) return "Estimated 1–2 min."
+  if (boundaryCount <= 4) return "Estimated 2–4 min."
+  if (boundaryCount <= 6) return "Estimated 3–8 min."
+  return "Estimated 5+ min."
 }
 
 /** Re-export so callers can use it for "Reset to defaults" affordances later. */

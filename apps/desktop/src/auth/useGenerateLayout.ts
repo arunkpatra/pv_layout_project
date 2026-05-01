@@ -67,6 +67,7 @@ import {
   PREVIEW_LICENSE_KEY_PRO,
   PREVIEW_LICENSE_KEY_PRO_PLUS,
 } from "./licenseKey"
+import { useCurrentLayoutJobStore } from "../state/currentLayoutJob"
 import { useLayoutResultStore } from "../state/layoutResult"
 import { useProjectStore } from "../state/project"
 
@@ -113,6 +114,13 @@ export interface UseGenerateLayoutMutationOptions {
   fetchImpl?: FetchLike
   /** Retry policy override (tests pass a no-op sleep). */
   retry?: RetryOptions
+  /**
+   * Polling cadence (ms) for the async layout-job loop. Defaults to
+   * 2000 ms — same value Spike 2's cloud-poll uses, so the desktop
+   * polling code is identical for local and cloud paths. Tests pass
+   * a smaller number to avoid sleeping in CI.
+   */
+  pollIntervalMs?: number
 }
 
 export function useGenerateLayoutMutation(
@@ -125,6 +133,8 @@ export function useGenerateLayoutMutation(
   const setResult = useLayoutResultStore((s) => s.setResult)
   const addRun = useProjectStore((s) => s.addRun)
   const selectRun = useProjectStore((s) => s.selectRun)
+  const setJobState = useCurrentLayoutJobStore((s) => s.setJobState)
+  const pollIntervalMs = options.pollIntervalMs ?? 2000
 
   return useMutation<GenerateLayoutResult, Error, GenerateLayoutVars>({
     mutationFn: async (vars) => {
@@ -166,11 +176,38 @@ export function useGenerateLayoutMutation(
         options.retry
       )
 
-      // Stage 2: sidecar /layout. Single-shot — sidecar errors propagate
-      // to the user-facing button. Calc has already been debited at this
-      // point; retry with the same idempotency key returns the same Run
-      // (no double-debit) when the user clicks Generate again.
-      const layoutResult = await sidecar.runLayout(vars.parsedKmz, vars.params)
+      // Stage 2: async /layout/jobs — start the job, then poll until
+      // terminal. Same compute as the legacy blocking /layout, but the
+      // request returns immediately with a job_id and the work runs in
+      // a sidecar background thread. The polling loop publishes the
+      // live JobState to the `currentLayoutJob` Zustand slice so the
+      // pinned area in LayoutPanel can render the per-plot progress
+      // list and Cancel button. Single-shot at the mutation level —
+      // sidecar errors propagate to the user-facing button. The user
+      // retries via Generate (same idempotency-key path).
+      const { job_id } = await sidecar.startLayoutJob(
+        vars.parsedKmz,
+        vars.params
+      )
+      let jobState = await sidecar.getLayoutJob(job_id)
+      setJobState(jobState)
+      while (jobState.status === "queued" || jobState.status === "running") {
+        await sleep(pollIntervalMs)
+        jobState = await sidecar.getLayoutJob(job_id)
+        setJobState(jobState)
+      }
+      if (jobState.status === "cancelled") {
+        // User-initiated abort. Throw a stable error that onError /
+        // mutationState consumers can recognise; the panel keeps the
+        // (cancelled) JobState in the slice as the post-run summary.
+        throw new LayoutJobCancelledError()
+      }
+      if (jobState.status === "failed" || !jobState.result) {
+        throw new Error(
+          "Sidecar layout job failed. See sidecar logs for details."
+        )
+      }
+      const layoutResult = jobState.result.results
 
       // Stage 3: S3 PUT result JSON. Single-shot — on 403 EXPIRED_URL the
       // caller should re-mutate (which mints a fresh URL via B16's
@@ -326,3 +363,20 @@ async function renderAndUploadThumbnail(
 
 /** B7 RUN_RESULT_SPEC.thumbnail.maxBytes — kept in sync with backend. */
 const THUMBNAIL_MAX_BYTES = 50_000
+
+/**
+ * Marker error for user-initiated cancellation. Distinct subclass so
+ * the UI can show the "Cancelled" surface instead of the generic
+ * "Layout failed" toast. Caught by the mutation's `onError` (when one
+ * is wired) or surfaced via `mutation.error` for the panel to inspect.
+ */
+export class LayoutJobCancelledError extends Error {
+  constructor() {
+    super("Layout job cancelled by user")
+    this.name = "LayoutJobCancelledError"
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}

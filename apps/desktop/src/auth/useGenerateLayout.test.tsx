@@ -139,7 +139,32 @@ function makeClient(
 function makeSidecar(
   overrides: Partial<SidecarClient> = {}
 ): SidecarClient {
+  // Spike 1 Phase 6 — mutation now calls startLayoutJob + polls
+  // getLayoutJob. Default mock returns a job that immediately reports
+  // status=done with the same STUB_LAYOUT_RESULT wrapped in the
+  // LayoutJobState shape, so the polling loop completes on the first
+  // poll and the existing test assertions about end-state still hold.
   return {
+    startLayoutJob: vi.fn().mockResolvedValue({ job_id: "stub-job-id" }),
+    getLayoutJob: vi.fn().mockResolvedValue({
+      job_id: "stub-job-id",
+      status: "done",
+      plots_total: STUB_LAYOUT_RESULT.length,
+      plots_done: STUB_LAYOUT_RESULT.length,
+      plots_failed: 0,
+      plots: STUB_LAYOUT_RESULT.map((r, i) => ({
+        index: i,
+        name: r.boundary_name,
+        status: "done",
+        started_at: 0,
+        ended_at: 0,
+        error: null,
+      })),
+      result: { results: STUB_LAYOUT_RESULT },
+    }),
+    cancelLayoutJob: vi
+      .fn()
+      .mockResolvedValue({ status: "cancelled", plots_done: 0 }),
     runLayout: vi.fn().mockResolvedValue(STUB_LAYOUT_RESULT),
     parseKmz: vi.fn(),
     health: vi.fn(),
@@ -199,6 +224,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl,
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -213,7 +239,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
     expect(client.createRunV2).toHaveBeenCalledTimes(1)
-    expect(sidecar.runLayout).toHaveBeenCalledTimes(1)
+    expect(sidecar.startLayoutJob).toHaveBeenCalledTimes(1)
     expect(fetchImpl).toHaveBeenCalledTimes(1) // S3 PUT
 
     expect(result.current.data?.run.id).toBe("run_abc")
@@ -230,6 +256,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -269,6 +296,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl,
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -298,6 +326,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -335,6 +364,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -367,6 +397,7 @@ describe("useGenerateLayoutMutation — happy path", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -413,6 +444,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl,
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -429,7 +461,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
     const e = result.current.error as EntitlementsError
     expect(e.status).toBe(402)
     expect(e.code).toBe("PAYMENT_REQUIRED")
-    expect(sidecar.runLayout).not.toHaveBeenCalled()
+    expect(sidecar.startLayoutJob).not.toHaveBeenCalled()
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
@@ -451,6 +483,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep, maxAttempts: 3 },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -475,7 +508,12 @@ describe("useGenerateLayoutMutation — error paths", () => {
   it("propagates sidecar errors after B16 succeeded — PUT NOT called", async () => {
     const client = makeClient()
     const sidecar = makeSidecar({
-      runLayout: vi.fn().mockRejectedValue(
+      // Phase 6: mutation orchestrates startLayoutJob → poll loop. A
+      // sidecar startup failure (e.g. shapely OperationalError during
+      // run_layout_multi setup) surfaces as a rejected startLayoutJob
+      // call, which the mutation propagates without ever reaching the
+      // S3 PUT step.
+      startLayoutJob: vi.fn().mockRejectedValue(
         new Error("sidecar crashed: shapely OperationalError")
       ),
     })
@@ -487,6 +525,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl,
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -518,6 +557,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
         useGenerateLayoutMutation(REAL_KEY, client, sidecar, {
           fetchImpl,
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -565,7 +605,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
     await waitFor(() => expect(result.current.isError).toBe(true))
 
     expect(client.createRunV2).not.toHaveBeenCalled()
-    expect(sidecar.runLayout).not.toHaveBeenCalled()
+    expect(sidecar.startLayoutJob).not.toHaveBeenCalled()
     expect(result.current.error?.message).toMatch(/preview/i)
   })
 
@@ -579,6 +619,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
         useGenerateLayoutMutation(null, client, sidecar, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
@@ -592,7 +633,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
     })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(client.createRunV2).not.toHaveBeenCalled()
-    expect(sidecar.runLayout).not.toHaveBeenCalled()
+    expect(sidecar.startLayoutJob).not.toHaveBeenCalled()
   })
 
   it("throws when sidecar is null", async () => {
@@ -604,6 +645,7 @@ describe("useGenerateLayoutMutation — error paths", () => {
         useGenerateLayoutMutation(REAL_KEY, client, null, {
           fetchImpl: s3OkFetch(),
           retry: { sleep: noSleep },
+          pollIntervalMs: 0,
         }),
       { wrapper: Wrapper }
     )
