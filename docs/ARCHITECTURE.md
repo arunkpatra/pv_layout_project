@@ -1,12 +1,14 @@
-# SolarLayout Desktop — Platform Architecture
+# SolarLayout — Platform Architecture
 
-**Status:** Draft for review
-**Last updated:** 2026-04-24
-**Owning repo:** `/Users/arunkpatra/codebase/pv_layout_project`
+**Status:** Active
+**Last updated:** 2026-05-01 (post-merge)
+**Owning repo:** `solarlayout` on GitHub (folder `/Users/arunkpatra/codebase/pv_layout_project` locally)
+**Scope:** desktop engineering tool (primary) + cloud support stack (in-repo since 2026-05-01)
 **Related repos (read-only reference):**
 
-- `PVlayout_Advance` — the current PyQt5 desktop app, source of truth for all domain logic
-- `renewable_energy` (mvp_web + mvp_api + mvp_db) — marketing site, user dashboard, entitlements API, database
+- `PVlayout_Advance` — the legacy PyQt5 desktop app, source of truth for all desktop domain logic (frozen at branch `baseline-v1-20260429`).
+
+The cloud surface (mvp_web + mvp_admin + mvp_api + mvp_db) used to live in a sibling `renewable_energy` repo; it was merged into this repo on 2026-05-01 via `git subtree`. See §13 below for the cloud architecture and [docs/post-parity/PRD-merge-spike.md](./post-parity/PRD-merge-spike.md) for the merge playbook.
 
 ---
 
@@ -78,32 +80,30 @@ Deliver a single native desktop application — Windows, macOS, Linux — that:
 
 ## 3. Repo layout
 
-Self-contained monorepo. No dependency on `renewable_energy`.
+Single Bun-workspaces monorepo housing both desktop and cloud surfaces. Desktop and cloud have separate release cadences, toolchains, and deploy targets — but share lint/typecheck conventions, the `@solarlayout/*` package scope, and a unified CI pipeline.
 
 ```
-pv_layout_project/
+solarlayout/  (folder name on disk: pv_layout_project/)
 ├── apps/
-│   └── desktop/                        Tauri + React desktop app
-│       ├── src/                        React frontend
-│       │   ├── canvas/MapCanvas.tsx        replaces matplotlib FigureCanvas
-│       │   ├── panels/InputPanel.tsx       replaces gui/input_panel.py
-│       │   ├── panels/SummaryPanel.tsx
-│       │   ├── dialogs/StartupDialog.tsx   replaces gui/startup_dialog.py
-│       │   ├── dialogs/LicenseKeyDialog.tsx
-│       │   ├── dialogs/LicenseInfoDialog.tsx
-│       │   ├── dialogs/HelpDialog.tsx
-│       │   ├── hooks/useSidecar.ts         typed RPC to pvlayout-engine
-│       │   ├── hooks/useEntitlements.ts
-│       │   ├── state/projectStore.ts       Zustand store
-│       │   └── App.tsx
-│       ├── src-tauri/                  Rust shell
-│       │   ├── src/main.rs
-│       │   ├── src/sidecar.rs          spawn + health-check
-│       │   ├── src/keyring.rs          OS keyring wrapper
-│       │   └── tauri.conf.json
-│       └── package.json
+│   ├── desktop/                        Tauri + React desktop app
+│   │   ├── src/                        React frontend
+│   │   │   ├── canvas/MapCanvas.tsx        replaces matplotlib FigureCanvas
+│   │   │   ├── panels/InputPanel.tsx       replaces gui/input_panel.py
+│   │   │   ├── panels/SummaryPanel.tsx
+│   │   │   ├── dialogs/{StartupDialog,LicenseKeyDialog,LicenseInfoDialog,HelpDialog}.tsx
+│   │   │   ├── hooks/useSidecar.ts         typed RPC to pvlayout-engine
+│   │   │   ├── hooks/useEntitlements.ts
+│   │   │   ├── state/projectStore.ts       Zustand store
+│   │   │   └── App.tsx
+│   │   ├── src-tauri/                  Rust shell
+│   │   │   ├── src/{main,sidecar,keyring}.rs
+│   │   │   └── tauri.conf.json
+│   │   └── package.json
+│   ├── mvp_web/                        Next.js 16 — solarlayout.in (marketing + user dashboard)
+│   ├── mvp_admin/                      Next.js 16 — admin.solarlayout.in (Clerk-gated admin tool)
+│   └── mvp_api/                        Hono v4 on Bun — api.solarlayout.in (entitlements, billing, telemetry)
 ├── python/
-│   └── pvlayout_engine/                The sidecar
+│   └── pvlayout_engine/                The desktop sidecar
 │       ├── pvlayout_engine/
 │       │   ├── server.py               FastAPI app; 127.0.0.1 + token
 │       │   ├── routes/
@@ -115,24 +115,31 @@ pv_layout_project/
 │       │   ├── schemas.py              pydantic mirrors of pvlayout_core/models/project.py
 │       │   └── main.py                 uvicorn entry
 │       ├── pvlayout_core/              EXACT copy of PVlayout_Advance/{core,models,utils}
-│       ├── tests/
-│       │   ├── golden/                 reference KMZs + expected output JSONs
-│       │   └── test_*.py
+│       ├── tests/                      pytest (123 passed + 6 skipped at HEAD)
 │       ├── pvlayout-engine.spec        single PyInstaller spec
 │       └── pyproject.toml
 ├── packages/
-│   ├── ui/                             shadcn components, Nova theme tokens
+│   ├── ui-desktop/                     shadcn primitives for the Tauri desktop (was `ui` pre-merge)
 │   ├── sidecar-client/                 generated TS client from FastAPI OpenAPI
-│   └── entitlements-client/            tiny hand-written client for /entitlements + /usage/report
+│   ├── entitlements-client/            hand-written client for /entitlements + /usage/report
+│   ├── ui/                             shadcn primitives for the Next.js cloud apps
+│   ├── mvp_db/                         Prisma 7 schema + generated client (Postgres)
+│   ├── shared/                         shared TS types (consumed by mvp_api)
+│   ├── eslint-config/                  shared ESLint flat configs
+│   └── typescript-config/              shared tsconfig presets
 ├── docs/
 │   ├── ARCHITECTURE.md                 (this file)
-│   └── SPIKE_PLAN.md
-├── turbo.json
-├── package.json
-└── README.md
+│   ├── PLAN.md                         active desktop backlog
+│   ├── DESIGN_FOUNDATIONS.md           desktop design system foundations
+│   ├── adr/                            architecture decision records
+│   ├── initiatives/                    active V2 backend backlog + cloud spike plans
+│   └── post-parity/                    PRDs, findings, resume docs
+├── turbo.json                          unified pipelines (desktop + cloud)
+├── package.json                        Bun workspaces root (name: "solarlayout")
+└── .github/workflows/                  ci.yml + platform-deployment.yml + release.yml
 ```
 
-**Why self-contained:** the desktop product has a different release cadence, toolchain, and signing story than the web product. Two endpoints (`/entitlements`, `/usage/report`) are a small enough contract to hand-write a client for.
+**Why one repo, two surfaces:** post-merge it's mechanically simpler — one install, one CI run, one place for cross-cutting changes (e.g., adding a feature to the desktop that requires a new mvp_api endpoint no longer needs cross-repo coordination). The runtime separation is preserved through wire contracts (§13.4) and ADR-0004's "cloud is passive" principle.
 
 ---
 
@@ -420,4 +427,66 @@ Deferred to relevant spikes:
 - No custom icon language invention — we extend Lucide, we don't replace it.
 - No illustration system in v1.
 - No marketing-quality bespoke components in v1; we ship the engineering tool and let the marketing site do marketing.
+
+---
+
+## 13. Cloud surface
+
+Three Next.js / Hono apps and a Postgres database, all in this repo since the 2026-05-01 merge. The cloud is **passive storage + auth + billing** per [ADR-0004](./adr/0004-cloud-as-passive-storage.md): no engineering compute, no rendering, no model state. Desktop is the engineering tool; cloud holds entitlements, accepts opt-in artifact uploads, lists past designs, and runs the marketing/billing/admin surfaces.
+
+### 13.1 Apps
+
+| App | Domain | Stack | Hosted on | Purpose |
+|---|---|---|---|---|
+| `apps/mvp_web` | `solarlayout.in` (apex; `www.` redirects) | Next.js 16 App Router + Clerk + Stripe | Vercel | Marketing pages, sign-up/sign-in, pricing, Stripe checkout, user dashboard, license key issuance, downloads page, "your past designs" listing |
+| `apps/mvp_admin` | `admin.solarlayout.in` | Next.js 16 App Router + Clerk | Vercel | Internal admin tool — user lookup, plan management, transaction view, manual entitlement adjustments. Clerk-gated to admin role only. |
+| `apps/mvp_api` | `api.solarlayout.in` | Hono v4 on Bun runtime | Vercel | Entitlements API (`/v2/entitlements`), usage telemetry (`/v2/usage/report`), billing endpoints, Stripe webhook, project CRUD, S3 upload signing. License-key bearer auth for desktop; Clerk JWT for browser. |
+
+All three deploy from this repo via `.github/workflows/platform-deployment.yml` (workflow_dispatch only — manual trigger). The deploy uses Vercel CLI, not Vercel's git integration. Vercel team is `Journium`.
+
+### 13.2 Database
+
+| Component | Technology | Notes |
+|---|---|---|
+| `packages/mvp_db` | Prisma 7 + `@prisma/extension-semantic-id` | Schema source of truth; generates client to `src/generated/prisma`. Module resolution is **NodeNext** — consumers depend on the built dist (see CLAUDE.md §11 workspace resolution). |
+| Postgres | AWS RDS, us-east-1, instance `journium.cbuwaoikc0qr.us-east-1.rds.amazonaws.com:5432` | Single instance hosts separate `staging` + `production` DBs. Both at migration HEAD as of 2026-05-01. Credentials in gitignored `.env.staging` + `.env.production` at repo root. |
+
+Migrations are applied via `bunx prisma migrate deploy` after sourcing the relevant env file (see CLAUDE.md §8 for the command pattern). Local development uses Docker Compose Postgres on `localhost:5432`.
+
+### 13.3 Object storage
+
+| Bucket | Region | Purpose |
+|---|---|---|
+| `solarlayout-{local,staging,prod}-downloads` | ap-south-1 | Desktop installer artifacts, marketing PDFs |
+| `solarlayout-{local,staging,prod}-projects` | ap-south-1 | User-uploaded KMZ / PDF / DXF artifacts (opt-in from desktop, listed on dashboard) |
+
+AWS account `378240665051`. CI uses GitHub Actions OIDC; the trust policy currently still names `repo:SolarLayout/renewable_energy:*` — cosmetic, will update when the cable-engine workflow lands.
+
+### 13.4 Wire contracts (desktop ↔ cloud)
+
+The desktop app speaks to `api.solarlayout.in` over HTTPS. Two contracts matter:
+
+- **`GET /v2/entitlements`** — license-key bearer auth. Returns the V2 envelope `{success: true, data: {...}}` with the user's plans, available feature keys, and calculation quota. Source of truth for feature-key strings is the registry per [ADR-0005](./adr/0005-feature-key-registry.md). Response shape lives in `packages/shared/src/types/v2.ts`; both ends mirror it.
+- **`POST /v2/usage/report`** — license-key bearer auth. Telemetry sink for layout / export / energy-yield calls. Fire-and-forget on the desktop side; queued + retried on offline.
+
+V2 errors use a `V2ErrorCode` discriminated union (also in `packages/shared`); both ends key off it for messaging. The wider V2 endpoint surface (project CRUD, S3 upload signing) is laid out in [docs/initiatives/post-parity-v2-backend-plan.md](./initiatives/post-parity-v2-backend-plan.md) and consumed by the desktop's V2 client extension.
+
+Per the principle in CLAUDE.md §2 ("External contracts bind before code"): even though both ends now live in this repo, the boundary is real (different runtimes, JSON over HTTPS), and contract changes still flow one direction — `packages/shared` updates first, then the consumer mirrors.
+
+### 13.5 Auth
+
+| Surface | Mechanism | Why |
+|---|---|---|
+| Desktop ↔ mvp_api | License-key bearer (`sl_live_*`) | Desktop has no Clerk integration. Keys are issued by mvp_api on first authenticated dashboard request, persisted in OS keyring on the desktop, sent as `Authorization: Bearer sl_live_…` |
+| Browser ↔ mvp_web / mvp_admin | Clerk session | Standard Clerk patterns; mvp_admin further gates by admin role |
+| Browser ↔ mvp_api (when called from mvp_web's dashboard or mvp_admin) | Clerk JWT | mvp_api accepts Clerk JWTs for browser-originating calls; license-key bearer for desktop |
+| Stripe → mvp_api | Stripe-signed webhook | Live at `api.solarlayout.in/webhooks/stripe`; verified per Stripe's signing guidance |
+
+**Desktop never holds a Clerk token**, never authenticates against Clerk. The license-key model is intentional — no browser cookies, no OAuth flow, no token refresh, no SSO. The user pastes a key once; it lives in the OS keyring forever.
+
+### 13.6 Deployment + CI
+
+- **CI (`.github/workflows/ci.yml`):** desktop gates (lint/typecheck/test/build) + sidecar pytest, runs on every PR and main push. Clerk test publishable key is hardcoded in the workflow because `NEXT_PUBLIC_*` keys are public by design — it's needed for the Next.js prerender step.
+- **Cloud deploy (`.github/workflows/platform-deployment.yml`):** `workflow_dispatch` only — manual trigger. Deploys mvp_web, mvp_admin, mvp_api to Vercel via Vercel CLI. Authentication via `VERCEL_TOKEN`. No git-integration auto-deploy on Vercel side.
+- **Desktop release (`.github/workflows/release.yml`):** triggers on `v*` tag push; matrix builds across Windows, macOS x64/arm64, Linux; signs + notarizes; publishes installer artifacts.
 

@@ -12,7 +12,7 @@ bunx --bun shadcn@latest add <component> --cwd packages/ui
 bunx --bun shadcn@latest add --all --overwrite --cwd packages/ui
 ```
 
-Always install here, never directly into `apps/web` or other apps.
+Always install here, never directly into `apps/mvp_web`, `apps/mvp_admin`, or other consuming apps.
 
 ## Combobox — DO NOT USE the nova default
 
@@ -25,9 +25,9 @@ Use **Lucide React** (`lucide-react`): `import { ChevronDown } from "lucide-reac
 ## Exports
 
 Named path exports only — no barrel index:
-- `@renewable-energy/ui/components/button`
-- `@renewable-energy/ui/lib/utils` (exports `cn()`)
-- `@renewable-energy/ui/hooks/use-mobile`
+- `@solarlayout/ui/components/button`
+- `@solarlayout/ui/lib/utils` (exports `cn()`)
+- `@solarlayout/ui/hooks/use-mobile`
 
 ## Tailwind
 
@@ -37,8 +37,10 @@ Named path exports only — no barrel index:
 ## Adding a New App to the Monorepo
 
 When a new app consumes this package:
-1. Add `@renewable-energy/ui` to the app's `package.json` dependencies
-2. Add `@renewable-energy/ui/*` path alias in the app's `tsconfig.json`
-3. Add `"@renewable-energy/ui"` to the app's `transpilePackages` in `next.config.*`
+1. Add `@solarlayout/ui` to the app's `package.json` dependencies
+2. Add `@solarlayout/ui/*` path alias in the app's `tsconfig.json`
+3. Add `"@solarlayout/ui"` to the app's `transpilePackages` in `next.config.*`
 4. Add an `@source "../../../apps/<new-app>/**/*.{ts,tsx}"` line to `src/styles/globals.css`
-5. Import `@renewable-energy/ui/globals.css` in the app's root layout
+5. Import `@solarlayout/ui/globals.css` in the app's root layout
+
+> Note: `packages/ui` (this package, `@solarlayout/ui`) hosts shadcn primitives for the **web/admin Next.js apps**. The Tauri desktop app uses a separate library at `packages/ui-desktop` (`@solarlayout/ui-desktop`) — different design system, different consumers, no overlap.

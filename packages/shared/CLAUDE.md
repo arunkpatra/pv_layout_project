@@ -1,8 +1,9 @@
 # packages/shared — Shared TypeScript Types
 
 Pure type definitions only. No runtime code, no tests, no dependencies.  
-Used by `apps/api` (compiled dist) and `packages/api-client` (compiled dist).  
-`apps/web` resolves it via a `tsconfig.json` path alias pointing to source (Bundler resolution).
+Used by `apps/mvp_api` (Hono backend) as a workspace dep. Type-only — consumers
+import from `@solarlayout/shared` via Bun's workspace resolution; no compiled
+dist required.
 
 ## Key Type Contracts
 
@@ -14,5 +15,5 @@ Used by `apps/api` (compiled dist) and `packages/api-client` (compiled dist).
 
 - Add to the relevant file in `src/types/`
 - Re-export from `src/index.ts`
-- Run `bun run build` (or `tsc --build`) — consumers that use compiled dist need a fresh build before they can resolve the new types
+- Consumers pick up changes via workspace resolution; no rebuild required for type-only changes
 - No migration or test needed for type-only changes

@@ -1,7 +1,7 @@
 # ADR 0004: Cloud is passive storage — desktop is the engineering tool
 Date: 2026-04-24
 Spike: S8.8 (decision codified ahead of S12 design)
-Status: accepted
+Status: accepted (with 2026-05-01 post-merge note — see bottom)
 
 ## Context
 
@@ -57,3 +57,11 @@ Detailed contract — endpoint shape, auth, retry behavior, dashboard listing UI
 - **Cross-device project sync** ("open this design on a different laptop") — out of scope. Possible future product feature; would require revisiting this ADR.
 - **Real-time collaboration** ("two engineers editing the same plant") — out of scope. Same.
 - **Versioned project history in cloud** — out of scope. The user's local Tauri filesystem is the source of truth for project state.
+
+## 2026-05-01 post-merge note
+
+The Context section above describes "two repositories" (`pv_layout_project` and `renewable_energy`). On 2026-04-30/05-01 those repos were merged into a single `solarlayout` monorepo (folder name on disk remains `pv_layout_project` for now). `apps/mvp_web`, `apps/mvp_admin`, `apps/mvp_api`, and `packages/mvp-db` now live alongside the desktop app and shared packages in this repo.
+
+The merge does **not** change the decision. The boundary this ADR codifies is between the **desktop runtime** and the **cloud runtime**, not between two git repositories. The cloud apps are still passive storage + entitlements + telemetry; the desktop is still where every engineering computation happens. Whether the cloud code lives in this repo or a sibling repo is a delivery-mechanics choice, not an architecture choice.
+
+What changed mechanically: references to `renewable_energy` in the Context and Decision sections should now be read as references to `apps/mvp_*` and `packages/mvp-db` within this repo. The "no cloud-side compute infrastructure" consequence still holds — `apps/mvp_api` is Hono + Postgres + Vercel, no compute layer added.

@@ -1,16 +1,22 @@
-# pv_layout_project — Claude Code Context
+# solarlayout — Claude Code Context
 
 **Read this file at the start of every session on this repo. It is the canonical map of what this project is, where things live, how they fit together, and how we work.**
+
+> **Repo identity:** GitHub `SolarLayout/solarlayout`. Local working directory still `pv_layout_project/` for now (folder rename pending; not blocking). Was two repos until 2026-05-01 — see §1.
 
 ---
 
 ## 1. What this project is
 
-A ground-up rewrite of the **SolarLayout** desktop product — a native desktop application (Windows, macOS, Linux) for automated solar PV plant layout design. Given a KMZ boundary, module specs, and plant parameters, it places panel tables, ICR (Inverter Control Room) buildings, string inverters, DC/AC cables, lightning arresters, and exports to KMZ, DXF, and PDF. It also computes 25-year energy yield.
+The **SolarLayout** product surface — desktop engineering tool plus cloud support stack — in one monorepo.
 
-**Why a rewrite:** the current PyQt5 + matplotlib app (`PVlayout_Advance` — read-only reference) is functionally complete but has a 90s-era desktop UI. This repo replaces the UI layer with a modern native-feel shell while preserving 100% of the domain logic.
+**Desktop (primary product, primary focus of this repo):** A ground-up rewrite of the SolarLayout desktop product — a native desktop application (Windows, macOS, Linux) for automated solar PV plant layout design. Given a KMZ boundary, module specs, and plant parameters, it places panel tables, ICR (Inverter Control Room) buildings, string inverters, DC/AC cables, lightning arresters, and exports to KMZ, DXF, and PDF. It also computes 25-year energy yield. **Why a rewrite:** the legacy PyQt5 + matplotlib app (`PVlayout_Advance` — read-only reference) is functionally complete but has a 90s-era desktop UI. This repo replaces the UI layer with a modern native-feel shell while preserving 100% of the domain logic.
 
-**Quality bar:** [Claude Desktop](https://claude.ai/download) for chrome, typography, motion, and color discipline. [Linear](https://linear.app) for engineering-tool density. [Figma](https://www.figma.com) for canvas+inspector interactions. Reference screenshots at `reference_screenshots_for_UX_dsktop/{light_theme,dark_theme}/` are normative.
+**Cloud (supporting surface, in-repo since merge):** the marketing site (`solarlayout.in` via `apps/mvp_web`), the user dashboard + payments (Clerk + Stripe via `mvp_web` + `apps/mvp_api`), the entitlements + telemetry API (`api.solarlayout.in` via `mvp_api`), the admin tool (`admin.solarlayout.in` via `apps/mvp_admin`), and the Postgres schema (`packages/mvp_db`). Per [ADR-0004](./docs/adr/0004-cloud-as-passive-storage.md): cloud is **passive** — no engineering compute, no rendering. Desktop does everything; cloud holds entitlements, accepts uploads, lists past designs.
+
+**Why merged (2026-05-01):** the `renewable_energy` repo (which hosted the cloud apps) was merged into this repo via `git subtree` with full history preservation. One repo, one CI, one deploy pipeline, one place to reason about cross-cutting changes. Burn-the-boats migration: prod was cut over, both DBs are at migration HEAD, the old GitHub repo is archive-pending. See [docs/post-parity/PRD-merge-spike.md](./docs/post-parity/PRD-merge-spike.md) for the playbook and [docs/post-parity/RESUME-2026-05-01-post-merge.md](./docs/post-parity/RESUME-2026-05-01-post-merge.md) for the post-merge state snapshot.
+
+**Quality bar (desktop):** [Claude Desktop](https://claude.ai/download) for chrome, typography, motion, and color discipline. [Linear](https://linear.app) for engineering-tool density. [Figma](https://www.figma.com) for canvas+inspector interactions. Reference screenshots at `reference_screenshots_for_UX_dsktop/{light_theme,dark_theme}/` are normative.
 
 ---
 
@@ -24,7 +30,7 @@ A ground-up rewrite of the **SolarLayout** desktop product — a native desktop 
 - **Backlog-driven.** Work proceeds row-by-row through [docs/PLAN.md](./docs/PLAN.md). Pick the top `todo` row; do it; flip to `done`. No spike-execution protocol, no per-row gate memo.
 - **Tiered process per row (post-parity).** T1 = build + test. T2 = T1 + integration test (typically across desktop ↔ sidecar ↔ V2 backend). T3 = T1 + a short decision memo at `docs/post-parity/findings/YYYY-MM-DD-NNN-<slug>.md`. The row's tier is non-negotiable for that row; don't lighten or heavyen it on the fly. (The parity-era T1/T2/T3 model — port + parity-test + solar-domain memo — applied through 2026-04-29 and is preserved in the archived parity table.)
 - **No out-of-plan features.** If a request comes in that isn't in PLAN.md or required by an in-PLAN row's acceptance, it waits until the table is fully `done` or the row is explicitly added.
-- **V2 backend is a hard dependency for most desktop rows.** The active backend plan lives in the `renewable_energy` repo at `docs/initiatives/post-parity-v2-backend-plan.md` (branch `post-parity-v2-backend`), executed in a separate Claude Code session. This repo's [docs/post-parity/PLAN-backend.md](./docs/post-parity/PLAN-backend.md) is the superseded scoping draft — read for additional rationale only.
+- **V2 backend is a hard dependency for most desktop rows.** The active backend plan lives in this repo at [docs/initiatives/post-parity-v2-backend-plan.md](./docs/initiatives/post-parity-v2-backend-plan.md) (brought in by the 2026-05-01 merge; was previously in the separate `renewable_energy` repo on its `post-parity-v2-backend` branch). [docs/post-parity/PLAN-backend.md](./docs/post-parity/PLAN-backend.md) is the superseded scoping draft — read for additional rationale only. With one repo there is no longer a separate backend session — desktop and cloud work share this CLAUDE.md.
 - **Functional parity is the floor, not the ceiling.** Per Prasanta's 2026-04-29 directive: whatever a user could do in the legacy PyQt5 app, the new app must support. UI/UX architecture is unconstrained — original quality bar (Claude Desktop chrome / Linear density / Figma canvas-inspector / semantic tokens / light-first with dark as preview) holds.
 - **Design bar is explicit and non-negotiable** for code that lands in the new-app UI surface — see §12 of `ARCHITECTURE.md` and `DESIGN_FOUNDATIONS.md`. "It works" is not done. "It matches the quality bar" is done.
 
@@ -36,7 +42,7 @@ Each row has a tight scope. Execute end-to-end without leaking. But when porting
 
 ### External contracts bind before code
 
-Names that cross a boundary to another repo or service — feature-key strings, API response shapes, export format IDs, sidecar route paths — have a source of truth outside this repo. Read that source before typing the name in this one. Preview and mock data is silent about contract divergence; assume it's lying until a contract test or the real file agrees. New names flow one direction: the external contract changes first, we mirror.
+Names that cross a boundary between runtimes — feature-key strings, API response shapes, export format IDs, sidecar route paths, mvp_api wire shapes — have a single source of truth. Read that source before typing the name elsewhere. The merge put desktop and cloud in one repo but **the boundary is still real**: Tauri runs in the user's webview, the sidecar runs as a localhost subprocess, mvp_api runs on Vercel. They exchange JSON over HTTPS, not function calls. Preview and mock data is silent about contract divergence; assume it's lying until a contract test or the real file agrees. New names flow one direction: the contract source-of-truth changes first, the other side mirrors.
 
 Full principle, post-mortem of the S7/S10 incident that landed it, authoritative source-of-truth file table, and operational steps: [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md). Feature-key registry policy: [ADR-0005](./docs/adr/0005-feature-key-registry.md).
 
@@ -53,44 +59,60 @@ Full principle, post-mortem of the S7/S10 incident that landed it, authoritative
 ## 3. Repository map
 
 ```
-pv_layout_project/
+pv_layout_project/                       ← folder name; GitHub repo is "solarlayout"
 ├── CLAUDE.md                            ← this file
 ├── README.md
 ├── docs/
-│   ├── PLAN.md                          active backlog (tier-graded, domain-grouped)
-│   ├── ARCHITECTURE.md                  canonical architecture
-│   ├── DESIGN_FOUNDATIONS.md            design system foundations
+│   ├── PLAN.md                          active desktop backlog (tier-graded)
+│   ├── ARCHITECTURE.md                  canonical architecture (desktop + cloud)
+│   ├── DESIGN_FOUNDATIONS.md            design system foundations (desktop)
 │   ├── adr/                             architecture decision records
-│   ├── design/
-│   │   ├── light/                       light mocks
-│   │   └── dark/                        dark mocks
+│   ├── design/{light,dark}/             desktop mocks
+│   ├── initiatives/
+│   │   └── post-parity-v2-backend-plan.md   active V2 backend backlog
 │   ├── parity/baselines/                legacy numeric capture data (test fixture)
 │   ├── principles/                      cross-cutting principles
+│   ├── post-parity/                     PRDs, findings, resume docs (post-2026-04-29)
 │   └── historical/                      superseded planning artifacts (audit trail; do not modify)
 ├── reference_screenshots_for_UX_dsktop/
 │   ├── light_theme/                     Claude Desktop light — normative
 │   └── dark_theme/                      Claude Desktop dark — normative
 ├── apps/
-│   └── desktop/                         Tauri 2 + React 19 + TS desktop app
-│       ├── src/                         React frontend
-│       └── src-tauri/                   Rust shell
+│   ├── desktop/                         Tauri 2 + React 19 + TS desktop app
+│   │   ├── src/                         React frontend
+│   │   └── src-tauri/                   Rust shell
+│   ├── mvp_web/                         Next.js 16 — solarlayout.in (marketing + dashboard)
+│   ├── mvp_admin/                       Next.js 16 — admin.solarlayout.in (Clerk-gated)
+│   └── mvp_api/                         Hono v4 (Bun) — api.solarlayout.in (entitlements, billing, telemetry)
 ├── python/
-│   └── pvlayout_engine/                 FastAPI sidecar
+│   └── pvlayout_engine/                 FastAPI sidecar (desktop's compute engine)
 │       ├── pvlayout_engine/             FastAPI server + schemas + routes
 │       ├── pvlayout_core/               EXACT copy of PVlayout_Advance/{core,models,utils}
 │       └── tests/
 ├── packages/
-│   ├── ui/                              shadcn-based component library
+│   ├── ui-desktop/                      shadcn primitives for the Tauri desktop app (was `ui` pre-merge)
 │   ├── sidecar-client/                  generated TS client from FastAPI OpenAPI
-│   └── entitlements-client/             hand-written client for api.solarlayout.in
-├── turbo.json
-├── package.json                         Bun workspaces root
-└── .github/workflows/                   CI (added in S4+)
+│   ├── entitlements-client/             hand-written client for api.solarlayout.in (desktop-side)
+│   ├── ui/                              shadcn primitives for the Next.js cloud apps
+│   ├── mvp_db/                          Prisma 7 schema + generated client (Postgres)
+│   ├── shared/                          shared TS types (consumed by mvp_api)
+│   ├── eslint-config/                   shared ESLint flat configs
+│   └── typescript-config/               shared tsconfig presets
+├── turbo.json                           Turborepo pipelines (unified for desktop + cloud)
+├── package.json                         Bun workspaces root (name: "solarlayout")
+└── .github/workflows/
+    ├── ci.yml                           desktop + cloud gates (lint/typecheck/test/build + sidecar pytest)
+    ├── platform-deployment.yml          workflow_dispatch — deploys mvp_{web,admin,api} to Vercel
+    └── release.yml                      desktop release pipeline
 ```
+
+**`packages/ui` vs `packages/ui-desktop`:** they're different libraries for different worlds — `ui` is for the Next.js cloud apps (mvp_web/mvp_admin), `ui-desktop` is for the Tauri desktop app. They share the shadcn ancestry but have diverged on tokens, components in scope, and consumers. Don't cross-import. Pre-merge they both happened to be called `@solarlayout/ui`; the desktop one was renamed to `@solarlayout/ui-desktop` during the merge to break the collision.
 
 ---
 
 ## 4. Tech stack at a glance
+
+### 4.1 Desktop
 
 | Layer | Technology | Why |
 |---|---|---|
@@ -107,13 +129,38 @@ pv_layout_project/
 | Sidecar | **Python 3.12+** + **FastAPI** + **uvicorn** | Minimal overhead around existing Python core |
 | Python core | **pvlayout_core** (copied from PVlayout_Advance) | Shapely, pyproj, simplekml, matplotlib (PDF only), ezdxf, numpy |
 | Python tooling | **uv** + **pyproject.toml** | Modern, fast |
-| Monorepo | **Turborepo** + **Bun workspaces** | Consistent gates, selective builds |
 | Sidecar packaging | **PyInstaller** (onefile) | Mature; matches PVlayout_Advance pattern |
 | Desktop packaging | **Tauri bundler** | MSI / DMG / AppImage / DEB |
 
-**Explicitly NOT using:** PyQt5, PySide2/6, Electron, Flutter, Qt Quick/QML.
+**Explicitly NOT using on desktop:** PyQt5, PySide2/6, Electron, Flutter, Qt Quick/QML.
 
-**Architecture one-liner:** Tauri Rust shell ↔ React frontend ↔ localhost HTTP ↔ PyInstaller-bundled Python sidecar running `pvlayout_core` verbatim. External: `api.solarlayout.in` for entitlements + usage telemetry only.
+**Desktop architecture one-liner:** Tauri Rust shell ↔ React frontend ↔ localhost HTTP ↔ PyInstaller-bundled Python sidecar running `pvlayout_core` verbatim. External: `api.solarlayout.in` for entitlements + usage telemetry only.
+
+### 4.2 Cloud
+
+| Layer | Technology | Why |
+|---|---|---|
+| Marketing + dashboard | **Next.js 16** (App Router) on **Vercel** | mvp_web — `solarlayout.in` |
+| Admin tool | **Next.js 16** (App Router) on **Vercel** | mvp_admin — `admin.solarlayout.in` |
+| API server | **Hono v4** on **Bun** runtime, on **Vercel** | mvp_api — `api.solarlayout.in` |
+| Auth | **Clerk** | Used by mvp_web + mvp_admin only; never desktop (license-key bearer auth on desktop) |
+| Payments | **Stripe** (live webhook at `api.solarlayout.in/webhooks/stripe`) | Subscriptions + plan management |
+| Database | **Postgres** on AWS RDS (us-east-1: `journium.cbuwaoikc0qr...`) | Single instance for staging + prod (separate DBs) |
+| ORM | **Prisma 7** with semantic-id extension | mvp_db |
+| Object storage | **AWS S3** (ap-south-1, account 378240665051) | Buckets `solarlayout-{local,staging,prod}-{downloads,projects}` |
+| Validation | **Zod** | At every external boundary |
+
+**Cloud architecture one-liner:** Vercel-hosted Next.js + Hono in front of an AWS RDS Postgres + S3, with Clerk for human auth, license keys for desktop auth, and Stripe for billing. Per [ADR-0004](./docs/adr/0004-cloud-as-passive-storage.md): no compute, no rendering — passive storage and auth/billing only.
+
+### 4.3 Shared
+
+| Layer | Technology | Why |
+|---|---|---|
+| Monorepo | **Turborepo** + **Bun workspaces** | Consistent gates, selective builds, single install |
+| Lint | **ESLint** flat config (shared via `@solarlayout/eslint-config`) | One config family across desktop + cloud |
+| Format | **Prettier** | No semicolons, double quotes, trailing-commas:es5, 80-char width |
+| TypeScript | **`@solarlayout/typescript-config`** presets | Reused tsconfig bases |
+| CI | **GitHub Actions** | `ci.yml` runs all four JS gates + sidecar pytest; `platform-deployment.yml` deploys cloud apps via Vercel CLI |
 
 ---
 
@@ -141,50 +188,67 @@ If you ever see `PVLayout_Basic.spec`, `main_basic.py`, `main_pro.py`, `main_pro
 
 ## 7. External context (read-only reference repos)
 
-These exist elsewhere on disk and are referenced by this project but **never modified by work in this repo**:
+The cloud stack used to live in a separate `renewable_energy` repo. After the 2026-05-01 merge it lives in this repo (`apps/mvp_*`, `packages/mvp_db`, `packages/{ui,shared,eslint-config,typescript-config}`). The old repo on GitHub is archive-pending — **don't read or modify it**; treat this repo as the source of truth for everything cloud.
+
+The only remaining external read-only reference:
 
 | Repo | Path | Purpose |
 |---|---|---|
-| `PVlayout_Advance` | `/Users/arunkpatra/codebase/PVlayout_Advance` | Source of truth for all domain logic. We copy `core/`, `models/`, `utils/` into `python/pvlayout_engine/pvlayout_core/` in S1. We don't modify the source repo. |
-| `renewable_energy` | `/Users/arunkpatra/codebase/renewable_energy` | Hosts `apps/mvp_web` (marketing + dashboard on Vercel), `apps/mvp_api` (Hono backend serving `api.solarlayout.in`), `packages/mvp_db` (Prisma + Postgres). We consume `api.solarlayout.in/entitlements` and `/usage/report`. Anything else in that repo (old `apps/{web,api,layout-engine}`) is defunct — ignore. |
+| `PVlayout_Advance` | `/Users/arunkpatra/codebase/PVlayout_Advance` | Source of truth for all desktop domain logic. We copied `core/`, `models/`, `utils/` into `python/pvlayout_engine/pvlayout_core/` in S1 (frozen at branch `baseline-v1-20260429`). We don't modify the source repo. |
 
-Source-of-truth files for external contracts (feature keys, API shapes, usage payloads) are catalogued in [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md) under §2's "External contracts bind before code" principle.
+Source-of-truth files for **internal** contracts (feature keys, API shapes, usage payloads — now all in this repo) are catalogued in [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md) under §2's "External contracts bind before code" principle. The principle itself still applies — desktop and cloud are separate runtimes with versioned wire contracts even though they share a repo.
 
 ---
 
 ## 8. Common commands
 
-> These land in S0+ as the repo gets built out. Until S0 is complete, the repo is just docs and references.
-
 ```bash
-# From repo root
+# From repo root — covers all workspaces (desktop + cloud)
 bun install
 bun run dev               # all dev servers
-bun run build
-bun run lint              # eslint via flat config (S8.7)
-bun run typecheck
-bun run test              # vitest + RTL across all workspaces (S8.7)
+bun run build             # turbo build across 10 packages
+bun run lint              # eslint flat config across 8 lintable packages
+bun run typecheck         # tsc --noEmit across 13 packages
+bun run test              # vitest + bun:test across 9 testing workspaces (~931 JS/TS tests)
 bun run format            # prettier --write across the repo
 bun run format:check      # prettier --check (CI)
+
+# Pre-commit gate (same gate as CI)
+bun run lint && bun run typecheck && bun run test && bun run build
+cd python/pvlayout_engine && uv run pytest tests/ -q
+
+# Selective with turbo --filter
+bunx turbo build --filter=@solarlayout/desktop
+bunx turbo test --filter=@solarlayout/mvp-api
+bunx turbo dev --filter=@solarlayout/mvp-web
 
 # Desktop app — from apps/desktop
 bun run tauri dev         # launches Tauri shell with sidecar
 bun run tauri build       # produces installer for host OS/arch
-bun run test:watch        # vitest in watch mode for the desktop workspace
 bun run vite:dev          # vite-only preview (no Tauri); design / headless render mode
 
-# UI package — from packages/ui
-bun run test:watch        # vitest in watch mode for ui
-
 # Python sidecar — from python/pvlayout_engine
-uv sync                   # install deps
-uv run pytest             # run tests (golden-file harness lands in S3)
-uv run python -m pvlayout_engine.main    # dev-mode sidecar
-uv run pyinstaller pvlayout-engine.spec  # build standalone binary (S4+)
+uv sync --extra dev       # install deps INCLUDING pytest (bare `uv sync` strips dev extras)
+uv run pytest tests/ -q   # 123 passed + 6 skipped at HEAD
+uv run python -m pvlayout_engine.main      # dev-mode sidecar (port 8001)
+uv run pyinstaller pvlayout-engine.spec    # build standalone binary
 
-# Pre-commit gate (from S8.7 onward — same gate as CI)
-bun run lint && bun run typecheck && bun run test && bun run build
-cd python/pvlayout_engine && uv run pytest tests/ -q
+# Cloud database — from repo root
+bun run mvp-db:generate   # regenerate Prisma client (after schema.prisma change)
+bun run mvp-db:migrate    # create + apply migration (env-aware; see below)
+bun run mvp-db:status     # migration status against the connected DB
+bun run mvp-db:studio     # Prisma Studio
+bun run mvp-db:validate   # validate schema.prisma syntax
+
+# Migrations against staging or prod (credentials in gitignored .env.staging / .env.production at repo root)
+set -a; . ./.env.staging;    set +a; bunx prisma migrate status --schema=packages/mvp_db/prisma/schema.prisma
+set -a; . ./.env.production; set +a; bunx prisma migrate status --schema=packages/mvp_db/prisma/schema.prisma
+
+# Local cloud env files (gitignored; per-machine, NOT committed)
+# - apps/mvp_web/.env.local
+# - apps/mvp_admin/.env.local
+# Both contain NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (test pubkey, public by design — same value as ci.yml)
+# Without these the local Next.js build fails at prerender.
 ```
 
 ---
@@ -231,7 +295,7 @@ ADRs:
 - ADR 0001 — online-required entitlement policy (accepted 2026-04-24).
 - ADR 0002 — canvas-first MapLibre, no basemap (accepted 2026-04-24).
 - ADR 0003 — state architecture (accepted 2026-04-24).
-- ADR 0004 — cloud is passive storage (accepted 2026-04-24).
+- ADR 0004 — cloud is passive storage (accepted 2026-04-24; **2026-05-01 post-merge note** — the principle is unchanged but the Context now means in-repo `apps/mvp_*`, not a sibling `renewable_energy` repo).
 - ADR 0005 — feature key registry (accepted).
 - ADR 0006 — drawing / editing pipeline (accepted).
 - ADR 0007 — pvlayout_core S11.5 exception (**superseded** 2026-04-29 by docs/PLAN.md; the S11.5 changes themselves remain in place and correct).
@@ -242,14 +306,27 @@ New ADRs are written when a decision genuinely affects the shape of the system. 
 
 ## 11. Coding conventions
 
-- **Prettier:** no semicolons, double quotes, trailing commas (es5), 80-char width — matches `renewable_energy` conventions.
+- **Prettier:** no semicolons, double quotes, trailing commas (es5), 80-char width.
 - **Workspace package scope:** `@solarlayout/*` for all internal packages, all `private: true`.
-- **Zod** for all external input validation (sidecar request bodies, env vars, entitlements response parsing).
-- **State:** lives where ADR-0003 says it lives. TanStack Query for server cache; Zustand (sliced under `apps/desktop/src/state/<slice>.ts`) for cross-component client state; `useState` for ephemeral single-component UI state; `useRef` for imperative handles. Context is for *configuration* injection only, never for writable state. See [ADR-0003](./docs/adr/0003-state-architecture.md) for the full convention.
-- **Test co-location:** `foo.test.ts` beside `foo.ts`. Frontend uses Vitest + RTL + happy-dom (S8.7); sidecar uses pytest (S3).
+- **Zod** for all external input validation (sidecar request bodies, env vars, entitlements response parsing, mvp_api request bodies).
+- **State (desktop):** lives where ADR-0003 says it lives. TanStack Query for server cache; Zustand (sliced under `apps/desktop/src/state/<slice>.ts`) for cross-component client state; `useState` for ephemeral single-component UI state; `useRef` for imperative handles. Context is for *configuration* injection only, never for writable state. See [ADR-0003](./docs/adr/0003-state-architecture.md) for the full convention.
+- **Test co-location:** `foo.test.ts` beside `foo.ts`. Frontend uses Vitest + RTL + happy-dom; mvp_api uses Bun's built-in test runner; sidecar uses pytest.
 - **Python:** `ruff` + `mypy`. Tests in `python/pvlayout_engine/tests/`.
 - **Rust:** `cargo fmt` + `cargo clippy`. Lives in `apps/desktop/src-tauri/`.
-- **Commit style:** `parity: <feature name>` for row-closing commits; `wip: <summary>` for intra-row commits. Other categories (`chore:`, `docs:`, `fix:`) follow conventional-commits when the change isn't a parity row.
+- **Commit style:** `parity: <feature name>` for desktop parity-row-closing commits (legacy mission, archived); for post-parity work follow conventional-commits (`feat:`, `fix:`, `docs:`, `chore:`, `perf:`, `refactor:`). `wip:` for intra-row checkpoints. Always co-author with `Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
+
+### Workspace package resolution (Bundler vs NodeNext)
+
+When adding a new internal package, decide its `moduleResolution` first — it determines how consumers wire it up:
+
+| Strategy | When | How |
+|---|---|---|
+| **Source alias** | `moduleResolution: "Bundler"` (no `.js` extensions in imports) | Add to consuming app's `tsconfig.json` paths + `transpilePackages`; no build step needed. Used by most packages here. |
+| **Compiled dist** | `moduleResolution: "NodeNext"` (`.js` extensions in source) | Add `@solarlayout/<pkg>#typecheck` and `#build: { dependsOn: ["^build"] }` overrides in `turbo.json`; consumers depend on the built output. Used by `mvp_db` (Prisma client) and `mvp_api`'s build step. |
+
+**Never point a Next.js / Turbopack path alias at NodeNext source** — Turbopack cannot remap `.js` imports to `.ts` files at build time.
+
+**`turbo.json` per-package overrides REPLACE, not merge.** A `@solarlayout/mvp-api#build` entry replaces the global `build` task's `env` array entirely — it does not inherit from it. Always repeat the full `env` array on every per-package `#build` override or you lose env-var passthrough.
 
 ---
 
@@ -260,10 +337,11 @@ In order of preference:
 2. Check `docs/PLAN.md` — the scope question probably has an answer there (active row + tier policy + out-of-scope list).
 3. Check `docs/adr/` — a precedent may exist.
 4. Check `reference_screenshots_for_UX_dsktop/` — the visual question probably has an answer there.
-5. Check `PVlayout_Advance/` (read-only at branch `baseline-v1-20260429`) — the behavioral question probably has an answer there.
-6. Ask the human. Do not guess.
+5. Check `PVlayout_Advance/` (read-only at branch `baseline-v1-20260429`) — the behavioral question about the legacy desktop probably has an answer there.
+6. For cloud questions: read the relevant `apps/mvp_*/src/` or `packages/mvp_db/prisma/schema.prisma` directly — there is no separate "cloud reference repo" anymore.
+7. Ask the human. Do not guess.
 
-Explicitly: **do not design from memory, do not assume legacy behavior without reading its code at the baseline branch, do not invent requirements not in PLAN.md.**
+Explicitly: **do not design from memory, do not assume legacy behavior without reading its code at the baseline branch, do not invent requirements not in PLAN.md or `docs/initiatives/post-parity-v2-backend-plan.md`.**
 
 ---
 
@@ -271,8 +349,10 @@ Explicitly: **do not design from memory, do not assume legacy behavior without r
 
 At the start of every new session on this repo, before taking any action:
 1. Read this CLAUDE.md end to end.
-2. Read `docs/ARCHITECTURE.md` §1–3, §6.5, §12.
-3. Read `docs/PLAN.md` — header (status), the top `todo` row's Source + Acceptance, and the row's domain group (rows in the same group often share dependencies).
-4. Skim `docs/adr/README.md` for the index of accepted ADRs; read any ADR relevant to the row.
-5. If asked to do work: confirm it matches an in-PLAN row or its acceptance. If it doesn't, surface the mismatch to the human before proceeding.
-6. **If the row touches an external contract** (feature gates, entitlements, sidecar API, export formats, telemetry), read the source-of-truth file(s) listed in §7 before writing any name that crosses the boundary. Preview / mock data is silent about contract divergence — assume it's lying until a contract test or the real file says otherwise.
+2. Read `docs/ARCHITECTURE.md` — §1–3 for orientation, §6.5 + §12 for desktop specifics, the cloud section for cloud specifics.
+3. Read the relevant backlog:
+   - **Desktop work** → `docs/PLAN.md` header + top `todo` row + domain group.
+   - **Cloud / V2 backend work** → `docs/initiatives/post-parity-v2-backend-plan.md`.
+4. Skim `docs/adr/README.md` for the ADR index; read any ADR relevant to the row.
+5. If asked to do work: confirm it matches an in-backlog row or its acceptance. If it doesn't, surface the mismatch to the human before proceeding.
+6. **If the row touches a cross-runtime contract** (feature gates, entitlements, sidecar API, mvp_api wire shapes, export formats, telemetry payloads), read the source-of-truth file(s) listed in [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md) before writing any name that crosses the desktop ↔ cloud boundary. Both ends now live in this repo, but the boundary is real — Tauri runs in the user's webview, mvp_api runs on Vercel, they exchange JSON over HTTPS. Names still flow one direction: contract changes first, the other side mirrors.
