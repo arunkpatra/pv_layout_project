@@ -62,6 +62,7 @@ import {
 } from "@solarlayout/sidecar-client"
 import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import { useCurrentLayoutJobStore } from "../state/currentLayoutJob"
+import { useLayoutResultStore } from "../state/layoutResult"
 import { useLayoutFormStatusStore } from "../state/layoutFormStatus"
 import { useLayoutParamsStore } from "../state/layoutParams"
 import { layoutParametersSchema } from "../state/layoutParams"
@@ -504,6 +505,18 @@ function IdlePin({
       jobState.status === "failed" ||
       jobState.status === "cancelled")
 
+  // "Generate layout" → "Generate layout again" once a layout exists
+  // for this project. Two signals cover both same-session and
+  // cross-session cases:
+  //   - layoutResult populated → either auto-fetched on project open
+  //     (from a prior successful run) or set by this session's
+  //     onSuccess. Either way: a layout has landed for this project.
+  //   - terminal jobState in this session → user attempted Generate
+  //     this session (succeeded, failed, or cancelled). Even on
+  //     failure / cancel the "again" framing fits: they tried.
+  const layoutResult = useLayoutResultStore((s) => s.result)
+  const hasPriorAttempt = layoutResult !== null || isTerminal
+
   return (
     <>
       {isTerminal && jobState && <PostRunSummary jobState={jobState} />}
@@ -521,7 +534,11 @@ function IdlePin({
         disabled={generating}
         className="w-full"
       >
-        {generating ? "Generating…" : "Generate layout"}
+        {generating
+          ? "Generating…"
+          : hasPriorAttempt
+            ? "Generate layout again"
+            : "Generate layout"}
       </Button>
       {formHasErrors && (
         <p className="text-[12px] text-[var(--error-default)] leading-normal">
