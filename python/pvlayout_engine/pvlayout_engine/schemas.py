@@ -367,6 +367,83 @@ class LayoutResponse(_Model):
 
 
 # ---------------------------------------------------------------------------
+# Async layout jobs (POST /layout/jobs, GET/DELETE /layout/jobs/<id>) —
+# Spike 1 Phase 2. Same compute as POST /layout but the request returns
+# immediately with a job_id; the actual work runs in a background thread
+# that updates an in-process job table. Clients poll until status is
+# terminal (done / failed / cancelled), then read the final
+# LayoutResponse from `result`.
+#
+# Wire shape is structurally identical to Spike 2's cloud version: only
+# the storage backing the job table differs (in-process dict here;
+# Postgres there). The same desktop polling code drives both.
+# ---------------------------------------------------------------------------
+
+
+class JobStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PlotStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    # Plot was queued but skipped due to a job-level cancel before it ran.
+    CANCELLED = "cancelled"
+
+
+class PlotState(_Model):
+    """Per-plot live state inside an async layout job.
+
+    `started_at` / `ended_at` are epoch seconds (Unix time). The desktop
+    computes elapsed by subtracting from a local clock tick — no server
+    round-trip needed for the live "running (1m 14s)" counter.
+    """
+
+    index: int
+    name: str
+    status: PlotStatus
+    started_at: float | None = None
+    ended_at: float | None = None
+    # Populated when status == FAILED. Compact one-line message; the
+    # full traceback stays in sidecar logs.
+    error: str | None = None
+
+
+class LayoutJobStartResponse(_Model):
+    """POST /layout/jobs response — kicks off an async layout."""
+
+    job_id: str
+
+
+class LayoutJobState(_Model):
+    """GET /layout/jobs/<id> response — full snapshot of job state."""
+
+    job_id: str
+    status: JobStatus
+    plots_total: int
+    plots_done: int
+    plots_failed: int
+    plots: list[PlotState]
+    # Populated when status is terminal (done / cancelled with partial
+    # work / failed with partial work). Contains whatever results the
+    # job managed to produce — partial when cancelled mid-run.
+    result: LayoutResponse | None = None
+
+
+class LayoutJobCancelResponse(_Model):
+    """DELETE /layout/jobs/<id> response."""
+
+    status: str  # always "cancelled"
+    plots_done: int
+
+
+# ---------------------------------------------------------------------------
 # Water-body detection (POST /detect-water) — Row #5
 # ---------------------------------------------------------------------------
 

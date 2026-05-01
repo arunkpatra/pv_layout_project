@@ -24,6 +24,7 @@ from pvlayout_engine.config import SidecarConfig
 from pvlayout_engine.routes.dxf import router as dxf_router
 from pvlayout_engine.routes.kmz import router as kmz_router
 from pvlayout_engine.routes.layout import router as layout_router
+from pvlayout_engine.routes.layout_jobs import router as layout_jobs_router
 from pvlayout_engine.routes.pdf import router as pdf_router
 from pvlayout_engine.routes.session import router as session_router
 from pvlayout_engine.routes.thumbnail import router as thumbnail_router
@@ -109,6 +110,13 @@ def build_app(config: SidecarConfig) -> FastAPI:
     # --- Layout routes (S3) -------------------------------------------------
     # /parse-kmz, /layout, /refresh-inverters — all token-gated.
     authed.include_router(layout_router)
+
+    # --- Async layout jobs (Spike 1 Phase 2) -------------------------------
+    # POST /layout/jobs, GET/DELETE /layout/jobs/<id> — same compute as
+    # POST /layout but the request returns a job_id immediately and the
+    # work runs in a background thread. Polled by the desktop's per-plot
+    # progress UI; structurally identical to Spike 2's cloud version.
+    authed.include_router(layout_jobs_router)
 
     # --- Water-detection route (Row #5) -------------------------------------
     # /detect-water — sync; satellite tile fetch + classifier; token-gated.
