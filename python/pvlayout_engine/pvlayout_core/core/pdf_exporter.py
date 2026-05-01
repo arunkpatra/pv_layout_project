@@ -170,15 +170,18 @@ def export_pdf(
                         pass
 
             layout_figure.set_size_inches(*orig_size)
-        else:
-            fig_blank, ax = plt.subplots(figsize=(PAGE_W, PAGE_H))
-            ax.text(0.5, 0.5,
-                    "Layout plot not available.\nGenerate the layout first.",
-                    ha="center", va="center", fontsize=16,
-                    transform=ax.transAxes)
-            ax.axis("off")
-            pdf.savefig(fig_blank, bbox_inches="tight")
-            plt.close(fig_blank)
+        # When layout_figure is None — the new app's E1 export path —
+        # we skip page 1 entirely. The new app's canvas is MapLibre /
+        # deck.gl client-side; there is no server-side matplotlib
+        # equivalent yet. The earlier placeholder page ("Layout plot
+        # not available. Generate the layout first.") was misleading
+        # to customers because the layout WAS generated — only the
+        # PDF plot rendering is not yet wired. The PDF therefore
+        # starts at the Summary page when no figure is supplied,
+        # matching the stated intent in routes/pdf.py's docstring.
+        # When server-side layout rendering ships in a later row, the
+        # `if layout_figure is not None:` branch above re-enables
+        # page 1 with no further changes here.
 
         # ---- Page 2: Summary report -------------------------------------
         fig2 = _build_summary_figure(results, params, edition=edition)
