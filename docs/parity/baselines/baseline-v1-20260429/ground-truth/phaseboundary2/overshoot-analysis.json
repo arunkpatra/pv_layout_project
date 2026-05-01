@@ -1,0 +1,580 @@
+{
+  "summary": {
+    "plant": "phaseboundary2",
+    "baseline": "baseline-v1-20260429",
+    "fence_epsg": 32644,
+    "fence_area_m2": 233604.1,
+    "fence_is_multipolygon": false,
+    "ac_cables_total": 62,
+    "ac_cables_with_overshoot": 0,
+    "ac_total_length_m": 3590.0,
+    "ac_total_outside_length_m": 0.0,
+    "ac_outside_fraction_overall": 0.0,
+    "max_single_cable_overshoot_m": 0.0,
+    "median_overshoot_m_among_overshooting": 0.0,
+    "p90_overshoot_m_among_overshooting": 0.0,
+    "p99_overshoot_m_among_overshooting": 0.0,
+    "legacy_total_ac_cable_m_reported": 12974.5
+  },
+  "overshooting_cables": [],
+  "per_cable": [
+    {
+      "index": 1,
+      "length_m_legacy_reported": 39.6,
+      "length_m_recomputed": 35.617,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 2,
+      "length_m_legacy_reported": 54.6,
+      "length_m_recomputed": 50.583,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 3,
+      "length_m_legacy_reported": 70.6,
+      "length_m_recomputed": 66.623,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 4,
+      "length_m_legacy_reported": 50.2,
+      "length_m_recomputed": 46.227,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 5,
+      "length_m_legacy_reported": 57.0,
+      "length_m_recomputed": 53.0,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 6,
+      "length_m_legacy_reported": 73.1,
+      "length_m_recomputed": 69.14,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 7,
+      "length_m_legacy_reported": 48.8,
+      "length_m_recomputed": 44.76,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 8,
+      "length_m_legacy_reported": 73.6,
+      "length_m_recomputed": 69.601,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 9,
+      "length_m_legacy_reported": 64.7,
+      "length_m_recomputed": 60.699,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 10,
+      "length_m_legacy_reported": 48.7,
+      "length_m_recomputed": 44.71,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 11,
+      "length_m_legacy_reported": 54.9,
+      "length_m_recomputed": 50.89,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 12,
+      "length_m_legacy_reported": 67.0,
+      "length_m_recomputed": 62.96,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 13,
+      "length_m_legacy_reported": 36.6,
+      "length_m_recomputed": 32.64,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 14,
+      "length_m_legacy_reported": 52.7,
+      "length_m_recomputed": 48.7,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 15,
+      "length_m_legacy_reported": 91.7,
+      "length_m_recomputed": 87.695,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 16,
+      "length_m_legacy_reported": 90.0,
+      "length_m_recomputed": 85.995,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 17,
+      "length_m_legacy_reported": 76.7,
+      "length_m_recomputed": 72.65,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 18,
+      "length_m_legacy_reported": 69.0,
+      "length_m_recomputed": 64.987,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 19,
+      "length_m_legacy_reported": 117.4,
+      "length_m_recomputed": 113.424,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 20,
+      "length_m_legacy_reported": 59.7,
+      "length_m_recomputed": 55.656,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 21,
+      "length_m_legacy_reported": 42.7,
+      "length_m_recomputed": 38.74,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 22,
+      "length_m_legacy_reported": 40.5,
+      "length_m_recomputed": 36.5,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 23,
+      "length_m_legacy_reported": 42.7,
+      "length_m_recomputed": 38.74,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 24,
+      "length_m_legacy_reported": 36.6,
+      "length_m_recomputed": 32.64,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 25,
+      "length_m_legacy_reported": 59.7,
+      "length_m_recomputed": 55.656,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 26,
+      "length_m_legacy_reported": 77.1,
+      "length_m_recomputed": 73.1,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 27,
+      "length_m_legacy_reported": 78.0,
+      "length_m_recomputed": 73.956,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 28,
+      "length_m_legacy_reported": 50.2,
+      "length_m_recomputed": 46.24,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 29,
+      "length_m_legacy_reported": 58.3,
+      "length_m_recomputed": 54.304,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 30,
+      "length_m_legacy_reported": 62.4,
+      "length_m_recomputed": 58.356,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 31,
+      "length_m_legacy_reported": 58.7,
+      "length_m_recomputed": 54.733,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 32,
+      "length_m_legacy_reported": 66.6,
+      "length_m_recomputed": 62.644,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 33,
+      "length_m_legacy_reported": 37.7,
+      "length_m_recomputed": 33.697,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 34,
+      "length_m_legacy_reported": 78.3,
+      "length_m_recomputed": 74.276,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 35,
+      "length_m_legacy_reported": 60.3,
+      "length_m_recomputed": 56.324,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 36,
+      "length_m_legacy_reported": 40.7,
+      "length_m_recomputed": 36.72,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 37,
+      "length_m_legacy_reported": 70.5,
+      "length_m_recomputed": 66.504,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 38,
+      "length_m_legacy_reported": 42.7,
+      "length_m_recomputed": 38.74,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 39,
+      "length_m_legacy_reported": 61.0,
+      "length_m_recomputed": 57.04,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 40,
+      "length_m_legacy_reported": 64.2,
+      "length_m_recomputed": 60.225,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 41,
+      "length_m_legacy_reported": 67.0,
+      "length_m_recomputed": 62.973,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 42,
+      "length_m_legacy_reported": 71.5,
+      "length_m_recomputed": 67.468,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 43,
+      "length_m_legacy_reported": 75.1,
+      "length_m_recomputed": 71.12,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 44,
+      "length_m_legacy_reported": 77.2,
+      "length_m_recomputed": 73.18,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 45,
+      "length_m_legacy_reported": 89.4,
+      "length_m_recomputed": 85.38,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 46,
+      "length_m_legacy_reported": 92.3,
+      "length_m_recomputed": 88.266,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 47,
+      "length_m_legacy_reported": 44.2,
+      "length_m_recomputed": 40.23,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 48,
+      "length_m_legacy_reported": 53.7,
+      "length_m_recomputed": 49.656,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 49,
+      "length_m_legacy_reported": 59.5,
+      "length_m_recomputed": 55.522,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 50,
+      "length_m_legacy_reported": 51.6,
+      "length_m_recomputed": 47.642,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 51,
+      "length_m_legacy_reported": 46.6,
+      "length_m_recomputed": 42.6,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 52,
+      "length_m_legacy_reported": 55.3,
+      "length_m_recomputed": 51.274,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 53,
+      "length_m_legacy_reported": 73.6,
+      "length_m_recomputed": 69.636,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 54,
+      "length_m_legacy_reported": 51.5,
+      "length_m_recomputed": 47.476,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 55,
+      "length_m_legacy_reported": 46.6,
+      "length_m_recomputed": 42.6,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 56,
+      "length_m_legacy_reported": 36.6,
+      "length_m_recomputed": 32.64,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 57,
+      "length_m_legacy_reported": 83.2,
+      "length_m_recomputed": 79.2,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 58,
+      "length_m_legacy_reported": 42.7,
+      "length_m_recomputed": 38.74,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 59,
+      "length_m_legacy_reported": 42.7,
+      "length_m_recomputed": 38.74,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 60,
+      "length_m_legacy_reported": 85.5,
+      "length_m_recomputed": 81.507,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 61,
+      "length_m_legacy_reported": 110.5,
+      "length_m_recomputed": 106.48,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    },
+    {
+      "index": 62,
+      "length_m_legacy_reported": 56.0,
+      "length_m_recomputed": 52.013,
+      "outside_length_m": 0.0,
+      "outside_fraction": 0.0,
+      "n_outside_segments": 0,
+      "legacy_route_quality": "ok"
+    }
+  ]
+}

@@ -1,0 +1,688 @@
+{
+  "summary": {
+    "plant": "phaseboundary2",
+    "baseline": "baseline-v1-20260429",
+    "mode": "reconstructed",
+    "fence_epsg": 32644,
+    "fence_area_m2": 233604.1,
+    "usable_polygon_area_m2": 198070.3,
+    "individual_home_runs": {
+      "n_routed": 62,
+      "total_route_length_m": 12726.5,
+      "vs_plant_fence": {
+        "n_with_overshoot": 0,
+        "fraction_with_overshoot": 0.0,
+        "total_outside_length_m": 0.0,
+        "fraction_outside_overall": 0.0,
+        "max_overshoot_m": 0.0,
+        "min_overshoot_m": 0.0,
+        "median_overshoot_m": 0.0,
+        "p90_overshoot_m": 0.0
+      },
+      "vs_usable_polygon": {
+        "n_with_overshoot": 38,
+        "fraction_with_overshoot": 0.6129,
+        "total_outside_length_m": 1276.6,
+        "fraction_outside_overall": 0.100312,
+        "max_overshoot_m": 95.98,
+        "min_overshoot_m": 1.897,
+        "median_overshoot_m": 32.616,
+        "p90_overshoot_m": 58.655
+      }
+    },
+    "mst_trench": {
+      "n_edges": 62,
+      "n_with_overshoot_vs_fence": 0,
+      "total_route_length_m": 3590.0,
+      "total_outside_fence_length_m": 0.0
+    }
+  },
+  "overshooting_individual_cables": [
+    {
+      "rank": 30,
+      "start": [
+        550356.3343430889,
+        2400768.98
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 327.907,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 95.98,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 20,
+      "start": [
+        550646.1379794526,
+        2401061.33
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 254.247,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 80.163,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 24,
+      "start": [
+        550642.8410097557,
+        2401091.7299999995
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 281.35,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 76.551,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 3
+    },
+    {
+      "rank": 32,
+      "start": [
+        550327.3210097556,
+        2400711.13
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 5,
+      "length_m": 414.77,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 59.535,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 3
+    },
+    {
+      "rank": 31,
+      "start": [
+        550301.9343430889,
+        2400750.7299999995
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 5,
+      "length_m": 400.557,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 58.278,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 18,
+      "start": [
+        550411.8796062468,
+        2400799.4299999997
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 241.912,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 52.648,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 16,
+      "start": [
+        550501.4010097557,
+        2401122.2299999995
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 170.41,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 45.82,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 3
+    },
+    {
+      "rank": 10,
+      "start": [
+        550519.534343089,
+        2401085.63
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 151.943,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 40.175,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 3
+    },
+    {
+      "rank": 15,
+      "start": [
+        550577.8907067253,
+        2401085.63
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 210.3,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 38.455,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 7,
+      "start": [
+        550549.454343089,
+        2401049.13
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 145.363,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 34.823,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 11,
+      "start": [
+        550595.694343089,
+        2401049.13
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 191.603,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 34.823,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 5,
+      "start": [
+        550582.638343089,
+        2400988.2299999995
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 117.647,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 34.44,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 12,
+      "start": [
+        550628.334343089,
+        2400976.0300000003
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 151.143,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 34.44,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 22,
+      "start": [
+        550680.558343089,
+        2400988.2299999995
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 215.567,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 34.44,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 23,
+      "start": [
+        550301.9343430889,
+        2400982.13
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 211.763,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 33.415,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 26,
+      "start": [
+        550301.9343430889,
+        2401030.83
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 260.463,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 33.415,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 29,
+      "start": [
+        550269.2943430889,
+        2400982.13
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 244.403,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 33.415,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 6,
+      "start": [
+        550595.694343089,
+        2400945.63
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 118.497,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 32.616,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 13,
+      "start": [
+        550628.334343089,
+        2400939.5300000003
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 157.237,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 32.616,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 17,
+      "start": [
+        550660.974343089,
+        2400945.63
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 183.777,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 32.616,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 25,
+      "start": [
+        550693.614343089,
+        2400945.63
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 216.417,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 32.616,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 28,
+      "start": [
+        550693.614343089,
+        2400872.5300000003
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 289.517,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 32.616,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 54,
+      "start": [
+        550791.5343430891,
+        2400866.4299999997
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 275.98,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 25.089,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 58,
+      "start": [
+        550758.8943430891,
+        2400860.33
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 314.72,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 25.089,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 59,
+      "start": [
+        550726.2543430891,
+        2400866.4299999997
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 341.26,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 25.089,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 61,
+      "start": [
+        550806.0410097558,
+        2400799.4299999997
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 328.474,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 25.089,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 53,
+      "start": [
+        550930.2543430892,
+        2401262.2299999995
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 258.54,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 19.749,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 57,
+      "start": [
+        551006.0257716606,
+        2401256.1799999997
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 328.261,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 19.749,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 60,
+      "start": [
+        550905.7743430892,
+        2401323.13
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 294.96,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 19.749,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 40,
+      "start": [
+        550741.0907067255,
+        2401043.0300000003
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 149.824,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 18.28,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 44,
+      "start": [
+        550726.2543430891,
+        2401085.63
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 207.26,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 18.28,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 49,
+      "start": [
+        550693.614343089,
+        2401085.63
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 239.9,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 18.28,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 50,
+      "start": [
+        550693.614343089,
+        2401043.0300000003
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 197.3,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 18.28,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 55,
+      "start": [
+        550657.3476764223,
+        2401177.0300000003
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 367.567,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 18.28,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 56,
+      "start": [
+        550641.934343089,
+        2401140.4299999997
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 346.38,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 18.28,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 35,
+      "start": [
+        550814.8486288034,
+        2401030.83
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 88.266,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 13.834,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 2
+    },
+    {
+      "rank": 19,
+      "start": [
+        550334.5743430889,
+        2400872.5300000003
+      ],
+      "end": [
+        550492.3941233088,
+        2400960.8270505075
+      ],
+      "n_route_pts": 4,
+      "length_m": 246.117,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 7.701,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    },
+    {
+      "rank": 37,
+      "start": [
+        550811.1183430891,
+        2400994.33
+      ],
+      "end": [
+        550857.7135166428,
+        2401076.231063537
+      ],
+      "n_route_pts": 4,
+      "length_m": 128.496,
+      "outside_fence_m": 0.0,
+      "outside_usable_m": 1.897,
+      "n_segments_outside_fence": 0,
+      "n_segments_outside_usable": 1
+    }
+  ]
+}
