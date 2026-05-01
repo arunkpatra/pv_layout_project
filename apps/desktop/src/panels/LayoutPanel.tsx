@@ -433,13 +433,11 @@ function CableCalcFieldRow({
  */
 export function PinnedActionArea({
   generating,
-  noProject,
   boundaryCount,
   hasCableRouting,
   onCancel,
 }: {
   generating: boolean
-  noProject: boolean
   boundaryCount: number | null
   hasCableRouting: boolean
   onCancel: () => void
@@ -462,12 +460,10 @@ export function PinnedActionArea({
         <IdlePin
           jobState={jobState}
           generating={generating}
-          noProject={noProject}
           boundaryCount={boundaryCount}
           formHasErrors={formHasErrors}
           showPreflightChip={
             !generating &&
-            !noProject &&
             hasCableRouting &&
             enableCableCalc &&
             (boundaryCount ?? 0) > 1
@@ -486,14 +482,12 @@ export function PinnedActionArea({
 function IdlePin({
   jobState,
   generating,
-  noProject,
   boundaryCount,
   formHasErrors,
   showPreflightChip,
 }: {
   jobState: LayoutJobState | null
   generating: boolean
-  noProject: boolean
   boundaryCount: number | null
   formHasErrors: boolean
   showPreflightChip: boolean
@@ -518,14 +512,10 @@ function IdlePin({
         form="layout-form"
         variant="primary"
         size="md"
-        disabled={generating || noProject}
+        disabled={generating}
         className="w-full"
       >
-        {generating
-          ? "Generating…"
-          : noProject
-            ? "Open a KMZ to generate"
-            : "Generate layout"}
+        {generating ? "Generating…" : "Generate layout"}
       </Button>
       {formHasErrors && (
         <p className="text-[12px] text-[var(--error-default)] leading-normal">

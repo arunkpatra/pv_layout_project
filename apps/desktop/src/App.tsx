@@ -352,7 +352,19 @@ export function App(): JSX.Element {
   // LayoutPanel's pinned area to render running / post-run states;
   // cleared on KMZ load + project switch so a stale "All 6 done in
   // 3m 42s" summary from another project doesn't leak across.
-  const currentJobState = useCurrentLayoutJobStore((s) => s.jobState)
+  // Narrow selectors for handleCancelLayout's deps. Reading the full
+  // jobState object as a useCallback dep churns every 2 s poll tick
+  // (Zustand returns a new object reference on each update); pulling
+  // out the two primitives needed for the cancel decision keeps the
+  // callback identity stable across polls. PinnedActionArea reads
+  // jobState directly via its own slice subscription, so App.tsx
+  // doesn't need a top-level reference.
+  const currentJobId = useCurrentLayoutJobStore(
+    (s) => s.jobState?.job_id ?? null
+  )
+  const currentJobStatus = useCurrentLayoutJobStore(
+    (s) => s.jobState?.status ?? null
+  )
   const clearCurrentJobState = useCurrentLayoutJobStore(
     (s) => s.clearJobState
   )
@@ -370,6 +382,11 @@ export function App(): JSX.Element {
   // they're captured at mount.
   const [layoutFormKey, setLayoutFormKey] = useState(0)
 
+  // Inspector tab selection lifted to App.tsx so PinnedActionArea (which
+  // lives in the sticky tabs band, not inside any TabsContent) can be
+  // gated to the Layout tab without duplicating TabsContent value="layout".
+  const [inspectorTab, setInspectorTab] = useState("layout")
+
   // Read params from Zustand via getState() at call-time, not via a hook
   // closure. LayoutPanel's onSubmit does `setAll(values); onGenerate()` in
   // the same tick — a closure over `useLayoutParamsStore((s) => s.params)`
@@ -383,14 +400,19 @@ export function App(): JSX.Element {
   // to attach the Run to. P1/P2 always set this on a successful open/create,
   // so in normal use the gate just protects against a not-yet-loaded state.
   const currentProject = useProjectStore((s) => s.currentProject)
+  // TanStack Query guarantees `.mutate` is a stable reference across
+  // renders; the parent mutation object is not. Lifting the stable
+  // reference (same pattern as `openRunMutate` below) keeps
+  // handleGenerate from recreating on every mutation status change.
+  const generateLayoutMutate = generateLayoutMutation.mutate
   const handleGenerate = useCallback(() => {
     if (!project || !currentProject) return
-    generateLayoutMutation.mutate({
+    generateLayoutMutate({
       projectId: currentProject.id,
       parsedKmz: project.kmz,
       params: useLayoutParamsStore.getState().params,
     })
-  }, [project, currentProject, generateLayoutMutation])
+  }, [project, currentProject, generateLayoutMutate])
 
   // Spike 1 Phase 6 — cooperative cancel for the in-flight async layout
   // job. Reads the current job_id from the slice and DELETEs it on the
@@ -398,22 +420,17 @@ export function App(): JSX.Element {
   // mutation throws LayoutJobCancelledError. No-op when no job is in
   // flight (e.g. user hammers the button).
   const handleCancelLayout = useCallback(() => {
-    if (!sidecarClient) return
-    const jobId = currentJobState?.job_id
-    if (!jobId) return
-    if (
-      currentJobState.status !== "queued" &&
-      currentJobState.status !== "running"
-    ) {
+    if (!sidecarClient || !currentJobId) return
+    if (currentJobStatus !== "queued" && currentJobStatus !== "running") {
       return
     }
-    void sidecarClient.cancelLayoutJob(jobId).catch((err) => {
+    void sidecarClient.cancelLayoutJob(currentJobId).catch((err) => {
       // Best-effort — if the DELETE itself fails, the polling loop
       // still sees the eventual server state, and the user can click
       // Generate again to start fresh.
       console.warn("[layout] cancelLayoutJob failed:", err)
     })
-  }, [sidecarClient, currentJobState])
+  }, [sidecarClient, currentJobId, currentJobStatus])
 
   // Surface the upsell modal on Generate-Layout 402, mirroring the P1
   // upload path. The B16 message contains the human-readable detail
@@ -450,9 +467,10 @@ export function App(): JSX.Element {
     queryClient.removeQueries({ queryKey: ["entitlements"] })
   }, [queryClient])
 
+  const entQueryRefetch = entQuery.refetch
   const handleRetryEntitlements = useCallback(() => {
-    void entQuery.refetch()
-  }, [entQuery])
+    void entQueryRefetch()
+  }, [entQueryRefetch])
 
   // ── P1 — new-project mutation (uploadKmzToS3 + createProjectV2) ──────────
   // Bound to the active license key + module-singleton entitlements client
@@ -806,7 +824,6 @@ export function App(): JSX.Element {
       deleteProjectMutation,
       currentProject,
       clearLayoutResult,
-      clearCurrentJobState,
       resetLayoutParams,
       resetLayerVisibility,
       resetEditingState,
@@ -1323,17 +1340,15 @@ export function App(): JSX.Element {
         inspector={
           project ? (
             <InspectorRoot>
-              <Tabs defaultValue="layout">
-                {/* Single sticky container holds BOTH the tabs row AND
-                    (for the Layout tab only) the LayoutPanel pinned
-                    action area — one self-sized parent, no hardcoded
-                    `top` offsets between siblings. Robustness fix for
-                    S3-01b in SMOKE-LOG.md: the previous two-sibling
-                    approach with `top-[58px]` was 17px short due to
-                    TabsContent's built-in mt-[16px] + 1px TabsList
-                    border. With one sticky parent, height is whatever
-                    its content totals to — survives any future
-                    TabsList / Trigger / padding changes. */}
+              {/* Tabs are controlled so PinnedActionArea (which lives
+                  in the sticky tabs band, not inside LayoutPanel) can
+                  be gated to the Layout tab via a normal conditional,
+                  without resorting to two TabsContent siblings sharing
+                  the same value. Single sticky parent holds TabsList +
+                  PinnedActionArea so height is self-determined; see
+                  S3-01b in SMOKE-LOG.md for the original sticky-stack
+                  fix this preserves. */}
+              <Tabs value={inspectorTab} onValueChange={setInspectorTab}>
                 <div className="sticky top-0 z-20 bg-[var(--surface-ground)]">
                   <div className="px-[20px] pt-[18px]">
                     <TabsList>
@@ -1342,31 +1357,17 @@ export function App(): JSX.Element {
                       <TabsTrigger value="runs">Runs</TabsTrigger>
                     </TabsList>
                   </div>
-                  {/* PinnedActionArea is the LayoutPanel's idle/running/
-                      post-run action surface. Lives here (not inside
-                      LayoutPanel's <form>) so it shares the sticky
-                      parent with TabsList. The Generate button uses
-                      `form="layout-form"` to stay bound to the form
-                      that lives below in TabsContent. Gated to the
-                      Layout tab via TabsContent forceMount + Tailwind
-                      data-[state=inactive]:hidden so it disappears
-                      when Energy / Runs are active. */}
-                  <TabsContent
-                    value="layout"
-                    forceMount
-                    className="data-[state=inactive]:hidden mt-0"
-                  >
+                  {inspectorTab === "layout" && (
                     <PinnedActionArea
                       generating={layoutMutation.isPending}
-                      noProject={!project}
                       boundaryCount={projectCounts?.boundaries ?? null}
                       hasCableRouting={hasCableRouting}
                       onCancel={handleCancelLayout}
                     />
-                  </TabsContent>
+                  )}
                 </div>
-                {/* Form body — separate TabsContent (also forceMount)
-                    so RHF state survives tab switches. */}
+                {/* forceMount + data-[state=inactive]:hidden so RHF
+                    state in LayoutPanel survives tab switches. */}
                 <TabsContent
                   value="layout"
                   forceMount
@@ -1380,9 +1381,7 @@ export function App(): JSX.Element {
                   {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
                   <SummaryPanel generating={layoutMutation.isPending} />
                 </TabsContent>
-                <TabsContent
-                  value="energy"
-                >
+                <TabsContent value="energy">
                   <EnergyTabContent />
                 </TabsContent>
                 {/* P5 — runs gallery + list, forceMount so multi-select
