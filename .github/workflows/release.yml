@@ -1,22 +1,45 @@
 name: Release
 
+# Tag-driven release pipeline modeled after the legacy
+# PVlayout_Advance flow: tag push → parallel platform builds →
+# download artifacts → version-rename → checksums → GitHub Release
+# with all installers attached.
+#
+# What gets attached to the Release page:
+#   - SolarLayout-<version>-windows.zip       (.zip wrapping a .msi;
+#                                              unzipped + installed
+#                                              via Windows Installer)
+#   - SolarLayout-<version>-macos-arm64.dmg   (Apple Silicon)
+#   - SolarLayout-<version>-macos-x64.dmg     (Intel)
+#   - SolarLayout-<version>-linux-x64.AppImage (portable)
+#   - SolarLayout-<version>-linux-x64.deb     (Debian/Ubuntu)
+#   - SolarLayout-<version>-checksums.sha256  (SHA256 of all five)
+#
+# Operator (Arun) then downloads from the Release page and uploads
+# to S3 download buckets per docs/RELEASE.md §5.5.
+#
+# Security posture: every interpolated expression is a trusted
+# tag/ref value — no user-controlled input.
+
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+
+permissions:
+  contents: write
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Gate & Release
+  # ── Stage 1: Run gates first. No point spending 20+ min on
+  # platform builds if lint/typecheck/test/build is red on the
+  # tagged ref. Same gate CI runs on every push.
+  gate:
+    name: Gates (lint + typecheck + test + build)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
-
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,16 +72,126 @@ jobs:
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xhc3NpYy13YXNwLTU1LmNsZXJrLmFjY291bnRzLmRldiQ
 
-      - name: Create GitHub Release
+  # ── Stage 2: Build platform installers in parallel. Each
+  # workflow is reusable (workflow_call) so the same logic can run
+  # ad-hoc via workflow_dispatch from the Actions UI.
+  build-windows:
+    name: Build Windows
+    needs: gate
+    uses: ./.github/workflows/build-windows.yml
+
+  build-macos:
+    name: Build macOS
+    needs: gate
+    uses: ./.github/workflows/build-macos.yml
+
+  build-linux:
+    name: Build Linux
+    needs: gate
+    uses: ./.github/workflows/build-linux.yml
+
+  # ── Stage 3: Aggregate, version, checksum, and create the
+  # GitHub Release page with all artifacts attached.
+  release:
+    name: Create Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          PRERELEASE_FLAG=""
-          if echo "$TAG_NAME" | grep -q "^v0\."; then
-            PRERELEASE_FLAG="--prerelease"
+          # Strip leading "v" — v0.1.0 → 0.1.0
+          VERSION="${TAG_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG_NAME → version: $VERSION"
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: solarlayout-windows
+          path: release-assets/
+
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: solarlayout-macos-arm64
+          path: release-assets/
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: solarlayout-macos-x64
+          path: release-assets/
+
+      - name: Download Linux AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: solarlayout-linux-x64-appimage
+          path: release-assets/
+
+      - name: Download Linux deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: solarlayout-linux-x64-deb
+          path: release-assets/
+
+      - name: Rename assets with version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        working-directory: release-assets
+        run: |
+          mv "SolarLayout-windows.zip"        "SolarLayout-${VERSION}-windows.zip"
+          mv "SolarLayout-macos-arm64.dmg"    "SolarLayout-${VERSION}-macos-arm64.dmg"
+          mv "SolarLayout-macos-x64.dmg"      "SolarLayout-${VERSION}-macos-x64.dmg"
+          mv "SolarLayout-linux-x64.AppImage" "SolarLayout-${VERSION}-linux-x64.AppImage"
+          mv "SolarLayout-linux-x64.deb"      "SolarLayout-${VERSION}-linux-x64.deb"
+          ls -lh
+
+      - name: Generate SHA256 checksums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        working-directory: release-assets
+        run: |
+          sha256sum \
+            "SolarLayout-${VERSION}-windows.zip" \
+            "SolarLayout-${VERSION}-macos-arm64.dmg" \
+            "SolarLayout-${VERSION}-macos-x64.dmg" \
+            "SolarLayout-${VERSION}-linux-x64.AppImage" \
+            "SolarLayout-${VERSION}-linux-x64.deb" \
+            > "SolarLayout-${VERSION}-checksums.sha256"
+          cat "SolarLayout-${VERSION}-checksums.sha256"
+
+      - name: Decide prerelease flag
+        id: prerelease
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          # Mark as prerelease while we're on v0.x.x.
+          if echo "$TAG_NAME" | grep -qE '^v0\.'; then
+            echo "flag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=false" >> "$GITHUB_OUTPUT"
           fi
-          gh release create "$TAG_NAME" \
-            --generate-notes \
-            --title "$TAG_NAME" \
-            $PRERELEASE_FLAG
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "SolarLayout ${{ github.ref_name }}"
+          generate_release_notes: true
+          prerelease: ${{ steps.prerelease.outputs.flag == 'true' }}
+          files: |
+            release-assets/SolarLayout-${{ steps.version.outputs.version }}-windows.zip
+            release-assets/SolarLayout-${{ steps.version.outputs.version }}-macos-arm64.dmg
+            release-assets/SolarLayout-${{ steps.version.outputs.version }}-macos-x64.dmg
+            release-assets/SolarLayout-${{ steps.version.outputs.version }}-linux-x64.AppImage
+            release-assets/SolarLayout-${{ steps.version.outputs.version }}-linux-x64.deb
+            release-assets/SolarLayout-${{ steps.version.outputs.version }}-checksums.sha256
