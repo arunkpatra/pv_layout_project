@@ -49,8 +49,6 @@ import {
 import { useCreateProjectMutation } from "./auth/useCreateProject"
 import { useOpenProjectMutation } from "./auth/useOpenProject"
 import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
-import { useHasFeature } from "./auth/FeatureGate"
-import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import { useRenameProjectMutation } from "./auth/useRenameProject"
 import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { useAutoSaveProject } from "./auth/useAutoSaveProject"
@@ -368,10 +366,6 @@ export function App(): JSX.Element {
   const clearCurrentJobState = useCurrentLayoutJobStore(
     (s) => s.clearJobState
   )
-  // Drives the pre-flight expectation chip + the Generate-button enable
-  // state when the LayoutPanel's PinnedActionArea is rendered in the
-  // sticky tabs band (lifted out of LayoutPanel for sticky-stacking).
-  const hasCableRouting = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
   const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
   const showAcCables = useLayerVisibilityStore((s) => s.showAcCables)
   const showLas = useLayerVisibilityStore((s) => s.showLas)
@@ -1361,7 +1355,6 @@ export function App(): JSX.Element {
                     <PinnedActionArea
                       generating={layoutMutation.isPending}
                       boundaryCount={projectCounts?.boundaries ?? null}
-                      hasCableRouting={hasCableRouting}
                       onCancel={handleCancelLayout}
                     />
                   )}

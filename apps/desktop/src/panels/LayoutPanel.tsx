@@ -434,17 +434,22 @@ function CableCalcFieldRow({
 export function PinnedActionArea({
   generating,
   boundaryCount,
-  hasCableRouting,
   onCancel,
 }: {
   generating: boolean
   boundaryCount: number | null
-  hasCableRouting: boolean
   onCancel: () => void
 }) {
   const jobState = useCurrentLayoutJobStore((s) => s.jobState)
   const formHasErrors = useLayoutFormStatusStore((s) => s.hasErrors)
   const enableCableCalc = useLayoutFormStatusStore((s) => s.enableCableCalc)
+  // Read the entitlement here — `useHasFeature` reads from
+  // `<EntitlementsProvider>` which wraps the whole AppShell tree, so
+  // this is safe wherever PinnedActionArea renders. Lifting this hook
+  // to App.tsx's top level (above the provider's JSX) crashes with
+  // "useEntitlementsContext must be used inside <EntitlementsProvider>"
+  // on every render — see the post-mortem in commit log.
+  const hasCableRouting = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
   const isInflight =
     jobState !== null &&
     (jobState.status === "queued" || jobState.status === "running")
