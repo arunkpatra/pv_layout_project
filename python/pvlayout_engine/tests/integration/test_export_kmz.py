@@ -195,6 +195,17 @@ def test_export_kmz_empty_results_returns_422(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(
+    reason=(
+        "Spike 1 §2.2 — KMZ summary text was intentionally split into "
+        "'AC cable BoM length' + 'AC cable trench length' siblings to "
+        "make the EPC distinction explicit. This diverges textually from "
+        "legacy 'AC cable total'; byte-equivalence is no longer the bar. "
+        "Cable-numeric correctness is asserted by "
+        "tests/integration/test_layout_s11_5_cables.py (BoM bit-identical "
+        "+ trench length sourced from sum(ac_cable_runs[*].length_m))."
+    )
+)
 def test_export_kmz_byte_equivalent_to_legacy(
     legacy_kmz, tmp_path: Path
 ) -> None:

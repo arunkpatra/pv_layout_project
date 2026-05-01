@@ -9,7 +9,10 @@ Layers:
   OBSTRUCTIONS – user-drawn obstructions (green)
   INVERTERS    – string inverters (lime)
   DC_CABLES    – DC string cable routes (orange)  [only when include_cables=True]
-  AC_CABLES    – AC feeder cable routes (magenta) [only when include_cables=True]
+  AC_CABLE_TRENCH – physical AC cable trench/tray route (magenta) [only when include_cables=True]
+                    Geometry is the MST corridor through the plant; the per-
+                    inverter copper BoM is reported separately in the PDF/KMZ
+                    summary (see PRD §2.2).
   LA           – lightning arrester symbols        [only when include_la=True]
   ANNOTATIONS  – labels and text
 
@@ -62,7 +65,7 @@ def export_dxf(
                       toggle is OFF in the UI), the LA layer is not created
                       and no LA elements are exported.
     include_cables  : if True, DC and AC cable routes are written to
-                      DC_CABLES / AC_CABLES layers.  If False (cable display
+                      DC_CABLES / AC_CABLE_TRENCH layers.  If False (cable display
                       toggle is OFF in the UI), those layers are not created
                       and no cable polylines are exported.
     """
@@ -85,7 +88,7 @@ def export_dxf(
     ]
     if include_cables:
         layer_defs.append(("DC_CABLES", COL_ORANGE))
-        layer_defs.append(("AC_CABLES", COL_MAGENTA))
+        layer_defs.append(("AC_CABLE_TRENCH", COL_MAGENTA))
     if include_la:
         layer_defs.append(("LA", COL_MAROON))
     for lname, lcol in layer_defs:
@@ -186,7 +189,7 @@ def export_dxf(
                 if len(pts2d) >= 2:
                     msp.add_lwpolyline(
                         pts2d, close=False,
-                        dxfattribs={"layer": "AC_CABLES", "lineweight": 25},
+                        dxfattribs={"layer": "AC_CABLE_TRENCH", "lineweight": 25},
                     )
 
         # ---- Lightning Arresters (only when LA toggle is ON) ------------------

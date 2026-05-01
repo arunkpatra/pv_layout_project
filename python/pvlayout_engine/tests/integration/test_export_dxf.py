@@ -206,7 +206,7 @@ def test_export_dxf_smoke(
     layer_names = {layer.dxf.name for layer in doc.layers}
     expected = {
         "BOUNDARY", "OBSTACLES", "TABLES", "ICR", "OBSTRUCTIONS",
-        "INVERTERS", "ANNOTATIONS", "DC_CABLES", "AC_CABLES", "LA",
+        "INVERTERS", "ANNOTATIONS", "DC_CABLES", "AC_CABLE_TRENCH", "LA",
     }
     assert expected.issubset(layer_names), (
         f"missing layers: {expected - layer_names}"
@@ -239,7 +239,7 @@ def test_export_dxf_excludes_la_when_toggled_off(
 def test_export_dxf_excludes_cables_when_toggled_off(
     client: TestClient, export_request_body: dict[str, Any]
 ) -> None:
-    """include_cables=False → DC_CABLES + AC_CABLES layers absent."""
+    """include_cables=False → DC_CABLES + AC_CABLE_TRENCH layers absent."""
     body = dict(export_request_body)
     body["include_cables"] = False
     resp = client.post("/export-dxf", headers=auth(), json=body)
@@ -248,10 +248,10 @@ def test_export_dxf_excludes_cables_when_toggled_off(
     doc = _read_dxf_from_response(resp.content)
     layer_names = {layer.dxf.name for layer in doc.layers}
     assert "DC_CABLES" not in layer_names
-    assert "AC_CABLES" not in layer_names
+    assert "AC_CABLE_TRENCH" not in layer_names
 
     for entity in doc.modelspace():
-        assert entity.dxf.layer not in ("DC_CABLES", "AC_CABLES"), (
+        assert entity.dxf.layer not in ("DC_CABLES", "AC_CABLE_TRENCH"), (
             f"unexpected cable-layer entity {entity.dxftype()} on {entity.dxf.layer}"
         )
 
@@ -402,9 +402,16 @@ def test_export_dxf_structure_parity_with_legacy(
 
     legacy_layers = {l.dxf.name for l in legacy_doc.layers}
     new_layers = {l.dxf.name for l in new_doc.layers}
+    # Spike 1 §2.2 — the AC layer was renamed AC_CABLES → AC_CABLE_TRENCH
+    # to make the EPC distinction explicit (trench corridor vs per-inverter
+    # copper BoM). Normalize legacy → new for the parity comparison so the
+    # rest of the structure (everything else identical) stays asserted.
+    legacy_layers = {
+        ("AC_CABLE_TRENCH" if l == "AC_CABLES" else l) for l in legacy_layers
+    }
     common = {
         "BOUNDARY", "OBSTACLES", "TABLES", "ICR", "OBSTRUCTIONS",
-        "INVERTERS", "ANNOTATIONS", "DC_CABLES", "AC_CABLES", "LA",
+        "INVERTERS", "ANNOTATIONS", "DC_CABLES", "AC_CABLE_TRENCH", "LA",
     }
     assert common.issubset(legacy_layers), (
         f"legacy missing layers: {common - legacy_layers}"
@@ -420,6 +427,15 @@ def test_export_dxf_structure_parity_with_legacy(
 
     legacy_groups = _group_by_layer_type(legacy_doc)
     new_groups = _group_by_layer_type(new_doc)
+
+    # Spike 1 §2.2 — normalize the AC layer rename when grouping too,
+    # mirroring the layer-name normalization above. Same intent: assert
+    # structural parity (same groups, same counts), accept the deliberate
+    # rename.
+    legacy_groups = {
+        (("AC_CABLE_TRENCH" if layer == "AC_CABLES" else layer), dxftype): v
+        for (layer, dxftype), v in legacy_groups.items()
+    }
 
     assert set(legacy_groups) == set(new_groups), (
         f"(layer, type) group key drift: "

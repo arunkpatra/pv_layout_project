@@ -28,7 +28,7 @@ export function VisibilitySection() {
   return (
     <InspectorSection title="Layer visibility">
       <ToggleRow
-        label="Show AC cables"
+        label="Show AC cable trench"
         entitled={hasCableRouting}
         checked={showAcCables}
         onCheckedChange={setShowAcCables}

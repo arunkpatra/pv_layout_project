@@ -130,15 +130,22 @@ def _boundary_summary_html(result: LayoutResult, params: LayoutParameters) -> st
             f"<b>DC/AC ratio</b>      : {result.dc_ac_ratio:.3f}<br/>"
         )
     # ---- Cable totals (mode-dependent) ----
+    # AC line items split into two siblings per Spike 1 §2.2:
+    #   - "AC cable BoM length" — sum of per-inverter home-run distances
+    #     (industry-correct procurement BoM; bit-identical to legacy).
+    #   - "AC cable trench length" — sum of MST trench segment lengths
+    #     (physical cable corridor; shared infrastructure).
     if params.design_mode == DesignMode.CENTRAL_INVERTER:
         html += (
             f"<b>String DC cable total</b>  : {result.total_dc_cable_m:,.0f} m  (MMS → SMB)<br/>"
-            f"<b>DC cable total</b>         : {result.total_ac_cable_m:,.0f} m  (SMB → Central Inverter)<br/>"
+            f"<b>DC cable BoM length</b>    : {result.total_ac_cable_m:,.0f} m  (SMB → Central Inverter)<br/>"
+            f"<b>DC cable trench length</b> : {result.total_ac_cable_trench_m:,.0f} m  (shared corridor)<br/>"
         )
     else:
         html += (
             f"<b>String DC cable total</b>  : {result.total_dc_cable_m:,.0f} m  (MMS → Str. Inverter)<br/>"
-            f"<b>AC cable total</b>         : {result.total_ac_cable_m:,.0f} m  (Str. Inverter → ICR)<br/>"
+            f"<b>AC cable BoM length</b>    : {result.total_ac_cable_m:,.0f} m  (Str. Inverter → ICR, per-inverter routes)<br/>"
+            f"<b>AC cable trench length</b> : {result.total_ac_cable_trench_m:,.0f} m  (shared corridor)<br/>"
         )
     html += f"<b>Lightning arresters</b>: {result.num_las} (40 m × 14 m each, r=100 m)<br/>"
     html += _energy_html(result)

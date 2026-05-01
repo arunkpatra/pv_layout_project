@@ -263,9 +263,17 @@ def _build_summary_figure(
         col_headers += ["Plant AC\n(MW)", "DC/AC\nRatio"]
     if _show_cable:
         if _is_ci:
-            col_headers += ["Str.DC\nCable (m)", "DC Cable\n(SMB→CInv)\n(m)"]
+            col_headers += [
+                "Str.DC\nCable (m)",
+                "DC Cable BoM\n(SMB→CInv)\n(m)",
+                "DC Cable\nTrench\n(m)",
+            ]
         else:
-            col_headers += ["Str.DC\nCable (m)", "AC Cable\n(Inv→ICR)\n(m)"]
+            col_headers += [
+                "Str.DC\nCable (m)",
+                "AC Cable BoM\n(Inv→ICR)\n(m)",
+                "AC Cable\nTrench\n(m)",
+            ]
     col_headers.append("LA")
 
     def _row_vals(r):
@@ -294,7 +302,11 @@ def _build_summary_figure(
                 f"{r.dc_ac_ratio:.3f}" if r.dc_ac_ratio > 0 else "—",
             ]
         if _show_cable:
-            v += [f"{r.total_dc_cable_m:,.0f}", f"{r.total_ac_cable_m:,.0f}"]
+            v += [
+                f"{r.total_dc_cable_m:,.0f}",
+                f"{r.total_ac_cable_m:,.0f}",
+                f"{r.total_ac_cable_trench_m:,.0f}",
+            ]
         v.append(f"{r.num_las}")
         return v
 
@@ -330,6 +342,7 @@ def _build_summary_figure(
             tot += [
                 f"{sum(r.total_dc_cable_m for r in results):,.0f}",
                 f"{sum(r.total_ac_cable_m for r in results):,.0f}",
+                f"{sum(r.total_ac_cable_trench_m for r in results):,.0f}",
             ]
         tot.append(f"{sum(r.num_las for r in results)}")
         rows_data.append(tot)
@@ -417,7 +430,11 @@ def _build_summary_figure(
                 f"{r.dc_ac_ratio:.3f}" if r.dc_ac_ratio > 0 else "—",
             ]
         if _show_cab:
-            v += [f"{r.total_dc_cable_m:,.0f} m", f"{r.total_ac_cable_m:,.0f} m"]
+            v += [
+                f"{r.total_dc_cable_m:,.0f} m",
+                f"{r.total_ac_cable_m:,.0f} m",
+                f"{r.total_ac_cable_trench_m:,.0f} m",
+            ]
         return v
 
     inv_rows = [_inv_row(r) for r in results]
@@ -444,6 +461,7 @@ def _build_summary_figure(
             tot2 += [
                 f"{sum(r.total_dc_cable_m for r in results):,.0f} m",
                 f"{sum(r.total_ac_cable_m for r in results):,.0f} m",
+                f"{sum(r.total_ac_cable_trench_m for r in results):,.0f} m",
             ]
         inv_rows.append(tot2)
 
@@ -458,9 +476,17 @@ def _build_summary_figure(
         inv_hdrs += ["Plant AC\nCapacity", "DC/AC\nRatio"]
     if _show_cab:
         if _is_ci_inv:
-            inv_hdrs += ["Str.DC\nCable (m)", "DC Cable\n(SMB→CInv) (m)"]
+            inv_hdrs += [
+                "Str.DC\nCable (m)",
+                "DC Cable BoM\n(SMB→CInv) (m)",
+                "DC Cable\nTrench (m)",
+            ]
         else:
-            inv_hdrs += ["String DC\nCable (m)", "AC Cable\n(Inv→ICR) (m)"]
+            inv_hdrs += [
+                "String DC\nCable (m)",
+                "AC Cable BoM\n(Inv→ICR) (m)",
+                "AC Cable\nTrench (m)",
+            ]
 
     itbl = ax_inv.table(
         cellText=inv_rows,

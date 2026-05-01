@@ -128,9 +128,16 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
         )}
         {hasCableMeasurements && agg.totalAcCableM > 0 && (
           <PropertyRow
-            label="AC cable length"
+            label="AC cable BoM length"
             value={formatCableLength(agg.totalAcCableM)}
             unit={agg.totalAcCableM >= 1000 ? "km" : "m"}
+          />
+        )}
+        {hasCableMeasurements && agg.totalAcCableTrenchM > 0 && (
+          <PropertyRow
+            label="AC cable trench length"
+            value={formatCableLength(agg.totalAcCableTrenchM)}
+            unit={agg.totalAcCableTrenchM >= 1000 ? "km" : "m"}
           />
         )}
         {hasEnergyYield && agg.plantAcCapacityMw > 0 && (
@@ -169,6 +176,7 @@ function aggregate(results: LayoutResult[]) {
   let totalLas = 0
   let totalDcCableM = 0
   let totalAcCableM = 0
+  let totalAcCableTrenchM = 0
   let totalInverterCapacityKwp = 0
   let plantAcCapacityMw = 0
   for (const r of results) {
@@ -182,6 +190,7 @@ function aggregate(results: LayoutResult[]) {
     totalLas += r.num_las
     totalDcCableM += r.total_dc_cable_m
     totalAcCableM += r.total_ac_cable_m
+    totalAcCableTrenchM += r.total_ac_cable_trench_m
     totalInverterCapacityKwp += r.inverter_capacity_kwp
     plantAcCapacityMw += r.plant_ac_capacity_mw
   }
@@ -201,6 +210,7 @@ function aggregate(results: LayoutResult[]) {
     totalLas,
     totalDcCableM,
     totalAcCableM,
+    totalAcCableTrenchM,
     totalInverterCapacityKwp,
     plantAcCapacityMw,
     // dc_ac_ratio is a plant-level invariant (not additive across boundaries)

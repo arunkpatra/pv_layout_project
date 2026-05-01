@@ -401,9 +401,12 @@ function CableCalcFieldRow({
     <div className="flex flex-col gap-[4px] py-[6px]">
       <div className="flex items-center justify-between gap-[12px]">
         <div className="flex flex-1 items-center gap-[8px] min-w-0">
-          <Label className="truncate">Calculate cables</Label>
+          <Label className="truncate">Calculate AC cable trench</Label>
           {!entitled && (
-            <Chip tone="accent" aria-label="Calculate cables requires Pro">
+            <Chip
+              tone="accent"
+              aria-label="Calculate AC cable trench requires Pro"
+            >
               Pro
             </Chip>
           )}

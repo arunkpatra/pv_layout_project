@@ -78,17 +78,17 @@ describe("VisibilitySection", () => {
 
   it("renders both toggle rows with the expected labels", () => {
     renderSection(PRO_FEATURES)
-    expect(screen.getByText("Show AC cables")).toBeInTheDocument()
+    expect(screen.getByText("Show AC cable trench")).toBeInTheDocument()
     expect(screen.getByText("Show lightning arresters")).toBeInTheDocument()
   })
 
-  it("Pro user: clicking 'Show AC cables' dispatches to the store", async () => {
+  it("Pro user: clicking 'Show AC cable trench' dispatches to the store", async () => {
     const user = userEvent.setup()
     renderSection(PRO_FEATURES)
 
     expect(useLayerVisibilityStore.getState().showAcCables).toBe(false)
 
-    const sw = screen.getByRole("switch", { name: /Show AC cables/i })
+    const sw = screen.getByRole("switch", { name: /Show AC cable trench/i })
     await user.click(sw)
 
     expect(useLayerVisibilityStore.getState().showAcCables).toBe(true)
@@ -109,7 +109,7 @@ describe("VisibilitySection", () => {
   it("Basic user: AC cables toggle disabled with 'Pro' chip; LA toggle remains enabled", () => {
     renderSection(BASIC_FEATURES)
 
-    const acSwitch = screen.getByRole("switch", { name: /Show AC cables/i })
+    const acSwitch = screen.getByRole("switch", { name: /Show AC cable trench/i })
     const laSwitch = screen.getByRole("switch", { name: /Show lightning arresters/i })
     expect(acSwitch).toBeDisabled()
     expect(laSwitch).not.toBeDisabled()
@@ -122,7 +122,7 @@ describe("VisibilitySection", () => {
     const user = userEvent.setup()
     renderSection(BASIC_FEATURES)
 
-    const sw = screen.getByRole("switch", { name: /Show AC cables/i })
+    const sw = screen.getByRole("switch", { name: /Show AC cable trench/i })
     await user.click(sw)
 
     expect(useLayerVisibilityStore.getState().showAcCables).toBe(false)
