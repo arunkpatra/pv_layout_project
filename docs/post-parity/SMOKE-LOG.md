@@ -2261,8 +2261,28 @@ Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`
 
 User observation while running the app live: scrolling the LayoutPanel form caused the `Layout / Energy yield / Runs` tabs row to scroll up and out of the viewport, while only the Generate button below remained pinned. Expected behaviour: both elements stay visible during scroll because both are top-level navigation/action affordances.
 
-Fix landed live during the session, two coordinated changes:
+First attempt — two independent sticky elements with hardcoded `top-[51px]` then `top-[58px]` to position the pinned area below the tabs band — produced a "scroll-up-then-stick" jitter regardless of the offset value. See S3-01b for the root-cause investigation and the robust fix that replaced this approach.
 
-1. `apps/desktop/src/App.tsx` — wrapped `<TabsList>` in a sticky band (`sticky top-0 z-20 bg-[var(--surface-ground)]`) inside the `<Tabs>` container. Padding moved from the Tabs root onto the sticky band so the surrounding inspector content lays out naturally without negative-margin workarounds. Removed the `-mx-[20px]` workarounds on all three `TabsContent` panels (no longer needed once the parent doesn't have `px-[20px]`).
-2. `apps/desktop/src/panels/LayoutPanel.tsx` — changed the LayoutPanel pinned action area's `top-0` to `top-[51px]` so it stacks below the new tabs band rather than overlapping. The 51px value matches the band's rendered height (`pt-[18px]` + `h-[32px]` TabsTrigger + 1px border).
+---
+
+**S3-01b** — Robust fix for the sticky-stack ordering (replaces S3-01's hardcoded top offset).
+
+Subagent-driven root-cause investigation found: TabsContent (`packages/ui-desktop/src/components/Tabs.tsx:50`) has a built-in `mt-[16px]`. Combined with TabsList's 1px border-bottom, the natural Y of the pinned action area at scroll=0 was 75px (band 59 + mt 16), not 51 or 58 as my hardcoded top values assumed. Any further padding/font/border change to TabsList would silently re-break the offset. Fragile by construction.
+
+Robust fix — single sticky parent containing both bands, height self-determined:
+
+1. **New slice `apps/desktop/src/state/layoutFormStatus.ts`** — mirrors RHF live state (`hasErrors`, `enableCableCalc`) up so the lifted PinnedActionArea can read them without consuming RHF.
+
+2. **`apps/desktop/src/panels/LayoutPanel.tsx`** —
+   - `LayoutPanelProps` slimmed to only `onGenerate`. The other props (`generating`, `noProject`, `boundaryCount`, `onCancel`) now flow directly from App.tsx into PinnedActionArea.
+   - `PinnedActionArea` is now `export function` so App.tsx can render it directly. Reads `hasErrors` + `enableCableCalc` from the new layoutFormStatus slice.
+   - The PinnedActionArea's outer `<div>` no longer has `position: sticky` — its sticky parent is the band in App.tsx.
+   - The `<form>` now carries `id="layout-form"`. The Generate button (still inside PinnedActionArea, but PinnedActionArea now lives outside the form physically) has `form="layout-form"` so HTML5's form-association keeps the submit binding.
+   - Two `useEffect`s mirror `Object.keys(errors).length > 0` and `watch("enable_cable_calc")` into the slice with primitive deps (so RHF object-identity churn doesn't cause excess writes).
+
+3. **`apps/desktop/src/App.tsx`** —
+   - Single sticky container `sticky top-0 z-20 bg-[var(--surface-ground)]` holds both the TabsList block and a TabsContent (forceMount, gated to layout tab) containing PinnedActionArea. Padding moved to inner divs; the sticky parent's height equals the sum of its children, no measurement needed.
+   - Imports PinnedActionArea + sources `hasCableRouting` via `useHasFeature` to pass into PinnedActionArea.
+
+Verified: lint 8/8, typecheck 13/13, test 9/9. Vite HMR picks up the React changes without app restart. Tabs row + Generate button now share one sticky parent — adjusting TabsList padding, TabsTrigger height, or `mt-*` on either child no longer breaks the alignment because there's nothing to align.
 

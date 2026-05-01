@@ -49,6 +49,8 @@ import {
 import { useCreateProjectMutation } from "./auth/useCreateProject"
 import { useOpenProjectMutation } from "./auth/useOpenProject"
 import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
+import { useHasFeature } from "./auth/FeatureGate"
+import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import { useRenameProjectMutation } from "./auth/useRenameProject"
 import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { useAutoSaveProject } from "./auth/useAutoSaveProject"
@@ -82,7 +84,7 @@ import { useEditingStateStore } from "./state/editingState"
 import { useRefreshInvertersMutation } from "./state/useRefreshInvertersMutation"
 import { useAddRoadMutation } from "./state/useAddRoadMutation"
 import { useRemoveLastRoadMutation } from "./state/useRemoveLastRoadMutation"
-import { LayoutPanel } from "./panels/LayoutPanel"
+import { LayoutPanel, PinnedActionArea } from "./panels/LayoutPanel"
 import { SummaryPanel } from "./panels/SummaryPanel"
 import { VisibilitySection } from "./panels/VisibilitySection"
 import { DrawingToolbar } from "./panels/DrawingToolbar"
@@ -354,6 +356,10 @@ export function App(): JSX.Element {
   const clearCurrentJobState = useCurrentLayoutJobStore(
     (s) => s.clearJobState
   )
+  // Drives the pre-flight expectation chip + the Generate-button enable
+  // state when the LayoutPanel's PinnedActionArea is rendered in the
+  // sticky tabs band (lifted out of LayoutPanel for sticky-stacking).
+  const hasCableRouting = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
   const resetLayerVisibility = useLayerVisibilityStore((s) => s.resetToDefaults)
   const showAcCables = useLayerVisibilityStore((s) => s.showAcCables)
   const showLas = useLayerVisibilityStore((s) => s.showLas)
@@ -1318,35 +1324,57 @@ export function App(): JSX.Element {
           project ? (
             <InspectorRoot>
               <Tabs defaultValue="layout">
-                {/* Sticky tabs band — pins the Layout / Energy / Runs
-                    tabs at the top of the inspector scroll container so
-                    they stay visible while the user scrolls through
-                    the LayoutPanel form below. The LayoutPanel's own
-                    pinned action area stacks UNDER this band via
-                    `top-[51px]` (matches this band's rendered height:
-                    pt-18 + h-32 TabsTrigger + 1px border = 51px). */}
-                <div className="sticky top-0 z-20 px-[20px] pt-[18px] bg-[var(--surface-ground)]">
-                  <TabsList>
-                    <TabsTrigger value="layout">Layout</TabsTrigger>
-                    <TabsTrigger value="energy">Energy yield</TabsTrigger>
-                    <TabsTrigger value="runs">Runs</TabsTrigger>
-                  </TabsList>
+                {/* Single sticky container holds BOTH the tabs row AND
+                    (for the Layout tab only) the LayoutPanel pinned
+                    action area — one self-sized parent, no hardcoded
+                    `top` offsets between siblings. Robustness fix for
+                    S3-01b in SMOKE-LOG.md: the previous two-sibling
+                    approach with `top-[58px]` was 17px short due to
+                    TabsContent's built-in mt-[16px] + 1px TabsList
+                    border. With one sticky parent, height is whatever
+                    its content totals to — survives any future
+                    TabsList / Trigger / padding changes. */}
+                <div className="sticky top-0 z-20 bg-[var(--surface-ground)]">
+                  <div className="px-[20px] pt-[18px]">
+                    <TabsList>
+                      <TabsTrigger value="layout">Layout</TabsTrigger>
+                      <TabsTrigger value="energy">Energy yield</TabsTrigger>
+                      <TabsTrigger value="runs">Runs</TabsTrigger>
+                    </TabsList>
+                  </div>
+                  {/* PinnedActionArea is the LayoutPanel's idle/running/
+                      post-run action surface. Lives here (not inside
+                      LayoutPanel's <form>) so it shares the sticky
+                      parent with TabsList. The Generate button uses
+                      `form="layout-form"` to stay bound to the form
+                      that lives below in TabsContent. Gated to the
+                      Layout tab via TabsContent forceMount + Tailwind
+                      data-[state=inactive]:hidden so it disappears
+                      when Energy / Runs are active. */}
+                  <TabsContent
+                    value="layout"
+                    forceMount
+                    className="data-[state=inactive]:hidden mt-0"
+                  >
+                    <PinnedActionArea
+                      generating={layoutMutation.isPending}
+                      noProject={!project}
+                      boundaryCount={projectCounts?.boundaries ?? null}
+                      hasCableRouting={hasCableRouting}
+                      onCancel={handleCancelLayout}
+                    />
+                  </TabsContent>
                 </div>
-                {/* forceMount: keep the LayoutPanel mounted across tab
-                    switches so RHF's working form state survives. Hidden
-                    via Radix's data-[state] attr + Tailwind variant. */}
+                {/* Form body — separate TabsContent (also forceMount)
+                    so RHF state survives tab switches. */}
                 <TabsContent
                   value="layout"
                   forceMount
-                  className="mt-[8px] data-[state=inactive]:hidden"
+                  className="data-[state=inactive]:hidden"
                 >
                   <LayoutPanel
                     key={layoutFormKey}
                     onGenerate={handleGenerate}
-                    onCancel={handleCancelLayout}
-                    generating={layoutMutation.isPending}
-                    noProject={!project}
-                    boundaryCount={projectCounts?.boundaries ?? null}
                   />
                   {layoutResult && <VisibilitySection />}
                   {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
@@ -1354,7 +1382,6 @@ export function App(): JSX.Element {
                 </TabsContent>
                 <TabsContent
                   value="energy"
-                  className="mt-[8px]"
                 >
                   <EnergyTabContent />
                 </TabsContent>
@@ -1363,7 +1390,7 @@ export function App(): JSX.Element {
                 <TabsContent
                   value="runs"
                   forceMount
-                  className="mt-[8px] data-[state=inactive]:hidden"
+                  className="data-[state=inactive]:hidden"
                 >
                   <RunsList onDeleteRuns={handleDeleteRuns} />
                 </TabsContent>

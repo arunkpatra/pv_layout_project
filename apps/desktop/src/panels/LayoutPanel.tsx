@@ -61,37 +61,16 @@ import {
 } from "@solarlayout/sidecar-client"
 import { FEATURE_KEYS } from "@solarlayout/entitlements-client"
 import { useCurrentLayoutJobStore } from "../state/currentLayoutJob"
+import { useLayoutFormStatusStore } from "../state/layoutFormStatus"
 import { useLayoutParamsStore } from "../state/layoutParams"
 import { layoutParametersSchema } from "../state/layoutParams"
 import { useHasFeature } from "../auth/FeatureGate"
 
 interface LayoutPanelProps {
   onGenerate: (params: LayoutParameters) => void
-  /**
-   * Cancel an in-flight layout job. Wired by App.tsx — calls
-   * `sidecar.cancelLayoutJob(currentJobId)`. The slice update happens
-   * via the polling loop's next tick (cooperative cancel).
-   */
-  onCancel: () => void
-  /** True while the layout mutation is in flight. */
-  generating: boolean
-  /** True when no project is loaded — disables the Generate button. */
-  noProject: boolean
-  /**
-   * Boundary count from the parsed KMZ (computed by App.tsx via
-   * `countKmzFeatures`). Drives the pre-flight time-estimate chip.
-   * `null` when no project is loaded.
-   */
-  boundaryCount: number | null
 }
 
-export function LayoutPanel({
-  onGenerate,
-  onCancel,
-  generating,
-  noProject,
-  boundaryCount,
-}: LayoutPanelProps) {
+export function LayoutPanel({ onGenerate }: LayoutPanelProps) {
   // RHF owns the working form state; Zustand holds the *saved* params
   // (defaults at mount + last-submitted snapshot). Don't auto-sync on
   // every keystroke — `watch()` returns a new object reference per
@@ -118,6 +97,7 @@ export function LayoutPanel({
   const designMode = watch("design_mode")
   const tiltOverride = watch("tilt_angle") !== null
   const pitchOverride = watch("row_spacing") !== null
+  const enableCableCalc = watch("enable_cable_calc")
 
   // Belt-and-braces coercion: if the user isn't entitled to cable_routing,
   // force enable_cable_calc to false at submit time regardless of what
@@ -125,6 +105,24 @@ export function LayoutPanel({
   // surviving a license downgrade — the UI gate in CableCalcFieldRow
   // handles the steady-state display.
   const hasCableRouting = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
+
+  // Mirror two pieces of RHF live state up to the layoutFormStatus
+  // slice so the PinnedActionArea — which now lives outside the form
+  // (rendered in App.tsx alongside the tabs band for sticky-stacking,
+  // see SMOKE-LOG.md S3-01b) — can read them without consuming RHF.
+  // Booleans are deliberate as deps (object identity changes every
+  // render; the booleans only flip on real change).
+  const setHasErrors = useLayoutFormStatusStore((s) => s.setHasErrors)
+  const setEnableCableCalc = useLayoutFormStatusStore(
+    (s) => s.setEnableCableCalc
+  )
+  const hasErrors = Object.keys(errors).length > 0
+  useEffect(() => {
+    setHasErrors(hasErrors)
+  }, [hasErrors, setHasErrors])
+  useEffect(() => {
+    setEnableCableCalc(enableCableCalc)
+  }, [enableCableCalc, setEnableCableCalc])
 
   const onSubmit: SubmitHandler<LayoutParameters> = (values) => {
     const coerced: LayoutParameters = hasCableRouting
@@ -135,25 +133,11 @@ export function LayoutPanel({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      {/* ── Pinned action area ─────────────────────────────────────────
-          Sticks to the top of the inspector scroll container. Three
-          states swap in based on the live JobState from the
-          `currentLayoutJob` slice:
-            - idle (no job yet OR terminal job displayed as summary)
-            - running (per-plot progress list + Cancel)
-            - post-run (terminal summary line + Generate)
-          */}
-      <PinnedActionArea
-        generating={generating}
-        noProject={noProject}
-        boundaryCount={boundaryCount}
-        formHasErrors={Object.keys(errors).length > 0}
-        enableCableCalc={watch("enable_cable_calc")}
-        hasCableRouting={hasCableRouting}
-        onCancel={onCancel}
-      />
-
+    // `id="layout-form"` so the Generate button (rendered in App.tsx
+    // inside the sticky tabs band, NOT inside this <form>) can submit
+    // it via `form="layout-form"` on the button. Lift documented in
+    // SMOKE-LOG.md S3-01b.
+    <form id="layout-form" onSubmit={handleSubmit(onSubmit)}>
       {/* ── Module ──────────────────────────────────────────────────── */}
       <InspectorSection
         title="Module"
@@ -435,31 +419,41 @@ function CableCalcFieldRow({
  *     (with caret-expand on partial outcomes)
  *   - idle (no terminal snapshot): optional pre-flight chip + Generate
  */
-function PinnedActionArea({
+/**
+ * Rendered by App.tsx INSIDE the shared sticky tabs band — not by
+ * LayoutPanel itself. Decoupling is what fixes S3-01b's "scroll-up-
+ * before-stick" bug: with both the tabs row and this action area
+ * inside one sticky parent, the stack height is self-determined and
+ * doesn't depend on hardcoded pixel offsets.
+ *
+ * Reads RHF live state (`hasErrors`, `enableCableCalc`) from the
+ * layoutFormStatus slice that LayoutPanel mirrors into. Receives
+ * everything else as direct props from App.tsx (which already owns
+ * those values).
+ */
+export function PinnedActionArea({
   generating,
   noProject,
   boundaryCount,
-  formHasErrors,
-  enableCableCalc,
   hasCableRouting,
   onCancel,
 }: {
   generating: boolean
   noProject: boolean
   boundaryCount: number | null
-  formHasErrors: boolean
-  enableCableCalc: boolean
   hasCableRouting: boolean
   onCancel: () => void
 }) {
   const jobState = useCurrentLayoutJobStore((s) => s.jobState)
+  const formHasErrors = useLayoutFormStatusStore((s) => s.hasErrors)
+  const enableCableCalc = useLayoutFormStatusStore((s) => s.enableCableCalc)
   const isInflight =
     jobState !== null &&
     (jobState.status === "queued" || jobState.status === "running")
 
   return (
     <div
-      className="sticky top-[51px] z-10 px-[20px] py-[14px] flex flex-col gap-[10px]
+      className="px-[20px] pb-[12px] pt-[8px] flex flex-col gap-[10px]
         bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
     >
       {isInflight ? (
@@ -518,6 +512,10 @@ function IdlePin({
       )}
       <Button
         type="submit"
+        // The button physically lives outside the LayoutPanel <form>
+        // (rendered by App.tsx in the sticky tabs band). HTML5
+        // form-association attribute keeps the submit binding intact.
+        form="layout-form"
         variant="primary"
         size="md"
         disabled={generating || noProject}
