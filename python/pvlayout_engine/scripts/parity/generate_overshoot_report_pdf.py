@@ -276,6 +276,10 @@ header-includes:
   - \\usepackage{{array}}
   - \\setlength{{\\heavyrulewidth}}{{0.6pt}}
   - \\setlength{{\\lightrulewidth}}{{0.3pt}}
+  - \\usepackage{{xurl}}
+  - \\urlstyle{{tt}}
+  - \\setlength{{\\emergencystretch}}{{3em}}
+  - \\sloppy
 ---
 
 \\thispagestyle{{empty}}
@@ -710,7 +714,7 @@ correctness guarantee that legacy lacks.
 """
 
     md_parts.append(
-        f"""
+        rf"""
 # Appendix A --- Reproduction commands
 
 To regenerate the JSON inputs that drive this report:
@@ -737,14 +741,14 @@ The reconstruct mode requires `PVlayout_Advance` checked out at branch
 
 # Appendix B --- File paths (relative to repository root)
 
-- Legacy capture: `{rel_capture}`
-- Overshoot analysis: `{rel_overshoot}`
-- Detection script: `{rel_script}`
-- This report's source memo: `{rel_memo}`
-- Legacy code under test: `core/string_inverter_manager.py:413-444`
-  (`_score()` at line 435) in `{baseline}`.
+- Legacy capture: \path{{{rel_capture}}}
+- Overshoot analysis: \path{{{rel_overshoot}}}
+- Detection script: \path{{{rel_script}}}
+- This report's source memo: \path{{{rel_memo}}}
+- Legacy code under test: \path{{core/string_inverter_manager.py:413-444}}
+  (`_score()` at line 435) in \path{{{baseline}}}.
 - New-app router (Pattern V):
-  `python/pvlayout_engine/pvlayout_core/core/string_inverter_manager.py:295-348`.
+  \path{{python/pvlayout_engine/pvlayout_core/core/string_inverter_manager.py:295-348}}.
 
 # Appendix C --- References (verified)
 
