@@ -48,7 +48,10 @@ import {
 } from "./auth/useEntitlements"
 import { useCreateProjectMutation } from "./auth/useCreateProject"
 import { useOpenProjectMutation } from "./auth/useOpenProject"
-import { useGenerateLayoutMutation } from "./auth/useGenerateLayout"
+import {
+  useGenerateLayoutMutation,
+  LayoutJobCancelledError,
+} from "./auth/useGenerateLayout"
 import { useRenameProjectMutation } from "./auth/useRenameProject"
 import { useDeleteProjectMutation } from "./auth/useDeleteProject"
 import { useAutoSaveProject } from "./auth/useAutoSaveProject"
@@ -1320,15 +1323,16 @@ export function App(): JSX.Element {
             {/* P4 — top-right pill mirrors auto-save status. */}
             <SaveIndicator status={saveStatus} />
 
-            {layoutMutation.isError && (
-              <OpenErrorOverlay
-                detail={
-                  layoutMutation.error?.message ?? "Layout generation failed."
-                }
-                onDismiss={() => layoutMutation.reset()}
-                onRetry={handleGenerate}
-              />
-            )}
+            {layoutMutation.isError &&
+              !(layoutMutation.error instanceof LayoutJobCancelledError) && (
+                <OpenErrorOverlay
+                  detail={
+                    layoutMutation.error?.message ?? "Layout generation failed."
+                  }
+                  onDismiss={() => layoutMutation.reset()}
+                  onRetry={handleGenerate}
+                />
+              )}
           </MapCanvas>
         }
         inspector={

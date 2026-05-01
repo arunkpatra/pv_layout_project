@@ -2254,6 +2254,7 @@ Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`
 | ID | Surface | Severity | Owner | Status |
 |---|---|---|---|---|
 | S3-01 | Tabs row (Layout / Energy / Runs) scrolled out of view; only Generate button stayed sticky | P2 | FE | **fixed** (live) |
+| S3-02 | Cancel mid-run leaves orphan backend Run + debited calc with no UI cleanup | **P0** | FE + BE | open (cleanup landing this commit; refund policy decision still open) |
 
 ---
 
@@ -2285,4 +2286,57 @@ Robust fix — single sticky parent containing both bands, height self-determine
    - Imports PinnedActionArea + sources `hasCableRouting` via `useHasFeature` to pass into PinnedActionArea.
 
 Verified: lint 8/8, typecheck 13/13, test 9/9. Vite HMR picks up the React changes without app restart. Tabs row + Generate button now share one sticky parent — adjusting TabsList padding, TabsTrigger height, or `mt-*` on either child no longer breaks the alignment because there's nothing to align.
+
+---
+
+**S3-02** — Cancel mid-run leaves orphan backend Run + debited calc; UI also misrepresents cancelled state.
+
+#### What the user saw
+
+After clicking **Cancel** mid-run on a multi-plot generate:
+
+1. The post-run summary line correctly showed *"Cancelled — 2 of 6 done before stop."*
+2. **But** expanding the chevron next to that line showed the per-plot list with the running plots **still spinning** (status: running). They did not flip to a terminal state.
+3. **And** an unrelated error overlay popped on the canvas: *"Couldn't open KMZ — Layout job cancelled by user. [Dismiss] [Try again]"*. The KMZ was never the problem; the overlay text is leftover copy from when this surface was a KMZ-open error.
+4. Closing/reopening the project hid all of this — but the underlying state asymmetry remained.
+
+#### Investigation — three distinct issues, two are UI, one is backend hygiene
+
+**Issue A (sidecar — by-design, UI gap):** the sidecar's cancel handler at `python/pvlayout_engine/pvlayout_engine/routes/layout_jobs.py:214` only sets `job.cancelled = True` + `job.status = CANCELLED` + counts plots done. It does **not** touch any individual plot's `status`. The runner loop then flips QUEUED plots to CANCELLED, but plots already RUNNING are left RUNNING — because cooperative cancel can't kill a `ProcessPoolExecutor` worker mid-Shapely-op without corrupting the pool. The sidecar is telling the truth (the worker is still computing); the **UI** is wrong to keep rendering it as a live spinner once the parent job is terminal.
+
+**Issue B (UI — leftover error-overlay copy):** `useGenerateLayout` throws `LayoutJobCancelledError` (a stable, recognisable subclass) when the polling loop sees `status: cancelled`. That throw trips the mutation's `isError` branch, and `App.tsx` renders `OpenErrorOverlay` (originally for KMZ-open errors, hence the misleading title). User-initiated cancellation is the *expected* outcome of clicking Cancel; it should not surface as a recoverable error.
+
+**Issue C (BACKEND HYGIENE — the P0 part of this finding):** the order of operations in `useGenerateLayout.ts:159-161` is `client.createRunV2` (B16) **first**, then start the sidecar job. B16 is *"atomic debit + Run row + presigned upload URL"* — so by the time the layout job even kicks off, the backend has already committed:
+
+- A `Run` row (no `deletedAt`).
+- A debited calc (UsageRecord, idempotency-keyed).
+- A presigned S3 upload URL.
+
+On cancel, the result-JSON PUT to that S3 URL never happens. Frontend correctly does NOT call `setResult` or `addRun` (canvas + runs slice are clean). But the backend Run row + calc debit **persist**. On next project reopen, `listRuns` returns the orphan and it shows up in the Runs gallery with no thumbnail and no result.
+
+The desktop already wires `deleteRunMutation` (used by recents delete + RunsList → calls B18 `DELETE /v2/projects/:id/runs/:runId`). The pieces exist; the cancel path just doesn't invoke them.
+
+#### What's landing in this commit
+
+Three fixes, one focused commit:
+
+1. **Cleanup on cancel** — when `useGenerateLayout`'s mutationFn detects `status: cancelled`, it now calls `client.deleteRunV2(licenseKey, projectId, b16.run.id).catch(() => {})` (best-effort, idempotent — second DELETE returns 404 cleanly per B18) **before** throwing `LayoutJobCancelledError`. Then invalidates the `["entitlements", licenseKey]` query so the quota chip refreshes.
+
+2. **Suppress error overlay on cancel** — App.tsx's `OpenErrorOverlay` rendering branch now checks `!(layoutMutation.error instanceof LayoutJobCancelledError)`. Other layout errors still surface normally; only the user's own cancel is silent.
+
+3. **Render running plots as "interrupted" when job is terminal** — `PlotList` gains an optional `terminal: boolean` prop. When `true`, plots whose status is still `running` render with the `Ban` icon (not `Loader2 animate-spin`) and their elapsed counter is frozen. The running pin (in-flight) passes `terminal={false}`; the post-run summary's expanded list passes `terminal={true}`.
+
+#### Refund policy — explicitly NOT addressed in this commit
+
+Per the V2 backend plan §49 (*"Run delete does not refund the calc"*) and the cable-compute offload feasibility memo §14 (*"cancelling a job after submission charges the user the full calc"*), today's policy is **no refund**. Arun has flagged this for revisit as **"must be worked next."** That work belongs in `docs/initiatives/post-parity-v2-backend-plan.md` (likely a new B-row: `POST /v2/runs/:runId/refund` or similar), not in this smoke-fix commit.
+
+#### Status
+
+| Layer | Fix | Status |
+|---|---|---|
+| FE — `useGenerateLayout.ts` | deleteRunV2 + invalidate entitlements on cancel detect | **fixed** (this commit) |
+| FE — `App.tsx` | suppress OpenErrorOverlay for LayoutJobCancelledError | **fixed** (this commit) |
+| FE — `LayoutPanel.tsx` PlotList | terminal-mode rendering for stuck-running plots | **fixed** (this commit) |
+| BE — refund policy | new endpoint + Run/UsageRecord linkage | **open**, P0, owned by BE next |
+
 

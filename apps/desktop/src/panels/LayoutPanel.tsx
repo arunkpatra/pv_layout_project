@@ -650,7 +650,9 @@ function PostRunSummary({ jobState }: { jobState: LayoutJobState }) {
           </button>
         )}
       </div>
-      {expanded && canExpand && <PlotList plots={jobState.plots} />}
+      {expanded && canExpand && (
+        <PlotList plots={jobState.plots} terminal />
+      )}
     </div>
   )
 }
@@ -658,29 +660,47 @@ function PostRunSummary({ jobState }: { jobState: LayoutJobState }) {
 /**
  * Per-plot status list — boundary name, status icon, elapsed counter
  * (or final elapsed for done plots, or error message for failed).
- * Used in both the running pin and the expanded post-run summary.
+ * Used in both the running pin (live) and the expanded post-run summary.
+ *
+ * `terminal=true` re-interprets per-plot `running` status as
+ * "interrupted" (Ban icon, frozen elapsed). Cooperative cancel can
+ * leave a worker still computing in the sidecar after the job is
+ * marked cancelled (see SMOKE-LOG.md S3-02), so the wire shape stays
+ * accurate but the UI must stop showing a live spinner once the
+ * parent job is terminal.
  */
-function PlotList({ plots }: { plots: PlotState[] }) {
+function PlotList({
+  plots,
+  terminal = false,
+}: {
+  plots: PlotState[]
+  terminal?: boolean
+}) {
   return (
     <ul className="flex flex-col gap-[2px] -mx-[4px] px-[4px] py-[6px]
       bg-[var(--surface-muted)] rounded-[6px] text-[12px]">
-      {plots.map((p) => (
-        <li
-          key={p.index}
-          className="flex items-center gap-[8px] py-[2px] min-w-0"
-        >
-          <PlotStatusIcon status={p.status} />
-          <span
-            className="text-[var(--text-primary)] truncate min-w-0 flex-1"
-            title={p.name}
+      {plots.map((p) => {
+        const interrupted = terminal && p.status === "running"
+        return (
+          <li
+            key={p.index}
+            className="flex items-center gap-[8px] py-[2px] min-w-0"
           >
-            {p.name}
-          </span>
-          <span className="text-[var(--text-muted)] tabular-nums shrink-0">
-            {plotTimingText(p)}
-          </span>
-        </li>
-      ))}
+            <PlotStatusIcon
+              status={interrupted ? "cancelled" : p.status}
+            />
+            <span
+              className="text-[var(--text-primary)] truncate min-w-0 flex-1"
+              title={p.name}
+            >
+              {p.name}
+            </span>
+            <span className="text-[var(--text-muted)] tabular-nums shrink-0">
+              {interrupted ? "interrupted" : plotTimingText(p)}
+            </span>
+          </li>
+        )
+      })}
     </ul>
   )
 }

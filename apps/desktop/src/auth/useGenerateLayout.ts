@@ -197,9 +197,28 @@ export function useGenerateLayoutMutation(
         setJobState(jobState)
       }
       if (jobState.status === "cancelled") {
-        // User-initiated abort. Throw a stable error that onError /
-        // mutationState consumers can recognise; the panel keeps the
-        // (cancelled) JobState in the slice as the post-run summary.
+        // User-initiated abort.
+        //
+        // Backend hygiene (S3-02 in SMOKE-LOG.md): B16 already committed
+        // a Run row + debited a calc before this job kicked off. The
+        // result-JSON PUT to S3 never happens on cancel. To avoid a
+        // thumbless / resultless orphan in the Runs gallery, soft-delete
+        // the Run via B18. Best-effort — second DELETE on a soft-deleted
+        // run returns 404 cleanly per B18, and a transient network error
+        // is acceptable: the worst case is one orphan row that the user
+        // can manually delete from the gallery.
+        //
+        // Refund policy: today the calc stays debited (per V2 plan §49 +
+        // cable-compute offload feasibility memo §14). Refund-on-cancel
+        // is a future backend addition tracked under S3-02.
+        await client
+          .deleteRunV2(licenseKey, vars.projectId, b16.run.id)
+          .catch(() => {})
+        // Refresh the entitlements query so the quota chip reflects the
+        // (still-debited) calc count immediately.
+        void queryClient.invalidateQueries({
+          queryKey: ["entitlements", licenseKey],
+        })
         throw new LayoutJobCancelledError()
       }
       if (jobState.status === "failed" || !jobState.result) {
