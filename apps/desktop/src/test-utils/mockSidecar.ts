@@ -58,6 +58,7 @@ const defaultLayoutResult: LayoutResult = {
   ac_cable_runs_wgs84: [],
   total_dc_cable_m: 0,
   total_ac_cable_m: 0,
+  total_ac_cable_trench_m: 0,
   string_kwp: 0,
   inverter_capacity_kwp: 0,
   num_string_inverters: 0,
@@ -93,6 +94,31 @@ export function createMockSidecarClient(
     refreshInverters: vi.fn().mockResolvedValue(defaultLayoutResult),
     addRoad: vi.fn().mockResolvedValue(defaultLayoutResult),
     removeLastRoad: vi.fn().mockResolvedValue(defaultLayoutResult),
+    // Spike 1 Phase 4 — async layout-job endpoints. Defaults give
+    // tests a happy-path job that immediately reports done with the
+    // same default result the blocking runLayout returns. Tests that
+    // exercise progress / cancellation override these explicitly.
+    startLayoutJob: vi.fn().mockResolvedValue({ job_id: "mock-job-id" }),
+    getLayoutJob: vi.fn().mockResolvedValue({
+      job_id: "mock-job-id",
+      status: "done" as const,
+      plots_total: defaultLayoutResults.length,
+      plots_done: defaultLayoutResults.length,
+      plots_failed: 0,
+      plots: defaultLayoutResults.map((r, i) => ({
+        index: i,
+        name: r.boundary_name,
+        status: "done" as const,
+        started_at: 0,
+        ended_at: 0,
+        error: null,
+      })),
+      result: { results: defaultLayoutResults },
+    }),
+    cancelLayoutJob: vi.fn().mockResolvedValue({
+      status: "cancelled" as const,
+      plots_done: 0,
+    }),
     // SP1 — best-effort thumbnail render. Default: tiny placeholder
     // bytes so callers that fire-and-forget the upload chain can spy
     // call counts without bytecount assertions failing.

@@ -53,6 +53,7 @@ const sampleResult: LayoutResult = {
   ac_cable_runs_wgs84: [],
   total_dc_cable_m: 0,
   total_ac_cable_m: 0,
+  total_ac_cable_trench_m: 0,
   string_kwp: 0,
   inverter_capacity_kwp: 0,
   num_string_inverters: 0,

@@ -207,7 +207,19 @@ export interface LayoutResult {
   ac_cable_runs: CableRun[]
   ac_cable_runs_wgs84: UTMPoint[][]
   total_dc_cable_m: number
+  /**
+   * Per-inverter copper BoM — sum of individual home-run distances per
+   * inverter→ICR. Industry-standard EPC bill-of-materials length (what
+   * a procurement team orders). Bit-identical to legacy.
+   */
   total_ac_cable_m: number
+  /**
+   * MST trench length — sum of `ac_cable_runs[].length_m`. Represents
+   * the physical cable trench / cable-tray corridor through the plant
+   * (shared infrastructure). Distinct from `total_ac_cable_m` because
+   * each inverter's copper run is dedicated, not shared. See PRD §2.2.
+   */
+  total_ac_cable_trench_m: number
   string_kwp: number
   inverter_capacity_kwp: number
   num_string_inverters: number
@@ -254,6 +266,70 @@ export interface LayoutRequest {
 /** /layout response envelope (one LayoutResult per boundary in the input). */
 export interface LayoutResponse {
   results: LayoutResult[]
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Async layout jobs (Spike 1 Phase 2) — POST/GET/DELETE /layout/jobs
+//
+// Same compute as POST /layout but the request returns a job_id
+// immediately and the work runs server-side in a background thread.
+// The desktop polls GET /layout/jobs/<id> every ~2 s until status is
+// terminal (done / failed / cancelled), then reads the LayoutResponse
+// from `result`. Wire shape is structurally identical to Spike 2's
+// cloud version (Postgres-backed) — only the URL changes.
+// ─────────────────────────────────────────────────────────────────────
+
+export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled"
+
+/** Per-plot status in the live progress list. `cancelled` here means
+ * the plot was queued and skipped because the job-level cancel arrived
+ * before it could start; running plots that finished after cancel land
+ * as `done`. */
+export type PlotStatus = "queued" | "running" | "done" | "failed" | "cancelled"
+
+/** Per-plot live state inside an async layout job. */
+export interface PlotState {
+  index: number
+  name: string
+  status: PlotStatus
+  /** Epoch seconds (Unix time). `null` until the plot starts. */
+  started_at: number | null
+  /** Epoch seconds (Unix time). `null` while running. */
+  ended_at: number | null
+  /** Compact one-line message; populated when `status === "failed"`. */
+  error: string | null
+}
+
+/** POST /layout/jobs response — kicks off an async layout job. */
+export interface LayoutJobStartResponse {
+  job_id: string
+}
+
+/** GET /layout/jobs/<id> response — full snapshot of job state.
+ *
+ * `result` is populated when status is terminal:
+ *   - `done`: full LayoutResponse (success on every plot, or partial
+ *     with some `failed` plot rows the desktop renders inline).
+ *   - `cancelled`: partial LayoutResponse with whatever finished before
+ *     the cancel landed; the rest are tagged `cancelled` in `plots`.
+ *   - `failed`: catastrophic job-level error (parser, projection, etc.);
+ *     `result` may be null.
+ */
+export interface LayoutJobState {
+  job_id: string
+  status: JobStatus
+  plots_total: number
+  plots_done: number
+  plots_failed: number
+  plots: PlotState[]
+  result: LayoutResponse | null
+}
+
+/** DELETE /layout/jobs/<id> response. Cooperative cancel: pending plots
+ * are skipped; already-running workers complete on their own. */
+export interface LayoutJobCancelResponse {
+  status: "cancelled"
+  plots_done: number
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -320,6 +396,34 @@ export interface SidecarClient {
 
   /** S11: pop the most recently added obstruction (LIFO) and recompute. */
   removeLastRoad(request: RemoveRoadRequest): Promise<LayoutResult>
+
+  /**
+   * Spike 1 Phase 2 — async variant of runLayout.
+   *
+   * Returns immediately with a `job_id`. The desktop polls
+   * `getLayoutJob(job_id)` every ~2 s until the returned `status` is
+   * terminal (done / failed / cancelled), then reads the final
+   * LayoutResponse from `state.result`.
+   *
+   * Same compute as `runLayout`; the difference is purely in the wire
+   * shape — the underlying work (table placement → ICR placement →
+   * lightning arresters → string inverters) is identical.
+   */
+  startLayoutJob(
+    parsedKmz: ParsedKMZ,
+    params: LayoutParameters
+  ): Promise<LayoutJobStartResponse>
+
+  /** Poll the current state of an async layout job. */
+  getLayoutJob(jobId: string): Promise<LayoutJobState>
+
+  /**
+   * Request cooperative cancellation. Pending plots are marked
+   * cancelled; already-running workers complete on their own (no clean
+   * abort signal across process boundaries). The job's terminal state
+   * preserves whatever finished as a partial result.
+   */
+  cancelLayoutJob(jobId: string): Promise<LayoutJobCancelResponse>
 
   /**
    * SP1 / B23 — render a single LayoutResult to a 400×300 WebP preview
@@ -430,6 +534,31 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req),
       })
+    },
+
+    startLayoutJob(
+      parsedKmz: ParsedKMZ,
+      params: LayoutParameters
+    ): Promise<LayoutJobStartResponse> {
+      const body: LayoutRequest = { parsed_kmz: parsedKmz, params }
+      return request<LayoutJobStartResponse>("/layout/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    },
+
+    getLayoutJob(jobId: string): Promise<LayoutJobState> {
+      // Path component is server-generated UUID hex — no special chars
+      // expected, but encodeURIComponent is correct hygiene.
+      return request<LayoutJobState>(`/layout/jobs/${encodeURIComponent(jobId)}`)
+    },
+
+    cancelLayoutJob(jobId: string): Promise<LayoutJobCancelResponse> {
+      return request<LayoutJobCancelResponse>(
+        `/layout/jobs/${encodeURIComponent(jobId)}`,
+        { method: "DELETE" }
+      )
     },
 
     async renderLayoutThumbnail(
