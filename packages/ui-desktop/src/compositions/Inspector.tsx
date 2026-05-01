@@ -2,7 +2,11 @@ import { ChevronDown, ChevronRight } from "lucide-react"
 import { useEffect, useState, type HTMLAttributes, type ReactNode } from "react"
 import { cn } from "../lib/cn"
 
-export function InspectorRoot({ children, className, ...props }: HTMLAttributes<HTMLDivElement>) {
+export function InspectorRoot({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn("flex flex-col", className)} {...props}>
       {children}
@@ -43,8 +47,13 @@ export function InspectorSection({
 
   if (!collapsible) {
     return (
-      <section className={cn("px-[20px] py-[18px] border-b border-[var(--border-subtle)]", className)}>
-        <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-primary)] mb-[12px]">
+      <section
+        className={cn(
+          "border-b border-[var(--border-subtle)] px-[20px] py-[18px]",
+          className
+        )}
+      >
+        <h3 className="mb-[12px] text-[11px] font-semibold tracking-[0.04em] text-[var(--text-primary)] uppercase">
           {title}
         </h3>
         {children}
@@ -59,7 +68,7 @@ export function InspectorSection({
   return (
     <section
       className={cn(
-        "px-[20px] py-[18px] border-b border-[var(--border-subtle)]",
+        "border-b border-[var(--border-subtle)] px-[20px] py-[12px]",
         className
       )}
     >
@@ -69,22 +78,22 @@ export function InspectorSection({
           expanded ? "mb-[12px]" : "mb-0"
         )}
       >
-        <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-primary)] m-0">
+        <h3 className="m-0 text-[11px] font-semibold tracking-[0.04em] text-[var(--text-primary)] uppercase">
           {title}
         </h3>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           className={cn(
-            "p-[3px] rounded-[4px]",
-            "hover:bg-[var(--surface-muted)] transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-default)]"
+            "rounded-[4px] p-[3px]",
+            "transition-colors hover:bg-[var(--surface-muted)]",
+            "focus-visible:ring-2 focus-visible:ring-[var(--accent-default)] focus-visible:outline-none"
           )}
           aria-expanded={expanded}
           aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`}
         >
           <ChevronIcon
-            className="size-[14px] text-[var(--text-muted)] shrink-0"
+            className="size-[14px] shrink-0 text-[var(--text-muted)]"
             aria-hidden
           />
         </button>
@@ -153,10 +162,12 @@ export function PropertyRow({
   return (
     <div className="flex items-baseline justify-between gap-[12px] py-[5px] text-[13px]">
       <span className="text-[var(--text-secondary)]">{label}</span>
-      <span className="text-[var(--text-primary)] font-medium tabular-nums">
+      <span className="font-medium text-[var(--text-primary)] tabular-nums">
         {value}
         {unit && (
-          <span className="ml-[5px] text-[var(--text-muted)] font-normal">{unit}</span>
+          <span className="ml-[5px] font-normal text-[var(--text-muted)]">
+            {unit}
+          </span>
         )}
       </span>
     </div>
@@ -173,7 +184,7 @@ export function SummaryStat({
   return (
     <div className="flex flex-col gap-[2px]">
       <span className="text-[11px] text-[var(--text-muted)]">{label}</span>
-      <span className="text-[16px] font-semibold text-[var(--text-primary)] tabular-nums leading-tight">
+      <span className="text-[16px] leading-tight font-semibold text-[var(--text-primary)] tabular-nums">
         {value}
       </span>
     </div>
@@ -181,5 +192,7 @@ export function SummaryStat({
 }
 
 export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-3 gap-y-[14px] gap-x-[12px]">{children}</div>
+  return (
+    <div className="grid grid-cols-3 gap-x-[12px] gap-y-[14px]">{children}</div>
+  )
 }
