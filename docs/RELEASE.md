@@ -58,19 +58,30 @@ cd python/pvlayout_engine && uv run pytest tests/ -q
 
 If anything red, fix before tagging.
 
-### 3.2 If there are DB schema changes
+### 3.2 Database migrations
 
-Migrations run first inside `platform-deployment.yml` against the target environment's `MVP_DATABASE_URL` secret. **No manual step needed for migration deploy** — the workflow handles it. To preview migration status against staging or prod from a local machine before triggering the workflow:
+The `migrate` job runs **on every deploy**, before any of the three Vercel app deploys. It executes `bunx prisma migrate deploy` against the target environment's `MVP_DATABASE_URL` secret. When there are no pending migrations the job is a fast no-op; when there are, it applies them in order.
+
+You don't have to do anything manual to deploy migrations — the workflow handles it.
+
+What you might want to do as a sanity check before triggering the workflow:
 
 ```bash
 # Pattern — credentials live in gitignored .env.staging / .env.production
 # at repo root. See memory/reference_db_credentials.md for the values.
+
+# Preview what's pending against staging.
 set -a; . ./.env.staging; set +a
 bunx prisma migrate status --schema=packages/mvp_db/prisma/schema.prisma
 
+# Same against production.
 set -a; . ./.env.production; set +a
 bunx prisma migrate status --schema=packages/mvp_db/prisma/schema.prisma
 ```
+
+If `migrate status` shows pending migrations against prod that you don't expect, **stop and investigate** before triggering the deploy. The workflow will apply them as-is.
+
+For destructive migrations (column drops, type changes that can't be rolled back), apply them to staging first via a `staging`-only deploy and verify the cloud apps still work, then run the production deploy.
 
 ### 3.3 If there are seed-data changes
 
