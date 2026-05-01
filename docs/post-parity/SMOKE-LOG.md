@@ -2257,6 +2257,7 @@ Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`
 | S3-02 | Cancel mid-run leaves orphan backend Run + debited calc with no UI cleanup | **P0** | FE + BE | open (cleanup landing this commit; refund policy decision still open) |
 | S3-04 | Steps 10-12 (KMZ / PDF / DXF export) untestable from UI — no export buttons | P2 | FE | **blocked on E1** in PLAN.md (todo). Sidecar relabel work (Spike 1 Phase 7) shipped + unit-tested via pytest; UI wiring is row E1's scope. Steps 10-12 deferred until E1 lands. |
 | S3-05 | License-key swap leaves previous user's project / runs / cached fetches in place — cascade of "unauthorized" overlays + privacy leak across the auth boundary | **P0** | FE | **fixed** — desktop `clearAllPerUserSession` wipes every per-user slice + cached query on swap (commit `3cce241`); sidecar `DELETE /layout/jobs` defense-in-depth flush wired alongside (this commit). Spike 2 retires the sidecar's in-process job table entirely; the desktop-side wipe stays canonical. |
+| S3-06 | A run generated with `enable_cable_calc=false` produces an incomplete-deliverable layout (tables + ICRs + LAs only — NO inverters, NO DC/AC cables) and exports faithfully reflect it. Customer can ship a partial DXF/PDF/KMZ without a warning. | P2 | FE + product | **open** — UX gap, not a bug. Fix surface: (a) consider defaulting `enable_cable_calc=true` for tier-eligible users, (b) chip on run card flagging "no cables computed," (c) warn at export time when `dc_cable_runs.length === 0 && ac_cable_runs.length === 0`. Discovered during E1 export verification. |
 
 ---
 
@@ -2404,5 +2405,47 @@ Spike 2 retires the sidecar's in-process job table by moving compute to RDS-back
 | `packages/sidecar-client` | `flushLayoutJobs()` adapter | **fixed** (this commit) |
 | Desktop wiring | best-effort `sidecarClient.flushLayoutJobs()` from `clearAllPerUserSession` | **fixed** (this commit) |
 | Spike 2 PRD note | hygiene principle codified | **fixed** (this commit) |
+
+---
+
+**S3-06** — Runs generated with `enable_cable_calc=false` are partial-deliverable layouts; UI does not flag this and exports faithfully reflect it.
+
+#### What surfaced
+
+During E1 (export buttons) verification, a DXF exported from a phaseboundary2 run had:
+
+| Layer | Entities | Expected (full layout) |
+|---|---|---|
+| BOUNDARY | 1 | 1 ✓ |
+| TABLES | 611 | 611 ✓ |
+| ICR | 2 | 2 ✓ |
+| LA | 44 | 44 ✓ |
+| ANNOTATIONS | 25 | 25 ✓ |
+| **INVERTERS** | **0** | 62 |
+| **DC_CABLES** | **0** | 604 |
+| **AC_CABLE_TRENCH** | **0** | 62 |
+
+Diagnosis: the run was generated with the "Calculate AC cable trench" toggle OFF. When `enable_cable_calc=false`, `place_string_inverters()` doesn't run; `placed_string_inverters / dc_cable_runs / ac_cable_runs` arrays stay empty. The DXF exporter has no tier gating and no cable-presence gating — it iterates whatever's in the LayoutResult. Exporter behavior is correct; the gap is upstream UX.
+
+#### Why this is a UX gap, not a bug
+
+EPC engineers don't ask "is cable computation enabled?" before clicking Generate. They click Generate, see the canvas render, see the Layout Summary, and assume their export contains everything. A partial layout (tables + ICRs only, no inverters or cable infrastructure) is technically a valid "site-survey-quality" layout, but absolutely NOT an EPC-deliverable that should be sent to a client without context. Today nothing in the UI distinguishes the two cases — the user can ship a half-deliverable to a customer and not realize it.
+
+Plus: the Run gallery card shows the same thumbnail / metadata for both. A future user opening their own past runs has no way to tell which were "full" vs "tables-only."
+
+#### Surface options (any combination)
+
+1. **Default `enable_cable_calc=true`** for all tier-eligible users. Today's default is the user's last submitted value (RHF persists), which means a once-cleared toggle stays cleared across runs — high foot-shoot probability.
+2. **Visible "Cable computation: off" chip on the run card** in the Runs gallery + on the Layout Summary section while that run is active. Disambiguates partial vs full at a glance.
+3. **Warn at Export-button click** when both `dc_cable_runs.length === 0` AND `ac_cable_runs.length === 0` — a confirm dialog: *"This run was generated without cable computation. The export will not include inverters or cable infrastructure. Continue?"*
+4. **Default the form's `enable_cable_calc` field to `true` on a fresh project**, with the existing belt-and-braces submit-time coercion to `false` for non-entitled tiers. Combines (1) with the existing tier gating.
+
+#### Status
+
+| Layer | Decision needed |
+|---|---|
+| Product | Pick from (1)/(2)/(3)/(4) above (or other). Could be a Phase 6 polish row. |
+| FE | Implementation follows the product call. None of the four options are heavy lifts. |
+| Backend | None — not a wire-shape concern. |
 
 
