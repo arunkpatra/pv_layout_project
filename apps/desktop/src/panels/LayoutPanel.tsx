@@ -456,7 +456,7 @@ export function PinnedActionArea({
 
   return (
     <div
-      className="px-[20px] pb-[12px] pt-[8px] flex flex-col gap-[10px]
+      className="px-[20px] py-[12px] flex flex-col gap-[10px]
         bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
     >
       {isInflight ? (

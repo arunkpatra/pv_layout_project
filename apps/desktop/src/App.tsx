@@ -1344,7 +1344,7 @@ export function App(): JSX.Element {
                   fix this preserves. */}
               <Tabs value={inspectorTab} onValueChange={setInspectorTab}>
                 <div className="sticky top-0 z-20 bg-[var(--surface-ground)]">
-                  <div className="px-[20px] pt-[18px]">
+                  <div className="px-[20px] pt-[12px]">
                     <TabsList>
                       <TabsTrigger value="layout">Layout</TabsTrigger>
                       <TabsTrigger value="energy">Energy yield</TabsTrigger>
