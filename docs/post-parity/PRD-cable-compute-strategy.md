@@ -7,6 +7,23 @@
 **Branch context:** POC implementation already on `perf/cable-multiplot-poc` (off `post-parity-v1-desktop`).
 **Cross-repo partner:** `renewable_energy` (backend session). Their feasibility audit at [renewable_energy/docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md](file:///Users/arunkpatra/codebase/renewable_energy/docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md).
 
+> **⚠ POST-MERGE NOTE (added 2026-05-01, after the merge that landed `renewable_energy` into this repo):**
+>
+> Sections of this PRD were authored assuming a two-repo arrangement with paste-block coordination between sessions. **That arrangement is gone** — `renewable_energy` was merged into this repo as `apps/mvp_*`, `packages/mvp_db`, and `packages/{ui,shared,…}` per [CLAUDE.md §1](../../CLAUDE.md). One repo, one CI, one deploy.
+>
+> **Sections affected and their post-merge status:**
+> - **§1.2 phasing rationale** — the "hard cross-repo dependency on a published wheel" framing is stale. See §1.5 + §5 + §6.3 notes below.
+> - **§1.5 effort table** — the "Wheel publishing (gating)" week dissolves: see §6.3 note.
+> - **§5 Cross-Repo Dependency Map** — entire section is now historical. The Lambda packaging concern survives but as an intra-repo `Dockerfile COPY` problem, not a registry-publishing pipeline.
+> - **§6.3 Wheel publishing deliverables** — "publish to GitHub Packages" / "cross-repo CI version-drift gate" steps are no longer required. What survives is small: an engine-version constant on `pvlayout_core` for `Slice.engineVersion` recording.
+> - **§6.5 Spike 2 backend deliverables** — annotated "owned by `renewable_energy` session"; that session no longer exists, but the deliverables themselves are still real (they just live in this repo's `apps/mvp_api/` and `apps/cable-engine/` paths).
+> - **§8 Risks #2 (Wheel publishing slips)** — risk dissolves with the merge.
+> - **Closing line** — "Spike 2 gated on wheel publishing (week 2)" is no longer accurate.
+>
+> **Detailed Spike 2 redesign is OUT OF SCOPE for this annotation pass** (per Arun, 2026-05-01: "detailed design / brainstorming will happen at Spike 2 level independently when we reach there"). Inline notes flag what's stale; the full Spike-2 design refresh happens at Spike 2 kickoff.
+>
+> Hyperlinks pointing at `file:///Users/arunkpatra/codebase/renewable_energy/...` are dead post-merge — those files now live under `apps/mvp_*` / `apps/layout-engine/` in this repo. Not patched here; will be re-pointed during the Spike 2 design refresh.
+
 ---
 
 ## Table of Contents
@@ -43,6 +60,8 @@ We split the work into two spikes inside one PRD:
 
 Phasing rationale: Spike 1 is shippable in one week and has zero dependency on the backend repo. Spike 2 has a hard cross-repo dependency (a published `pvlayout_core` wheel — see §5) that makes "do it all at once" infeasible. Spike 1 lands ahead of Spike 2 and de-risks Spike 2 by introducing the local-job-table pattern that Spike 2's cloud version is structurally identical to.
 
+> **POST-MERGE (2026-05-01):** the "hard cross-repo dependency" framing dissolves. The Lambda's `pvlayout_core` need is now satisfied by an intra-repo `Dockerfile COPY` from `python/pvlayout_engine/pvlayout_core` at build time — no registry, no wheel publishing pipeline. Spike 1 → Spike 2 ordering still makes sense (the local-job-table pattern still de-risks the cloud-job-table design), but the gate between them is much smaller. Re-examined at Spike 2 kickoff.
+
 ### 1.3 What we explicitly are NOT doing
 
 This PRD documents what we are **not** changing, because earlier exploration tested an option that we discarded:
@@ -69,6 +88,8 @@ Spike 1 is bounded by Amdahl's Law on the slowest plot (P2 in the multi-plot fix
 | Spike 2 | weeks 3–6 (4 weeks)  | ~20 | backend session works in parallel from week 3 |
 
 Spike 2's start is gated on (a) Spike 1 landing and (b) `pvlayout_core` published as a versioned wheel from this repo. The wheel is the desktop session's spike-1.5 deliverable; the backend cannot start container packaging without it.
+
+> **POST-MERGE (2026-05-01):** the "Wheel publishing (gating) week" row is **stale** — Lambda packaging is now an intra-repo `Dockerfile COPY` problem, no registry pipeline needed. What survives from the old week-2 deliverable is small (an engine-version constant for `Slice.engineVersion` recording — see §6.3 note), folded into Spike 2's own scope. Effort table re-cost at Spike 2 kickoff. Spike 2 calendar may shift earlier as a result.
 
 ---
 
@@ -467,7 +488,25 @@ When/if Fargate is needed (v2):
 
 ## 5. Cross-Repo Dependency Map
 
-The spike split is driven by one hard cross-repo dependency:
+> **⚠ POST-MERGE NOTE (2026-05-01) — entire section is now historical context, not actionable.**
+>
+> The "two repos coordinating" arrangement this section describes no longer exists. After the 2026-05-01 merge, both desktop AND backend live in this single repo (`apps/desktop/` + `apps/mvp_*/` + `apps/layout-engine/` + `python/pvlayout_engine/`). Everything below this banner was written for the two-repo world.
+>
+> **What survives the merge as still-relevant:**
+> - The Lambda container needs `pvlayout_core` installable inside its image (the *technical* need is unchanged).
+> - The engine-version recording requirement for `Slice.engineVersion` (per §4.5).
+>
+> **What dissolves:**
+> - The wheel-publishing pipeline (registry publish, GitHub Packages auth, version tagging convention as a release artifact).
+> - The cross-repo CI version-drift gate.
+> - The "paste-block protocol" coordination.
+> - Both consumers pinning the same wheel version (they share source now).
+> - The five clarifying questions in §5.3 (most were resolved by the merge itself).
+>
+> **What replaces the wheel pipeline:**
+> An intra-repo `Dockerfile COPY` from `python/pvlayout_engine/pvlayout_core` at Lambda image build time. Lambda's Docker context can be the repo root; the Dockerfile COPYs the source tree and `pip install`s it directly. No registry, no version-drift gate.
+>
+> Detailed Spike 2 architectural refresh (incl. new wire schemas, packaging conventions, deploy pipelines for the merged repo) is **deferred to Spike 2 kickoff**.
 
 ### 5.1 The wheel — desktop ships `pvlayout-core` to a registry
 
@@ -551,6 +590,16 @@ The backend feasibility audit raised five clarifying questions in §8.1 that nee
 | 5 | Cross-repo CI gate: backend repo's PR fails if pinned version diverges from desktop's latest |
 | 6 | Desktop sidecar's `pyproject.toml` pins the published wheel (transition from local path dep) |
 
+> **⚠ POST-MERGE NOTE (2026-05-01) — table is stale.** Items 3-6 are no longer required (no registry, no cross-repo CI gate, no version pinning between two repos). What survives, in much smaller form:
+>
+> | # | Surviving deliverable | Reasoning |
+> |---|---|---|
+> | A | `__version__ = "X.Y.Z"` constant on `pvlayout_core/__init__.py` (or `pyproject.toml` read at import time) | Lambda invocation records this in `Slice.engineVersion` per §4.5. Single source of truth shared by sidecar + Lambda. |
+> | B | Lambda `Dockerfile` `COPY python/pvlayout_engine/pvlayout_core /opt/pvlayout_core` + `pip install /opt/pvlayout_core` | Replaces "pip install from registry." Build context = repo root. |
+> | C | CI rebuild trigger on `pvlayout_core/**` paths in the Lambda image build workflow | Replaces "version drift gate." If source changes, image rebuilds; otherwise it doesn't. |
+>
+> Re-cost at Spike 2 kickoff. Items 1-2 (package metadata + `uv build`) are still nice-to-have for local development hygiene but aren't gating.
+
 ### 6.4 Spike 2 deliverables — desktop side (weeks 3–6)
 
 | # | Deliverable | Files / area |
@@ -605,6 +654,7 @@ Aggregated from POC findings + architecture research + backend feasibility audit
 |---|---|---|---|---|---|---|
 | 1 | PyInstaller bundle breaks `ProcessPoolExecutor` workers | S1 | Med | High | `freeze_support()`; test 3 OS bundles before merge | desktop |
 | 2 | Wheel publishing slips → Spike 2 phase 2.1 blocked | S2 (gate) | Med | High | Treat wheel as the gating week-2 deliverable; daily standup on it | desktop |
+| 2-POST-MERGE | ~~Wheel publishing slips~~ — **risk dissolved 2026-05-01.** No registry pipeline = no slip. Replacement risk: "Lambda Dockerfile COPY context misconfigured" — trivial mitigation, surfaces immediately on first image build. | — | — | — | — | — |
 | 3 | `pvlayout_core` not actually side-effect-free across plot calls | S2 | Low | High | CI test asserting byte-equal LayoutResponse for sequential vs multi-plot calls | desktop (week 1 deliverable) |
 | 4 | Lambda VPC config not matching `apps/layout-engine` | S2 | Med | Med | Backend session verifies via `aws lambda get-function-configuration` in week 3 | backend |
 | 5 | SQS at-least-once redelivery causes inconsistent slice state | S2 | Med | Med | Idempotent UPDATE: `WHERE status IN (QUEUED, RUNNING)` | backend |
@@ -649,3 +699,5 @@ Aggregated from POC findings + architecture research + backend feasibility audit
 ---
 
 *End of PRD. This document is the deliverable of the cable-compute POC. Spike 1 ready for implementation now; Spike 2 gated on wheel publishing (week 2). Both spikes track against the acceptance criteria and risk register in §3.9 / §4.11 / §8.*
+
+> **POST-MERGE FOOTER (2026-05-01):** Spike 1 is shipped. The "Spike 2 gated on wheel publishing (week 2)" framing is **stale** — see top-of-document banner + §1.5 + §5 + §6.3 notes. Spike 2 is now gated only on (a) the architectural refresh that revisits this PRD's two-repo assumptions and (b) a B27 refund-policy decision (per [post-parity-v2-backend-plan.md](../initiatives/post-parity-v2-backend-plan.md)). That refresh happens at Spike 2 kickoff, in this repo, as a single coordinated effort.
