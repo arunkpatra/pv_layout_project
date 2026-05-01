@@ -21,6 +21,7 @@ export { IconButton, type IconButtonProps } from "./components/IconButton"
 export { Kbd } from "./components/Kbd"
 export { Chip, type ChipProps } from "./components/Chip"
 export { Badge, type BadgeProps } from "./components/Badge"
+export { Alert, type AlertProps } from "./components/Alert"
 export { SunMark } from "./components/Icon"
 // Lucide icons re-exported here so consuming apps don't take a direct
 // `lucide-react` dependency. Add new exports as new surfaces need them

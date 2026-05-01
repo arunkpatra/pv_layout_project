@@ -41,6 +41,7 @@ import { useEffect, useState } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
+  Alert,
   Button,
   Chip,
   InspectorSection,
@@ -778,10 +779,10 @@ function summariseFailedNames(plots: PlotState[]): string {
  */
 function PreflightChip({ boundaryCount }: { boundaryCount: number }) {
   return (
-    <Chip tone="neutral" className="self-start">
+    <Alert tone="warning">
       Multi-plot cable calc — {boundaryCount} boundaries.{" "}
       {estimatedTimeRangeText(boundaryCount)}
-    </Chip>
+    </Alert>
   )
 }
 

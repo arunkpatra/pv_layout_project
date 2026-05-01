@@ -9,7 +9,7 @@ export const Switch = forwardRef<
   <SwitchPrimitive.Root
     ref={ref}
     className={cn(
-      "relative inline-flex shrink-0 h-[20px] w-[34px] rounded-full transition-colors duration-[120ms]",
+      "relative inline-flex items-center shrink-0 h-[20px] w-[34px] rounded-full transition-colors duration-[120ms]",
       "border border-transparent outline-none",
       "data-[state=checked]:bg-[var(--accent-default)] data-[state=unchecked]:bg-[var(--surface-muted)]",
       "disabled:opacity-40 disabled:cursor-not-allowed",
