@@ -20,6 +20,7 @@ All coordinates are in UTM metres (same projection used by the layout engine).
 The boundary polygon is converted from WGS84 to UTM before drawing.
 """
 import ezdxf
+from ezdxf import bbox as ezdxf_bbox
 from ezdxf import units as dxf_units
 from typing import List
 
@@ -220,5 +221,27 @@ def export_dxf(
                     (la_cx, la_cy),
                     align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER,
                 )
+
+    # Compute drawing extents + set the model-space viewport so the file
+    # opens centred on the layout instead of at world-origin (0,0).
+    # Smoke discovery 2026-05-01 (E1): without this, AutoCAD / viewers
+    # opened the export with `$EXTMIN = 1e+20` / `$EXTMAX = -1e+20`
+    # (uninitialised) and the user saw a blank canvas — the entities
+    # were there at UTM coordinates ~(550000, 2400000), miles away from
+    # the default origin. Some viewers auto-zoom-extents on load,
+    # others don't; setting the extents + the modelspace viewport
+    # ensures every viewer opens to the correct view.
+    box = ezdxf_bbox.extents(msp, fast=True)
+    if box.has_data:
+        doc.header["$EXTMIN"] = (box.extmin.x, box.extmin.y, 0)
+        doc.header["$EXTMAX"] = (box.extmax.x, box.extmax.y, 0)
+        # Centre the modelspace viewport on the drawing with a 10%
+        # margin so the layout fills the open view. Height is the
+        # vertical extent — ezdxf computes width to match aspect ratio.
+        size_y = max(box.size.y, 1.0)
+        doc.set_modelspace_vport(
+            height=size_y * 1.1,
+            center=(box.center.x, box.center.y),
+        )
 
     doc.saveas(output_path)
