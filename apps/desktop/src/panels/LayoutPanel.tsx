@@ -562,10 +562,10 @@ function RunningPin({
       <PlotList plots={jobState.plots} />
       <Button
         type="button"
-        variant="ghost"
-        size="sm"
+        variant="destructive"
+        size="md"
         onClick={onCancel}
-        className="self-center"
+        className="w-full"
       >
         Cancel
       </Button>
