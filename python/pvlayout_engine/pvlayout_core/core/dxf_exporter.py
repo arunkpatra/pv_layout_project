@@ -226,18 +226,27 @@ def export_dxf(
     # opens centred on the layout instead of at world-origin (0,0).
     # Smoke discovery 2026-05-01 (E1): without this, AutoCAD / viewers
     # opened the export with `$EXTMIN = 1e+20` / `$EXTMAX = -1e+20`
-    # (uninitialised) and the user saw a blank canvas — the entities
-    # were there at UTM coordinates ~(550000, 2400000), miles away from
-    # the default origin. Some viewers auto-zoom-extents on load,
-    # others don't; setting the extents + the modelspace viewport
-    # ensures every viewer opens to the correct view.
+    # (uninitialised) and the user saw a blank canvas — entities were
+    # there at UTM coordinates ~(550000, 2400000), miles away from the
+    # default origin. Some viewers auto-zoom-extents on load, others
+    # don't; valid extents + a sensible viewport ensure every viewer
+    # opens to the correct view.
+    #
+    # Subtle ezdxf 1.x behavior: writing `doc.header["$EXTMIN"]` directly
+    # appears to take in memory but is reset on `saveas()`. The proper
+    # flow is to set the modelspace block's `dxf.extmin / extmax` first,
+    # then call `doc.update_extents()` which copies them into the
+    # header. (See ezdxf.document.Drawing.update_extents source — guard
+    # `if bool(extmin) and bool(extmax)` requires the msp values to be
+    # non-default before the header is touched.)
     box = ezdxf_bbox.extents(msp, fast=True)
     if box.has_data:
-        doc.header["$EXTMIN"] = (box.extmin.x, box.extmin.y, 0)
-        doc.header["$EXTMAX"] = (box.extmax.x, box.extmax.y, 0)
+        msp.dxf.extmin = (box.extmin.x, box.extmin.y, 0)
+        msp.dxf.extmax = (box.extmax.x, box.extmax.y, 0)
+        doc.update_extents()
         # Centre the modelspace viewport on the drawing with a 10%
-        # margin so the layout fills the open view. Height is the
-        # vertical extent — ezdxf computes width to match aspect ratio.
+        # margin. Height is the vertical extent — ezdxf computes width
+        # to match the aspect ratio of the active viewport.
         size_y = max(box.size.y, 1.0)
         doc.set_modelspace_vport(
             height=size_y * 1.1,
