@@ -2253,5 +2253,16 @@ Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`
 
 | ID | Surface | Severity | Owner | Status |
 |---|---|---|---|---|
-| _(to be filled as observations land)_ |  |  |  |  |
+| S3-01 | Tabs row (Layout / Energy / Runs) scrolled out of view; only Generate button stayed sticky | P2 | FE | **fixed** (live) |
+
+---
+
+**S3-01** — Tabs band needs to be sticky, not just the Generate button.
+
+User observation while running the app live: scrolling the LayoutPanel form caused the `Layout / Energy yield / Runs` tabs row to scroll up and out of the viewport, while only the Generate button below remained pinned. Expected behaviour: both elements stay visible during scroll because both are top-level navigation/action affordances.
+
+Fix landed live during the session, two coordinated changes:
+
+1. `apps/desktop/src/App.tsx` — wrapped `<TabsList>` in a sticky band (`sticky top-0 z-20 bg-[var(--surface-ground)]`) inside the `<Tabs>` container. Padding moved from the Tabs root onto the sticky band so the surrounding inspector content lays out naturally without negative-margin workarounds. Removed the `-mx-[20px]` workarounds on all three `TabsContent` panels (no longer needed once the parent doesn't have `px-[20px]`).
+2. `apps/desktop/src/panels/LayoutPanel.tsx` — changed the LayoutPanel pinned action area's `top-0` to `top-[51px]` so it stacks below the new tabs band rather than overlapping. The 51px value matches the band's rendered height (`pt-[18px]` + `h-[32px]` TabsTrigger + 1px border).
 

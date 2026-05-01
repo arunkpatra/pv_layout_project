@@ -459,7 +459,7 @@ function PinnedActionArea({
 
   return (
     <div
-      className="sticky top-0 z-10 px-[20px] py-[14px] flex flex-col gap-[10px]
+      className="sticky top-[51px] z-10 px-[20px] py-[14px] flex flex-col gap-[10px]
         bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
     >
       {isInflight ? (

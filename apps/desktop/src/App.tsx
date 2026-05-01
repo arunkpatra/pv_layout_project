@@ -1317,19 +1317,28 @@ export function App(): JSX.Element {
         inspector={
           project ? (
             <InspectorRoot>
-              <Tabs defaultValue="layout" className="px-[20px] pt-[18px]">
-                <TabsList>
-                  <TabsTrigger value="layout">Layout</TabsTrigger>
-                  <TabsTrigger value="energy">Energy yield</TabsTrigger>
-                  <TabsTrigger value="runs">Runs</TabsTrigger>
-                </TabsList>
+              <Tabs defaultValue="layout">
+                {/* Sticky tabs band — pins the Layout / Energy / Runs
+                    tabs at the top of the inspector scroll container so
+                    they stay visible while the user scrolls through
+                    the LayoutPanel form below. The LayoutPanel's own
+                    pinned action area stacks UNDER this band via
+                    `top-[51px]` (matches this band's rendered height:
+                    pt-18 + h-32 TabsTrigger + 1px border = 51px). */}
+                <div className="sticky top-0 z-20 px-[20px] pt-[18px] bg-[var(--surface-ground)]">
+                  <TabsList>
+                    <TabsTrigger value="layout">Layout</TabsTrigger>
+                    <TabsTrigger value="energy">Energy yield</TabsTrigger>
+                    <TabsTrigger value="runs">Runs</TabsTrigger>
+                  </TabsList>
+                </div>
                 {/* forceMount: keep the LayoutPanel mounted across tab
                     switches so RHF's working form state survives. Hidden
                     via Radix's data-[state] attr + Tailwind variant. */}
                 <TabsContent
                   value="layout"
                   forceMount
-                  className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+                  className="mt-[8px] data-[state=inactive]:hidden"
                 >
                   <LayoutPanel
                     key={layoutFormKey}
@@ -1345,7 +1354,7 @@ export function App(): JSX.Element {
                 </TabsContent>
                 <TabsContent
                   value="energy"
-                  className="mt-[8px] -mx-[20px]"
+                  className="mt-[8px]"
                 >
                   <EnergyTabContent />
                 </TabsContent>
@@ -1354,7 +1363,7 @@ export function App(): JSX.Element {
                 <TabsContent
                   value="runs"
                   forceMount
-                  className="mt-[8px] -mx-[20px] data-[state=inactive]:hidden"
+                  className="mt-[8px] data-[state=inactive]:hidden"
                 >
                   <RunsList onDeleteRuns={handleDeleteRuns} />
                 </TabsContent>
