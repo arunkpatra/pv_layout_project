@@ -129,6 +129,18 @@ export function createMockSidecarClient(
     renderLayoutThumbnail: vi
       .fn()
       .mockResolvedValue(new Uint8Array([0x52, 0x49, 0x46, 0x46])),
+    // E1 — export bytes. Default: 8-byte placeholder per format so
+    // tests that fire export calls without overriding can assert
+    // call counts + writeFile invocation without bytecount diffs.
+    exportKmz: vi
+      .fn()
+      .mockResolvedValue(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0])),
+    exportPdf: vi
+      .fn()
+      .mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0, 0, 0, 0])),
+    exportDxf: vi
+      .fn()
+      .mockResolvedValue(new Uint8Array([0x30, 0x0a, 0x53, 0x45, 0, 0, 0, 0])),
     ...overrides,
   }
 }

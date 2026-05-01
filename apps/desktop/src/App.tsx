@@ -87,6 +87,7 @@ import { useAddRoadMutation } from "./state/useAddRoadMutation"
 import { useRemoveLastRoadMutation } from "./state/useRemoveLastRoadMutation"
 import { LayoutPanel, PinnedActionArea } from "./panels/LayoutPanel"
 import { SummaryPanel } from "./panels/SummaryPanel"
+import { DeliverablesBand, planNameToEdition } from "./panels/DeliverablesBand"
 import { VisibilitySection } from "./panels/VisibilitySection"
 import { DrawingToolbar } from "./panels/DrawingToolbar"
 import { InteractionController } from "./canvas/InteractionController"
@@ -1442,6 +1443,20 @@ export function App(): JSX.Element {
                           expanded by default; persistKey survives
                           reload. */}
                       <SummaryPanel generating={layoutMutation.isPending} />
+                      {/* E1 — exports for the current run. Renders only
+                          when layoutResult is populated (the band
+                          self-hides otherwise). Inline action row, no
+                          section-header chrome — semantically distinct
+                          from "Layout summary" stats but visually
+                          adjacent. See PLAN row E1 + DeliverablesBand
+                          docstring for the locked design decisions. */}
+                      <DeliverablesBand
+                        sidecarClient={sidecarClient}
+                        generating={layoutMutation.isPending}
+                        edition={planNameToEdition(
+                          entitlements.plans[0]?.planName
+                        )}
+                      />
                     </>
                   )}
                 </div>

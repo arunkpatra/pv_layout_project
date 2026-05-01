@@ -459,6 +459,55 @@ export interface SidecarClient {
    * `<img onError>` fallback masks PUT failures invisibly to the user.
    */
   renderLayoutThumbnail(result: LayoutResult): Promise<Uint8Array>
+
+  /**
+   * E1 — export multi-result layout to KMZ (Google Earth). Returns the
+   * raw `application/vnd.google-earth.kmz` bytes ready for the desktop
+   * to write via the Tauri save dialog.
+   *
+   * Sidecar-side this wraps `pvlayout_core.core.kmz_exporter.export_kmz`,
+   * ungated per ADR-0005. KMZ exporter renders all layout elements
+   * unconditionally — no toggle flags. (`include_la` / `include_cables`
+   * exist as DXF flags only; KMZ is all-or-nothing.)
+   */
+  exportKmz(
+    results: LayoutResult[],
+    params: LayoutParameters
+  ): Promise<Uint8Array>
+
+  /**
+   * E1 — export multi-result layout to PDF (summary pages). Returns the
+   * raw `application/pdf` bytes.
+   *
+   * Sidecar-side this wraps `pvlayout_core.core.pdf_exporter.export_pdf`,
+   * ungated per ADR-0005. `edition` is the lowercase tier string
+   * ("basic" / "pro" / "pro_plus") — drives which sections render.
+   * `energyParams` is optional; when null, energy yield + 25-year forecast
+   * pages are skipped (PRD §3.2 / E2 will wire energyParams once energy
+   * yield ships as its own row).
+   */
+  exportPdf(
+    results: LayoutResult[],
+    params: LayoutParameters,
+    edition: string,
+    energyParams?: unknown
+  ): Promise<Uint8Array>
+
+  /**
+   * E1 — export multi-result layout to AutoCAD DXF. Returns the raw
+   * `application/dxf` bytes.
+   *
+   * Sidecar-side this wraps `pvlayout_core.core.dxf_exporter.export_dxf`,
+   * ungated per ADR-0005. The two flags mirror legacy's UI toggles —
+   * defaulting both to `true` matches legacy's "all layers on" behavior
+   * and is the E1 ship-default (no UI toggle in this row; future export-
+   * preferences row may surface them).
+   */
+  exportDxf(
+    results: LayoutResult[],
+    params: LayoutParameters,
+    options?: { includeLa?: boolean; includeCables?: boolean }
+  ): Promise<Uint8Array>
 }
 
 export class SidecarError extends Error {
@@ -614,7 +663,90 @@ export function createSidecarClient(opts: SidecarClientOptions): SidecarClient {
       const buf = await response.arrayBuffer()
       return new Uint8Array(buf)
     },
+
+    exportKmz(
+      results: LayoutResult[],
+      params: LayoutParameters
+    ): Promise<Uint8Array> {
+      return _exportBinary(
+        fetchImpl,
+        baseUrl,
+        authHeader,
+        "/export-kmz",
+        { results, params }
+      )
+    },
+
+    exportPdf(
+      results: LayoutResult[],
+      params: LayoutParameters,
+      edition: string,
+      energyParams?: unknown
+    ): Promise<Uint8Array> {
+      return _exportBinary(fetchImpl, baseUrl, authHeader, "/export-pdf", {
+        results,
+        params,
+        edition,
+        // Match the sidecar's optional energy_params field name. Pass
+        // `null` explicitly so the JSON serializer emits the field; the
+        // route accepts both null + missing.
+        energy_params: energyParams ?? null,
+      })
+    },
+
+    exportDxf(
+      results: LayoutResult[],
+      params: LayoutParameters,
+      options: { includeLa?: boolean; includeCables?: boolean } = {}
+    ): Promise<Uint8Array> {
+      return _exportBinary(fetchImpl, baseUrl, authHeader, "/export-dxf", {
+        results,
+        params,
+        // Defaults match legacy + sidecar Pydantic schema (both true).
+        include_la: options.includeLa ?? true,
+        include_cables: options.includeCables ?? true,
+      })
+    },
   }
+}
+
+/**
+ * Shared bespoke binary-POST helper for the three /export-* routes.
+ * Same shape as renderLayoutThumbnail above — kept inline rather than
+ * factored to a method so the SidecarClient methods stay close to the
+ * routes they wrap. SidecarError shape preserved on non-2xx so
+ * downstream consumers handle export failures the same way they handle
+ * any other sidecar error.
+ */
+async function _exportBinary(
+  fetchImpl: typeof fetch,
+  baseUrl: string,
+  authHeader: Record<string, string>,
+  path: "/export-kmz" | "/export-pdf" | "/export-dxf",
+  body: unknown
+): Promise<Uint8Array> {
+  const response = await fetchImpl(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: {
+      ...authHeader,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    let errBody: unknown = null
+    try {
+      errBody = await response.json()
+    } catch {
+      // body may be empty or not JSON — swallow
+    }
+    const message =
+      extractError(errBody) ??
+      `Sidecar ${path} returned ${response.status}`
+    throw new SidecarError(response.status, message, errBody)
+  }
+  const buf = await response.arrayBuffer()
+  return new Uint8Array(buf)
 }
 
 // ─────────────────────────────────────────────────────────────────────
