@@ -256,20 +256,10 @@ export function App(): JSX.Element {
   // ── Entitlements query ────────────────────────────────────────────────────
   const entQuery = useEntitlementsQuery(activeKey)
 
-  // On successful fetch: if the key was pending (newly entered), promote it
-  // to saved + persist to keyring. If the key was already saved, no-op.
-  useEffect(() => {
-    if (!entQuery.isSuccess) return
-    if (pendingKey && pendingKey !== savedKey) {
-      void saveLicenseKey(pendingKey).catch((err) =>
-        console.error("keyring save failed:", err)
-      )
-      setSavedKey(pendingKey)
-      setPendingKey(null)
-      setValidationError(null)
-      setChangeKeyDialogOpen(false)
-    }
-  }, [entQuery.isSuccess, pendingKey, savedKey])
+  // The success-side license-swap effect lives further down, AFTER
+  // `clearAllPerUserSession` is declared — see the "S3-05" useEffect
+  // block beneath the handlers. It's relocated so the helper it
+  // depends on is in scope at TS-checking time.
 
   // On 401: if the key was pending, surface an inline error in the dialog;
   // if the key was the saved one, clear keyring and drop back to no-license.
@@ -454,6 +444,65 @@ export function App(): JSX.Element {
     setValidationError(null)
   }, [])
 
+  // Wipe every per-user slice + every cached query, then bump the form
+  // key so RHF remounts. Called on license-key swap (S3-05) so the
+  // previous user's project / runs / cached fetches don't leak across
+  // the auth boundary, and on explicit Clear License so "Sign out"
+  // returns the app to a fully blank slate. Both flows lead to the
+  // RecentsView render branch (`!project`), which then refetches with
+  // the new (or null) key.
+  //
+  // queryClient.clear() drops everything, including the just-resolved
+  // entitlements query for the new key — TanStack re-fires it on the
+  // next render of `useEntitlementsQuery(activeKey)`, so the user
+  // briefly sees the "Verifying licence…" splash, then lands cleanly.
+  const clearAllProjectState = useProjectStore((s) => s.clearAll)
+  const tabsReset = useTabsStore((s) => s.reset)
+  const clearAllPerUserSession = useCallback(() => {
+    clearAllProjectState()
+    clearLayoutResult()
+    resetLayoutParams()
+    resetLayerVisibility()
+    resetEditingState()
+    clearCurrentJobState()
+    tabsReset()
+    setLayoutFormKey((k) => k + 1)
+    queryClient.clear()
+  }, [
+    clearAllProjectState,
+    clearLayoutResult,
+    resetLayoutParams,
+    resetLayerVisibility,
+    resetEditingState,
+    clearCurrentJobState,
+    tabsReset,
+    queryClient,
+  ])
+
+  // S3-05 — license-key swap success branch. Relocated here from
+  // alongside the other entitlements-query effects so
+  // `clearAllPerUserSession` (declared above) is in scope. Wipes
+  // every per-user slice + every cached query when this is a true
+  // swap (savedKey was non-null), so the previous user's project /
+  // runs / cached fetches do not leak across the auth boundary.
+  // First-launch (savedKey === null) is a no-op for the wipe.
+  useEffect(() => {
+    if (!entQuery.isSuccess) return
+    if (pendingKey && pendingKey !== savedKey) {
+      const isRealSwap = savedKey !== null
+      void saveLicenseKey(pendingKey).catch((err) =>
+        console.error("keyring save failed:", err)
+      )
+      setSavedKey(pendingKey)
+      setPendingKey(null)
+      setValidationError(null)
+      setChangeKeyDialogOpen(false)
+      if (isRealSwap) {
+        clearAllPerUserSession()
+      }
+    }
+  }, [entQuery.isSuccess, pendingKey, savedKey, clearAllPerUserSession])
+
   const handleClearLicense = useCallback(async () => {
     await clearLicenseKey().catch(() => {})
     setSavedKey(null)
@@ -461,8 +510,8 @@ export function App(): JSX.Element {
     setValidationError(null)
     setInfoDialogOpen(false)
     setChangeKeyDialogOpen(false)
-    queryClient.removeQueries({ queryKey: ["entitlements"] })
-  }, [queryClient])
+    clearAllPerUserSession()
+  }, [clearAllPerUserSession])
 
   const entQueryRefetch = entQuery.refetch
   const handleRetryEntitlements = useCallback(() => {
@@ -599,6 +648,8 @@ export function App(): JSX.Element {
   const tabsSwitchTab = useTabsStore((s) => s.switchTab)
   const tabsUpdateName = useTabsStore((s) => s.updateTabName)
   const tabsGoHome = useTabsStore((s) => s.goHome)
+  // tabsReset is declared earlier in the function (above the
+  // clearAllPerUserSession helper) so the helper has it in scope.
 
   // ── KMZ load flow ────────────────────────────────────────────────────────
   // P1 wiring: parse locally for the canvas (existing behaviour) AND
