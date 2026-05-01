@@ -20,8 +20,13 @@
  *   4. Site
  *   5. Inverter sizing
  *
- * Generate button at the bottom — wired by App.tsx via `onGenerate`
- * because the mutation lives in the orchestrator, not the panel.
+ * Spike 1 Phase 5 layout — pinned action area at the top + collapsible
+ * sections. The Generate button (and, in Phase 6, the in-flight
+ * progress UI) lives in a `position: sticky; top: 0` band so it's
+ * always one click away during iterate-and-rerun work; sections below
+ * scroll under it. Each section's expand/collapse state persists per
+ * machine via `localStorage` so the user's chosen layout survives
+ * reloads. Multi-open by design (not a true accordion).
  */
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -103,8 +108,42 @@ export function LayoutPanel({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
+      {/* ── Pinned action area ─────────────────────────────────────────
+          Sticks to the top of the inspector scroll container. Phase 6
+          will swap this between idle / running / post-run states; for
+          Phase 5 only the idle (Generate button) state is rendered.
+          The bottom border separates it visually from the form below
+          while scrolled. */}
+      <div
+        className="sticky top-0 z-10 px-[20px] py-[14px] flex flex-col gap-[8px]
+          bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
+      >
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          disabled={generating || noProject}
+          className="w-full"
+        >
+          {generating
+            ? "Generating…"
+            : noProject
+              ? "Open a KMZ to generate"
+              : "Generate layout"}
+        </Button>
+        {Object.keys(errors).length > 0 && (
+          <p className="text-[12px] text-[var(--error-default)] leading-normal">
+            Fix the validation errors above before generating.
+          </p>
+        )}
+      </div>
+
       {/* ── Module ──────────────────────────────────────────────────── */}
-      <InspectorSection title="Module">
+      <InspectorSection
+        title="Module"
+        collapsible
+        persistKey="layout-panel.section.module"
+      >
         <FieldRow label="Length" error={errors.module?.length?.message}>
           <NumberInput
             {...register("module.length", { valueAsNumber: true })}
@@ -129,7 +168,11 @@ export function LayoutPanel({
       </InspectorSection>
 
       {/* ── Table ───────────────────────────────────────────────────── */}
-      <InspectorSection title="Table">
+      <InspectorSection
+        title="Table"
+        collapsible
+        persistKey="layout-panel.section.table"
+      >
         <FieldRow label="Orientation">
           <Segmented
             value={watch("table.orientation")}
@@ -173,7 +216,11 @@ export function LayoutPanel({
       </InspectorSection>
 
       {/* ── Spacing & tilt ──────────────────────────────────────────── */}
-      <InspectorSection title="Spacing & tilt">
+      <InspectorSection
+        title="Spacing & tilt"
+        collapsible
+        persistKey="layout-panel.section.spacing"
+      >
         <FieldRow label="Override tilt">
           <Switch
             checked={tiltOverride}
@@ -219,7 +266,11 @@ export function LayoutPanel({
       </InspectorSection>
 
       {/* ── Site ────────────────────────────────────────────────────── */}
-      <InspectorSection title="Site">
+      <InspectorSection
+        title="Site"
+        collapsible
+        persistKey="layout-panel.section.site"
+      >
         <FieldRow
           label="Perimeter road width"
           error={errors.perimeter_road_width?.message}
@@ -233,7 +284,11 @@ export function LayoutPanel({
       </InspectorSection>
 
       {/* ── Inverter sizing ─────────────────────────────────────────── */}
-      <InspectorSection title="Inverter sizing">
+      <InspectorSection
+        title="Inverter sizing"
+        collapsible
+        persistKey="layout-panel.section.inverter"
+      >
         <FieldRow label="Design mode">
           <Select
             value={designMode}
@@ -278,28 +333,6 @@ export function LayoutPanel({
           onCheckedChange={(checked) => setValue("enable_cable_calc", checked)}
         />
       </InspectorSection>
-
-      {/* ── Generate ────────────────────────────────────────────────── */}
-      <div className="px-[20px] py-[16px] flex flex-col gap-[8px]">
-        <Button
-          type="submit"
-          variant="primary"
-          size="md"
-          disabled={generating || noProject}
-          className="w-full"
-        >
-          {generating
-            ? "Generating…"
-            : noProject
-              ? "Open a KMZ to generate"
-              : "Generate layout"}
-        </Button>
-        {Object.keys(errors).length > 0 && (
-          <p className="text-[12px] text-[var(--error-default)] leading-normal">
-            Fix the validation errors above before generating.
-          </p>
-        )}
-      </div>
     </form>
   )
 }
