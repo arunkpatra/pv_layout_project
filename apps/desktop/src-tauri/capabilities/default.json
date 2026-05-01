@@ -11,7 +11,13 @@
     "shell:allow-kill",
     {
       "identifier": "shell:allow-open",
-      "allow": [{ "url": "https://**" }]
+      "allow": [
+        { "url": "https://**" },
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" }
+      ]
     },
     {
       "identifier": "http:default",
@@ -33,6 +39,15 @@
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$RESOURCE/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" }
       ]
     }
   ]
