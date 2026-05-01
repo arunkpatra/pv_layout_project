@@ -47,6 +47,10 @@ import {
   PREVIEW_LICENSE_KEY_PRO_PLUS,
 } from "./licenseKey"
 import { useLayoutResultStore } from "../state/layoutResult"
+import {
+  layoutParametersSchema,
+  useLayoutParamsStore,
+} from "../state/layoutParams"
 import { useProjectStore } from "../state/project"
 
 const PREVIEW_KEYS = new Set<string>([
@@ -80,6 +84,7 @@ export function useOpenRunMutation(
   options: UseOpenRunMutationOptions = {}
 ): UseMutationResult<OpenRunResult, Error, OpenRunVars> {
   const setResult = useLayoutResultStore((s) => s.setResult)
+  const setAllParams = useLayoutParamsStore((s) => s.setAll)
 
   return useMutation<OpenRunResult, Error, OpenRunVars>({
     mutationFn: async (vars) => {
@@ -127,6 +132,24 @@ export function useOpenRunMutation(
       // open with runs.
       const currentProjectId = useProjectStore.getState().currentProject?.id
       if (currentProjectId !== vars.projectId) return
+      // Hydrate the form-params slice from the run's stored params
+      // BEFORE flipping resultRunId. App.tsx watches resultRunId and
+      // bumps layoutFormKey on change, which remounts LayoutPanel —
+      // RHF's `defaultValues` are captured at mount, so the slice
+      // must be populated first or the form would re-mount against
+      // stale defaults. Schema is `z.unknown()` on the wire (engine
+      // params are opaque); validate locally and skip on failure
+      // (defensive against future schema drift — the form just stays
+      // at its current values rather than crashing).
+      const parsed = layoutParametersSchema.safeParse(data.detail.params)
+      if (parsed.success) {
+        setAllParams(parsed.data)
+      } else {
+        console.warn(
+          "[useOpenRun] run.params failed schema validation; skipping form hydration",
+          parsed.error.format()
+        )
+      }
       // Capture both the result AND the runId so the App's auto-fetch
       // effect (keyed on selectedRunId vs resultRunId) skips redundant
       // re-fetches.

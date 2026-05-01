@@ -579,6 +579,16 @@ export function App(): JSX.Element {
     })
   }, [selectedRunId, currentProject, resultRunId, openRunMutate])
 
+  // Re-mount LayoutPanel whenever the active run changes, so RHF's
+  // `defaultValues` (captured at mount) re-seed from the just-loaded
+  // run's params. useOpenRun.onSuccess populates layoutParams.params
+  // BEFORE bumping resultRunId, so this remount picks up the right
+  // values. Skipped on the initial mount (resultRunId starts null).
+  useEffect(() => {
+    if (resultRunId === null) return
+    setLayoutFormKey((k) => k + 1)
+  }, [resultRunId])
+
   // ── S2 — multi-tab integration ──────────────────────────────────────────
   // Tab state is metadata-only; the actual project state lives in its
   // existing per-domain slices and is mutated by the open flow below.
