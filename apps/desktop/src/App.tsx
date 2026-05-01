@@ -1352,19 +1352,31 @@ export function App(): JSX.Element {
                     </TabsList>
                   </div>
                   {inspectorTab === "layout" && (
-                    <PinnedActionArea
-                      generating={layoutMutation.isPending}
-                      boundaryCount={projectCounts?.boundaries ?? null}
-                      onCancel={handleCancelLayout}
-                    />
+                    <>
+                      <PinnedActionArea
+                        generating={layoutMutation.isPending}
+                        boundaryCount={projectCounts?.boundaries ?? null}
+                        onCancel={handleCancelLayout}
+                      />
+                      {/* Layout summary lives inside the sticky parent
+                          (alongside tabs + Generate band) so the
+                          results stay visible while the user iterates
+                          on form parameters below. Collapsible —
+                          expanded by default; persistKey survives
+                          reload. */}
+                      <SummaryPanel generating={layoutMutation.isPending} />
+                    </>
                   )}
                 </div>
                 {/* forceMount + data-[state=inactive]:hidden so RHF
-                    state in LayoutPanel survives tab switches. */}
+                    state in LayoutPanel survives tab switches. mt-0
+                    overrides TabsContent's default mt-[16px] — the
+                    first section's own pt is enough breathing room
+                    below the sticky tabs band. */}
                 <TabsContent
                   value="layout"
                   forceMount
-                  className="data-[state=inactive]:hidden"
+                  className="data-[state=inactive]:hidden mt-0"
                 >
                   <LayoutPanel
                     key={layoutFormKey}
@@ -1372,7 +1384,6 @@ export function App(): JSX.Element {
                   />
                   {layoutResult && <VisibilitySection />}
                   {layoutResult && <DrawingToolbar onUndoLast={handleUndoLast} />}
-                  <SummaryPanel generating={layoutMutation.isPending} />
                 </TabsContent>
                 <TabsContent value="energy">
                   <EnergyTabContent />

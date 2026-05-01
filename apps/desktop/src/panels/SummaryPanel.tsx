@@ -35,7 +35,11 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
 
   if (generating) {
     return (
-      <InspectorSection title="Layout summary">
+      <InspectorSection
+        title="Layout summary"
+        collapsible
+        persistKey="layout-panel.section.summary"
+      >
         <StatGrid>
           <SkeletonStat />
           <SkeletonStat />
@@ -52,7 +56,11 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
 
   if (!result || result.length === 0) {
     return (
-      <InspectorSection title="Layout summary">
+      <InspectorSection
+        title="Layout summary"
+        collapsible
+        persistKey="layout-panel.section.summary"
+      >
         <p className="text-[12px] text-[var(--text-muted)] leading-normal">
           Configure parameters above and click Generate to place tables and
           ICRs and see counts here.

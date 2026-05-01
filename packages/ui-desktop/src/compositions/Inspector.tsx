@@ -63,26 +63,32 @@ export function InspectorSection({
         className
       )}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
+      <div
         className={cn(
-          "flex items-center justify-between w-full",
-          "-mx-[4px] px-[4px] py-[1px] rounded-[4px]",
-          "hover:bg-[var(--surface-muted)] transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-default)]",
+          "flex items-center justify-between",
           expanded ? "mb-[12px]" : "mb-0"
         )}
-        aria-expanded={expanded}
       >
         <h3 className="text-[11px] font-semibold tracking-[0.04em] uppercase text-[var(--text-muted)] m-0">
           {title}
         </h3>
-        <ChevronIcon
-          className="size-[14px] text-[var(--text-muted)] shrink-0"
-          aria-hidden
-        />
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={cn(
+            "p-[3px] rounded-[4px]",
+            "hover:bg-[var(--surface-muted)] transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-default)]"
+          )}
+          aria-expanded={expanded}
+          aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`}
+        >
+          <ChevronIcon
+            className="size-[14px] text-[var(--text-muted)] shrink-0"
+            aria-hidden
+          />
+        </button>
+      </div>
       {expanded && children}
     </section>
   )

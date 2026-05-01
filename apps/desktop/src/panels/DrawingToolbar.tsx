@@ -46,7 +46,11 @@ export function DrawingToolbar({ onUndoLast }: DrawingToolbarProps) {
   }
 
   return (
-    <InspectorSection title="Interaction">
+    <InspectorSection
+      title="Interaction"
+      collapsible
+      persistKey="layout-panel.section.interaction"
+    >
       <div className="flex flex-col gap-[6px]">
         <ModeButton
           label="Drag ICR"

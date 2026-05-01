@@ -26,7 +26,11 @@ export function VisibilitySection() {
   const hasCableRouting = useHasFeature(FEATURE_KEYS.CABLE_ROUTING)
 
   return (
-    <InspectorSection title="Layer visibility">
+    <InspectorSection
+      title="Layer visibility"
+      collapsible
+      persistKey="layout-panel.section.visibility"
+    >
       <ToggleRow
         label="Show AC cable trench"
         entitled={hasCableRouting}
