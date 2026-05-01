@@ -2255,6 +2255,7 @@ Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`
 |---|---|---|---|---|
 | S3-01 | Tabs row (Layout / Energy / Runs) scrolled out of view; only Generate button stayed sticky | P2 | FE | **fixed** (live) |
 | S3-02 | Cancel mid-run leaves orphan backend Run + debited calc with no UI cleanup | **P0** | FE + BE | open (cleanup landing this commit; refund policy decision still open) |
+| S3-04 | Steps 10-12 (KMZ / PDF / DXF export) untestable from UI — no export buttons | P2 | FE | **blocked on E1** in PLAN.md (todo). Sidecar relabel work (Spike 1 Phase 7) shipped + unit-tested via pytest; UI wiring is row E1's scope. Steps 10-12 deferred until E1 lands. |
 
 ---
 
