@@ -1282,6 +1282,7 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
     result.ac_cable_runs                 = []
     result.total_dc_cable_m              = 0.0
     result.total_ac_cable_m              = 0.0
+    result.total_ac_cable_trench_m       = 0.0
     result.ac_cable_m_per_inverter       = {}
     result.ac_cable_m_per_icr            = {}
     result.string_kwp                    = 0.0
@@ -1447,7 +1448,7 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
         _reset_pattern_stats()
 
     # Visual: MST tree, each edge a CableRun.
-    ac_cables, _mst_total = _route_ac_mst(
+    ac_cables, mst_total = _route_ac_mst(
         icr_groups, icr_centers,
         gap_ys, col_xs, usable,
         ac_cable_factor,
@@ -1455,6 +1456,10 @@ def place_string_inverters(result: LayoutResult, params: LayoutParameters) -> No
         route_poly=route_poly,
     )
     result.ac_cable_runs = ac_cables
+    # The MST sum is the physical trench corridor length — distinct from
+    # the per-inverter BoM below. Both numbers are EPC line items; see
+    # PRD §2.2. Round to the same precision as `total_ac_cable_m`.
+    result.total_ac_cable_trench_m = round(mst_total, 1)
 
     # Quantity: every inverter individually routed; sum gives BOM length.
     # Returns per-ICR / per-inverter subtotals (S11.5 Phase E).

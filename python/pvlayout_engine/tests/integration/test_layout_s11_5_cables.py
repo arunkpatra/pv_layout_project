@@ -154,6 +154,29 @@ def test_cables_on_phaseboundary2(client: TestClient) -> None:
         f"(Δ {ac_delta*100:.2f} % > {LENGTH_TOLERANCE*100:.0f} %)"
     )
 
+    # ---- AC cable trench length (Spike 1 Phase 3) ----
+    # New top-level scalar surfaced from the MST sum that was previously
+    # discarded. Must equal sum(ac_cable_runs[*].length_m) — they share
+    # the same source. And must be ≤ total_ac_cable_m (BoM): trench is
+    # shared corridor; BoM is per-inverter copper. PRD §2.2.
+    trench_m = r["total_ac_cable_trench_m"]
+    runs_sum = sum(c["length_m"] for c in r["ac_cable_runs"])
+    assert abs(trench_m - runs_sum) <= 0.5, (
+        f"total_ac_cable_trench_m {trench_m} m disagrees with "
+        f"sum(ac_cable_runs[*].length_m) {runs_sum:.1f} m "
+        "(should match within rounding)"
+    )
+    assert trench_m > 0, (
+        f"total_ac_cable_trench_m={trench_m}; expected non-zero on a "
+        "cabled run with multiple inverters (the MST geometry exists, "
+        "so its sum must be positive)"
+    )
+    assert trench_m <= r["total_ac_cable_m"], (
+        f"trench length {trench_m} m exceeds BoM {r['total_ac_cable_m']} m; "
+        "EPC invariant violated (trench is shared corridor, BoM is "
+        "per-inverter dedicated copper)"
+    )
+
     # ---- Zero boundary violations (Pattern V keeps all cables inside) ----
     # Post-ADR-0007-amendment: Pattern V's visibility graph on the
     # boundary-minus-ICR polygon resolves all cables that previously fell

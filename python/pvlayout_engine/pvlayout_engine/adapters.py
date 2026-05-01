@@ -205,6 +205,11 @@ def result_from_core(r: core.LayoutResult) -> schemas.LayoutResult:
         ],
         total_dc_cable_m=r.total_dc_cable_m,
         total_ac_cable_m=r.total_ac_cable_m,
+        # MST trench length — surfaced for the "AC cable trench length"
+        # report row (PRD §2.2). Defaults to 0.0 on legacy results that
+        # predate the field, so older serialized payloads round-trip
+        # cleanly.
+        total_ac_cable_trench_m=getattr(r, "total_ac_cable_trench_m", 0.0),
         ac_cable_m_per_inverter=dict(getattr(r, "ac_cable_m_per_inverter", {}) or {}),
         ac_cable_m_per_icr=dict(getattr(r, "ac_cable_m_per_icr", {}) or {}),
         string_kwp=r.string_kwp,
@@ -391,6 +396,8 @@ def result_to_core(r: schemas.LayoutResult) -> core.LayoutResult:
     ]
     out.total_dc_cable_m = r.total_dc_cable_m
     out.total_ac_cable_m = r.total_ac_cable_m
+    # MST trench length — symmetric round-trip with result_from_core.
+    out.total_ac_cable_trench_m = getattr(r, "total_ac_cable_trench_m", 0.0)
     # S11.5: carry AC subtotals on the reverse path for round-trip consistency.
     # /refresh-inverters overwrites these when place_string_inverters re-runs.
     out.ac_cable_m_per_inverter = dict(getattr(r, "ac_cable_m_per_inverter", {}) or {})

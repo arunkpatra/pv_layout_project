@@ -287,7 +287,14 @@ class LayoutResult(_Model):
     ac_cable_runs: list[CableRun] = Field(default_factory=list)
     ac_cable_runs_wgs84: list[list[UTMPoint]] = Field(default_factory=list)
     total_dc_cable_m: float = 0.0
+    # Per-inverter copper BoM (sum of individual home-run distances).
+    # Industry-correct procurement number; bit-identical to legacy.
     total_ac_cable_m: float = 0.0
+    # MST trench length (sum of `ac_cable_runs[].length_m`). Physical
+    # cable trench / tray corridor; distinct from BoM because copper
+    # runs are per-inverter, not shared. Surfaced for the PDF/KMZ
+    # report's "AC cable trench length" sibling row. See PRD §2.2.
+    total_ac_cable_trench_m: float = 0.0
     # S11.5: additive per-inverter / per-ICR AC subtotals. Keyed by inverter
     # index (1-based) / ICR array position (0-based). Empty dicts before
     # S11.5 runs or when cables are disabled. JSON emits integer keys as

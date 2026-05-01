@@ -371,7 +371,16 @@ class LayoutResult:
     dc_cable_runs: List[CableRun] = field(default_factory=list)
     ac_cable_runs: List[CableRun] = field(default_factory=list)
     total_dc_cable_m: float = 0.0
+    # Per-inverter copper BoM: sum of individual home-run distances per
+    # inverter→ICR. Industry-standard EPC bill-of-materials length —
+    # what a procurement team orders. See PRD §2.1.
     total_ac_cable_m: float = 0.0
+    # MST trench length: sum of segment lengths in `ac_cable_runs[]`.
+    # Represents the physical cable trench / cable tray corridor through
+    # the plant (shared infrastructure). Distinct from `total_ac_cable_m`
+    # because each inverter's copper run is dedicated, not shared. See
+    # PRD §2.2 — "AC cable trench" relabel.
+    total_ac_cable_trench_m: float = 0.0
     # S11.5: additive per-inverter / per-ICR AC subtotals. Keys are
     # inverter index (PlacedStringInverter.index, 1-based) and ICR array
     # position (0-based, matches placed_icrs index). Empty dicts before
