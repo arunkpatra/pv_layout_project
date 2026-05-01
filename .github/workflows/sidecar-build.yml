@@ -82,6 +82,22 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: ./scripts/smoke_binary.sh
 
+      # Parallel-path smoke (Spike 1 Phase 1 risk #1) — runs the bundle,
+      # fires a multi-plot /layout with cable_calc=true, and verifies
+      # that ProcessPoolExecutor workers spawn cleanly inside the
+      # PyInstaller _MEIPASS context (no BrokenProcessPool / ImportError
+      # / ModuleNotFoundError in stderr).
+      #
+      # Restricted to macOS + Linux because the script uses `pgrep -af`
+      # to enumerate worker processes, and Git Bash on Windows doesn't
+      # ship pgrep. Windows still exercises the bundle's basic startup
+      # via smoke_binary.sh above; multi-plot parallel on Windows is
+      # verified manually for now and can be wired in later if a real
+      # Windows-only regression ever surfaces.
+      - name: Smoke-test parallel-spawn path
+        if: runner.os != 'Windows'
+        run: ./scripts/smoke_parallel.sh
+
       - name: Rename artifact for upload
         env:
           PLATFORM: ${{ matrix.platform }}
