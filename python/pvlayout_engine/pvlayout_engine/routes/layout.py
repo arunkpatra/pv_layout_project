@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import multiprocessing
 import os
 import tempfile
 from pathlib import Path
@@ -192,7 +193,15 @@ def layout(request: LayoutRequest) -> LayoutResponse:
     if use_parallel:
         max_workers = min(len(core_results), os.cpu_count() or 4)
         args_list = [(r, core_params) for r in core_results]
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as ex:
+        # Pin to spawn explicitly. macOS defaults to spawn since 3.8;
+        # Linux defaults to fork which interacts badly with PyInstaller's
+        # _MEIPASS bootloader; Windows is always spawn. Pinning makes the
+        # behavior identical across all three platforms and matches what
+        # `_run_per_plot_pipeline` expects (top-level callable, no closures).
+        spawn_ctx = multiprocessing.get_context("spawn")
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=spawn_ctx
+        ) as ex:
             core_results = list(ex.map(_run_per_plot_pipeline, args_list))
     else:
         for r in core_results:

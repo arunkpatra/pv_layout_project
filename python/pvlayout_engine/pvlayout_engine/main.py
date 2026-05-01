@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import multiprocessing
 import os
 import socket
 import sys
@@ -164,4 +165,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # MUST be the first call inside the `__main__` guard. Required for
+    # PyInstaller-bundled binaries that use `multiprocessing` with the
+    # `spawn` start method: workers re-execute the entry point, and
+    # without `freeze_support()` they would re-run `main()` and spin up
+    # their own uvicorn servers. Harmless no-op when running unbundled.
+    multiprocessing.freeze_support()
     raise SystemExit(main())
