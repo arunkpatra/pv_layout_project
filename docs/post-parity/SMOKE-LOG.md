@@ -2201,3 +2201,57 @@ new project → SP6 boundary fallback on the empty card → Generate
 
 ---
 
+
+### Session 3 — Spike 1 verification (cable perf + UX hygiene + trench relabel)
+
+**Date:** 2026-05-01
+**App HEAD:** `d3e9642` on `main` (post-merge; Spike 1 phases 1–8 + CI build pipeline shipped)
+**Backend HEAD:** unchanged from Session 2 — V2 endpoints carried forward.
+**Sidecar:** dev (`uv run python -m pvlayout_engine.main` via Tauri externalBin in dev mode)
+
+#### What's being verified
+
+Spike 1 is the cable-compute performance + UX work. Eight phases shipped, all behind CI gates. This session is the human-eyes pass against a live multi-plot KMZ.
+
+| Phase | What lands in the smoke surface |
+|---|---|
+| 1 | PyInstaller `freeze_support()` + explicit spawn — bundled-only, not exercised in dev mode (sidecar runs via `uv run`, not from the bundle) |
+| 2 | Async `/layout/jobs` endpoints — exercised every Generate click |
+| 3 | `total_ac_cable_trench_m` field — appears in SummaryPanel + KMZ + PDF |
+| 4 | TS sidecar-client adapter — invisible plumbing |
+| 5 | Pinned Generate button + collapsible sections in LayoutPanel — first thing the user sees |
+| 6 | Per-plot live progress + Cancel + pre-flight chip — visible during multi-plot generate |
+| 7 | "AC cable trench" relabel — toggle labels + summary rows + export labels |
+| 8 | CI matrix smoke — already CI-verified; no human surface |
+
+#### Coverage targets (in execution order)
+
+Steps run against a Pro-Plus fixture key (`sl_live_desktop_test_PRO_PLUS_stable`) unless noted. Tier-switching at the end checks the entitlement gate.
+
+1. **Pinned Generate area is sticky** — scroll the right inspector with form values populated; verify Generate stays at top.
+2. **Sections collapse + persist** — collapse "Module" + "Site"; reload Tauri; verify those two stay collapsed, others stay expanded.
+3. **Single-plot KMZ** (`tests/golden/kmz/phaseboundary2.kmz`) — verify NO pre-flight chip (single-plot suppresses it), Generate runs sequentially (no parallel dispatch since 1 plot), per-plot list shows 1 row.
+4. **Toggle relabeled** — confirm "Calculate AC cable trench" label (was "Calculate cables").
+5. **Multi-plot KMZ** (`tests/golden/kmz/complex-plant-layout.kmz`) — verify pre-flight chip appears with "Estimated 3–8 min" range (6 boundaries), Generate kicks off parallel dispatch, per-plot list populates with 6 boundaries each ticking elapsed every second.
+6. **Cancel mid-run** — click Cancel ~30s in; verify post-run summary "Cancelled — K of 6 done before stop"; running plots may complete (cooperative cancel) but pending get marked cancelled.
+7. **Full multi-plot completion** — kick off Generate again, let it complete; verify post-run summary "All 6 boundaries done in Mm Ss" and Generate button restored.
+8. **SummaryPanel rows** — verify `AC cable BoM length` row + new `AC cable trench length` row both render with `hasCableMeasurements` entitlement.
+9. **VisibilitySection toggle relabeled** — confirm "Show AC cable trench" (was "Show AC cables").
+10. **KMZ export** — open the exported KMZ in a text editor or Google Earth, confirm description block shows two-line "AC cable BoM length" + "AC cable trench length" siblings (instead of single "AC cable total").
+11. **PDF export** — verify both PDF tables show "AC Cable BoM" + "AC Cable Trench" columns; TOTAL row sums both correctly.
+12. **DXF export** — open in LibreCAD or AutoCAD; confirm AC layer is named `AC_CABLE_TRENCH` (was `AC_CABLES`).
+13. **Tier downgrade simulation** — switch to BASIC fixture key; confirm cable_calc toggle is disabled with "Pro" chip; confirm previous run's `enable_cable_calc=true` form state gets coerced to false at submit time (belt-and-braces from `LayoutPanel.tsx:99`).
+14. **Sidecar lifecycle** — already verified above this session: app close → sidecar self-exits within ~1s via parent-PID watchdog.
+
+#### Guardrails
+
+- B7 fixture project / run still untouched (carried from Session 2).
+- DEACTIVATED + QUOTA_EDGE keys — same constraints as Session 2.
+- During multi-plot generate, **do NOT switch tabs or close the app mid-job** — the `currentLayoutJob` slice clears on project switch but we haven't tested the case where the watchdog kills the sidecar mid-job.
+
+#### Observations
+
+| ID | Surface | Severity | Owner | Status |
+|---|---|---|---|---|
+| _(to be filled as observations land)_ |  |  |  |  |
+
