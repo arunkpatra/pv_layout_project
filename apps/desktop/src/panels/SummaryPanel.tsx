@@ -61,9 +61,9 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
         collapsible
         persistKey="layout-panel.section.summary"
       >
-        <p className="text-[12px] text-[var(--text-muted)] leading-normal">
-          Configure parameters above and click Generate to place tables and
-          ICRs and see counts here.
+        <p className="text-[12px] leading-normal text-[var(--text-muted)]">
+          Configure parameters above and click Generate to place tables and ICRs
+          and see counts here.
         </p>
       </InspectorSection>
     )
@@ -92,13 +92,10 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
             label="Inverters"
             value={agg.totalStringInverters.toLocaleString()}
           />
-          <SummaryStat
-            label="LAs"
-            value={agg.totalLas.toLocaleString()}
-          />
+          <SummaryStat label="LAs" value={agg.totalLas.toLocaleString()} />
         </StatGrid>
       </div>
-      <div className="mt-[16px]">
+      <div className="mt-[12px]">
         <PropertyRow
           label="Plant area"
           value={agg.totalAreaAcres.toFixed(2)}
@@ -160,10 +157,7 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
           />
         )}
         {hasEnergyYield && agg.dcAcRatio > 0 && (
-          <PropertyRow
-            label="DC/AC ratio"
-            value={agg.dcAcRatio.toFixed(2)}
-          />
+          <PropertyRow label="DC/AC ratio" value={agg.dcAcRatio.toFixed(2)} />
         )}
       </div>
     </InspectorSection>
@@ -213,8 +207,7 @@ function aggregate(results: LayoutResult[]) {
     totalIcrs,
     totalAreaAcres: totalAreaM2 * ACRES_PER_M2,
     totalUsedAreaAcres: totalUsedAreaM2 * ACRES_PER_M2,
-    packingDensity:
-      totalAreaM2 > 0 ? totalUsedAreaM2 / totalAreaM2 : 0,
+    packingDensity: totalAreaM2 > 0 ? totalUsedAreaM2 / totalAreaM2 : 0,
     rowPitchM: results[0]?.row_pitch_m ?? 0,
     tiltAngleDeg: results[0]?.tilt_angle_deg ?? 0,
     totalModules,

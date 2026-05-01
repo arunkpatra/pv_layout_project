@@ -160,7 +160,7 @@ export function PropertyRow({
   unit?: ReactNode
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-[12px] py-[5px] text-[13px]">
+    <div className="flex items-baseline justify-between gap-[12px] border-t border-(--border-subtle) py-[5px] text-[13px]">
       <span className="text-[var(--text-secondary)]">{label}</span>
       <span className="font-medium text-[var(--text-primary)] tabular-nums">
         {value}
