@@ -46,6 +46,18 @@ Names that cross a boundary between runtimes — feature-key strings, API respon
 
 Full principle, post-mortem of the S7/S10 incident that landed it, authoritative source-of-truth file table, and operational steps: [`docs/principles/external-contracts.md`](./docs/principles/external-contracts.md). Feature-key registry policy: [ADR-0005](./docs/adr/0005-feature-key-registry.md).
 
+### Verify with citations before proceeding
+
+For any claim that touches **far-reaching effect, external users (customer impact), or deep tech specifics**, fetch authoritative sources first, cite the URLs and quoted passages back to the user in chat, and only THEN proceed with the action. This is non-negotiable.
+
+What counts as a trigger: claims about external library/tool behavior, OS / runtime / package-manager specifics, CI/runner internals, security or signing posture, user-visible behavior on platforms not tested locally, SLAs / compliance / regulatory, pricing, anything that would land in a customer-facing release note.
+
+Authoritative = upstream project docs, official GitHub repos, RFC/IEC/ISO specifications, vendor docs (AWS / GitHub / Apple). NOT random Stack Overflow answers or stale blog posts. When two pages from the same vendor disagree (it has happened — Tauri 2's Prerequisites page vs their GitHub Actions example), call out the divergence and pick the canonical/freshest source with reasoning.
+
+Be honest about what cannot be verified. If a comparative claim ("X has more reports than Y") isn't supported by primary sources, drop or rephrase it — don't manufacture corroboration.
+
+This rule does NOT apply to small refactors, in-codebase reasoning where the actual code is the source of truth, or trivial syntax. The bar: would a wrong claim here cost real time, money, or customer trust? If yes → cite first.
+
 ### What I never do without explicit human ask
 - Skip a row in PLAN.md or work a row out of `todo` order without a documented reason in the row's notes.
 - Lighten or heavyen a row's tier on the fly — T1 stays T1, T3 stays T3.
