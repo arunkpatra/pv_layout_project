@@ -67,6 +67,19 @@ done
 
 if [[ -z "$PORT" ]]; then
   echo "ERROR: no READY line after ${BOOT_TIMEOUT}s" >&2
+  # Diagnostic dump — symmetric with the exit-before-READY branch above.
+  # Without this, a CI timeout produces "no READY line after 30s" with
+  # zero context (was the binary hung? still booting slowly? crashed
+  # silently between reads?). Dumping stdout + stderr + the alive-check
+  # is enough to disambiguate the three cases.
+  if kill -0 "$BIN_PID" 2>/dev/null; then
+    echo "--- process state: still alive (likely slow boot or hang) ---" >&2
+  else
+    echo "--- process state: exited (crashed silently between polls) ---" >&2
+  fi
+  echo "--- stdout (${BOOT_TIMEOUT}s window) ---" >&2
+  cat "$STDOUT_LOG" >&2
+  echo "--- stderr (${BOOT_TIMEOUT}s window) ---" >&2
   cat "$STDERR_LOG" >&2
   exit 3
 fi
