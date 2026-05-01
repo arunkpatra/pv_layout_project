@@ -72,7 +72,11 @@ export function SummaryPanel({ generating }: SummaryPanelProps) {
   const agg = aggregate(result)
 
   return (
-    <InspectorSection title="Layout summary">
+    <InspectorSection
+      title="Layout summary"
+      collapsible
+      persistKey="layout-panel.section.summary"
+    >
       <StatGrid>
         <SummaryStat label="MWp" value={agg.totalMwp.toFixed(2)} />
         <SummaryStat label="Tables" value={agg.totalTables.toLocaleString()} />
