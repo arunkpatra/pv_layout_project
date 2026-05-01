@@ -189,7 +189,7 @@ export function DeliverablesBand({
   const exportsDisabled = generating || sidecarClient === null
 
   return (
-    <div className="flex flex-col gap-[6px] border-b border-(--border-subtle) bg-(--surface-ground) px-[20px] py-[10px]">
+    <div className="flex flex-col gap-[6px] border-b border-(--border-subtle) px-[20px] py-[10px]">
       <div className="flex items-center gap-[8px]">
         <span className="mr-[4px] text-[11px] font-semibold tracking-[0.04em] text-(--text-primary) uppercase">
           Export

@@ -375,6 +375,36 @@ export function App(): JSX.Element {
   // gated to the Layout tab without duplicating TabsContent value="layout".
   const [inspectorTab, setInspectorTab] = useState("layout")
 
+  // Inspector "is scrolled" detection. A 1px sentinel placed at the very
+  // top of InspectorRoot is observed by IntersectionObserver: when it's
+  // intersecting (= scroll-top, no scroll yet), `scrolled` is false. When
+  // the sentinel scrolls out of view (= user has scrolled at all),
+  // `scrolled` flips true, and the sticky band picks up a soft drop
+  // shadow to telegraph "there's content above me." Callback ref because
+  // the sentinel mounts after App.tsx (gated on `project`); a useEffect
+  // with [] would run before the sentinel exists.
+  const ioRef = useRef<IntersectionObserver | null>(null)
+  const [scrolled, setScrolled] = useState(false)
+  const setScrollSentinelRef = useCallback((el: HTMLDivElement | null) => {
+    if (ioRef.current) {
+      ioRef.current.disconnect()
+      ioRef.current = null
+    }
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setScrolled(false)
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry) setScrolled(!entry.isIntersecting)
+      },
+      { threshold: 0 }
+    )
+    io.observe(el)
+    ioRef.current = io
+  }, [])
+
   // Read params from Zustand via getState() at call-time, not via a hook
   // closure. LayoutPanel's onSubmit does `setAll(values); onGenerate()` in
   // the same tick — a closure over `useLayoutParamsStore((s) => s.params)`
@@ -1412,6 +1442,18 @@ export function App(): JSX.Element {
         inspector={
           project ? (
             <InspectorRoot>
+              {/* Scroll sentinel — 1px tall, lives at the top of the
+                  inspector's scroll container. IntersectionObserver
+                  flips `scrolled` to true once this exits the viewport,
+                  driving the conditional shadow on the sticky band
+                  below. The `-mb-px` cancels the sentinel's 1px height
+                  so it contributes zero layout space — without this,
+                  the sticky wrapper would visibly snap up 1px the
+                  moment the user starts scrolling (the sentinel
+                  occupies a row before scroll, gets pulled out of view
+                  during scroll, and the sticky claims that 1px). The
+                  observer still has a real bounding box to track. */}
+              <div ref={setScrollSentinelRef} className="-mb-px h-px shrink-0" />
               {/* Tabs are controlled so PinnedActionArea (which lives
                   in the sticky tabs band, not inside LayoutPanel) can
                   be gated to the Layout tab via a normal conditional,
@@ -1421,7 +1463,11 @@ export function App(): JSX.Element {
                   S3-01b in SMOKE-LOG.md for the original sticky-stack
                   fix this preserves. */}
               <Tabs value={inspectorTab} onValueChange={setInspectorTab}>
-                <div className="sticky top-0 z-20 bg-[var(--surface-ground)]">
+                <div
+                  className={`sticky top-0 z-20 bg-[color-mix(in_srgb,var(--surface-panel)_40%,transparent)] backdrop-blur-2xl backdrop-saturate-150 border-b border-[var(--border-default)] transition-shadow duration-200 ${
+                    scrolled ? "shadow-[0_2px_8px_rgba(0,0,0,0.06)]" : "shadow-none"
+                  }`}
+                >
                   <div className="px-[20px] pt-[12px]">
                     <TabsList>
                       <TabsTrigger value="layout">Layout</TabsTrigger>

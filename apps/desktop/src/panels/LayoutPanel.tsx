@@ -459,7 +459,7 @@ export function PinnedActionArea({
   return (
     <div
       className="px-[20px] py-[12px] flex flex-col gap-[10px]
-        bg-[var(--surface-ground)] border-b border-[var(--border-subtle)]"
+        border-b border-[var(--border-subtle)]"
     >
       {isInflight ? (
         <RunningPin jobState={jobState} onCancel={onCancel} />
