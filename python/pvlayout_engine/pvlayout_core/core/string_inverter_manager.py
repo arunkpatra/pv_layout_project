@@ -729,6 +729,14 @@ def _route_ac_cable(
         _record_pattern("no_poly")
         return [start, end]
 
+    # ``poly`` is the usable_polygon (table-placement); both endpoints
+    # (inverter centre, ICR centre) are inside it by construction.
+    # Pattern V uses the wider ``route_poly`` (= fence − ICRs) for its
+    # visibility graph — see ``v_poly`` below. CR1 (2026-05-02) measured
+    # the cost of using ``route_poly`` for A-E's validation as well: 30-60%
+    # AC-length regression because A-E's templates terminate at the ICR
+    # centre which is in ``route_poly``'s ICR cutout. Current split is
+    # correct. See docs/post-parity/PRD-cable-routing-correctness.md.
     s = _safe_pt(start, poly)
     e = _safe_pt(end,   poly)
 
