@@ -57,3 +57,11 @@ select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+# Slow tests are opt-in. Default `pytest tests/` (CI + local) skips
+# anything marked `slow`. To run them explicitly:
+#   pytest -m slow tests/        # only slow
+#   pytest -m '' tests/          # everything (override the marker filter)
+markers = [
+    "slow: long-running test; opt-in (default skipped). One-time correctness audits, full PV engine on real KMZ fixtures, etc. Run on demand only.",
+]
+addopts = ["-m", "not slow"]

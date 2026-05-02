@@ -133,20 +133,34 @@ model CheckoutSession {
 }
 
 model UsageRecord {
-  id             String     @id @default("")
+  id             String        @id @default("")
   userId         String
-  user           User       @relation(fields: [userId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
   licenseKeyId   String
-  licenseKey     LicenseKey @relation(fields: [licenseKeyId], references: [id])
+  licenseKey     LicenseKey    @relation(fields: [licenseKeyId], references: [id])
   productId      String
-  product        Product    @relation(fields: [productId], references: [id])
+  product        Product       @relation(fields: [productId], references: [id])
   featureKey     String
   metadata       Json?
   idempotencyKey String?
-  createdAt      DateTime   @default(now())
+  /// Magnitude of this usage event in calc-units. v1 always +1 (charge)
+  /// or -1 (refund). Forward-looking: multi-plot may charge >1 per event.
+  /// Quota math is SUM(count) over a user's rows in an entitlement window.
+  count          Int           @default(1)
+  /// Type of usage event. v1: 'charge' | 'refund'. Forward-extensible.
+  /// Refund rows hidden from /dashboard/usage; quota math sums all kinds.
+  /// See B27 memo §B.1 — refund preserves immutable charge audit trail.
+  kind           String        @default("charge")
+  /// FK to the original UsageRecord this row refunds. Null for charges.
+  /// Self-relation named "Refunds" (Prisma requires named self-relations).
+  refundsRecordId String?
+  refundsRecord  UsageRecord?  @relation("Refunds", fields: [refundsRecordId], references: [id])
+  refundedBy     UsageRecord[] @relation("Refunds")
+  createdAt      DateTime      @default(now())
   run            Run?
 
   @@unique([userId, idempotencyKey])
+  @@index([userId, kind])
   @@map("usage_records")
 }
 
@@ -215,8 +229,26 @@ model Run {
   usageRecord         UsageRecord @relation(fields: [usageRecordId], references: [id])
   createdAt           DateTime    @default(now())
   deletedAt           DateTime?
+  /// Lifecycle state — one of "RUNNING" | "DONE" | "CANCELLED" | "FAILED".
+  /// Per refund-on-cancel policy (B27 memo 2026-05-02-002 §A.1):
+  ///   RUNNING   = job submitted, sidecar still working
+  ///   DONE      = job completed, deliverables published, charge stands
+  ///   CANCELLED = user clicked Cancel before DONE; UsageRecord refund row written
+  ///   FAILED    = system or user-input error; UsageRecord refund row written
+  /// Default 'RUNNING' is the correct value for new rows; the B29 migration
+  /// backfills all pre-existing rows to 'DONE' (every persisted Run today
+  /// has a result blob → completed).
+  status              String      @default("RUNNING")
+  /// Set when status transitions to CANCELLED (B30 cancel endpoint).
+  cancelledAt         DateTime?
+  /// Set when status transitions to FAILED (B32 failed-runs path).
+  failedAt            DateTime?
+  /// Free-text describing why the run failed. Internal-grade; v1 does
+  /// not surface this to the customer (B27 §A.3 — single 'Failed' badge).
+  failureReason       String?
 
   @@index([projectId])
   @@index([deletedAt])
+  @@index([status])
   @@map("runs")
 }

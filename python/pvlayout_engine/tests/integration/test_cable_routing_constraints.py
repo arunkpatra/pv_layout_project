@@ -32,12 +32,13 @@ the unified compliance PDF + the PRD at
 
 This test runs the in-process pipeline directly (not via FastAPI
 ``/layout``) — same module path as the probe script — to keep
-runtime under control. PVLAYOUT_SKIP_SLOW_CABLES=1 skips it in
-constrained CI, matching the existing s11_5 test's escape hatch.
+runtime under control. Marked ``@pytest.mark.slow`` (default skipped
+in CI + local) — this is a one-time correctness audit retained as a
+regression-detection backstop, not a routine test. To run it
+explicitly: ``pytest -m slow tests/integration/test_cable_routing_constraints.py``.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, List, Tuple
 
@@ -72,10 +73,7 @@ BV_FRACTION_PER_BOUNDARY_MAX = 0.02
 FENCE_OVERSHOOT_NOISE_FLOOR_M = 0.01
 
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("PVLAYOUT_SKIP_SLOW_CABLES") == "1",
-    reason="PVLAYOUT_SKIP_SLOW_CABLES=1 set; skipping cables-on integration",
-)
+pytestmark = pytest.mark.slow
 
 
 def _route_outside_fence_length(

@@ -100,6 +100,14 @@ export interface RunWire {
   usageRecordId: string
   createdAt: string
   deletedAt: string | null
+  /** Lifecycle state — RUNNING | DONE | CANCELLED | FAILED. */
+  status: string
+  /** Set when status flipped to CANCELLED (B30). */
+  cancelledAt: string | null
+  /** Set when status flipped to FAILED (B32). */
+  failedAt: string | null
+  /** Free-text reason for FAILED (B32). Null otherwise. */
+  failureReason: string | null
 }
 
 export interface RunUploadDescriptor {
@@ -137,6 +145,10 @@ interface RawRun {
   usageRecordId: string
   createdAt: Date
   deletedAt: Date | null
+  status: string
+  cancelledAt: Date | null
+  failedAt: Date | null
+  failureReason: string | null
 }
 
 function toRunWire(run: RawRun): RunWire {
@@ -150,6 +162,10 @@ function toRunWire(run: RawRun): RunWire {
     usageRecordId: run.usageRecordId,
     createdAt: run.createdAt.toISOString(),
     deletedAt: run.deletedAt?.toISOString() ?? null,
+    status: run.status,
+    cancelledAt: run.cancelledAt?.toISOString() ?? null,
+    failedAt: run.failedAt?.toISOString() ?? null,
+    failureReason: run.failureReason,
   }
 }
 
@@ -436,4 +452,220 @@ export async function deleteRun(
     where: { id: runId },
     data: { deletedAt: new Date() },
   })
+}
+
+/**
+ * Cancel a Run. Idempotent. Per refund-on-cancel policy
+ * (B27 memo 2026-05-02-002 §A.2 + §B.2):
+ *
+ *   RUNNING   → flip to CANCELLED, write refund UsageRecord (count=-1,
+ *               kind='refund', refundsRecordId=<original>), decrement
+ *               the matching Entitlement.usedCalculations. Single
+ *               Postgres transaction with SELECT … FOR UPDATE on Run.
+ *   CANCELLED → no-op, return current state. (Refund already issued.)
+ *   DONE      → 409 CONFLICT. ("Run already completed; use Delete.")
+ *   FAILED    → no-op, return current state. (Refund already issued by
+ *               B32's failed-runs path.)
+ *
+ * 404 on miss / cross-user / soft-deleted run / soft-deleted project —
+ * same posture as B17 (getRunDetail) and B18 (deleteRun).
+ *
+ * Race semantics: the FOR UPDATE lock serializes this endpoint against
+ * sidecar's completion path (B31 will add the sidecar-side check).
+ * Whichever transaction commits first wins; the loser sees the post-
+ * commit state and behaves correctly per the branch table above.
+ */
+export async function cancelRun(
+  userId: string,
+  projectId: string,
+  runId: string,
+): Promise<RunDetailWire> {
+  // 1. Ownership pre-check (no lock). 404-leakage-safe.
+  const project = await db.project.findFirst({
+    where: { id: projectId, userId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!project) {
+    throw new NotFoundError("Project", projectId)
+  }
+
+  const updatedRun = await db.$transaction(async (tx) => {
+    const txClient = tx as unknown as {
+      $queryRaw: <T>(strings: TemplateStringsArray, ...values: unknown[]) => Promise<T>
+      run: {
+        update: (args: {
+          where: { id: string }
+          data: Record<string, unknown>
+        }) => Promise<RawRun>
+      }
+      usageRecord: {
+        create: (args: {
+          data: {
+            userId: string
+            licenseKeyId: string
+            productId: string
+            featureKey: string
+            count: number
+            kind: string
+            refundsRecordId: string
+          }
+        }) => Promise<{ id: string }>
+      }
+      entitlement: {
+        updateMany: (args: {
+          where: Record<string, unknown>
+          data: Record<string, unknown>
+        }) => Promise<{ count: number }>
+      }
+    }
+
+    // 2. Lock the Run row + read its current status.
+    const rows = await txClient.$queryRaw<
+      Array<{ id: string; status: string; usageRecordId: string }>
+    >`
+      SELECT id, status, "usageRecordId"
+      FROM runs
+      WHERE id = ${runId}
+        AND "projectId" = ${projectId}
+        AND "deletedAt" IS NULL
+      FOR UPDATE
+    `
+
+    if (rows.length === 0) {
+      throw new NotFoundError("Run", runId)
+    }
+    const locked = rows[0]!
+
+    // 3. Branch on status.
+    if (locked.status === "DONE") {
+      throw new AppError(
+        "CONFLICT",
+        "Run already completed; use Delete to remove it from history",
+        409,
+      )
+    }
+
+    if (locked.status === "CANCELLED" || locked.status === "FAILED") {
+      // Idempotent — re-read the post-commit state and return it.
+      // Empty data = no-op write that returns the canonical row shape.
+      const current = await txClient.run.update({
+        where: { id: runId },
+        data: {},
+      })
+      return current
+    }
+
+    // RUNNING → execute the refund cascade.
+    // 3a. Look up the original UsageRecord to find productId + identity
+    //     for the refund row + entitlement decrement target.
+    const original = (await db.usageRecord.findFirst({
+      where: { id: locked.usageRecordId },
+      select: {
+        id: true,
+        productId: true,
+        userId: true,
+        licenseKeyId: true,
+        featureKey: true,
+      },
+    })) as {
+      id: string
+      productId: string
+      userId: string
+      licenseKeyId: string
+      featureKey: string
+    } | null
+
+    if (!original) {
+      // Should never happen — runs.usageRecordId is FK NOT NULL.
+      throw new AppError(
+        "INTERNAL_ERROR",
+        `UsageRecord ${locked.usageRecordId} missing for run ${runId}`,
+        500,
+      )
+    }
+
+    // 3b. Flip the Run status.
+    const updated = await txClient.run.update({
+      where: { id: runId },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+      },
+    })
+
+    // 3c. Insert refund UsageRecord row (count=-1, kind='refund').
+    await txClient.usageRecord.create({
+      data: {
+        userId: original.userId,
+        licenseKeyId: original.licenseKeyId,
+        productId: original.productId,
+        featureKey: original.featureKey,
+        count: -1,
+        kind: "refund",
+        refundsRecordId: original.id,
+      },
+    })
+
+    // 3d. Decrement Entitlement.usedCalculations on a matching active
+    //     entitlement for the same product. updateMany matches the
+    //     cheapest-first ordering convention from findFeaturePool (the
+    //     codebase allows multiple active entitlements per product).
+    //     If no match (e.g., entitlement deactivated post-debit), the
+    //     decrement is a no-op — refund row + Run flip still land, and
+    //     SUM(count) quota math (B34) reflects the refund.
+    await txClient.entitlement.updateMany({
+      where: {
+        userId: original.userId,
+        productId: original.productId,
+        deactivatedAt: null,
+        usedCalculations: { gt: 0 },
+      },
+      data: {
+        usedCalculations: { decrement: 1 },
+      },
+    })
+
+    return updated
+  })
+
+  // 4. Convert to wire shape + sign download URLs (parallel to getRunDetail).
+  const bucket = env.MVP_S3_PROJECTS_BUCKET
+  const layoutKey = `projects/${userId}/${projectId}/runs/${runId}/layout.json`
+  const energyKey = `projects/${userId}/${projectId}/runs/${runId}/energy.json`
+  const thumbnailKey = `projects/${userId}/${projectId}/runs/${runId}/thumbnail.webp`
+
+  const layoutResultBlobUrl = bucket
+    ? await getPresignedDownloadUrl(
+        layoutKey,
+        "layout.json",
+        READ_URL_TTL_SECONDS,
+        bucket,
+      )
+    : null
+  const energyResultBlobUrl = isEnergyClass(updatedRun.billedFeatureKey)
+    ? bucket
+      ? await getPresignedDownloadUrl(
+          energyKey,
+          "energy.json",
+          READ_URL_TTL_SECONDS,
+          bucket,
+        )
+      : null
+    : null
+  const thumbnailBlobUrl = bucket
+    ? await getPresignedDownloadUrl(
+        thumbnailKey,
+        "thumbnail.webp",
+        READ_URL_TTL_SECONDS,
+        bucket,
+      )
+    : null
+
+  return {
+    ...toRunWire(updatedRun),
+    layoutResultBlobUrl,
+    energyResultBlobUrl,
+    thumbnailBlobUrl,
+    exportsBlobUrls: [],
+  }
 }

@@ -5,6 +5,7 @@ import { ok } from "../../lib/response.js"
 import { AppError } from "../../lib/errors.js"
 import type { MvpHonoEnv } from "../../middleware/error-handler.js"
 import {
+  cancelRun,
   createRunForProject,
   deleteRun,
   getRunDetail,
@@ -88,3 +89,16 @@ runsRoutes.post("/v2/projects/:id/runs", async (c) => {
   )
   return c.json(ok(result), 201)
 })
+
+runsRoutes.post(
+  "/v2/projects/:id/runs/:runId/cancel",
+  async (c) => {
+    const user = c.get("user")
+    const result = await cancelRun(
+      user.id,
+      c.req.param("id"),
+      c.req.param("runId"),
+    )
+    return c.json(ok(result))
+  },
+)
