@@ -70,6 +70,10 @@ interface MockRunDetail {
   usageRecordId: string
   createdAt: Date
   deletedAt: Date | null
+  status: string
+  cancelledAt: Date | null
+  failedAt: Date | null
+  failureReason: string | null
   project: { userId: string }
 }
 
@@ -90,7 +94,11 @@ const mockRunUpdate = mock(
 const mockUsageRecordFindFirst = mock(
   async (..._args: unknown[]): Promise<{
     id: string
-    run: {
+    productId?: string
+    userId?: string
+    licenseKeyId?: string
+    featureKey?: string
+    run?: {
       id: string
       projectId: string
       name: string
@@ -100,6 +108,10 @@ const mockUsageRecordFindFirst = mock(
       usageRecordId: string
       createdAt: Date
       deletedAt: Date | null
+      status: string
+      cancelledAt: Date | null
+      failedAt: Date | null
+      failureReason: string | null
     } | null
   } | null> => null,
 )
@@ -128,6 +140,20 @@ const mockEntitlementFindMany = mock(async (..._args: unknown[]) => [
 ])
 
 const mockExecuteRaw = mock(async () => 1)
+
+const mockQueryRaw = mock(
+  async (..._args: unknown[]): Promise<
+    Array<{
+      id: string
+      status: string
+      usageRecordId: string
+    }>
+  > => [],
+)
+
+const mockEntitlementUpdateMany = mock(
+  async (..._args: unknown[]): Promise<{ count: number }> => ({ count: 1 }),
+)
 
 const mockUsageRecordCreate = mock(async () => ({
   id: "ur_new",
@@ -161,6 +187,10 @@ const mockRunCreate = mock(
     usageRecordId: args.data.usageRecordId,
     createdAt: new Date("2026-04-30T00:00:00Z"),
     deletedAt: null,
+    status: "RUNNING",
+    cancelledAt: null,
+    failedAt: null,
+    failureReason: null,
   }),
 )
 
@@ -169,16 +199,23 @@ const mockTransaction = mock(async (arg: unknown) => {
     return await (
       arg as (tx: {
         $executeRaw: typeof mockExecuteRaw
+        $queryRaw: typeof mockQueryRaw
         usageRecord: { create: typeof mockUsageRecordCreate }
-        run: { create: typeof mockRunCreate }
+        run: {
+          create: typeof mockRunCreate
+          update: typeof mockRunUpdate
+        }
+        entitlement: { updateMany: typeof mockEntitlementUpdateMany }
       }) => Promise<unknown>
     )({
       $executeRaw: mockExecuteRaw,
+      $queryRaw: mockQueryRaw,
       usageRecord: { create: mockUsageRecordCreate },
-      run: { create: mockRunCreate },
+      run: { create: mockRunCreate, update: mockRunUpdate },
+      entitlement: { updateMany: mockEntitlementUpdateMany },
     })
   }
-  // batch shape (not used by B15/B16 but harmless to keep)
+  // batch shape (not used by B16/B30 but harmless to keep)
   return arg
 })
 
@@ -231,7 +268,11 @@ mock.module("../../lib/db.js", () => ({
       create: mockUsageRecordCreate,
     },
     productFeature: { findFirst: mockProductFeatureFindFirst },
-    entitlement: { findMany: mockEntitlementFindMany },
+    entitlement: {
+      findMany: mockEntitlementFindMany,
+      updateMany: mockEntitlementUpdateMany,
+    },
+    $queryRaw: mockQueryRaw,
     $transaction: mockTransaction,
   },
 }))
@@ -544,6 +585,10 @@ describe("POST /v2/projects/:id/runs", () => {
       usageRecordId: "ur_existing",
       createdAt: new Date("2026-04-25T00:00:00Z"),
       deletedAt: null,
+      status: "DONE",
+      cancelledAt: null,
+      failedAt: null,
+      failureReason: null,
     }
     mockUsageRecordFindFirst.mockImplementation(async () => ({
       id: "ur_existing",
@@ -671,6 +716,10 @@ interface RunDetailWire {
   usageRecordId: string
   createdAt: string
   deletedAt: string | null
+  status: string
+  cancelledAt: string | null
+  failedAt: string | null
+  failureReason: string | null
 }
 
 const getRun = (projectId: string, runId: string) =>
@@ -691,6 +740,10 @@ const baseRun: MockRunDetail = {
   usageRecordId: "ur_x",
   createdAt: new Date("2026-04-15T12:00:00Z"),
   deletedAt: null,
+  status: "DONE",
+  cancelledAt: null,
+  failedAt: null,
+  failureReason: null,
   project: { userId: "usr_test1" },
 }
 
@@ -913,5 +966,345 @@ describe("DELETE /v2/projects/:id/runs/:runId", () => {
     // No upload or download URL signed — DELETE is a metadata-only op
     expect(mockGetPresignedUploadUrl).not.toHaveBeenCalled()
     expect(mockGetPresignedDownloadUrl).not.toHaveBeenCalled()
+  })
+})
+
+// ─── B30 — POST /v2/projects/:id/runs/:runId/cancel ──────────────────────────
+
+const cancel = (projectId: string, runId: string) =>
+  makeApp().request(
+    `/v2/projects/${projectId}/runs/${runId}/cancel`,
+    {
+      method: "POST",
+      headers: { Authorization: "Bearer sl_live_testkey" },
+    },
+  )
+
+describe("POST /v2/projects/:id/runs/:runId/cancel", () => {
+  beforeEach(() => {
+    mockProjectFindFirst.mockReset()
+    mockProjectFindFirst.mockImplementation(async () => ({ id: "prj_x" }))
+    mockQueryRaw.mockReset()
+    mockRunUpdate.mockClear()
+    mockUsageRecordCreate.mockClear()
+    mockUsageRecordFindFirst.mockReset()
+    mockUsageRecordFindFirst.mockImplementation(async () => ({
+      id: "ur_x",
+      productId: "prod_basic",
+      userId: "usr_test1",
+      licenseKeyId: "lk_test1",
+      featureKey: "plant_layout",
+    }))
+    mockEntitlementUpdateMany.mockReset()
+    mockEntitlementUpdateMany.mockImplementation(async () => ({ count: 1 }))
+  })
+
+  it("RUNNING → flips to CANCELLED, writes refund row, decrements entitlement, returns 200", async () => {
+    // The locked SELECT returns the run in RUNNING state.
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "RUNNING", usageRecordId: "ur_x" },
+    ])
+    // run.update returns the post-cancel row used by toRunWire.
+    mockRunUpdate.mockImplementation(async (args) => ({
+      id: args.where.id,
+      projectId: "prj_x",
+      name: "Run X",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      usageRecordId: "ur_x",
+      createdAt: new Date("2026-05-01T10:00:00Z"),
+      deletedAt: null,
+      status: "CANCELLED",
+      cancelledAt: new Date("2026-05-02T12:00:00Z"),
+      failedAt: null,
+      failureReason: null,
+    }))
+
+    const res = await cancel("prj_x", "run_x")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.id).toBe("run_x")
+    expect(body.data.status).toBe("CANCELLED")
+    expect(body.data.cancelledAt).toBe("2026-05-02T12:00:00.000Z")
+
+    // Transaction-internal effects
+    expect(mockQueryRaw).toHaveBeenCalledTimes(1)
+    expect(mockRunUpdate).toHaveBeenCalledTimes(1)
+    expect(mockUsageRecordCreate).toHaveBeenCalledTimes(1)
+    expect(mockEntitlementUpdateMany).toHaveBeenCalledTimes(1)
+
+    // Refund row shape
+    const urCall = mockUsageRecordCreate.mock.calls[0] as unknown as [
+      {
+        data: {
+          userId: string
+          productId: string
+          featureKey: string
+          count: number
+          kind: string
+          refundsRecordId: string
+          licenseKeyId: string
+        }
+      },
+    ]
+    expect(urCall[0].data.count).toBe(-1)
+    expect(urCall[0].data.kind).toBe("refund")
+    expect(urCall[0].data.refundsRecordId).toBe("ur_x")
+    expect(urCall[0].data.userId).toBe("usr_test1")
+    expect(urCall[0].data.productId).toBe("prod_basic")
+
+    // Entitlement decrement scoped to the user + productId
+    const entCall = mockEntitlementUpdateMany.mock.calls[0] as unknown as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ]
+    expect(entCall[0].where).toMatchObject({
+      userId: "usr_test1",
+      productId: "prod_basic",
+      deactivatedAt: null,
+    })
+  })
+
+  // ── Task 5: CANCELLED idempotent no-op ─────────────────────────────────────
+
+  it("CANCELLED → idempotent no-op, returns 200, no second refund or decrement", async () => {
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "CANCELLED", usageRecordId: "ur_x" },
+    ])
+    mockRunUpdate.mockImplementation(async (args) => ({
+      id: args.where.id,
+      projectId: "prj_x",
+      name: "Run X",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      usageRecordId: "ur_x",
+      createdAt: new Date("2026-05-01T10:00:00Z"),
+      deletedAt: null,
+      status: "CANCELLED",
+      cancelledAt: new Date("2026-05-02T11:00:00Z"),
+      failedAt: null,
+      failureReason: null,
+    }))
+
+    const res = await cancel("prj_x", "run_x")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.status).toBe("CANCELLED")
+    // No second refund row, no second decrement
+    expect(mockUsageRecordCreate).not.toHaveBeenCalled()
+    expect(mockEntitlementUpdateMany).not.toHaveBeenCalled()
+  })
+
+  // ── Task 6: DONE → 409 ─────────────────────────────────────────────────────
+
+  it("DONE → 409 CONFLICT with descriptive message; no state mutations", async () => {
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "DONE", usageRecordId: "ur_x" },
+    ])
+
+    const res = await cancel("prj_x", "run_x")
+    expect(res.status).toBe(409)
+    const body = (await res.json()) as {
+      success: false
+      error: { code: string; message: string }
+    }
+    expect(body.success).toBe(false)
+    expect(body.error.code).toBe("CONFLICT")
+    expect(body.error.message).toContain("already completed")
+    // Zero state mutations
+    expect(mockRunUpdate).not.toHaveBeenCalled()
+    expect(mockUsageRecordCreate).not.toHaveBeenCalled()
+    expect(mockEntitlementUpdateMany).not.toHaveBeenCalled()
+  })
+
+  // ── Task 7: FAILED → no-op ─────────────────────────────────────────────────
+
+  it("FAILED → idempotent no-op, returns 200, no second refund (B32 already issued it)", async () => {
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "FAILED", usageRecordId: "ur_x" },
+    ])
+    mockRunUpdate.mockImplementation(async (args) => ({
+      id: args.where.id,
+      projectId: "prj_x",
+      name: "Run X",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      usageRecordId: "ur_x",
+      createdAt: new Date("2026-05-01T10:00:00Z"),
+      deletedAt: null,
+      status: "FAILED",
+      cancelledAt: null,
+      failedAt: new Date("2026-05-02T10:30:00Z"),
+      failureReason: "validation_error",
+    }))
+
+    const res = await cancel("prj_x", "run_x")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { data: RunDetailWire }
+    expect(body.data.status).toBe("FAILED")
+    expect(body.data.failedAt).toBe("2026-05-02T10:30:00.000Z")
+    expect(body.data.failureReason).toBe("validation_error")
+    expect(mockUsageRecordCreate).not.toHaveBeenCalled()
+    expect(mockEntitlementUpdateMany).not.toHaveBeenCalled()
+  })
+
+  // ── Task 8: 404 ownership filters ──────────────────────────────────────────
+
+  it("returns 404 when the project doesn't exist (or belongs to another user)", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null)
+    const res = await cancel("prj_other", "run_x")
+    expect(res.status).toBe(404)
+    expect(mockQueryRaw).not.toHaveBeenCalled()
+    expect(mockRunUpdate).not.toHaveBeenCalled()
+  })
+
+  it("returns 404 when the project is soft-deleted", async () => {
+    mockProjectFindFirst.mockImplementation(async () => null) // where filter excludes
+    const res = await cancel("prj_deleted", "run_x")
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when the run doesn't exist", async () => {
+    // project ownership passes, but FOR UPDATE returns no rows
+    mockQueryRaw.mockImplementation(async () => [])
+    const res = await cancel("prj_x", "run_nope")
+    expect(res.status).toBe(404)
+    expect(mockRunUpdate).not.toHaveBeenCalled()
+  })
+
+  it("returns 404 when the run is soft-deleted (where filter excludes deletedAt)", async () => {
+    mockQueryRaw.mockImplementation(async () => [])
+    const res = await cancel("prj_x", "run_deleted")
+    expect(res.status).toBe(404)
+  })
+
+  it("scopes the project ownership check with where: { id, userId, deletedAt: null }", async () => {
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "RUNNING", usageRecordId: "ur_x" },
+    ])
+    mockRunUpdate.mockImplementation(async (args) => ({
+      id: args.where.id,
+      projectId: "prj_x",
+      name: "Run X",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      usageRecordId: "ur_x",
+      createdAt: new Date(),
+      deletedAt: null,
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      failedAt: null,
+      failureReason: null,
+    }))
+
+    await cancel("prj_x", "run_x")
+    const call = mockProjectFindFirst.mock.calls[0] as unknown as [
+      { where: Record<string, unknown> },
+    ]
+    expect(call?.[0]?.where).toMatchObject({
+      id: "prj_x",
+      userId: "usr_test1",
+      deletedAt: null,
+    })
+  })
+
+  // ── Task 9: detail-shape assertions ────────────────────────────────────────
+
+  it("refund UsageRecord captures the original's userId/licenseKeyId/productId/featureKey + new kind/count/refundsRecordId", async () => {
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "RUNNING", usageRecordId: "ur_x" },
+    ])
+    mockUsageRecordFindFirst.mockImplementation(async () => ({
+      id: "ur_x",
+      productId: "prod_pro",
+      userId: "usr_test1",
+      licenseKeyId: "lk_test1",
+      featureKey: "energy_yield",
+    }))
+    mockRunUpdate.mockImplementation(async (args) => ({
+      id: args.where.id,
+      projectId: "prj_x",
+      name: "Run X",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "energy_yield",
+      usageRecordId: "ur_x",
+      createdAt: new Date(),
+      deletedAt: null,
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      failedAt: null,
+      failureReason: null,
+    }))
+
+    await cancel("prj_x", "run_x")
+
+    const urCall = mockUsageRecordCreate.mock.calls[0] as unknown as [
+      {
+        data: {
+          userId: string
+          licenseKeyId: string
+          productId: string
+          featureKey: string
+          count: number
+          kind: string
+          refundsRecordId: string
+        }
+      },
+    ]
+    expect(urCall[0].data).toEqual({
+      userId: "usr_test1",
+      licenseKeyId: "lk_test1",
+      productId: "prod_pro",
+      featureKey: "energy_yield",
+      count: -1,
+      kind: "refund",
+      refundsRecordId: "ur_x",
+    })
+  })
+
+  it("entitlement decrement uses { decrement: 1 } and filters to active matching product", async () => {
+    mockQueryRaw.mockImplementation(async () => [
+      { id: "run_x", status: "RUNNING", usageRecordId: "ur_x" },
+    ])
+    mockUsageRecordFindFirst.mockImplementation(async () => ({
+      id: "ur_x",
+      productId: "prod_basic",
+      userId: "usr_test1",
+      licenseKeyId: "lk_test1",
+      featureKey: "plant_layout",
+    }))
+    mockRunUpdate.mockImplementation(async (args) => ({
+      id: args.where.id,
+      projectId: "prj_x",
+      name: "Run X",
+      params: {},
+      inputsSnapshot: {},
+      billedFeatureKey: "plant_layout",
+      usageRecordId: "ur_x",
+      createdAt: new Date(),
+      deletedAt: null,
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      failedAt: null,
+      failureReason: null,
+    }))
+
+    await cancel("prj_x", "run_x")
+    const entCall = mockEntitlementUpdateMany.mock.calls[0] as unknown as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ]
+    expect(entCall[0].where).toEqual({
+      userId: "usr_test1",
+      productId: "prod_basic",
+      deactivatedAt: null,
+      usedCalculations: { gt: 0 },
+    })
+    expect(entCall[0].data).toEqual({
+      usedCalculations: { decrement: 1 },
+    })
   })
 })
