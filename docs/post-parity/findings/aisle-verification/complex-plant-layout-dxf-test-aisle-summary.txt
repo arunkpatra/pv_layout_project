@@ -1,0 +1,38 @@
+=== complex-plant-layout-dxf-test ===
+DXF: /Users/arunkpatra/Desktop/complex-plant-layout-dxf-test.dxf
+
+Plant context:
+  Fence area:                       3,449,402.9 m^2
+  Tables (DXF TABLES layer):             10,771
+  AC cables (AC_CABLE_TRENCH):            1,079
+  Estimated row pitch (Y):                5.763 m
+  Row-gap bands detected:                 1,299
+  Row-gap total height:               1,752.411 m
+
+Aggregate cable lengths (total = 68,245.6 m):
+  Inside fence:                        68,245.6 m  (100.00%)
+  Outside fence (Class A):                  0.0 m  ( 0.00%)
+  Horizontal segments:                 28,758.9 m  (42.14%)
+  Vertical segments:                   29,450.7 m  (43.15%)
+  Diagonal segments (rare):            10,036.0 m  (14.71%)
+
+Aisle-routing claim — measured on HORIZONTAL segments only:
+  H-length:                            28,758.9 m
+  H-length inside row-gap bands:       28,557.9 m  (99.30% of H)
+  H-length crossing tables:                53.8 m  ( 0.19% of H)
+
+Diagnostic — VERTICAL segments crossing tables (expected; 2D-projection of trench-depth cables):
+  V-length crossing tables:            17,826.2 m  (60.53% of V)
+  (This is NOT a defect — vertical cable runs at trench depth alongside table frames.
+   The 2D rectangle in the DXF doesn't carry the depth distinction.)
+
+Per-cable counts:
+  Total AC cables:                        1,079
+  Cables exiting the fence:                   0
+
+Pass criteria (CR1 verification, locked 2026-05-02):
+  100% length inside fence:                      PASS  ( 0.00% outside; threshold 0.00%)
+  >=95% horizontal length in row-gap bands:      PASS  (99.30% in gaps; threshold 95.00%)
+  <=5% horizontal length crossing tables:        PASS  ( 0.19% in tables; threshold 5.00%)
+
+Overall: PASS

@@ -205,36 +205,26 @@ def _build_fence(boundary_polylines: List[List[Tuple[float, float]]]) -> Any:
     return unary_union(polys)
 
 
-def _estimate_row_gap_bands(
-    table_polylines: List[List[Tuple[float, float]]],
+def _table_centroid(pts: List[Tuple[float, float]]) -> Tuple[float, float]:
+    """Cheap centroid for a 4-point rectangle (or near-rectangle)."""
+    n = len(pts)
+    if n == 0:
+        return (0.0, 0.0)
+    cx = sum(p[0] for p in pts) / n
+    cy = sum(p[1] for p in pts) / n
+    return (cx, cy)
+
+
+def _rows_from_extents(
+    extents: List[Tuple[float, float]],
 ) -> Tuple[List[Tuple[float, float]], float]:
-    """Find the horizontal Y-strips between consecutive table rows.
-
-    Tables are placed by `layout_engine.run_layout` on a regular grid: each
-    row at y = miny + N * pitch_m, table height = table_h. The row-gap
-    Y-band for row N is from (y_row_N + table_h) to (y_row_{N+1}). The
-    gap-band height = pitch_m - table_h. This function clusters table
-    Y-extents to discover the row coordinates, then computes the gap
-    bands between them. Returns (bands, pitch_estimate).
+    """Cluster table Y-extents into row spans + estimate pitch. Helper for
+    `_build_aisle_mask`. Returns ([(row_miny, row_maxy), ...], pitch).
     """
-    if not table_polylines:
-        return [], 0.0
-
-    # Collect (miny, maxy) per table.
-    extents = []
-    for pts in table_polylines:
-        ys = [p[1] for p in pts]
-        if not ys:
-            continue
-        extents.append((min(ys), max(ys)))
     if not extents:
         return [], 0.0
-
-    # Cluster table-bottom (miny) values into rows. Tables in the same row
-    # share the same miny modulo float noise. Sort + group with a tolerance
-    # of 0.5 m (well below the typical row pitch of 6+ m).
-    extents.sort(key=lambda e: e[0])
-    rows: List[Tuple[float, float]] = []  # (row_miny, row_maxy)
+    extents = sorted(extents, key=lambda e: e[0])
+    rows: List[Tuple[float, float]] = []
     cluster_min, cluster_max = extents[0]
     for miny, maxy in extents[1:]:
         if miny - cluster_min < 0.5:
@@ -243,55 +233,118 @@ def _estimate_row_gap_bands(
             rows.append((cluster_min, cluster_max))
             cluster_min, cluster_max = miny, maxy
     rows.append((cluster_min, cluster_max))
-
     if len(rows) < 2:
-        return [], 0.0
-
-    # Gap bands: from each row's top to the next row's bottom.
-    bands: List[Tuple[float, float]] = []
-    for i in range(len(rows) - 1):
-        y_top_this = rows[i][1]
-        y_bot_next = rows[i + 1][0]
-        if y_bot_next > y_top_this:
-            bands.append((y_top_this, y_bot_next))
-
-    # Pitch estimate: median row-to-row distance.
+        return rows, 0.0
     deltas = sorted(rows[i + 1][0] - rows[i][0] for i in range(len(rows) - 1))
     pitch = deltas[len(deltas) // 2] if deltas else 0.0
+    return rows, pitch
 
-    return bands, pitch
 
+def _build_aisle_mask(
+    table_polylines: List[List[Tuple[float, float]]],
+    fence: Any,
+) -> Tuple[Any, float, int, float]:
+    """Build the per-boundary union of row-gap aisle polygons.
 
-def _length_in_y_bands(
-    line: LineString, bands: List[Tuple[float, float]]
-) -> float:
-    """Length of a polyline whose y-coordinate is inside any of the given
-    Y-strips. Implementation: clip the line against the union of horizontal
-    rectangles defined by each band (large enough x-extent to span the
-    polyline), measure intersection length.
+    Each fence component is treated as an independent plant: tables inside
+    it are clustered into rows, gap-bands are constructed between
+    consecutive rows, and each gap-band is rendered as a Polygon clipped
+    to the boundary's bounding box X-range. The final aisle mask is the
+    union of all such band polygons across all fence components.
 
-    Uses a per-band intersection (rather than a unioned-mask) so adjacent
-    bands compose without double-counting (intersect with each band
-    independently, sum lengths).
+    This is the multi-boundary-correct version of the prior
+    `_estimate_row_gap_bands` (which over-fragmented the row clusters by
+    mixing tables from spatially-separate plants — see CR1
+    aisle-verification 2026-05-02 finding on complex-plant-layout).
+
+    Returns (aisle_mask_geometry_or_None, pitch_estimate_median_across_boundaries,
+              total_band_count, total_band_height_summed).
     """
-    if not bands or line.is_empty:
+    if fence is None or not table_polylines:
+        return None, 0.0, 0, 0.0
+
+    # Iterate fence components (Polygon → 1; MultiPolygon → N).
+    if hasattr(fence, "geoms"):
+        components = list(fence.geoms)
+    else:
+        components = [fence]
+
+    table_centroids = [(pts, _table_centroid(pts)) for pts in table_polylines]
+
+    all_band_polys = []
+    pitches: List[float] = []
+    band_count = 0
+    band_height_sum = 0.0
+
+    from shapely.geometry import Point as _ShapelyPoint
+
+    for comp in components:
+        if comp.is_empty:
+            continue
+        # Tables whose centroid is inside this fence component.
+        comp_tables: List[List[Tuple[float, float]]] = []
+        for pts, (cx, cy) in table_centroids:
+            try:
+                if comp.contains(_ShapelyPoint(cx, cy)):
+                    comp_tables.append(pts)
+            except Exception:
+                pass
+        if not comp_tables:
+            continue
+
+        # Per-component (miny, maxy) extents → row clustering.
+        extents = []
+        for pts in comp_tables:
+            ys = [p[1] for p in pts]
+            if not ys:
+                continue
+            extents.append((min(ys), max(ys)))
+        rows, pitch = _rows_from_extents(extents)
+        if pitch > 0:
+            pitches.append(pitch)
+        if len(rows) < 2:
+            continue
+
+        # Use the component's bounding box for the X-range of each band
+        # so the aisle polygon is confined to this plant's footprint.
+        comp_minx, _, comp_maxx, _ = comp.bounds
+        # 1 m padding so endpoint-near-band-edge doesn't get dropped by
+        # float epsilon when intersecting a polyline.
+        bx0, bx1 = comp_minx - 1.0, comp_maxx + 1.0
+
+        for i in range(len(rows) - 1):
+            y_top_this = rows[i][1]
+            y_bot_next = rows[i + 1][0]
+            if y_bot_next <= y_top_this:
+                continue
+            band = box(bx0, y_top_this, bx1, y_bot_next)
+            all_band_polys.append(band)
+            band_count += 1
+            band_height_sum += y_bot_next - y_top_this
+
+    if not all_band_polys:
+        return None, 0.0, 0, 0.0
+
+    aisle_mask = unary_union(all_band_polys)
+    median_pitch = (
+        sorted(pitches)[len(pitches) // 2] if pitches else 0.0
+    )
+    return aisle_mask, median_pitch, band_count, band_height_sum
+
+
+def _length_in_aisle_mask(line: Any, aisle_mask: Any) -> float:
+    """Length of a polyline lying inside the aisle-mask geometry (union
+    of per-plant row-gap polygons). Returns 0 when either is empty.
+    """
+    if aisle_mask is None or line is None or line.is_empty:
         return 0.0
-    minx, _, maxx, _ = line.bounds
-    # Pad by 1 m on each side so endpoints don't fall outside by float epsilon.
-    minx -= 1.0
-    maxx += 1.0
-    total = 0.0
-    for ylo, yhi in bands:
-        band_box = box(minx, ylo, maxx, yhi)
-        try:
-            inter = line.intersection(band_box)
-        except Exception:
-            continue
-        if inter.is_empty:
-            continue
-        # `length` accumulates over MultiLineString / GeometryCollection.
-        total += getattr(inter, "length", 0.0)
-    return total
+    try:
+        inter = line.intersection(aisle_mask)
+    except Exception:
+        return 0.0
+    if inter.is_empty:
+        return 0.0
+    return getattr(inter, "length", 0.0)
 
 
 def _classify_segment(
@@ -315,7 +368,7 @@ def _analyze_one_cable(
     cable_pts: List[Tuple[float, float]],
     fence: Any,
     tables_union: Any,
-    gap_bands: List[Tuple[float, float]],
+    aisle_mask: Any,
 ) -> CableAnalysis:
     line = LineString(cable_pts)
     total = line.length
@@ -354,8 +407,8 @@ def _analyze_one_cable(
         kind = _classify_segment(p1, p2)
         if kind == "horizontal":
             h_total += seg_len
-            if gap_bands:
-                h_in_gap += _length_in_y_bands(seg, gap_bands)
+            if aisle_mask is not None:
+                h_in_gap += _length_in_aisle_mask(seg, aisle_mask)
             if tables_union is not None:
                 try:
                     h_in_tbl += getattr(seg.intersection(tables_union), "length", 0.0)
@@ -400,10 +453,11 @@ def analyze_dxf(dxf_path: Path) -> PlantAnalysis:
     layers = _read_dxf_layers(dxf_path)
     fence = _build_fence(layers[LAYER_BOUNDARY])
     tables_union = _build_table_footprint(layers[LAYER_TABLES])
-    gap_bands, pitch = _estimate_row_gap_bands(layers[LAYER_TABLES])
+    aisle_mask, pitch, band_count, band_height = _build_aisle_mask(
+        layers[LAYER_TABLES], fence
+    )
 
     fence_area = float(fence.area) if fence is not None else 0.0
-    band_total_height = sum(yhi - ylo for ylo, yhi in gap_bands)
 
     pa = PlantAnalysis(
         dxf_path=str(dxf_path),
@@ -411,12 +465,12 @@ def analyze_dxf(dxf_path: Path) -> PlantAnalysis:
         n_ac_cables=len(layers[LAYER_AC]),
         fence_area_m2=round(fence_area, 1),
         table_pitch_y_estimate=round(pitch, 3),
-        gap_band_count=len(gap_bands),
-        gap_band_total_height_m=round(band_total_height, 3),
+        gap_band_count=band_count,
+        gap_band_total_height_m=round(band_height, 3),
     )
 
     for i, pts in enumerate(layers[LAYER_AC]):
-        ca = _analyze_one_cable(i, pts, fence, tables_union, gap_bands)
+        ca = _analyze_one_cable(i, pts, fence, tables_union, aisle_mask)
         pa.cables.append(ca)
         pa.aggregate_total_m += ca.total_length_m
         pa.aggregate_inside_fence_m += ca.inside_fence_m

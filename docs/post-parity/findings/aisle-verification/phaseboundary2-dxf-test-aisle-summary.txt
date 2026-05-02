@@ -1,0 +1,38 @@
+=== phaseboundary2-dxf-test ===
+DXF: /Users/arunkpatra/Desktop/phaseboundary2-dxf-test.dxf
+
+Plant context:
+  Fence area:                         233,604.1 m^2
+  Tables (DXF TABLES layer):                611
+  AC cables (AC_CABLE_TRENCH):               62
+  Estimated row pitch (Y):                6.090 m
+  Row-gap bands detected:                   106
+  Row-gap total height:                 153.160 m
+
+Aggregate cable lengths (total = 3,590.0 m):
+  Inside fence:                         3,590.0 m  (100.00%)
+  Outside fence (Class A):                  0.0 m  ( 0.00%)
+  Horizontal segments:                  1,677.8 m  (46.74%)
+  Vertical segments:                    1,912.2 m  (53.26%)
+  Diagonal segments (rare):                 0.0 m  ( 0.00%)
+
+Aisle-routing claim — measured on HORIZONTAL segments only:
+  H-length:                             1,677.8 m
+  H-length inside row-gap bands:        1,677.8 m  (100.00% of H)
+  H-length crossing tables:                 0.0 m  ( 0.00% of H)
+
+Diagnostic — VERTICAL segments crossing tables (expected; 2D-projection of trench-depth cables):
+  V-length crossing tables:             1,199.5 m  (62.73% of V)
+  (This is NOT a defect — vertical cable runs at trench depth alongside table frames.
+   The 2D rectangle in the DXF doesn't carry the depth distinction.)
+
+Per-cable counts:
+  Total AC cables:                           62
+  Cables exiting the fence:                   0
+
+Pass criteria (CR1 verification, locked 2026-05-02):
+  100% length inside fence:                      PASS  ( 0.00% outside; threshold 0.00%)
+  >=95% horizontal length in row-gap bands:      PASS  (100.00% in gaps; threshold 95.00%)
+  <=5% horizontal length crossing tables:        PASS  ( 0.00% in tables; threshold 5.00%)
+
+Overall: PASS
