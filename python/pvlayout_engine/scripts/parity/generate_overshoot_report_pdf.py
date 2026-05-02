@@ -97,7 +97,7 @@ def _style_axes(ax) -> None:
 
 
 def chart_overshoot_histogram(
-    overshoots: List[float], out_path: Path
+    overshoots: List[float], out_path: Path, n_overshoot: int
 ) -> None:
     fig, ax = plt.subplots(figsize=(6.5, 3.6), dpi=160)
     bins = [0, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -105,7 +105,7 @@ def chart_overshoot_histogram(
     ax.set_xlabel("Outside-usable-polygon length per cable (m)")
     ax.set_ylabel("Number of cables")
     ax.set_title(
-        "Distribution of per-cable overshoot vs usable_polygon (n=38)",
+        f"Distribution of per-cable overshoot vs usable_polygon (n={n_overshoot})",
         fontsize=10,
     )
     _style_axes(ax)
@@ -120,7 +120,7 @@ def chart_clean_vs_overshoot(
     n_clean = n_total - n_overshoot
     fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=160)
     bars = ax.bar(
-        ["Inside usable_polygon", "Routed through forbidden zone"],
+        ["Inside usable_polygon", "Outside usable_polygon"],
         [n_clean, n_overshoot],
         color=[COLOR_BAR, COLOR_ACCENT],
         edgecolor="white",
@@ -139,7 +139,7 @@ def chart_clean_vs_overshoot(
         )
     ax.set_ylabel("Number of home-run AC cables")
     ax.set_title(
-        f"Cable compliance against design constraint polygon "
+        f"Cables vs legacy's own internal usable_polygon constraint "
         f"(total = {n_total})",
         fontsize=10,
     )
@@ -168,7 +168,7 @@ def chart_length_vs_overshoot(
     ax.set_xlabel("Cable total length (m)")
     ax.set_ylabel("Length outside usable_polygon (m)")
     ax.set_title(
-        "Per-cable length vs out-of-zone length (overshooting cables only)",
+        "Per-cable length vs out-of-polygon length (overshooting cables only)",
         fontsize=10,
     )
     _style_axes(ax)
@@ -313,34 +313,96 @@ there.
     )
 
     # Executive Summary ----------------------------------------------------
+    n_fence = vs_fence.get("n_with_overshoot", 0)
+    fence_outside_m = vs_fence.get("total_outside_length_m", 0.0)
+    fence_max_m = vs_fence.get("max_overshoot_m", 0.0)
+    fence_median_m = vs_fence.get("median_overshoot_m", 0.0)
+    usable_outside_m = vs_usable.get("total_outside_length_m", 0.0)
+
+    # Two distinct defect classes — framing differs based on whether the
+    # plant fence (legal property boundary) is breached. The fence breach
+    # is a hard physical/legal defect; the usable_polygon breach is a
+    # self-inconsistency between legacy's own design intent and behaviour.
+    if n_fence > 0:
+        customer_impact = (
+            f"*Legacy returns a Bill of Materials in which "
+            f"{_fmt_float(fence_outside_m)} m of cable "
+            f"({_fmt_pct(fence_outside_m, routed_total)} of total routed "
+            f"length) would have to be installed off the project's legal "
+            f"property as drawn in the source KMZ --- physically not "
+            f"realisable without separately negotiated easements that are "
+            f"not part of the engineering scope. Beyond the off-property "
+            f"cables, legacy is also internally inconsistent with its own "
+            f"routing constraint (see finding 2).*"
+        )
+        finding_1 = (
+            f"**Cables routed off-property.** The plant fence (the property "
+            f"line as drawn in the customer's source KMZ) is **not** "
+            f"respected by legacy on this plant. "
+            f"**{n_fence} of {n_routed} cables ({_fmt_pct(n_fence, n_routed)})** "
+            f"have one or more segments outside the fence. Total cable "
+            f"length routed off-property: "
+            f"**{_fmt_float(fence_outside_m)} m "
+            f"({_fmt_pct(fence_outside_m, routed_total)} of routed length)**. "
+            f"Worst single cable: **{_fmt_float(fence_max_m, 2)} m** beyond "
+            f"the fence. Median overshoot among off-property cables: "
+            f"{_fmt_float(fence_median_m, 2)} m. This is a hard, physical "
+            f"defect: the BoM lists copper that cannot be installed without "
+            f"acquiring rights to land outside the project."
+        )
+    else:
+        customer_impact = (
+            f"*Legacy returns a Bill of Materials internally inconsistent "
+            f"with its own design intent: the routing engine defines a "
+            f"polygon (`usable_polygon` --- table-setbacks and obstacle "
+            f"exclusions) as the cable-routing constraint, then routes "
+            f"{_fmt_pct(usable_outside_m, routed_total)} of cable length "
+            f"through that polygon. The plant fence (legal property "
+            f"boundary) is respected on this plant; no cables route "
+            f"off-property. The defect is one of code self-consistency "
+            f"and customer auditability, not of regulatory compliance.*"
+        )
+        finding_1 = (
+            f"**Plant fence is respected on this plant.** All "
+            f"**{n_routed} of {n_routed} home-run AC cables (100%)** route "
+            f"inside the property fence as drawn in the source KMZ. "
+            f"**No cables are routed off-property.** This is the "
+            f"physical/legal boundary that matters: cables outside it "
+            f"would require easements outside the engineering scope. "
+            f"Legacy is correct on this metric for `{plant}`. The defect "
+            f"on this plant is the distinct internal-spec issue documented "
+            f"in finding 2."
+        )
+
     md_parts.append(
         f"""
 # Executive Summary
 
-**Customer impact (plain language):** *Legacy returns a Bill of Materials
-that includes {_fmt_pct(vs_usable.get('total_outside_length_m', 0.0), routed_total)}
-of cable length routed through the design's forbidden zones, with no
-audit trail to identify which cables.*
+**Customer impact (plain language):** {customer_impact}
 
-The four key findings on `{plant}.kmz`:
+The four key findings on `{plant}.kmz`. The plant has **{n_routed}
+home-run AC cables** totalling **{_fmt_float(routed_total)} m** of routed
+length; analysis is conducted against two distinct reference polygons
+(see the *Two reference polygons* section in Methodology).
 
-1. Legacy routes **{n_routed} home-run AC cables** totalling
-   **{_fmt_float(routed_total)} m** for this plant. The plant fence (the
-   property line as drawn in the source KMZ) is respected:
-   **{vs_fence.get('n_with_overshoot', 0)} of {n_routed} cables (0%)**
-   leave the property fence. No cables are routed off-property.
+1. {finding_1}
 
-2. The legacy pipeline's own internal design constraint polygon
-   (`usable_polygon` --- the table-setback / obstacle-exclusion polygon
+2. **Legacy code is self-inconsistent against its own internal routing
+   constraint.** Independent of whether the plant fence is breached,
+   legacy's own `usable_polygon` (the table-setback / obstacle-exclusion
+   polygon that the routing engine defines as the design constraint and
    that Pattern F's scoring function is supposed to enforce) is violated
-   by **{n_overshoot} of {n_routed} cables ({_fmt_pct(n_overshoot, n_routed)})**.
-   Total cable length routed through forbidden zones:
-   **{_fmt_float(vs_usable.get('total_outside_length_m', 0.0))} m
-   ({_fmt_pct(vs_usable.get('total_outside_length_m', 0.0), routed_total)} of
-   total routed length)**. Worst single cable:
-   **{_fmt_float(vs_usable.get('max_overshoot_m', 0.0), 2)} m** outside the
-   polygon. Median overshoot among violating cables:
-   {_fmt_float(vs_usable.get('median_overshoot_m', 0.0), 2)} m.
+   on **{n_overshoot} of {n_routed} cables ({_fmt_pct(n_overshoot, n_routed)})**.
+   Total cable length routed through legacy's own exclusion zones:
+   **{_fmt_float(usable_outside_m)} m
+   ({_fmt_pct(usable_outside_m, routed_total)} of total routed length)**.
+   Worst single cable: **{_fmt_float(vs_usable.get('max_overshoot_m', 0.0), 2)} m**
+   outside the polygon. Median overshoot among violating cables:
+   {_fmt_float(vs_usable.get('median_overshoot_m', 0.0), 2)} m. This is
+   not a regulatory or code violation (real-world standards do not
+   define a usable-polygon-style boundary for cables --- see the
+   *What the codes govern* section in Methodology); it is a defect of
+   code self-consistency.
 
 3. The legacy router's last-resort routine (Pattern F) does not reject
    paths that exit the design constraint polygon. Its scoring function
@@ -355,8 +417,8 @@ The four key findings on `{plant}.kmz`:
    summed into `total_ac_cable_m`. The reported BoM number
    ({_fmt_float(legacy_total_ac)} m for this plant) is an unaudited
    scalar --- there is no per-cable trace in the legacy output that
-   would allow a customer to identify which cables enter the forbidden
-   zones.
+   would allow a customer to identify which cables exit the fence or
+   the design constraint polygon.
 
 The replacement implementation in this repository (Pattern V at
 `core/string_inverter_manager.py:295-348`) routes 100% of cables inside
@@ -423,12 +485,37 @@ Confusing them is the single biggest reading risk in this report.
   {_fmt_pct(summary.get('usable_polygon_area_m2', 0.0), summary.get('fence_area_m2', 1.0))}
   of the plant fence.
 
-The "forbidden zones" referred to in this report are the regions
-**inside the plant fence but outside `usable_polygon`** --- equipment
-setbacks, obstacle buffers, and exclusion areas the customer specified
-in the KMZ. These are the regions where legacy routes
-{_fmt_pct(vs_usable.get('total_outside_length_m', 0.0), routed_total)}
-of total cable length.
+The two polygons measure two different things, and conflating them is
+the single biggest reading risk in this report:
+
+- A cable outside the **plant fence** is a physical/legal defect: it
+  cannot be installed without acquiring rights to land that is not part
+  of the project parcel.
+- A cable outside `usable_polygon` (but inside the fence) is a
+  **code self-consistency defect**: legacy's own routing engine defined
+  the polygon as its routing constraint, then ignored that constraint
+  on some fraction of the cables. It is not, by itself, a real-world
+  code or regulatory violation --- see the next subsection.
+
+## What the codes govern
+
+The publicly available cabling standards relevant to utility-scale PV
+do **not** define a `usable_polygon`-style boundary, nor do they
+prohibit routing through table setbacks per se. They specify cable
+sizing, conductor type, burial depth, mechanical protection, and
+AC/DC separation --- physics-and-safety constraints on the cable
+itself, not parcel-geometry constraints on the route. The geographic
+boundary the standards do reference is the project's electrical
+boundary (e.g. IEC 62548-1:2023's "boundary of a PV array is the
+output side of the PV array") and the property fence + jurisdictional
+setbacks (varies heavily by AHJ). Verified secondary sources for these
+positions are listed in Appendix C; the underlying primary standards
+are paywalled and have not been read verbatim by the authors of this
+report. The implication is that the headline real-world defect on this
+plant is the **fence overshoot** (when present); the
+`usable_polygon` overshoot is a defect against legacy's own internal
+spec, defensible on code-quality and customer-auditability grounds but
+not on regulatory grounds.
 
 ## Capture and detection
 
@@ -489,13 +576,19 @@ overshoot conclusions, which are about the home-run polylines that
 | Plant fence (property line) | {vs_fence.get('n_with_overshoot', 0)} / {n_routed} | {_fmt_pct(vs_fence.get('n_with_overshoot', 0), n_routed)} | {_fmt_float(vs_fence.get('total_outside_length_m', 0.0))} | {_fmt_pct(vs_fence.get('total_outside_length_m', 0.0), routed_total)} | {_fmt_float(vs_fence.get('max_overshoot_m', 0.0), 2)} | {_fmt_float(vs_fence.get('median_overshoot_m', 0.0), 2)} | {_fmt_float(vs_fence.get('p90_overshoot_m', 0.0), 2)} |
 | `usable_polygon` (design constraint) | {vs_usable.get('n_with_overshoot', 0)} / {n_routed} | {_fmt_pct(vs_usable.get('n_with_overshoot', 0), n_routed)} | {_fmt_float(vs_usable.get('total_outside_length_m', 0.0))} | {_fmt_pct(vs_usable.get('total_outside_length_m', 0.0), routed_total)} | {_fmt_float(vs_usable.get('max_overshoot_m', 0.0), 2)} | {_fmt_float(vs_usable.get('median_overshoot_m', 0.0), 2)} | {_fmt_float(vs_usable.get('p90_overshoot_m', 0.0), 2)} |
 
-Reading: legacy does **not** route cables outside the property fence on
-this plant. Legacy **does** route
-{_fmt_pct(vs_usable.get('n_with_overshoot', 0), n_routed)} of cables
-through the design's forbidden zones (table setbacks, obstacle buffers,
-equipment exclusions), totalling
+Reading: the **plant fence** row is the legal/physical boundary —
+cables outside this row are off-property and cannot be installed
+without separately negotiated easements. The **`usable_polygon`** row
+is legacy's own internal routing constraint — cables outside this row
+indicate code self-inconsistency (Pattern F's `_score()` permits
+violations rather than rejecting them) but not a regulatory violation.
+On this plant, fence overshoot:
+{_fmt_pct(vs_fence.get('n_with_overshoot', 0), n_routed)} of cables /
+{_fmt_pct(vs_fence.get('total_outside_length_m', 0.0), routed_total)}
+of length; `usable_polygon` overshoot:
+{_fmt_pct(vs_usable.get('n_with_overshoot', 0), n_routed)} of cables /
 {_fmt_pct(vs_usable.get('total_outside_length_m', 0.0), routed_total)}
-of the total routed length.
+of length.
 
 \\newpage
 """
@@ -542,7 +635,7 @@ of total overshoot concentrated in the top 10 cables).
 | Home-run cables routed | {_fmt_int(n_routed)} | {_fmt_int(n_routed)} |
 | Total home-run AC length (m) | {_fmt_float(legacy_total_ac)} | ~{_fmt_float(NEWAPP_TOTAL_AC_M)} |
 | Cables routed inside `usable_polygon` | {_fmt_int(n_routed - n_overshoot)} ({_fmt_pct(n_routed - n_overshoot, n_routed)}) | {_fmt_int(n_routed)} ({NEWAPP_PCT_INSIDE_USABLE:.0f}%) |
-| Length routed through forbidden zones (m) | {_fmt_float(vs_usable.get('total_outside_length_m', 0.0))} | 0.0 |
+| Length routed outside `usable_polygon` (m) | {_fmt_float(vs_usable.get('total_outside_length_m', 0.0))} | 0.0 |
 | Per-cable polyline preserved in output | No (discarded after summing) | Yes (with `route_quality` tag) |
 | Last-resort router behaviour | Pattern F: scores violations, returns least-violating candidate | Pattern V: visibility-graph + Dijkstra; inside-polygon by construction |
 
@@ -568,11 +661,11 @@ cables contribute disproportionately to total
 overshoot.]({chart_paths['hist'].name})
 
 ![Compliance breakdown of all {n_routed} home-run cables against
-`usable_polygon`. The forbidden-zone bar is the count Pattern F's
-`_score()` function effectively
-permits.]({chart_paths['breakdown'].name})
+legacy's own internal `usable_polygon` constraint. The
+outside-`usable_polygon` bar is the count Pattern F's `_score()`
+function effectively permits.]({chart_paths['breakdown'].name})
 
-![Per-cable length vs out-of-zone length, for the {n_overshoot}
+![Per-cable length vs out-of-polygon length, for the {n_overshoot}
 overshooting cables. Longer cables tend to incur larger absolute
 overshoot, but the relationship is loose --- some short cables have
 near-100% out-of-zone fractions.]({chart_paths['scatter'].name})
@@ -582,9 +675,57 @@ near-100% out-of-zone fractions.]({chart_paths['scatter'].name})
     )
 
     # Inference ------------------------------------------------------------
+    n_fence_inf = vs_fence.get("n_with_overshoot", 0)
+    fence_outside_inf = vs_fence.get("total_outside_length_m", 0.0)
+    if n_fence_inf > 0:
+        fence_inference = (
+            f"On this plant, legacy routes "
+            f"{n_fence_inf} of {n_routed} cables "
+            f"({_fmt_pct(n_fence_inf, n_routed)}) physically outside the "
+            f"property fence, totalling "
+            f"{_fmt_float(fence_outside_inf)} m "
+            f"({_fmt_pct(fence_outside_inf, routed_total)} of routed "
+            f"length). This is a hard physical defect: cables can only "
+            f"be installed where the project owns or leases land. The "
+            f"BoM number includes copper that cannot be installed under "
+            f"the engineering scope as defined by the source KMZ."
+        )
+    else:
+        fence_inference = (
+            f"On this plant, all {n_routed} cables route inside the "
+            f"property fence; the off-property defect is **not** present. "
+            f"The fence-overshoot row in Table 2 is zero. Legacy is "
+            f"correct on the legal/physical boundary for this input."
+        )
+
     md_parts.append(
         f"""
 # Inference
+
+## Two distinct defect classes
+
+This report measures legacy against two boundaries, and they are
+qualitatively different defects when violated:
+
+**Class A --- physical/legal (fence overshoot).** {fence_inference}
+
+**Class B --- code self-consistency (`usable_polygon` overshoot).**
+Independent of Class A, legacy's own routing engine defines a polygon
+(`usable_polygon`) as its routing constraint, then routes
+{_fmt_pct(n_overshoot, n_routed)} of cables through that polygon ---
+{_fmt_float(usable_outside_m)} m of cable length
+({_fmt_pct(usable_outside_m, routed_total)} of total). This is not a
+real-world code or regulatory violation; the publicly available cabling
+standards do not define a usable-polygon-style boundary for cables (see
+Methodology / *What the codes govern*). It is a defect of code
+self-consistency: the legacy pipeline declares an internal constraint
+and then ignores it on a substantial fraction of cables. The customer
+specified setbacks, equipment-exclusion zones, and obstacle buffers in
+the source KMZ; the legacy pipeline projects those into
+`usable_polygon`; Pattern F then returns routes that re-enter those
+zones; the BoM is summed without flagging which cables. The
+auditability problem (Class B is invisible in the output) compounds
+the defect.
 
 ## What the numbers mean
 
@@ -627,7 +768,9 @@ the polyline. The polylines are not written to the legacy artifact
 output. The {_fmt_float(legacy_total_ac)} m AC total in the BoM is
 therefore a single scalar, with no per-cable trace that would let a
 customer's compliance reviewer identify the
-{_fmt_int(n_overshoot)} cables that pass through forbidden zones. The
+{_fmt_int(n_overshoot)} cables that exit the design constraint
+polygon (or, on plants where it occurs, the {_fmt_int(n_fence_inf)}
+that exit the property fence). The
 analysis in this report was only possible by inserting an
 instrumentation hook into the running pipeline.
 
@@ -635,47 +778,74 @@ instrumentation hook into the running pipeline.
 
 A customer specifies setback distances, equipment exclusion zones, and
 obstacle buffers in their KMZ. The legacy pipeline projects these into
-its `usable_polygon`, then in
+its `usable_polygon`, then on
 {_fmt_pct(n_overshoot, n_routed)} of cable cases on `{plant}` it
-returns a route that re-enters those very zones. The customer's BoM
-arrives with copper that is supposed to be drawn through forbidden
-ground, with no indication in the saved output that this has happened.
+returns a route that re-enters those very zones --- the zones the
+customer asked for the cables to avoid. The customer's BoM arrives
+without any indication in the saved output that this has happened, so
+a downstream compliance reviewer cannot identify which cables to
+re-route or contest. This is the audit-trail compounding effect on
+the Class B defect.
 
 \\newpage
 """
     )
 
     # Conclusion -----------------------------------------------------------
+    if n_fence_inf > 0:
+        fence_bullet = (
+            f"- Routes {_fmt_int(n_fence_inf)} of {_fmt_int(n_routed)} "
+            f"cables ({_fmt_pct(n_fence_inf, n_routed)}) physically "
+            f"off-property, totalling "
+            f"{_fmt_float(fence_outside_inf)} m of cable that cannot be "
+            f"installed within the project's land rights "
+            f"(**Class A defect**)."
+        )
+    else:
+        fence_bullet = (
+            f"- Respects the property fence on this plant: 0 of "
+            f"{_fmt_int(n_routed)} cables route off-property "
+            f"(Class A defect not present on `{plant}`)."
+        )
+
     md_parts.append(
         f"""
 # Conclusion
 
 On the test input `{plant}.kmz`, the legacy pipeline:
 
+{fence_bullet}
 - Routes {_fmt_int(n_overshoot)} of {_fmt_int(n_routed)} home-run AC
-  cables ({_fmt_pct(n_overshoot, n_routed)}) through the design's
-  forbidden zones.
-- Reports {_fmt_pct(vs_usable.get('total_outside_length_m', 0.0), routed_total)}
-  of total cable length running through those zones.
-- Discards the per-cable polylines after summing, leaving no audit
-  trail.
+  cables ({_fmt_pct(n_overshoot, n_routed)}) through its own
+  `usable_polygon` exclusion zones (table setbacks, obstacle buffers,
+  equipment exclusions) ---
+  {_fmt_pct(usable_outside_m, routed_total)}
+  of total cable length, with the legacy code accepting these routes
+  by least-violation scoring rather than rejecting them
+  (**Class B defect**: code self-inconsistency).
+- Discards the per-cable polylines after summing into the BoM scalar,
+  leaving no audit trail by which a customer can identify which cables
+  exit the fence (Class A) or the design constraint polygon (Class B).
 - Selects last-resort routes by least-violation count rather than by
   rejection.
 
-These four behaviours are independently sufficient to characterise the
-output as not deliverable to a customer who has specified setbacks or
-exclusion zones in their input KMZ. The customer cannot identify which
-cables violate, cannot reconcile the BoM against their constraint
-drawing, and cannot rely on the routing logic to honour the constraints
-in the first place.
+The Class A defect, where present, is a hard physical/legal failure:
+the BoM lists copper that cannot be installed within the project's
+land rights as drawn in the source KMZ. The Class B defect is a code
+self-consistency failure: legacy declares an internal routing
+constraint and ignores it on a substantial fraction of cables, with
+no audit trail. Both defects are structural in the legacy code, not
+parameter-tuning artefacts of a single input.
 
-The new-app implementation in this repository fixes all four:
+The new-app implementation in this repository fixes all of:
 
 1. `usable_polygon` is enforced by construction in the visibility-graph
-   router (`core/string_inverter_manager.py:295-348`).
+   router (`core/string_inverter_manager.py:295-348`); cables also
+   stay inside the plant fence (the polygon is a subset of the fence
+   by definition).
 2. Every per-cable polyline is preserved in the saved output.
-3. Each polyline carries a `route_quality` tag that flags any path that
-   does fall back to a non-strict router.
+3. Each polyline carries a `route_quality` tag that flags any path
+   that does fall back to a non-strict router.
 4. Pattern V is invoked before Pattern F, removing the routine path to
    constraint-violating routes.
 
@@ -886,6 +1056,7 @@ def main() -> int:
         chart_overshoot_histogram(
             [r.get("outside_usable_m", 0.0) for r in rows],
             chart_paths["hist"],
+            n_overshoot=int(vs_usable.get("n_with_overshoot", 0)),
         )
         chart_clean_vs_overshoot(
             n_total=int(homeruns.get("n_routed", 0)),
