@@ -196,10 +196,26 @@ jobs:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_MVP_ADMIN }}
 
+  build-lambda-images:
+    # C4 cloud-offload arc: build + push :<environment-tag> alongside the
+    # standard :<git-sha>. Calls build-lambdas.yml as a reusable workflow
+    # so the Dockerfile-build / buildx / QEMU / arm64 / ECR push logic
+    # lives in a single place. The :<env-tag> push is gated on the
+    # environment-tag input (set only here, never by build-lambdas.yml's
+    # other triggers) — env tags are deploy-state pointers, produced only
+    # when an operator has actively triggered a deploy.
+    name: Build Lambda images
+    needs: migrate
+    if: inputs.environment == 'production'
+    uses: ./.github/workflows/build-lambdas.yml
+    with:
+      environment-tag: ${{ inputs.environment }}
+    secrets: inherit
+
   deploy-lambdas:
     # C4 cloud-offload arc: refresh AWS Lambda functions to the latest
-    # :production-tagged image. build-lambdas.yml pushes that tag on every
-    # push to main; this job calls aws lambda update-function-code so the
+    # :<environment-tag>-tagged image. build-lambda-images (above) pushes
+    # the env tag; this job calls aws lambda update-function-code so the
     # function picks up the new digest behind the same tag.
     #
     # Static matrix — explicit deploy intent. Future Lambdas (compute-
@@ -212,7 +228,7 @@ jobs:
     # yet. When a staging environment is added with its own Lambda
     # function shells, this job becomes env-conditional via matrix.
     name: Deploy Lambdas
-    needs: migrate
+    needs: build-lambda-images
     if: inputs.environment == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 10

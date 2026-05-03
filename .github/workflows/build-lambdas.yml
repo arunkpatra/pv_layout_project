@@ -14,13 +14,19 @@ name: build-lambdas
 # See docs/AWS_RESOURCES.md § GitHub Actions OIDC.
 #
 # Image tagging:
-#   - <git-sha>:  always pushed (D21 — Run.engineVersion source of truth)
-#   - latest:     pushed only on main (convenience tag for ad-hoc invocations)
-#   - production: pushed only on main (env-state tag — the prod Lambda
-#                 function is configured with image-uri ending in
-#                 :production; platform-deployment.yml's deploy-lambdas
-#                 job calls aws lambda update-function-code so the
-#                 function picks up the new digest behind the same tag)
+#   - <git-sha>:        always pushed (D21 — Run.engineVersion source of truth)
+#   - latest:           pushed only on main (convenience tag)
+#   - <environment-tag>: pushed only when called via workflow_call with a
+#                       non-empty environment-tag input (e.g. 'production',
+#                       'staging'). Only platform-deployment.yml does this —
+#                       env tags are deploy-state pointers ("what's actually
+#                       running in env X"), so they're produced only when an
+#                       operator has actively triggered a deploy. The Lambda
+#                       function in env X is configured with image-uri ending
+#                       in :<env-tag>; platform-deployment.yml's
+#                       deploy-lambdas job calls aws lambda
+#                       update-function-code so the function picks up the
+#                       new digest behind the same tag.
 #
 # Build context is REPO ROOT (per D5) so each Lambda's Dockerfile can
 # COPY python/pvlayout_core sibling.
@@ -30,6 +36,13 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      environment-tag:
+        description: "Optional environment tag to push alongside :<git-sha> (e.g. 'production', 'staging'). Only set by platform-deployment.yml's deploy-lambdas flow; never by direct push/PR/workflow_dispatch triggers."
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -105,6 +118,6 @@ jobs:
           tags: |
             ${{ steps.ecr-login.outputs.registry }}/solarlayout/${{ matrix.lambda }}:${{ github.sha }}
             ${{ github.ref == 'refs/heads/main' && format('{0}/solarlayout/{1}:latest', steps.ecr-login.outputs.registry, matrix.lambda) || '' }}
-            ${{ github.ref == 'refs/heads/main' && format('{0}/solarlayout/{1}:production', steps.ecr-login.outputs.registry, matrix.lambda) || '' }}
+            ${{ inputs.environment-tag != '' && format('{0}/solarlayout/{1}:{2}', steps.ecr-login.outputs.registry, matrix.lambda, inputs.environment-tag) || '' }}
           cache-from: type=gha,scope=${{ matrix.lambda }}
           cache-to: type=gha,mode=max,scope=${{ matrix.lambda }}
