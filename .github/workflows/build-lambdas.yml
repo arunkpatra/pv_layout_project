@@ -1,0 +1,104 @@
+name: build-lambdas
+
+# Build + push Lambda container images to ECR. One job per Lambda
+# directory under python/lambdas/, matrix-driven. arm64 (Graviton)
+# images via buildx + QEMU emulation on the x86_64 GitHub runner.
+#
+# Triggers (mirror ci.yml's pattern):
+#   push:               every branch (including main)
+#   pull_request:       PRs targeting main
+#   workflow_dispatch:  manual trigger from the Actions UI
+#
+# Authentication: GHA OIDC → IAM role solarlayout-github-actions
+# (trust scoped to repo:SolarLayout/solarlayout:*).
+# See docs/AWS_RESOURCES.md § GitHub Actions OIDC.
+#
+# Image tagging:
+#   - <git-sha>:  always pushed (D21 — Run.engineVersion source of truth)
+#   - latest:     pushed only on main (convenience tag for ad-hoc invocations)
+#
+# Build context is REPO ROOT (per D5) so each Lambda's Dockerfile can
+# COPY python/pvlayout_core sibling.
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write   # for OIDC
+  contents: read    # for checkout
+
+jobs:
+  discover:
+    name: discover lambdas
+    runs-on: ubuntu-22.04
+    outputs:
+      lambdas: ${{ steps.list.outputs.lambdas }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: List Lambda directories
+        id: list
+        shell: bash
+        run: |
+          set -euo pipefail
+          lambdas=$(find python/lambdas -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          count=$(echo "$lambdas" | jq 'length')
+          echo "lambdas=$lambdas" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Discovered $count Lambda(s): $lambdas"
+
+  build:
+    name: build ${{ matrix.lambda }}
+    needs: discover
+    if: ${{ needs.discover.outputs.count != '0' }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        lambda: ${{ fromJSON(needs.discover.outputs.lambdas) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: python/lambdas/${{ matrix.lambda }}/Dockerfile
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/solarlayout/${{ matrix.lambda }}:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}/solarlayout/{1}:latest', steps.ecr-login.outputs.registry, matrix.lambda) || '' }}
+          cache-from: type=gha,scope=${{ matrix.lambda }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.lambda }}
