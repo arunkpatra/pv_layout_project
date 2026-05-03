@@ -27,11 +27,11 @@ from pvlayout_engine.server import build_app
 
 
 TEST_TOKEN = "wgs84-corner-test-token-abcdefghij"
+# KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+# parents[3] from this file = repo_root/python/.
 KMZ_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "golden"
-    / "kmz"
-    / "phaseboundary2.kmz"
+    Path(__file__).resolve().parents[3]
+    / "pvlayout_core/tests/golden/kmz/phaseboundary2.kmz"
 )
 
 
