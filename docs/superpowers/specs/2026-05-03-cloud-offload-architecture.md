@@ -342,7 +342,7 @@ Shipped:  PR #5 (https://github.com/SolarLayout/solarlayout/pull/5),
 #### C3 — Lambda monorepo scaffolding
 
 ```
-Status:   todo
+Status:   done (2026-05-03)
 Depends:  C2
 Tier:     T2
 
@@ -375,6 +375,23 @@ Acceptance
 Out of scope
   - Any Lambda code (that's C4).
   - IaC.
+
+Plan:     docs/superpowers/plans/2026-05-03-c3-lambda-monorepo-scaffolding.md
+Shipped:  PR #6 (https://github.com/SolarLayout/solarlayout/pull/6),
+          merged on 2026-05-03 — Lambda monorepo conventions
+          established (python/lambdas/README.md + canonical Dockerfile
+          template); throwaway smoketest Lambda built (arm64 Graviton)
+          + pushed to solarlayout/smoketest ECR via new GHA OIDC role
+          solarlayout-github-actions; matrix CI workflow build-
+          lambdas.yml auto-discovers future Lambdas. arm64 Graviton
+          platform locked. Three spec amendments landed during the
+          row: v1.2 (naming-convention prefix flip pvlayout-* →
+          solarlayout-*), v1.3 (D24 + new row C3.5 inserted between
+          C3 and C4 — local-dev parallel HTTP transport pattern), v1.4
+          (post-row drift fixes: plan-file IAM action list backfill +
+          C4 row text made explicit about smoketest cleanup). v1.3
+          shifts C4's Depends from C3 to C3.5; the next implementation
+          row to start is C3.5, not C4.
 ```
 
 #### C3.5 — Local-dev parallel HTTP transport + `USE_LOCAL_ENVIRONMENT` switch
