@@ -40,10 +40,13 @@ import {
   runResultUploadUrlResponseSchema,
   usageReportV2ResponseSchema,
   v2ErrorResponseSchema,
+  parsedKmzSchema,
+  v2SuccessResponseSchema,
   type CreateProjectV2Request,
   type CreateRunV2Request,
   type CreateRunV2Result,
   type EntitlementSummaryV2,
+  type ParsedKmz,
   type PatchProjectV2Request,
   type PresignedUploadUrlResult,
   type ProjectDetailV2Wire,
@@ -161,6 +164,21 @@ export interface EntitlementsClient {
    * useOpenProject hook maps this to a "project not found" surface.
    */
   getProjectV2(key: string, projectId: string): Promise<ProjectDetailV2Wire>
+  /**
+   * V2 — `POST /v2/projects/:id/parse-kmz` (C4). Triggers the parse-kmz
+   * Lambda for an existing project: mvp_api looks up the project's
+   * `kmzBlobUrl`, invokes the Lambda with `{bucket, key}`, persists the
+   * parsed payload to `Project.parsedKmz`, and returns the `ParsedKmz`
+   * to the caller.
+   *
+   * Errors collapse to a single user-facing surface per the C4
+   * brainstorm Q3 lock: mvp_api auto-DELETEs the Project + refunds
+   * quota on any Lambda / parse failure, and returns the V2 envelope
+   * error. The caller observes only the V2 error code/message and
+   * shows a uniform "try again" message regardless of the underlying
+   * cause.
+   */
+  parseKmzV2(key: string, projectId: string): Promise<ParsedKmz>
   /**
    * V2 — `POST /v2/projects/:id/runs` (B16). Atomically debits one calc
    * for the supplied feature, creates a UsageRecord + Run row in a single
@@ -496,6 +514,20 @@ export function createEntitlementsClient(
         throw new EntitlementsError(
           0,
           `Get-project response failed schema validation: ${parsed.error.message}`,
+          raw
+        )
+      }
+      return parsed.data.data
+    },
+
+    async parseKmzV2(key, projectId) {
+      const path = `/v2/projects/${encodeURIComponent(projectId)}/parse-kmz`
+      const raw = await request(path, { method: "POST" }, key)
+      const parsed = v2SuccessResponseSchema(parsedKmzSchema).safeParse(raw)
+      if (!parsed.success) {
+        throw new EntitlementsError(
+          0,
+          `Parse-kmz response failed schema validation: ${parsed.error.message}`,
           raw
         )
       }

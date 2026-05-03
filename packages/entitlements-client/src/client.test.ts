@@ -867,6 +867,7 @@ const successCreatedProject = {
     createdAt: "2026-04-30T12:00:00.000Z",
     updatedAt: "2026-04-30T12:00:00.000Z",
     deletedAt: null,
+    parsedKmz: null,
   },
 }
 
@@ -1071,6 +1072,7 @@ const successProjectDetail = {
     createdAt: "2026-04-30T10:00:00.000Z",
     updatedAt: "2026-04-30T10:00:00.000Z",
     deletedAt: null,
+    parsedKmz: null,
     kmzDownloadUrl:
       "https://solarlayout-local-projects.s3.ap-south-1.amazonaws.com/projects/usr_test1/kmz/abc.kmz?X-Amz-Signature=...",
     runs: [
@@ -1233,6 +1235,148 @@ describe("getProjectV2", () => {
     // accidentally passing a string with reserved chars.
     await client.getProjectV2(KEY, "prj_with spaces/odd")
     expect(seenUrl).toContain("prj_with%20spaces%2Fodd")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// V2 — parseKmzV2 (C4)
+// ---------------------------------------------------------------------------
+
+const successParsedKmz = {
+  success: true,
+  data: {
+    boundaries: [
+      {
+        name: "boundary-1",
+        coords: [
+          [78.0, 12.0],
+          [78.1, 12.0],
+          [78.1, 12.1],
+          [78.0, 12.1],
+          [78.0, 12.0],
+        ],
+        obstacles: [],
+        water_obstacles: [],
+        line_obstructions: [],
+      },
+    ],
+    centroid_lat: 12.05,
+    centroid_lon: 78.05,
+  },
+}
+
+describe("parseKmzV2", () => {
+  test("POSTs /v2/projects/:id/parse-kmz and returns the ParsedKmz payload", async () => {
+    let seenUrl = ""
+    let seenMethod = ""
+    let seenAuth = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input, init) => {
+        seenUrl = input.toString()
+        seenMethod = init?.method ?? ""
+        seenAuth = new Headers(init?.headers).get("authorization") ?? ""
+        return jsonResponse(successParsedKmz)
+      },
+    })
+    const result = await client.parseKmzV2(KEY, "prj_test")
+    expect(seenUrl).toBe(
+      "https://api.solarlayout.in/v2/projects/prj_test/parse-kmz"
+    )
+    expect(seenMethod).toBe("POST")
+    expect(seenAuth).toBe(`Bearer ${KEY}`)
+    expect(result.boundaries).toHaveLength(1)
+    expect(result.boundaries[0]?.name).toBe("boundary-1")
+    expect(result.centroid_lat).toBeCloseTo(12.05, 5)
+    expect(result.centroid_lon).toBeCloseTo(78.05, 5)
+  })
+
+  test("URL-encodes the projectId path segment", async () => {
+    let seenUrl = ""
+    const client = createEntitlementsClient({
+      fetchImpl: async (input) => {
+        seenUrl = input.toString()
+        return jsonResponse(successParsedKmz)
+      },
+    })
+    await client.parseKmzV2(KEY, "prj_with spaces/odd")
+    expect(seenUrl).toContain("prj_with%20spaces%2Fodd/parse-kmz")
+  })
+
+  test("maps 500 INTERNAL_SERVER_ERROR via V2 envelope", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Could not process the KMZ. Please try again.",
+            },
+          },
+          500
+        ),
+    })
+    try {
+      await client.parseKmzV2(KEY, "prj_test")
+      throw new Error("expected throw")
+    } catch (err) {
+      expect(err).toBeInstanceOf(EntitlementsError)
+      const e = err as EntitlementsError
+      expect(e.status).toBe(500)
+      expect(e.code).toBe("INTERNAL_SERVER_ERROR")
+    }
+  })
+
+  test("maps 404 NOT_FOUND via V2 envelope", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Project not found.",
+            },
+          },
+          404
+        ),
+    })
+    try {
+      await client.parseKmzV2(KEY, "prj_missing")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(404)
+      expect(e.code).toBe("NOT_FOUND")
+    }
+  })
+
+  test("rejects a malformed success body (schema guard)", async () => {
+    const client = createEntitlementsClient({
+      fetchImpl: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            boundaries: [
+              {
+                name: "boundary-1",
+                coords: [],
+                // missing obstacles / water_obstacles / line_obstructions
+              },
+            ],
+            centroid_lat: 12.05,
+            centroid_lon: 78.05,
+          },
+        }),
+    })
+    try {
+      await client.parseKmzV2(KEY, "prj_test")
+      throw new Error("expected throw")
+    } catch (err) {
+      const e = err as EntitlementsError
+      expect(e.status).toBe(0)
+      expect(e.message).toContain("schema validation")
+    }
   })
 })
 
@@ -1518,6 +1662,7 @@ const successPatchProject = {
     createdAt: "2026-04-30T10:00:00.000Z",
     updatedAt: "2026-04-30T12:30:00.000Z",
     deletedAt: null,
+    parsedKmz: null,
   },
 }
 

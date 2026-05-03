@@ -339,6 +339,36 @@ export type BoundaryGeojsonMultiPolygon = z.infer<
   typeof boundaryGeojsonMultiPolygonSchema
 >
 
+// ─────────────────────────────────────────────────────────────────────
+// ParsedKmz — full canvas-render payload from parse-kmz Lambda (C4).
+// Sibling to BoundaryGeojson (which is polygon-only, GeoJSON-spec).
+// Persisted on Project.parsedKmz; consumed by desktop on project open.
+//
+// Wire shape mirrors `_parsed_to_wire` in
+// `python/lambdas/parse-kmz/parse_kmz_lambda/handler.py`. Each coord is
+// a (lon, lat) tuple in WGS84. Obstacle / water_obstacle /
+// line_obstruction arrays may be empty when the KMZ doesn't carry them.
+// ─────────────────────────────────────────────────────────────────────
+
+const wgs84Coord = z.tuple([z.number(), z.number()])
+
+export const parsedKmzBoundarySchema = z.object({
+  name: z.string(),
+  coords: z.array(wgs84Coord),
+  obstacles: z.array(z.array(wgs84Coord)),
+  water_obstacles: z.array(z.array(wgs84Coord)),
+  line_obstructions: z.array(z.array(wgs84Coord)),
+})
+
+export const parsedKmzSchema = z.object({
+  boundaries: z.array(parsedKmzBoundarySchema),
+  centroid_lat: z.number(),
+  centroid_lon: z.number(),
+})
+
+export type ParsedKmz = z.infer<typeof parsedKmzSchema>
+export type ParsedKmzBoundary = z.infer<typeof parsedKmzBoundarySchema>
+
 /**
  * B11 request body. Mirrors `CreateProjectSchema` in
  * `renewable_energy/apps/mvp_api/src/modules/projects/projects.routes.ts`:
@@ -389,6 +419,12 @@ export const projectV2WireSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   deletedAt: z.string().nullable(),
+  // C4 — parse-kmz Lambda result, persisted by mvp_api after a
+  // successful POST /v2/projects/:id/parse-kmz. Null on freshly-created
+  // projects (before parse-kmz runs) and on legacy projects created
+  // pre-C4. Desktop reads this on project-open in lieu of round-tripping
+  // the KMZ through the local sidecar.
+  parsedKmz: parsedKmzSchema.nullable(),
 })
 
 export type ProjectV2Wire = z.infer<typeof projectV2WireSchema>

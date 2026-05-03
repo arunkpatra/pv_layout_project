@@ -390,6 +390,7 @@ describe("projectV2WireSchema", () => {
     createdAt: "2026-04-30T12:00:00.000Z",
     updatedAt: "2026-04-30T12:00:00.000Z",
     deletedAt: null,
+    parsedKmz: null,
   }
 
   test("parses the full backend ProjectWire shape", () => {
@@ -439,6 +440,7 @@ describe("createProjectV2ResponseSchema", () => {
         createdAt: "2026-04-30T12:00:00.000Z",
         updatedAt: "2026-04-30T12:00:00.000Z",
         deletedAt: null,
+        parsedKmz: null,
       },
     })
     expect(r.success).toBe(true)
@@ -502,6 +504,7 @@ describe("projectDetailV2WireSchema", () => {
     createdAt: "2026-04-30T12:00:00.000Z",
     updatedAt: "2026-04-30T12:00:00.000Z",
     deletedAt: null,
+    parsedKmz: null,
   }
   const sampleRun = {
     id: "run_xyz",
@@ -582,6 +585,7 @@ describe("getProjectV2ResponseSchema", () => {
         createdAt: "2026-04-30T12:00:00.000Z",
         updatedAt: "2026-04-30T12:00:00.000Z",
         deletedAt: null,
+        parsedKmz: null,
         kmzDownloadUrl: "https://s3.example/presigned",
         runs: [],
       },
@@ -834,6 +838,7 @@ describe("patchProjectV2ResponseSchema", () => {
         createdAt: "2026-04-30T12:00:00.000Z",
         updatedAt: "2026-04-30T12:30:00.000Z",
         deletedAt: null,
+        parsedKmz: null,
       },
     })
     expect(r.success).toBe(true)
