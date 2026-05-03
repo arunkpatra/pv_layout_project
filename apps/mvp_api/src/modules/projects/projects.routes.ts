@@ -11,6 +11,7 @@ import {
   listProjects,
   patchProject,
 } from "./projects.service.js"
+import { parseKmzHandler } from "./parse-kmz.service.js"
 
 export const projectsRoutes = new Hono<MvpHonoEnv>()
 
@@ -95,6 +96,16 @@ projectsRoutes.patch("/v2/projects/:id", async (c) => {
   const project = await patchProject(user.id, c.req.param("id"), parsed.data)
   return c.json(ok(project))
 })
+
+/**
+ * C4 — POST /v2/projects/:id/parse-kmz
+ *
+ * Triggers the parse-kmz Lambda for the Project's stored kmzBlobUrl.
+ * Persists parsedKmz + boundaryGeojson on success; soft-deletes the
+ * Project + collapses the Lambda's structured failure envelope to a
+ * uniform 500 INTERNAL_SERVER_ERROR on any failure (per spec C4 Q3).
+ */
+projectsRoutes.post("/v2/projects/:id/parse-kmz", parseKmzHandler)
 
 projectsRoutes.post("/v2/projects", async (c) => {
   let body: unknown

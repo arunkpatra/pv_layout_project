@@ -79,3 +79,20 @@ export async function getPresignedUploadUrl(
     { expiresIn },
   )
 }
+
+/**
+ * Split an `s3://<bucket>/<key>` URL into its components.
+ *
+ * Used by parse-kmz route (and future Lambda routes) to translate
+ * a stored Project.kmzBlobUrl into a Lambda payload `{bucket, key}`.
+ *
+ * Throws on malformed input — Project.kmzBlobUrl was set by mvp_api
+ * itself at upload time, so a malformed value indicates DB corruption.
+ */
+export function parseS3Url(url: string): { bucket: string; key: string } {
+  const match = url.match(/^s3:\/\/([^/]+)\/(.+)$/)
+  if (!match) {
+    throw new Error(`malformed s3 url: ${url}`)
+  }
+  return { bucket: match[1]!, key: match[2]! }
+}
