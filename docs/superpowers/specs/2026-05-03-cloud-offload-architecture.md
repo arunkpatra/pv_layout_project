@@ -397,7 +397,7 @@ Shipped:  PR #6 (https://github.com/SolarLayout/solarlayout/pull/6),
 #### C3.5 — Local-dev parallel HTTP transport + `USE_LOCAL_ENVIRONMENT` switch
 
 ```
-Status:           todo
+Status:           done (2026-05-03)
 Depends:          C3
 Tier:             T2 (build + integration test against local docker-compose)
 Brainstorm-first: yes — first cross-cutting cross-runtime pattern; choices
@@ -526,6 +526,35 @@ Out of scope
   - Cloud-side AWS SDK invoke + SQS publish implementation — those
     paths in lambda-invoker throw NotImplementedError in C3.5;
     C4 fills the SDK invoke path; C7 fills the SQS publish path.
+
+Plan:     docs/superpowers/plans/2026-05-03-c3.5-local-dev-transport.md
+Brainstorm: docs/superpowers/specs/2026-05-03-c3.5-local-dev-transport.md
+Shipped:  PR #<filled-at-merge>, merged at <SHA-filled-at-merge> on
+          2026-05-03 — local-dev parallel HTTP transport pattern
+          landed (smoketest server.py stdlib http.server on 4100;
+          mvp_api lambda-invoker.ts with invoke()/enqueue() +
+          USE_LOCAL_ENVIRONMENT branching + NotImplementedError stubs
+          for cloud paths filled at C4/C7; .env.example documents the
+          lambda-invoker env contract; python/lambdas/README.md
+          extended with Local-dev section covering server.py
+          convention, port allocation, sync/async shape table,
+          business-logic factoring + DB-connection patterns for C6+).
+          Three spec amendments landed during the row: v1.5 (drop
+          integration-test bullet; manual smoke replaces it) at
+          303c113, v1.6 (adopt journium-bip-pipeline pattern; drop
+          Dockerfile.local + docker-compose Lambda services) at
+          7d1f3ef, and one cloud-diagram clarification commit
+          (3f473e6 — split sync vs async cloud paths in brainstorm
+          spec §4 to surface SQS mediation explicitly). Smoke
+          ST-C3.5-L: PASS with one P3 observation (Ctrl-C
+          KeyboardInterrupt traceback; matches journium precedent;
+          no fix). §11.5 retrospective surfaced two minor non-
+          blocking items (status-flip cadence drift vs §12; C4
+          forward-pointing nit on .env.example cleanup); both
+          dispositioned as no-action per Arun. AWS RIE was
+          explored as a single-Dockerfile alternative and rejected
+          per feedback_proven_over_novel.md — prefer the journium-
+          bip-pipeline pattern that's been in production for months.
 ```
 
 #### C4 — `parse-kmz` Lambda end-to-end
