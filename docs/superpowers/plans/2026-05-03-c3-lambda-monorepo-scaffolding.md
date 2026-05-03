@@ -1135,7 +1135,7 @@ jobs:
 
 Notes on tag-list conditional: GitHub Actions doesn't support conditional list entries cleanly; the `format()` ternary returns either the `latest` tag or an empty string. `docker/build-push-action@v5` ignores empty tag entries.
 
-`provenance: false`: SLSA provenance attestations create an OCI manifest list that previously fought ECR's `IMMUTABLE` tag policy on the second push (each commit creates a new attestation manifest with a different digest but same logical tag). Now that the repo is MUTABLE this is less load-bearing, but disabling provenance still keeps the image push minimal — no value for a single-image-per-Lambda-repo setup.
+`provenance: false`: **load-bearing for Lambda compatibility.** SLSA provenance attestations make `docker buildx build` produce a multi-platform OCI manifest list under a single tag (the actual image + an attestation manifest as separate entries). AWS Lambda expects a single-image manifest at the tag, NOT a manifest list — Lambda either fails to update the function or fails at invocation with "manifest is not an OCI image manifest" / similar. **Without `provenance: false`, deployed Lambdas don't run.** This matches the journium pattern (verified: `journium-litellm-proxy` + `journium-bip-pipeline` both ship `provenance: false` in `.github/workflows/reusable-build.yml:115` + `build-docker-image.yml:67`; journium has been running this in prod for months). Secondary benefit (less load-bearing now): the manifest-list-vs-IMMUTABLE friction we hit during the MUTABLE switch — also moot once the repo is MUTABLE, but still worth noting that provenance attestations re-tag-conflict with IMMUTABLE policies.
 
 - [ ] **Step 2: Verify with `actionlint`**
 
