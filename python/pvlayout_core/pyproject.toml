@@ -1,0 +1,55 @@
+[project]
+name = "pvlayout-core"
+version = "0.0.0"
+description = "SolarLayout domain logic — layout engine, parsers, exporters, energy yield. Vendored from PVlayout_Advance/{core,models,utils} at S1; extracted to a standalone package per cloud-offload spec D6."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [
+    { name = "SolarLayout" }
+]
+# Runtime dependencies — the domain libs the engine + future Lambdas
+# both consume. Kept here (not in pvlayout-engine) per cloud-offload
+# spec D4 + D6: pvlayout_core is the single source of solar-domain
+# truth and owns its own dep graph.
+dependencies = [
+    "shapely>=2.0",
+    "pyproj>=3.5",
+    "simplekml>=1.3",
+    "matplotlib>=3.7",
+    "numpy>=1.24",
+    "ezdxf>=1.0",
+    "Pillow>=10.0",     # satellite tile fetch + preview PNG generation
+    "requests>=2.32",   # PVGIS / NASA POWER irradiance fetch in energy_calculator
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pvlayout_core"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+# Slow tests are opt-in. Default `pytest tests/` (CI + local) skips
+# anything marked `slow`. Mirrors pvlayout_engine's convention.
+markers = [
+    "slow: long-running test; opt-in (default skipped). One-time correctness audits, full PV engine on real KMZ fixtures, etc. Run on demand only.",
+]
+addopts = ["-m", "not slow"]
