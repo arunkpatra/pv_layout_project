@@ -5,7 +5,7 @@
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
 
-> **Cold-session reader:** if you arrived here via a fresh Claude Code session, skip to §13 for the prompt that launched you, then read this document end-to-end **before any code action**. Locked decisions (D1–D22) are non-negotiable; row scopes (C1–C20) are bounded; reality wins over spec on the verifications.
+> **Cold-session reader:** if you arrived here via a fresh Claude Code session, skip to §13 for the prompt that launched you, then read this document end-to-end **before any code action**. Locked decisions (D1–D23) are non-negotiable; row scopes (C1–C21) are bounded; reality wins over spec on the verifications.
 
 ---
 
@@ -40,7 +40,7 @@ This is the architectural reset that unblocks mobile, retires the PyInstaller bu
 These came out of the brainstorm captured in this session (transcript-level notes superseded by this file). Cite by ID in implementation rows. Spec amendments require a dedicated commit with the changed D-ID and rationale.
 
 - **D1 — Cloud-offload model.** Heavy compute moves to AWS Lambda containers. Tauri and future Expo/RN apps are thin HTTP+UI clients.
-- **D2 — Sidecar dies.** `python/pvlayout_engine/` is removed in C18. No sidecar in the end state on any form factor.
+- **D2 — Sidecar dies.** `python/pvlayout_engine/` is removed in C19. No sidecar in the end state on any form factor.
 - **D3 — Figma-style edits.** Drawing obstructions / adding roads / overriding ICR positions are client-side state mutations on `Project.edits` (autosaved via existing B13). The server only ever receives `(KMZ, edits, params) → fresh Run`. There are no incremental-edit endpoints in the cloud world.
 - **D4 — One engine, one knowledge asset.** `pvlayout_core/` is the single source of solar-domain truth. Prasanta is the authoritative reviewer for that surface. Lambdas + handlers + glue are SWE-side.
 - **D5 — Lambda Dockerfile `COPY` from monorepo.** No wheel registry. Build context is the repo root; Dockerfiles `COPY python/pvlayout_core` + `pip install` it directly. Image tag = git SHA.
@@ -51,7 +51,7 @@ These came out of the brainstorm captured in this session (transcript-level note
 - **D10 — One Lambda = one image = one package.** No mono-image dispatch. Each `python/lambdas/<purpose>/` is its own deployment artifact with its own dependency graph and memory/timeout config.
 - **D11 — Per-Run unit of compute (v1).** One SQS message per Run, one Lambda invocation per Run, one Run row, one S3 layout result blob. No `Slice` table. Per-plot fan-out is v3 (§10), not built.
 - **D12 — Pre-render all artifacts inside `compute-layout`.** A single Lambda invocation produces layout JSON + DXF + PDF + KMZ + thumbnail and PUTs all five to S3 at deterministic key paths. Conditional content (energy section, cable layers) is decided by the rendering functions inside `pvlayout_core/exporters/`. There are no separate `export-*` Lambdas.
-- **D13 — Energy rolled into `compute-layout` (v1).** No separate `compute-energy` Lambda. Functional split is v2 future ladder.
+- **D13 — Energy rolled into `compute-layout` (v1).** Generate Layout is the single user trigger; the Lambda decides whether to compute energy based on Run params + tier entitlements. **Energy is feature-gated** via the `energy_yield` + `generation_estimates` feature keys (Pro Plus tier per V2 plan §2 + `seed-products.ts`); B16's existing entitlement-debit machinery enforces this at Run-create time. The Tauri Inspector has a separate `Energy` tab that reads `Run.energyResultBlobUrl`; users without entitlement OR runs where energy wasn't requested see an empty/upsell state. **Implementation status note:** `pvlayout_core` already has the energy compute module fully working (parity-tested vs legacy PVlayout_Advance), but the cross-runtime wiring (Lambda branch + desktop Inspector tab + feature-gating-in-UI) is **not yet built** — tracked in C18, which is intentionally brainstorm-first because several practical UX questions aren't nailed down at spec time. Functional split into a separate `compute-energy` Lambda is v2 future ladder, not v1.
 - **D14 — Idempotent slice-update SQL.** Lambdas update `Run` with `WHERE status IN ('RUNNING')` so SQS at-least-once redelivery is harmless. Even though there's no `Slice` table v1, the pattern is established for v3 forward-compat.
 - **D15 — `Run.status` is the single lifecycle truth.** Lifecycle: `QUEUED` (mvp_api creates) → `RUNNING` (Lambda picks up) → `DONE | FAILED | CANCELLED`. No separate `Job` table. Status enum already supports this post-B29 (RUNNING/DONE/CANCELLED/FAILED — adding QUEUED needs verification, see §11).
 - **D16 — Cancel: B30 + Lambda cancel-marker check.** Desktop calls B30 `cancelRunV2` (already shipped). Lambda's completion path does `SELECT … FOR UPDATE` on `Run.status` immediately before flipping to DONE; if status is CANCELLED, abort the upload (best-effort S3 cleanup; orphan tolerable).
@@ -61,46 +61,70 @@ These came out of the brainstorm captured in this session (transcript-level note
 - **D20 — Lambda credentials via env.** RDS connection string + AWS region in Lambda env vars. Rotate via Secrets Manager when compliance asks. No IAM-database-auth in v1.
 - **D21 — Engine version recorded per Run.** `compute-layout` writes the git SHA of its image to a new column `Run.engineVersion: String?` (added in C7's mvp_api migration row). Mid-deploy drift is observable by post-hoc query.
 - **D22 — Lambda → ECS portability.** Same Docker image works for ECS via `CMD` change. Documented escape hatch; not built v1.
+- **D23 — Compound feature gating for compute Runs.** A single Run may invoke multiple gated compute features: layout (always), cable routing (conditionally, per `params.enable_cable_calc` + `cable_routing` entitlement; works today in Tauri via the LayoutPanel toggle), energy yield (conditionally, per `energy_yield`/`generation_estimates` entitlement; not yet wired — see D13 + C18). Gating enforces at three layers: **(1)** client UI gates per-feature affordances (toggles, tabs, upsell chips) per the user's `availableFeatures` union — same as today on Tauri; **(2)** mvp_api B16 enforces at Run-create time — for each gated feature implied by `params`, verify the corresponding feature key is in `availableFeatures`; reject 402 if missing; **(3)** the Lambda trusts what's in params — no entitlement re-validation, no DB entitlement query (keeps Lambda simple per D9). **Migration note:** today, layer-2 cable enforcement lives in the sidecar's `require_feature("cable_routing")` dependency on the `/layout` route. When the sidecar dies (C19), that enforcement must already be live in B16. C7 picks this up explicitly. Energy gating follows the same pattern when C18 lands.
 
 ## 4. Architecture Overview
 
+**Three first-class API client surfaces (long-run vision):**
+
+| Surface | App | Auth | Status | Notes |
+|---|---|---|---|---|
+| **Desktop** | `apps/desktop` (Tauri) | license-key bearer | live | Layout app on macOS / Windows / Linux. |
+| **Mobile** | Expo / React Native (future) | license-key bearer | future | Same wire contracts as desktop; same Lambda compute path. |
+| **Web — layout app** | `apps/mvp_web` (new route group, future) | license-key bearer (or Clerk JWT bridged) | future | Browser-rendered layout app. **Lives as additional pages inside the existing `mvp_web` Next.js app, not a separate site/app/repo.** |
+| **Web — marketing + dashboard** | `apps/mvp_web` (existing route groups) | public / Clerk JWT (humans) | live | solarlayout.in. Customer dashboard reads V1 `/entitlements` + `/dashboard/usage` (extended for status badges in C15). |
+| **Web — admin** | `apps/mvp_admin` | Clerk JWT (ADMIN role) | live | admin.solarlayout.in. Customer + transaction inspection. |
+
+All five surfaces are clients of the same `mvp_api` and the same RDS `mvp_db`. Auth distinction is real but bounded: license-key bearer for the *layout-app* surfaces (desktop, mobile, future web layout app) — they act on behalf of an end-user-license-holder; Clerk JWT for the *human-operator* surfaces (mvp_web dashboard, mvp_admin) — they act on behalf of an authenticated human session. The two auth schemes coexist at the mvp_api middleware layer per existing `licenseKeyAuth` and `clerkAuth`.
+
+**Compute flow (focuses on the layout-app surfaces; Clerk-authed surfaces are read-only against the same DB):**
+
 ```
-            ┌────────────┐                       ┌────────────┐
-            │   Tauri    │                       │   Expo /   │
-            │  desktop   │                       │ RN mobile  │
-            └─────┬──────┘                       └─────┬──────┘
-                  │   HTTPS (license-key bearer)        │
-                  └──────────────┬──────────────────────┘
-                                 ▼
-                        ┌─────────────────┐
-                        │     mvp_api     │   Hono/Bun on Vercel
-                        │  (orchestrator) │
-                        └───┬─────┬───┬───┘
-                            │     │   │
-       ┌────────────────────┘     │   └──────────────────┐
-       │                          │                       │
-       ▼                          ▼                       ▼
-┌──────────────┐         ┌────────────────┐      ┌────────────────┐
-│ parse-kmz    │         │  SQS queue     │      │  RDS Postgres  │◄──┐
-│ Lambda       │         │ compute-layout │      │  (mvp_db)      │   │
-│ (sync invoke)│         │  + DLQ         │      └────────────────┘   │
-└──────────────┘         └───────┬────────┘                           │
-                                 │                                    │
-                                 ▼                                    │
-                        ┌────────────────┐    psycopg2: UPDATE Run    │
-                        │ compute-layout │ ───────────────────────────┘
-                        │ Lambda image   │
-                        │ (pvlayout_core │
-                        │  inside)       │
-                        └───────┬────────┘
-                                │
-                                ▼
-                          ┌──────────┐
-                          │   S3     │  layout.json, exports/{dxf,pdf,kmz},
-                          │ projects │  thumbnail.webp
-                          │  bucket  │
-                          └──────────┘
+   ┌─────────┐   ┌──────────┐   ┌────────────┐         ┌────────────┐  ┌──────────┐
+   │  Tauri  │   │ Expo/RN  │   │ mvp_web    │         │ mvp_web    │  │ mvp_admin│
+   │ desktop │   │ mobile   │   │ (future:   │         │ marketing  │  │          │
+   │         │   │          │   │ layout app │         │ + dashboard│  │          │
+   │         │   │          │   │ pages)     │         │            │  │          │
+   │ (live)  │   │ (future) │   │ (future)   │         │ (live)     │  │ (live)   │
+   └────┬────┘   └────┬─────┘   └────┬───────┘         └────┬───────┘  └────┬─────┘
+        │             │              │                    │             │
+        │  license-key bearer        │                    │  Clerk JWT  │
+        └─────────────┴──────────────┘                    └──────┬──────┘
+                      │                                          │
+                      ▼                                          ▼
+              ┌────────────────────────────────────────────────────────┐
+              │                       mvp_api                          │  Hono/Bun on Vercel
+              │  V2 layout-app routes  ·  V1 entitlements (frozen)     │
+              │  /admin/*  ·  /webhooks/stripe                         │
+              └─────┬──────────────┬─────────────────────────┬─────────┘
+                    │              │                          │
+       ┌────────────┘              │                          │
+       │                           ▼                          ▼
+       ▼                   ┌────────────────┐         ┌────────────────┐
+┌──────────────┐           │  SQS queue     │         │  RDS Postgres  │◄──┐
+│ parse-kmz    │           │ compute-layout │         │  (mvp_db)      │   │
+│ Lambda       │           │  + DLQ         │         └────────────────┘   │
+│ (sync invoke)│           └───────┬────────┘                              │
+└──────────────┘                   │                                       │
+                                   ▼                                       │
+                          ┌────────────────┐    psycopg2: UPDATE Run       │
+                          │ compute-layout │ ──────────────────────────────┘
+                          │ Lambda image   │
+                          │ (pvlayout_core │
+                          │  inside)       │
+                          └───────┬────────┘
+                                  │
+                                  ▼
+                            ┌──────────┐
+                            │   S3     │  layout.json, exports/{dxf,pdf,kmz},
+                            │ projects │  thumbnail.webp
+                            │  bucket  │
+                            └──────────┘
 ```
+
+mvp_web's dashboard and mvp_admin do NOT initiate compute; they read from the same RDS for status, history, and entitlements. The future browser-rendered layout app WILL initiate compute through the same `/v2/projects/:id/runs` flow as desktop and mobile — it's a new client surface, not a new API surface.
+
+**Important physical-layout note for future sessions:** the future browser layout app is **not a separate Vercel project, app directory, or repository**. It is a new route group inside the existing `apps/mvp_web` Next.js app, sharing the same deploy target, build pipeline, environment variables, and component library as the marketing + dashboard pages. Do NOT scaffold a new top-level `apps/web/` or `apps/mvp_web_layout/` when this surface is built. The two visual boxes for "mvp_web (future: layout app pages)" and "mvp_web marketing + dashboard" in the diagram refer to **two route groups within the same Next.js app**, with different auth schemes per route group.
 
 **Generate-Layout flow (canonical):**
 
@@ -162,14 +186,14 @@ pv_layout_project/
 │   ├── entitlements-client/                (extended in C9, C17)
 │   ├── mvp_db/                             (one migration in C7 for engineVersion)
 │   ├── shared/
-│   ├── sidecar-client/                     (DELETED in C18)
+│   ├── sidecar-client/                     (DELETED in C19)
 │   └── ui/, ui-desktop/, ...
 └── python/
     ├── pvlayout_core/                      ← extracted in C2; the engineering asset
     │   ├── pyproject.toml
     │   ├── pvlayout_core/
     │   └── tests/
-    ├── pvlayout_engine/                    ← DELETED in C18
+    ├── pvlayout_engine/                    ← DELETED in C19
     └── lambdas/                            ← new in C3
         ├── parse-kmz/
         │   ├── pyproject.toml
@@ -202,13 +226,16 @@ Order:
 6. Cancel + fail wiring (C10, C11, C12, C13).
 7. Visibility (C14, C15).
 8. Remaining workloads (C16, C17).
-9. Sidecar deletion (C18) — when every flag is permanently flipped.
-10. Mobile parity verification (C19) — no new code; confirm forms.
-11. Production cutover signoff (C20).
+9. Energy-yield wiring (C18) — brainstorm-first per row spec; cloud Lambda branch + Inspector tab.
+10. Sidecar deletion (C19) — when every flag is permanently flipped.
+11. Mobile parity verification (C20) — no new code; confirm forms.
+12. Production cutover signoff (C21).
 
 ## 9. Implementation Rows
 
-Each row is one cold-session unit. Status is one of `todo | in-progress | done | blocked`. Rows reference locked-decision IDs (D1–D22) to constrain re-debate. Child sessions invoke `superpowers:writing-plans` per row, then `superpowers:executing-plans` (TDD).
+Each row is one cold-session unit. Status is one of `todo | in-progress | done | blocked`. Rows reference locked-decision IDs (D1–D23) to constrain re-debate. Child sessions invoke `superpowers:writing-plans` per row, then `superpowers:executing-plans` (TDD).
+
+**Row template fields:** `Status`, `Depends`, `Tier`, `Brainstorm-first` (only on rows with open design or UX questions; absence = writing-plans-direct OK; governed by §11.3), `Goal`, `Locked`, `Open verifications`, `Acceptance`, `Smoke trigger` (only on rows where customer behavior changes or new infrastructure goes live; absence = no smoke required; governed by §11.2), `Out of scope`.
 
 ### Phase A — Foundation
 
@@ -327,9 +354,10 @@ Out of scope
 #### C4 — `parse-kmz` Lambda end-to-end
 
 ```
-Status:   todo
-Depends:  C3
-Tier:     T2 (build + integration test against real Lambda + mvp_api)
+Status:           todo
+Depends:          C3
+Tier:             T2 (build + integration test against real Lambda + mvp_api)
+Brainstorm-first: yes — first Lambda; pattern decisions (IAM, invoke timeout config, error response shape, exact wire contract vs sidecar) cascade to the 4 downstream Lambdas. Get them right once.
 
 Goal
   Ship the first cloud Lambda. Replaces sidecar /parse-kmz behind a
@@ -358,7 +386,17 @@ Acceptance
     mvp_api parseKmzV2 behind feature flag USE_CLOUD_PARSE (default
     off).
   - Integration test: real KMZ → mvp_api → Lambda → parsed JSON.
-  - Sidecar's /parse-kmz STAYS alive (deletion is C18).
+  - Sidecar's /parse-kmz STAYS alive (deletion is C19).
+
+Smoke trigger (Arun, per sec 11.2)
+  Local:    Tauri pointed at localhost:3003 mvp_api with
+            USE_CLOUD_PARSE=true; pick a real customer KMZ; observe
+            "Reading boundaries..." spinner; verify parsed boundaries
+            render on canvas matching legacy sidecar parse.
+  Staging:  Tauri (or curl) against api-staging mvp_api with the
+            same KMZ; verify response shape matches local + Lambda
+            CloudWatch log shows the invoke.
+  Prod:     deferred to phase-end (C21).
 
 Out of scope
   - Production deployment (staging only at this row).
@@ -419,8 +457,15 @@ Goal
   status/engineVersion via psycopg2. Initially testable in isolation
   (no SQS); tests invoke the handler directly with mock event.
 
+  Cable routing (AC + DC) is a sub-step of pvlayout_core.run_layout
+  controlled by params.enable_cable_calc; conditional inclusion in
+  DXF/PDF/KMZ exports is already handled by the existing exporter
+  modules. The Lambda doesn't separately decide — it trusts what's
+  in params (D23). Layer-2 cable feature gating moves to mvp_api in
+  C7.
+
 Locked
-  D5, D9, D10, D11, D12, D13, D14, D17, D20, D21
+  D5, D9, D10, D11, D12, D13, D14, D17, D20, D21, D23
 
 Open verifications
   - Confirm the existing sidecar /export-{dxf,pdf,kmz} routes use the
@@ -466,18 +511,23 @@ Out of scope
 #### C7 — mvp_api orchestrator: SQS publish + engineVersion column
 
 ```
-Status:   todo
-Depends:  C5, C6
-Tier:     T2 (integration test mocks SQS)
+Status:           todo
+Depends:          C5, C6
+Tier:             T2 (integration test mocks SQS)
+Brainstorm-first: yes — multi-feature gating semantics (D23) + publish-then-commit tx-and-SQS interaction with B16's existing idempotency machinery. Subtle ordering questions; non-obvious failure modes.
 
 Goal
   Extend B16 (createRunV2) to publish to SQS after Run.create within
   the same transaction (publish-then-commit, D19). Add migration for
   Run.engineVersion. Add Run.status='QUEUED' as a valid initial
-  state.
+  state. **Move layer-2 cable feature gating from sidecar to B16
+  (per D23):** today the sidecar's require_feature("cable_routing")
+  enforces; once C19 deletes the sidecar, B16 must already enforce
+  this or cable gating breaks. Energy gating (when C18 lands) joins
+  the same pattern.
 
 Locked
-  D14, D15, D19, D21
+  D14, D15, D19, D21, D23
 
 Open verifications
   - Verify Run.status enum's current values; if string column without
@@ -487,27 +537,54 @@ Open verifications
     don't replace.
   - Verify Vercel function timeout includes margin for SQS SendMessage
     (~50-100ms typical, fine).
+  - **Read the current sidecar's gating chain to inventory which
+    feature keys gate which params.** Specifically:
+    `require_feature("cable_routing")` on the layout route guarded by
+    `params.enable_cable_calc`. Capture the exact mapping so B16's
+    multi-feature check is faithful.
+  - Verify B16's existing `findFeaturePool` + entitlement-debit path
+    can be extended to a multi-feature check without breaking the
+    idempotency contract.
 
 Acceptance
   - Migration adds Run.engineVersion: String? column.
   - apps/mvp_api/src/lib/sqs.ts publishes to compute-layout queue.
   - B16 wraps existing tx + SQS publish; rollback on SQS error.
+  - **B16 enforces multi-feature gating per D23**: if
+    `params.enable_cable_calc=true`, user must have `cable_routing` in
+    availableFeatures; reject 402 if missing. Future-proofed for energy
+    keys when C18 lands. Today's cable-via-sidecar gating remains live
+    until C19 deletes the sidecar.
   - Integration test: mock SQS → POST /v2/projects/:id/runs creates
     Run with status=QUEUED + publishes 1 message; if SQS throws, no
     Run row created.
+  - Integration test: cable-flag=true + user lacks cable_routing → 402,
+    no Run row created.
   - Run.status='QUEUED' returned in the response on success.
+
+Smoke trigger (Arun, per sec 11.2)
+  Local:    curl POST /v2/projects/:id/runs with cable_calc=true on
+            a Free-tier license key → expect 402 with feature_key
+            citing cable_routing. Then same on Pro key → expect 201
+            + Run.status=QUEUED. Verify SQS message in dev queue.
+  Staging:  Same two cases against staging mvp_api. Verify staging
+            SQS queue has the message; confirm no message published
+            on the 402 path (rollback worked).
+  Prod:     deferred to phase-end (C9 cutover smoke covers this).
 
 Out of scope
   - Lambda actually consuming the message (C8).
   - Outbox pattern.
+  - Energy gating (lands with C18 — same pattern, additive).
 ```
 
 #### C8 — Wire `compute-layout` Lambda to SQS trigger (end-to-end)
 
 ```
-Status:   todo
-Depends:  C5, C6, C7
-Tier:     T2 (integration: real SQS + real Lambda + real RDS)
+Status:           todo
+Depends:          C5, C6, C7
+Tier:             T2 (integration: real SQS + real Lambda + real RDS)
+Brainstorm-first: yes — first full async cloud end-to-end. IAM execution role scope, VPC config for RDS reach, SQS batch-size choice, visibility-timeout sizing, DLQ alarm thresholds — design decisions that establish the pattern for all subsequent SQS Lambdas.
 
 Goal
   Connect the compute-layout Lambda to the SQS queue as event source.
@@ -533,6 +610,17 @@ Acceptance
     artifacts.
   - DLQ stays empty under normal traffic.
 
+Smoke trigger (Arun, per sec 11.2) — first full async cloud smoke
+  Local:    LocalStack (or skip; staging is the real test).
+  Staging:  Tauri pointed at api-staging; create project, click
+            Generate on phaseboundary2.kmz fixture; observe
+            Run.status QUEUED → RUNNING → DONE in DB; verify all
+            5 S3 artifacts (layout.json + 3 exports + thumbnail);
+            CloudWatch shows Lambda invocation; DLQ empty.
+            Then complex-plant-layout.kmz (multi-plot, ~4min):
+            confirm Lambda doesn't time out; final status DONE.
+  Prod:     deferred to phase-end (C9 cutover smoke).
+
 Out of scope
   - Production deploy.
   - Cancel-marker check (C11) — Lambda just runs to DONE in this row.
@@ -543,9 +631,10 @@ Out of scope
 #### C9 — Desktop migration off sidecar `/layout/jobs`
 
 ```
-Status:   todo
-Depends:  C8
-Tier:     T2 (live verification on staging fixtures)
+Status:           todo
+Depends:          C8
+Tier:             T2 (live verification on staging fixtures)
+Brainstorm-first: yes — first user-facing cutover. Multiple state-shape decisions (LayoutJobState reduction, RunningPin redesign), polling cadence, feature-flag granularity, what to do on cloud-flag-off fallback. Read current useGenerateLayout end-to-end before deciding.
 
 Goal
   Switch useGenerateLayout from sidecar /layout/jobs polling to
@@ -573,9 +662,18 @@ Acceptance
   - All existing tests pass; new tests cover the cloud-flag branch.
   - Live: staging end-to-end verified.
 
-Out of scope
-  - Sidecar deletion (C18).
-  - Cancel wiring (C10).
+Smoke trigger (Arun, per sec 11.2) — first user-facing cutover smoke
+  Local:    Tauri with USE_CLOUD_LAYOUT=true, sidecar still running
+            but unused for layout; click Generate; verify spinner +
+            polling against mvp_api dev server; canvas renders
+            cloud-produced layout JSON; per-plot UI absent.
+  Staging:  Same Tauri build pointed at api-staging; full Generate
+            flow on phaseboundary2 + complex-plant fixtures; verify
+            polling cadence and canvas hydration match parity with
+            sidecar-rendered output (modulo engineVersion).
+  Prod:     PRODUCTION CUTOVER for layout — flip USE_CLOUD_LAYOUT in
+            a release build; verify on Arun's prod license that
+            Generate works; capture wall-clock vs sidecar baseline.
 ```
 
 ### Phase D — Cancel + Fail semantics
@@ -583,9 +681,10 @@ Out of scope
 #### C10 — Desktop cancel modal + cancelRunV2 wiring (was B33)
 
 ```
-Status:   todo
-Depends:  C9
-Tier:     T2
+Status:           todo
+Depends:          C9
+Tier:             T2
+Brainstorm-first: yes — modal copy + UX flow + state-machine decisions (what does the polling loop see when cancel succeeds vs when cancel races completion). Non-obvious because of LayoutJobCancelledError + the parity-era code paths being replaced.
 
 Goal
   When user clicks Cancel: show confirmation modal (B27 §B.7), call
@@ -613,6 +712,16 @@ Acceptance
   - Tests cover modal + cancel + refund visible in subsequent
     /v2/entitlements call.
 
+Smoke trigger (Arun, per sec 11.2) — money flow
+  Local:    Tauri click Generate; mid-flight click Cancel; observe
+            modal copy; confirm cancel; verify entitlement
+            remainingCalculations restored (refund); verify Run
+            row shows status=CANCELLED with deletedAt=null.
+  Staging:  Same against api-staging. Verify the
+            UsageRecord(kind='refund') row exists in staging RDS
+            with correct refundsRecordId.
+  Prod:     deferred to phase-end (C21).
+
 Out of scope
   - Lambda-side cancel-marker check (C11).
   - RunsList rendering of CANCELLED state (C14).
@@ -621,9 +730,10 @@ Out of scope
 #### C11 — Lambda cancel-marker check
 
 ```
-Status:   todo
-Depends:  C10
-Tier:     T2 (race-test deterministically)
+Status:           todo
+Depends:          C10
+Tier:             T2 (race-test deterministically)
+Brainstorm-first: yes — race semantics + S3 cleanup edge cases (which artifacts already PUT? best-effort vs strict cleanup? DLQ implications if cleanup itself fails?). Subtle correctness territory.
 
 Goal
   In compute-layout Lambda, before flipping Run.status to DONE, do
@@ -648,6 +758,16 @@ Acceptance
   - Integration test confirms refund row exists exactly once
     (B30's, not duplicated by Lambda).
 
+Smoke trigger (Arun, per sec 11.2) — race-condition smoke
+  Local:    skip — race needs real timing; covered in staging.
+  Staging:  Tauri click Generate on a small fixture (phaseboundary2,
+            ~4s); race the Cancel click to land DURING the Lambda's
+            compute window. Verify (a) Run ends CANCELLED; (b)
+            exactly ONE refund row; (c) S3 layout/exports either
+            absent OR explicitly cleaned up by Lambda; (d) no
+            "DONE → CANCELLED → DONE" status flap.
+  Prod:     deferred to phase-end (C21).
+
 Out of scope
   - Mid-run cancel polling (Lambda checks ONLY at completion, per
     D16 — keeps cost low).
@@ -656,9 +776,10 @@ Out of scope
 #### C12 — Lambda fail path
 
 ```
-Status:   todo
-Depends:  C8
-Tier:     T2
+Status:           todo
+Depends:          C8
+Tier:             T2
+Brainstorm-first: yes — error-context taxonomy (failureReason format, stack-trace truncation strategy), partial-progress S3 artifact cleanup behavior, distinguishing system errors from user-input errors at v1 (B27 §A.1 says one badge — but failureReason text matters for support).
 
 Goal
   Top-level try/except in compute-layout handler runs the
@@ -688,6 +809,17 @@ Acceptance
     throw); verify status flip, refund row, entitlement decrement.
   - Idempotent on redelivery: WHERE status IN ('RUNNING') guards.
 
+Smoke trigger (Arun, per sec 11.2) — money flow on system error
+  Local:    Inject a fault into pvlayout_core (e.g., set an
+            explicit raise mid-handler in dev); trigger Generate;
+            verify Run.status=FAILED + refund row + entitlement
+            decremented + failureReason populated.
+  Staging:  Use a deliberately-broken KMZ that triggers a known
+            engine error (Prasanta or test-fixture sourced);
+            same observations. DLQ should NOT receive (Lambda
+            caught + handled the failure cleanly).
+  Prod:     deferred to phase-end (C21).
+
 Out of scope
   - Failure-type taxonomy (one badge per B27 §A.1).
   - Stuck-RUNNING reconciler (C13).
@@ -696,9 +828,10 @@ Out of scope
 #### C13 — Stuck-RUNNING reconciler
 
 ```
-Status:   todo
-Depends:  C12
-Tier:     T1
+Status:           todo
+Depends:          C12
+Tier:             T1
+Brainstorm-first: yes — host-platform decision (Vercel Cron vs admin endpoint vs standalone scheduler), threshold value, observability shape, behavior when reconciler-itself fails mid-sweep.
 
 Goal
   Scheduled job sweeps Runs in RUNNING state older than N minutes
@@ -724,6 +857,15 @@ Acceptance
     invoke reconciler → status flipped, refund written.
   - Logging: counts of swept Runs per invocation.
 
+Smoke trigger (Arun, per sec 11.2) — backstop for crashed Lambdas
+  Local:    insert a Run row directly in dev RDS with status=RUNNING
+            + createdAt = NOW()-1h; trigger reconciler manually;
+            verify FAILED + refund.
+  Staging:  same in staging RDS via psql; trigger via Vercel Cron
+            invocation (or manual admin endpoint); verify the cron
+            log shows the swept count + observability metric.
+  Prod:     deferred to phase-end (C21).
+
 Out of scope
   - Configurable per-tier timeout (one global value v1).
   - Auto-retry on stuck Run (just FAILED + refund; user retries).
@@ -734,9 +876,10 @@ Out of scope
 #### C14 — Visible cancelled / failed runs in RunsList + RecentsView (was B28)
 
 ```
-Status:   todo
-Depends:  C10
-Tier:     T2
+Status:           todo
+Depends:          C10
+Tier:             T2
+Brainstorm-first: yes — UI variant decisions (icon set, badge copy, fallback layouts), interaction contract (clickable? selectable? tooltip on the failureReason?), RecentsView thumbnail-fallback chain.
 
 Goal
   RunsList renders status-aware cards: DONE (existing card),
@@ -759,6 +902,15 @@ Acceptance
   - RecentsView project-card respects last-run status for thumbnail
     placeholder.
   - Tests cover all status branches.
+
+Smoke trigger (Arun, per sec 11.2) — visibility regression detection
+  Local:    seed dev RDS with one Run per status (DONE / CANCELLED
+            / FAILED / RUNNING); open Tauri RunsList + RecentsView;
+            visually confirm 4 distinct variants render correctly.
+  Staging:  same against staging fixtures. Cancelled/failed cards
+            are visually distinguishable from DONE; click does NOT
+            hydrate canvas; thumbnail fallback respects status.
+  Prod:     deferred to phase-end (C21).
 
 Out of scope
   - Re-running a failed run (deferred).
@@ -792,6 +944,15 @@ Acceptance
   - Refund rows invisible to customer; quota number shows correctly.
   - Tests cover all three states.
 
+Smoke trigger (Arun, per sec 11.2) — customer-visible smoke
+  Local:    seed dev RDS with 3 UsageRecord rows (one each for
+            DONE/CANCELLED/FAILED Run); load mvp_web /dashboard/
+            usage in browser; verify 3 badges + correct quota
+            remaining.
+  Staging:  same against staging mvp_web at the staging URL.
+            Verify refund rows are NOT visible in the table.
+  Prod:     deferred to phase-end (C21).
+
 Out of scope
   - Customer-visible refund history.
   - Notifications on Failed.
@@ -802,9 +963,10 @@ Out of scope
 #### C16 — `detect-water` Lambda
 
 ```
-Status:   todo
-Depends:  C5, C8 (pattern reuse)
-Tier:     T2
+Status:           todo
+Depends:          C5, C8 (pattern reuse)
+Tier:             T2
+Brainstorm-first: yes — endpoint shape + lifecycle relationship to Run (separate detection-job entity? attached to Run? stateless write-through to Project.edits?). Row body explicitly notes this is undecided.
 
 Goal
   Port sidecar /detect-water to a SQS-triggered Lambda. Reuses the
@@ -829,7 +991,15 @@ Acceptance
   - Lambda fetches KMZ, runs satellite detection, writes polygons
     via psycopg2 to Project.edits.
   - Desktop swaps from sidecar to mvp_api behind flag.
-  - Sidecar route stays alive (deletion is C18).
+  - Sidecar route stays alive (deletion is C19).
+
+Smoke trigger (Arun, per sec 11.2) — second SQS pattern, lighter
+  Local:    skip — needs real satellite tile fetch.
+  Staging:  Tauri click "Detect water" on a known fixture with
+            water bodies; observe Project.edits.water_obstructions
+            populated within ~60s; canvas overlays water polygons
+            matching legacy sidecar output.
+  Prod:     deferred to phase-end (C21).
 
 Out of scope
   - Lifecycle table for detection jobs (write-through is sufficient).
@@ -839,9 +1009,10 @@ Out of scope
 #### C17 — Download endpoints + desktop export migration
 
 ```
-Status:   todo
-Depends:  C8
-Tier:     T2
+Status:           todo
+Depends:          C8
+Tier:             T2
+Brainstorm-first: yes — endpoint shape (presigned URL minted on each request vs cached? response carries signed URL or 302 redirects?), error UX when artifact missing, expired-URL UX, file-naming convention for the user's saved download.
 
 Goal
   mvp_api routes that mint presigned-GET URLs for the pre-rendered
@@ -866,18 +1037,120 @@ Acceptance
   - Browser/Tauri shell handles the actual download via the URL.
   - Tests cover happy path + missing artifact (404) + expired URL.
 
+Smoke trigger (Arun, per sec 11.2) — exports cutover smoke
+  Local:    Tauri with USE_CLOUD_EXPORTS=true; pick a DONE Run from
+            staging RDS; click each of DXF/PDF/KMZ download; verify
+            file lands on disk; open each (AutoCAD/Acrobat/Earth)
+            and confirm contents match legacy sidecar export.
+  Staging:  same against staging deployment; pick a Run on a
+            customer-realistic plant; download all three; spot-check
+            each. Especially: PDF includes correct project metadata,
+            DXF layers correct, KMZ opens in Google Earth.
+  Prod:     PRODUCTION CUTOVER for exports — flip USE_CLOUD_EXPORTS
+            in a release build; verify downloads work for an
+            actual customer-style Run.
+```
+
+#### C18 — Energy-yield wiring (cloud Lambda branch + Inspector tab)
+
+```
+Status:           todo
+Depends:          C8 (compute-layout Lambda live), C9 (desktop migration), C10 (cancel modal — pattern reuse)
+Tier:             T2 (cross-runtime: Lambda branch + desktop UI + integration test)
+Brainstorm-first: yes — explicit; multiple practical UX questions undecided at spec time (always-compute-or-toggle, billedFeatureKey shape, missing-entitlement Inspector tab UX, layout-only-run "Compute energy" CTA, network-I/O timeout impact). Listed in detail in this row's Goal section.
+
+Goal
+  Wire energy yield end-to-end through the cloud architecture.
+  Lambda branches on user-requested-energy flag, calls
+  pvlayout_core's energy module (already parity-working against
+  legacy PVlayout_Advance), PUTs result to Run.energyResultBlobUrl.
+  Desktop Inspector "Energy" tab reads + displays. Feature-gating
+  respected per existing entitlement system.
+
+  This row's child session MUST start with superpowers:brainstorming
+  before writing-plans, per the spec sec 13 protocol. Practical
+  realities not nailed down at spec time:
+
+  - Does Generate Layout ALWAYS compute energy if the user has the
+    entitlement, or is energy a separate user toggle? (Likely toggle
+    — Pro Plus user may have both layout-only and layout+energy
+    runs; affects calc billing.)
+  - billedFeatureKey for an energy-included run: plant_layout +
+    secondary energy_yield, or a single combined key? Memory says
+    energy_yield is its own feature key in the entitlement model.
+  - Inspector Energy tab UX when entitlement is missing: empty
+    state? Upsell chip? Greyed tab? UX decision.
+  - Inspector Energy tab UX when run was layout-only (no energy
+    computed): "Compute energy" CTA that fires a new Run? Hidden?
+  - PVGIS / NASA POWER fetch (~30s of network I/O) inside the same
+    Lambda invocation as layout compute — verify no Vercel/Lambda
+    timeout impact (sec 11 V1).
+
+Locked
+  D11 (per-Run unit), D12 (one Lambda invocation), D13 (rolled in
+  v1, gated, separate UI tab), D9 (Lambda direct-RDS), D23 (compound
+  feature gating; energy is the energy-side instance of the same
+  pattern C7 establishes for cables).
+
+Open verifications
+  - Read pvlayout_core/energy_calculator.py for the existing
+    module's public API + dep on requests + PVGIS / NASA POWER
+    endpoints.
+  - Read the existing Tauri Inspector tab structure (LayoutPanel +
+    siblings) to understand where the Energy tab mounts. Verify
+    whether any Energy-tab scaffolding already exists (parity-era).
+  - Read entitlements service for energy_yield + generation_estimates
+    feature key handling — B16's findFeaturePool already supports
+    both keys; verify.
+  - Verify Run.energyResultBlobUrl column exists post-B4 (yes per
+    schema state sec 5).
+
+Acceptance
+  - Brainstorm output committed at docs/superpowers/specs/<date>-
+    energy-yield-design.md before writing-plans starts.
+  - Lambda compute-layout branches on energy flag; if requested AND
+    entitlement present, calls energy_calculator + PUTs energy
+    result.
+  - Desktop Inspector renders Energy tab; reads
+    Run.energyResultBlobUrl if present; renders empty / upsell
+    state otherwise.
+  - Feature gating: B16 rejects energy-class Run create with 402 if
+    user lacks entitlement (existing machinery — verify).
+  - End-to-end test: Pro Plus user → Generate with energy flag →
+    Run.energyResultBlobUrl populated → desktop renders.
+  - Free / Basic / Pro user: Energy tab shows upsell or empty state;
+    no 402 cascade in console.
+
+Smoke trigger (Arun + Prasanta, per sec 11.2) — new gated feature
+  Local:    Tauri on Pro Plus license; Generate with energy
+            requested on a small fixture; verify energy result
+            populates Inspector Energy tab; numbers match legacy
+            (Prasanta validates solar-domain correctness on at
+            least one fixture). Then on Pro license: verify upsell
+            state in Energy tab; no console errors.
+  Staging:  same flow against staging; verify PVGIS/NASA POWER
+            calls succeed from Lambda; energy result blob present
+            in S3; wall-clock acceptable (<2min total).
+  Prod:     PRODUCTION CUTOVER for energy — flip the energy
+            feature flag in a release build; Arun runs Generate-
+            with-energy on a real Pro Plus license; numbers verified.
+
 Out of scope
-  - Re-render export on demand (artifacts are pre-rendered; if
-    missing, user re-runs Generate).
-  - Cache layer.
+  - Functional split (separate compute-energy Lambda) — v2 future.
+  - PVGIS / NASA POWER caching across Runs — defer.
+  - Energy-only re-runs against an existing layout (re-using cached
+    layout result) — defer; brainstorm whether this is v1 or v2.
 ```
 
-#### C18 — Sidecar deletion
+### Phase G — Closeout
+
+#### C19 — Sidecar deletion
 
 ```
-Status:   todo
-Depends:  C4, C9, C16, C17 (every flag must be permanently flipped)
-Tier:     T3 (decision memo + multi-file deletion)
+Status:           todo
+Depends:          C4, C9, C16, C17, C18 (every flag must be permanently flipped)
+Tier:             T3 (decision memo + multi-file deletion)
+Brainstorm-first: yes — irreversibility risk management. Brainstorm forces inventory of stragglers (any USE_CLOUD_* flag still off? any sidecar import in test fixtures? any CI gate still pointing at pvlayout_engine/?) before deletion is committed. The brainstorm output IS most of the decision memo.
 
 Goal
   Delete python/pvlayout_engine/, packages/sidecar-client/,
@@ -910,18 +1183,33 @@ Acceptance
     rollback context.
   - Atomic commit: `chore: delete sidecar; cloud paths are canonical`.
 
+Smoke trigger (Arun, per sec 11.2) — irreversibility smoke; FULL
+                                       FUNCTIONAL REGRESSION
+  Local:    fresh Tauri build off the deletion branch; full
+            customer-flow smoke: license-key login → new project
+            (parse-kmz cloud) → Generate Layout (cloud) →
+            Generate with cables (cloud) → Generate with energy
+            (cloud, Pro Plus key) → Cancel mid-flight
+            (refund verified) → Failed run path (refund verified)
+            → all 3 exports download → Recents view + RunsList
+            render correctly → multi-tab → license-key swap.
+  Staging:  same full regression against staging.
+  Prod:     PRODUCTION SIDECAR DELETION — release-build; Arun
+            verifies the same customer flow on prod with a real
+            Pro Plus license. NO ROLLBACK PATH after this row;
+            captured in the decision memo with the verification
+            evidence.
+
 Out of scope
   - Rolling back to the sidecar (forward-only).
   - mvp_admin observability of cloud Lambdas (separate concern).
 ```
 
-### Phase G — Closeout
-
-#### C19 — Mobile contract verification
+#### C20 — Mobile contract verification
 
 ```
 Status:   todo
-Depends:  C18
+Depends:  C19
 Tier:     T1 (no new code; documentation row)
 
 Goal
@@ -953,11 +1241,11 @@ Out of scope
   - Mobile-specific UX considerations.
 ```
 
-#### C20 — Production cutover + V1 retirement signoff
+#### C21 — Production cutover + V1 retirement signoff
 
 ```
 Status:   todo
-Depends:  C18
+Depends:  C19
 Tier:     T3 (decision memo)
 
 Goal
@@ -980,6 +1268,21 @@ Acceptance
   - Marketing site download CTA reflects desktop-app-cloud-only.
   - Retirement memo at docs/initiatives/findings/.
 
+Smoke trigger (Arun, per sec 11.2) — final cutover smoke
+  Local:    skip — this is a prod-state row.
+  Staging:  spot-check the legacy V1 endpoints respond as expected
+            (or 410 Gone where deletion-marked), confirm staging
+            mvp_web download CTA copy.
+  Prod:     PRODUCTION FINAL SIGN-OFF — verify on prod that:
+            (a) any remaining V1 endpoint usage from legacy installs
+            still works OR has been migrated cleanly;
+            (b) marketing site CTA reflects new state;
+            (c) DLQ has been empty for the prior 2 weeks;
+            (d) reconciler logs show no pathological patterns;
+            (e) Prasanta's legacy install path either migrated or
+            documented as support-only.
+            Sign-off captured in retirement memo.
+
 Out of scope
   - Deleting the V1 endpoints themselves (separate row, post-launch).
 ```
@@ -997,7 +1300,9 @@ These are documented to keep current decisions honest about future-proofing, NOT
 - Provisioned concurrency on first-of-day cold-start mitigation if metrics demand.
 - Outbox pattern instead of publish-then-commit if SQS reliability ever surprises us.
 
-## 11. Cross-cutting Verifications (one-time, before C-rows)
+## 11. Verifications & Smoke-Testing Protocol
+
+### 11.1 Cross-cutting one-time verifications (before C-rows)
 
 These need a green checkmark before the rows that depend on them start. Recommend doing them all in a single short verification session at the top of C1 / C2 work.
 
@@ -1010,6 +1315,154 @@ These need a green checkmark before the rows that depend on them start. Recommen
 | V5 | mvp_api package.json has neither `@aws-sdk/client-sqs` nor `@aws-sdk/client-lambda` (likely both missing) | C4, C7 | grep |
 | V6 | `Run.status` column type permits `QUEUED` (string column → yes; enum → migration needed) | C7 | schema.prisma |
 | V7 | Vercel Cron availability on the project's plan | C13 | Vercel dashboard |
+
+### 11.2 Smoke-testing protocol
+
+> **Operating principle:** unit tests test small pieces of code; smoke tests test what the user experiences. **No "works on my laptop" claim is acceptable as evidence the row is done.** CI/CD is a first-class citizen and ships alongside code, not as an afterthought. *But* smoke testing has real human cost — Arun's time is the bottleneck — so the cadence is **strategic, not exhaustive**.
+
+**Levels (ordered by cost):**
+
+| Level | Environment | When | Who |
+|---|---|---|---|
+| **Local** | Laptop: sidecar (until C19) + mvp_api dev server + dev/local S3 + local Postgres or staging RDS read-replica + LocalStack/real Lambda invoke | Every (smoke)-marked row, first | Arun |
+| **Staging** | Full Vercel + AWS staging deploy, real Lambda + SQS + RDS + S3 staging buckets | Every (smoke)-marked row, after Local + CI green | Arun |
+| **Production** | Live prod deploy, minimal targeted exercise post-cutover | Phase-end cutover rows only (C9, C19, C21) | Arun |
+
+**Operator default:** Arun for desktop UX + most rows. Prasanta when solar-domain correctness is the validation question (e.g., golden-test divergence on a real customer KMZ).
+
+**Cadence per (smoke) row — the 5-step Definition of Done:**
+
+1. **Automated gates pass** — pre-commit gate from CLAUDE.md §8 (`bun run lint && bun run typecheck && bun run test && bun run build`) plus any row-specific test gates.
+2. **Local smoke (Arun)** — execute the row's `Smoke trigger` *Local* steps. **Bite-sized chunks** per memory's feedback rule: one observation per prompt, never bundle a numbered checklist. Capture output evidence in the row's PR description (paste of relevant tool output, DB query result, S3 ListObjects, mvp_api response).
+3. **CI/CD green** — staging deploy succeeds; staging integration tests pass; the row's PR is green on `main`.
+4. **Staging smoke (Arun)** — execute the row's `Smoke trigger` *Staging* steps. Same bite-sized cadence. **This is the bulk of the "real environment" verification** — same wire as prod, no customer impact.
+5. **Production sign-off** — only at the phase-end cutover rows (C9, C19, C21). Targeted production smoke; captured in the cutover row's decision memo.
+
+**Rows that are NOT (smoke)-marked:** automated gates + code review is enough. CI/CD still runs against staging on every merge, but no manual sign-off is needed. Examples: doc cleanup, refactor-only, scaffold-only, documentation-only rows.
+
+**Anti-patterns to avoid:**
+
+- ❌ Bundling smoke checks into a numbered list ("steps 1-7"). One question per prompt; wait for human response. Memory feedback rule.
+- ❌ Claiming a row done before staging smoke passes. "Works on my laptop" is not done.
+- ❌ Smoking every row "to be safe." Smokes for pure refactors waste Arun's time and dilute the signal of the genuinely high-risk smokes.
+- ❌ Skipping local smoke and going straight to staging. Local catches 80% of issues at 1× the cost; staging issues are more expensive to debug.
+
+**Smoke evidence captured in the PR:**
+
+```
+## Smoke evidence (row Cnn)
+
+### Local
+- <observation 1>: <evidence — output paste, screenshot, etc.>
+- <observation 2>: <evidence>
+...
+
+### Staging
+- <observation 1>: <evidence>
+...
+
+### Prod  (only for phase-end cutover rows)
+- <observation>: <evidence>
+```
+
+Each `Smoke trigger` field in row §9 names the specific exercises for that row. The protocol above governs **what / when / who**; **§11.4 governs HOW to run a smoke session** (ST-ID nomenclature, pre-req validation, bite-sized step execution, P0–P3 finding classification, outcome protocol, dual evidence capture). Smoke sessions are launched via the **§13.2 cold-session prompt** — a fresh Claude Code session dedicated to driving one ST-ID end-to-end.
+
+### 11.3 Brainstorm-first vs writing-plans-direct
+
+> **Operating principle:** rows that have ANY undecided design or UX question — even a small one — produce dramatically better outcomes when the child session invokes `superpowers:brainstorming` *before* `superpowers:writing-plans`. This is structural, not stylistic.
+
+**Why structurally:**
+
+- **`superpowers:brainstorming`** has a HARD-GATE in its skill body: *"Do NOT invoke any implementation skill until you have presented a design and the user has approved it."* The skill enforces: explore project context → ask clarifying questions **one at a time** → propose 2-3 approaches with trade-offs → present design in sections, user approves each → write spec → user reviews spec → ONLY THEN handoff. Dialogue is mandatory; the skill cannot proceed past gates without user input.
+
+- **`superpowers:writing-plans`** is the implementation translator. Its job is to convert an *approved* design into an executable plan. When given an underspecified row, it fills the gaps with its own reasonable-looking decisions — silently — because that is the correct role of a plan-translator skill. It is not broken; it is working as designed. But it is the **wrong tool** when the design itself is incomplete.
+
+**Practical consequence (learned the hard way):** writing-plans pattern-matches the spec template and produces output. Brainstorming reads, analyzes, asks. The halted B32 plan that prompted this whole architectural reset was a writing-plans output against a row whose architecture hadn't been brainstormed — and it confidently produced ~150 LOC of detailed implementation around an architecture that didn't exist.
+
+**Spec convention:**
+
+Rows that need brainstorming-first carry a `Brainstorm-first: yes` field with a one-line Reason. **Absence of the field = writing-plans-direct is acceptable.** The cold-session prompt (§13) enforces this — when the row says yes, the child session MUST invoke `superpowers:brainstorming` first; the brainstorm output is committed at `docs/superpowers/specs/YYYY-MM-DD-<row-id>-<slug>.md` *before* `superpowers:writing-plans` is invoked. **The judgment call is removed from the cold session — the spec declares it.**
+
+**Decision criteria for marking a row YES:**
+- Open design or UX questions whose answer materially changes the implementation.
+- First instance of a new pattern (e.g., first Lambda → first SQS Lambda → first cutover).
+- Irreversibility risk (e.g., sidecar deletion, V1 retirement).
+- Multi-component interaction where ordering or contract is non-obvious.
+- Recent code reality may have diverged from a spec assumption.
+
+**Decision criteria for marking NO (or omitting):**
+- Pure refactor (file moves with green tests).
+- Pure scaffold (template-driven structure).
+- Documentation-only row.
+- Mechanical extension of an established pattern (mirrors a working sibling row verbatim).
+- Row body fully specifies handler shape / SQL / wire contract — no design questions remain.
+
+About half the rows in §9 are marked YES. That's not over-engineering — it reflects how much real design surface this arc actually contains.
+
+### 11.4 Smoke session execution protocol
+
+> **Smoke tests are formal AI-supported, human-executed tasks** with clear pre-requisites, step-by-step instructions, priority-classified outcomes, and a documented protocol for addressing findings. They are NEVER bundled into the row's implementation session — they happen on a separate cold Claude Code session whose ONLY job is to drive the smoke. The §13.2 prompt template launches such a session.
+
+**ST-ID nomenclature**
+
+Every smoke test instance is identified as `ST-<row-id>-<level>` where `<level> ∈ {L, S, P}` for Local / Staging / Prod. Examples:
+
+- `ST-C4-L` — local smoke for parse-kmz Lambda row
+- `ST-C9-S` — staging smoke for desktop migration row
+- `ST-C19-P` — prod smoke for sidecar deletion (the irreversibility one)
+
+Sub-steps within a session are referenced as `ST-C9-S.1`, `ST-C9-S.2`, etc. when needed — typically when capturing findings ("P1 found at ST-C9-S.4").
+
+**Session shape (the arc every smoke session follows):**
+
+1. **Pre-requisite validation FIRST.** The session verifies, before any smoke step:
+   - The target row in §9 has `Status: in-progress` (not `done` — smoke is the gate that flips done; not `todo` — implementation must be in flight).
+   - All of the row's `Depends` rows have `Status: done` in §9.
+   - The target environment is live and reachable: dev server up (Local), staging deploy green (Staging), prod accessible (Prod).
+   - No stale state from a prior smoke (no orphan Run rows in dev RDS, etc.).
+   
+   If any pre-req fails: **HALT.** Report what failed; smoke is rescheduled. Do NOT improvise a workaround.
+
+2. **Bite-sized step execution.** Claude breaks the row's `Smoke trigger` `<level>` entry into atomic executable steps. **One step per prompt.** Each step is concrete and runnable:
+   - ✅ "In another terminal at repo root, run `bun run dev` and report back when you see `mvp_api ready on :3003`."
+   - ✅ "Open AWS console → Lambda → `pvlayout-compute-layout-staging` → Monitor tab. Paste the most recent invocation timestamp + duration."
+   - ✅ "In Tauri, click the Generate button. Paste any console errors that appear in the next 10s."
+   - ❌ "Verify mvp_api works." (abstract; no atomic action)
+   - ❌ "Test all four status transitions." (multiple actions bundled)
+   
+   Human runs the step, pastes the **actual output** back. Claude analyzes and produces the next step. No numbered checklists, no batching. (Memory feedback rule.)
+
+3. **Findings classification (P0–P3).** Each anomaly observed during smoke is classified by Claude with the human's confirmation:
+
+| Priority | Definition | Row impact |
+|---|---|---|
+| **P0** | Blocker. Basic functional path doesn't work. Customer flow broken. Data integrity compromised. | Row CANNOT flip to done. Smoke halts; fix is mandatory before re-smoking. |
+| **P1** | Significant. Happy path works but a real bug, missing UX state, or design flaw emerges. | Row CANNOT flip to done. Either inline-fix (same PR) or create a new row this row depends on. |
+| **P2** | Minor. Cosmetic, edge-case, nice-to-have. UX rough edge that doesn't break the flow. | Row CAN flip to done. Captured as a follow-up — appended to a not-yet-started downstream row's notes, or a new low-priority row. |
+| **P3** | Observation only. Worth recording for posterity; documents the state of the system at smoke time. | No action. Recorded in SMOKE-LOG.md only. |
+
+4. **Outcome protocol per priority:**
+
+   - **P0** → fix INLINE in the row's branch + same PR. Re-run smoke from the failing step (not from scratch — Claude resumes from where the failure occurred). Row stays in-progress.
+   - **P1** → if scope is **small + bounded** (≤ half-day work, no new files, no design re-think): fix INLINE in same PR; re-smoke. Otherwise: **create a new row** via spec amendment commit (per §12) — typically inserted with a sub-row notation (e.g., `C8.1` between `C8` and `C9`) or appended as a new top-level row at the end of the relevant phase. The originating row's `Depends` updates to include the new row; row stays in-progress until the new row also closes.
+   - **P2** → captured as follow-up. Either appended to a not-yet-started downstream row's notes (preferred when fit is natural), OR a new low-priority row at the end of the relevant phase. Originating row CAN flip to done.
+   - **P3** → recorded in `docs/post-parity/SMOKE-LOG.md`. No action.
+
+5. **Evidence capture — TWO places, both required:**
+
+   - **The row's PR description** carries the immediate session log under a `## Smoke evidence (ST-<id>)` section per §11.2's evidence template. This is the per-PR record.
+   - **`docs/post-parity/SMOKE-LOG.md`** carries a cross-cutting entry per ST-ID: date, operator, pre-req validation result, atomic-step results (one line per ST-ID.N step), findings classified P0–P3, outcomes (inline fix? new row? bundled into XYZ?), session duration. **This file is the searchable archive of every smoke ever run** — protects future cold sessions from re-discovering the same bug.
+
+6. **Spec amendments from smoke findings.** P0 / P1 findings that surface a flaw in a locked decision (D-id) trigger a spec amendment commit per §12 BEFORE the row's implementation fix lands. The amendment commit names the D-id changed and why; the row's fix commit references the amendment. **Never silently work around a locked decision.**
+
+**What NOT to do during a smoke session:**
+
+- ❌ Run a smoke session from inside an implementation session. Different cognitive shapes; mixing produces sloppy smoke and rushed implementation. Use a fresh Claude Code session per §13.2.
+- ❌ Bundle steps. One step per prompt. Period.
+- ❌ Mark a row done with unresolved P0 or P1 findings. The smoke gate is real.
+- ❌ Skip pre-requisite validation. "It probably works" is how prod fires happen.
+- ❌ Capture evidence only in the PR description without updating `SMOKE-LOG.md`. The cross-cutting archive is what protects future cold sessions from re-discovering the same bug.
+- ❌ Improvise around an environment problem mid-smoke. If staging is half-broken, halt and surface; don't smoke through it and call results valid.
 
 ## 12. Tracking Protocol
 
@@ -1037,7 +1490,11 @@ If a child session discovers a locked decision (D-id) is wrong — architectural
 
 **Atomic commit per row** (matches `docs/PLAN.md` convention).
 
-## 13. Cold-Session Prompt Template
+## 13. Cold-Session Prompt Templates
+
+Two distinct cold-session prompts: §13.1 for **implementation** sessions (executing a row), §13.2 for **smoke-test** sessions (running an ST-ID per §11.4). They are deliberately separate — implementation and smoke have different cognitive shapes; mixing them produces sloppy smoke and rushed implementation.
+
+### 13.1 Implementation cold-session prompt
 
 Paste verbatim into a fresh Claude Code session. Replace `<ROW-ID>` and `<ROW-NAME>` with the target.
 
@@ -1051,8 +1508,8 @@ this spec end-to-end:
   docs/superpowers/specs/2026-05-03-cloud-offload-architecture.md
 
 This spec is the primary source of truth for the entire cloud-offload
-arc. It contains numbered locked decisions (D1–D22) and numbered
-implementation rows (C1–C20). I will reference IDs throughout our
+arc. It contains numbered locked decisions (D1–D23) and numbered
+implementation rows (C1–C21). I will reference IDs throughout our
 session.
 
 I want to execute row: <ROW-ID>: <ROW-NAME>
@@ -1073,12 +1530,29 @@ Operating rules:
 3. Stay inside the row's Goal + Acceptance + Out of scope. Do not
    silently expand.
 
-4. Use superpowers in order:
-   - Open design questions inside scope → superpowers:brainstorming first.
-   - Otherwise → superpowers:writing-plans → my sign-off →
-     superpowers:executing-plans (TDD).
-   - Standard pre-commit gate per CLAUDE.md §8 plus any row-specific
-     gates.
+4. Use superpowers in the order the row dictates — DO NOT EXERCISE
+   JUDGMENT here, the spec already decided:
+
+   - **If the row has `Brainstorm-first: yes`:** you MUST invoke
+     `superpowers:brainstorming` FIRST. Commit the brainstorm output
+     at `docs/superpowers/specs/YYYY-MM-DD-<row-id>-<slug>.md` and
+     get my approval BEFORE invoking writing-plans. The
+     `Brainstorm-first` field's `Reason` line names what you must
+     surface in dialogue. See sec 11.3 for why.
+   - **If the row has NO `Brainstorm-first` field:** invoke
+     `superpowers:writing-plans` directly → my sign-off →
+     `superpowers:executing-plans` (TDD). The row body fully
+     specifies the design; writing-plans-direct is acceptable.
+   - **Either way:** the standard pre-commit gate from CLAUDE.md
+     sec 8 applies, plus any row-specific test gates listed under
+     Acceptance.
+
+   Why this is non-negotiable per row: writing-plans is mechanical
+   by design. When given an underspecified row, it fills the gaps
+   silently with its own decisions — confidently and wrongly. The
+   halted B32 plan that prompted this whole architectural reset
+   was a writing-plans output against a row whose architecture
+   hadn't been brainstormed. Don't repeat that.
 
 5. On completion: flip the row's Status from todo/in-progress → done
    in the spec, append a one-line PR/commit reference, commit as
@@ -1091,6 +1565,107 @@ Begin by reading:
   - All "Depends" rows already marked done in §9
 
 Then propose your plan to me before writing any code.
+```
+
+### 13.2 Smoke-test cold-session prompt
+
+Paste verbatim into a fresh Claude Code session — separate from any implementation session. Replace `<ROW-ID>` with the target row and `<L|S|P>` with the smoke level.
+
+```
+We are running a smoke test for the cloud-offload-compute
+architecture project. This is a cold Claude Code session; you have
+NO prior context. Smoke-test sessions are dedicated tasks separate
+from implementation work — your ONLY job is to drive this smoke.
+
+Before doing ANYTHING ELSE — including clarifying questions — read:
+
+  1. docs/superpowers/specs/2026-05-03-cloud-offload-architecture.md
+     - sec 11.2 (smoke testing protocol — what/when/who)
+     - sec 11.4 (smoke session execution — ST-IDs, priorities,
+       outcome protocol; this is your operating manual)
+     - The target row's full entry in sec 9, especially its
+       `Smoke trigger` field
+  2. docs/post-parity/SMOKE-LOG.md (the prior smoke history for
+     context — what was tested before, what findings emerged)
+
+I want to execute smoke test: ST-<ROW-ID>-<L|S|P>
+
+(L = Local laptop env; S = Staging deploy; P = Production. The row's
+`Smoke trigger` field has a per-level entry naming the exercises.)
+
+Operating rules — DO NOT EXERCISE JUDGMENT, the spec decided:
+
+1. PRE-REQUISITE VALIDATION FIRST. Before any smoke step, verify:
+   - The target row in spec sec 9 has `Status: in-progress`
+     (not `done`, not `todo`).
+   - All of the row's `Depends` rows have `Status: done` in sec 9.
+   - The target environment is live and reachable for the chosen
+     <L|S|P> level. Run concrete checks (curl, AWS CLI, browser
+     load) and report back.
+   - No stale state from prior smokes (orphan rows in dev RDS,
+     leftover S3 objects, stuck SQS messages).
+   If ANY pre-req fails: HALT. Tell me what failed; we reschedule
+   the smoke. Do not improvise around environment problems.
+
+2. BITE-SIZED STEPS. Break the row's `Smoke trigger` <level>
+   entry into atomic executable steps. ONE STEP PER PROMPT.
+   Each step must be concrete and runnable:
+     ✅ "In another terminal at repo root, run `bun run dev` and
+         report when you see `mvp_api ready on :3003`."
+     ✅ "Open AWS console → Lambda → pvlayout-compute-layout-staging
+         → Monitor tab. Paste the most recent invocation timestamp
+         + duration."
+     ❌ "Verify mvp_api works." (abstract)
+     ❌ "Test all four status transitions." (multiple actions
+         bundled)
+   I will run the step and paste actual output back. You analyze,
+   then send the next step. No numbered checklists. No batching.
+
+3. CLASSIFY FINDINGS as we go. Each anomaly = P0 / P1 / P2 / P3
+   per spec sec 11.4. State your classification + reason; I confirm
+   or adjust:
+     - P0 = blocker (basic flow broken, data integrity)
+     - P1 = significant (real bug, missing UX state, design flaw)
+     - P2 = minor (cosmetic, edge-case)
+     - P3 = observation only
+
+4. APPLY OUTCOME PROTOCOL per spec sec 11.4:
+     - P0 → halt smoke; fix INLINE in the row's branch + same PR;
+       re-run from the failing step (not from scratch).
+     - P1 → if scope is small + bounded (≤half-day, no new files,
+       no design re-think): fix INLINE same PR. Otherwise: create
+       a new row via spec amendment commit per sec 12; row stays
+       in-progress until the new row also closes.
+     - P2 → captured as follow-up; appended to a not-yet-started
+       downstream row's notes OR a new low-priority row at the
+       end of the relevant phase. Originating row CAN flip done.
+     - P3 → recorded in SMOKE-LOG.md only. No action.
+
+5. CAPTURE EVIDENCE in TWO places, both required:
+     - The row's PR description (under `## Smoke evidence
+       (ST-<id>)`) — the per-PR record.
+     - docs/post-parity/SMOKE-LOG.md (cross-cutting archive entry
+       per ST-ID with date, operator, pre-req result, atomic-step
+       results, findings classified P0–P3, outcomes, session
+       duration).
+
+6. SPEC AMENDMENTS. If a finding contradicts a locked decision
+   (D-id), STOP and surface to me. Spec amendment commit per sec 12
+   happens BEFORE any fix lands. Never silently work around a
+   locked decision.
+
+7. SESSION END. If all steps passed with at most P2/P3 findings AND
+   this smoke level is the gate the row needs (per sec 11.2's 5-step
+   DoD): tell me; I (Arun) flip the row's Status to `done` in spec
+   sec 9 via an atomic commit. If unresolved P0/P1 remain: row stays
+   in-progress; we discuss next steps.
+
+Begin by:
+  (a) Reading sec 11.2, 11.4, and the target row's `Smoke trigger`
+      field in sec 9.
+  (b) Reading recent SMOKE-LOG.md entries for context.
+  (c) Running pre-requisite validation as your first concrete
+      action — return the result before anything else.
 ```
 
 ## 14. Doc Kill List
@@ -1113,4 +1688,4 @@ Disposition table for every existing doc that touches cloud offload, Spike 1/2, 
 
 ---
 
-*End of spec. This is the source of truth for cloud-offload compute architecture work. Cold sessions: §13. Live status of rows: §9. Decision IDs cited by rows: §3.*
+*End of spec. This is the source of truth for cloud-offload compute architecture work. Implementation cold sessions: §13.1. Smoke-test cold sessions: §13.2. Live status of rows: §9. Decision IDs cited by rows: §3. Smoke-test protocol: §11.2 + §11.4.*
