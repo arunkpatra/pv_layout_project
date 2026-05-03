@@ -14,6 +14,14 @@ const EnvSchema = z.object({
   AWS_REGION: z.string().optional(),
   MVP_S3_DOWNLOADS_BUCKET: z.string().optional(),
   MVP_S3_PROJECTS_BUCKET: z.string().optional(),
+  // Cloud Lambda function names — one var per Lambda, convention is
+  // `LAMBDA_<PURPOSE_UPPERCASE>_FUNCTION_NAME` (hyphens → underscores).
+  // Read at call time inside `lib/lambda-invoker.ts` so tests can
+  // override without preloading env. Listed here for discoverability
+  // — future Lambdas (compute-layout at C6, detect-water at C16,
+  // compute-energy at C18) add their own var following the same
+  // convention.
+  LAMBDA_PARSE_KMZ_FUNCTION_NAME: z.string().optional(),
   // Clerk — used to verify dashboard JWT tokens
   CLERK_SECRET_KEY: z.string().optional(),
   // Stripe

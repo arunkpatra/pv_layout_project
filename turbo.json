@@ -92,6 +92,7 @@
         "MVP_DATABASE_URL",
         "MVP_CORS_ORIGINS",
         "MVP_S3_DOWNLOADS_BUCKET",
+        "MVP_S3_PROJECTS_BUCKET",
         "NODEJS_HELPERS",
         "NODE_ENV",
         "PORT",
@@ -100,7 +101,8 @@
         "AWS_REGION",
         "CLERK_SECRET_KEY",
         "STRIPE_SECRET_KEY",
-        "STRIPE_WEBHOOK_SECRET"
+        "STRIPE_WEBHOOK_SECRET",
+        "LAMBDA_PARSE_KMZ_FUNCTION_NAME"
       ]
     },
     "@solarlayout/mvp-admin#build": {
