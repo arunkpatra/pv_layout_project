@@ -197,26 +197,33 @@ jobs:
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_MVP_ADMIN }}
 
   build-lambda-images:
-    # C4 cloud-offload arc: build + push :<environment-tag> alongside the
-    # standard :<git-sha>. Calls build-lambdas.yml as a reusable workflow
-    # so the Dockerfile-build / buildx / QEMU / arm64 / ECR push logic
-    # lives in a single place. The :<env-tag> push is gated on the
-    # environment-tag input (set only here, never by build-lambdas.yml's
-    # other triggers) — env tags are deploy-state pointers, produced only
-    # when an operator has actively triggered a deploy.
+    # C4 cloud-offload arc: build + push :<env-key> alongside the standard
+    # :<git-sha>. Calls build-lambdas.yml as a reusable workflow so the
+    # Dockerfile-build / buildx / QEMU / arm64 / ECR push logic lives in
+    # a single place. The :<env-key> push is gated on the environment-tag
+    # input (set only here, never by build-lambdas.yml's other triggers)
+    # — env tags are deploy-state pointers, produced only when an
+    # operator has actively triggered a deploy.
+    #
+    # ENV_KEY normalization (per C4 Task 9 follow-up): GitHub environment
+    # names are full-word capitalized ('Production', future 'Staging');
+    # the C3 README's <env> ∈ {staging, prod} convention uses lowercase
+    # abbrev. Map here so AWS Lambda function suffixes + ECR tags both
+    # use the abbrev consistently. The mapping stays local to this
+    # workflow; no GitHub-side or AWS-side state changes needed.
     name: Build Lambda images
     needs: migrate
-    if: inputs.environment == 'production'
+    if: inputs.environment == 'Production'
     uses: ./.github/workflows/build-lambdas.yml
     with:
-      environment-tag: ${{ inputs.environment }}
+      environment-tag: ${{ inputs.environment == 'Production' && 'prod' || 'staging' }}
     secrets: inherit
 
   deploy-lambdas:
     # C4 cloud-offload arc: refresh AWS Lambda functions to the latest
-    # :<environment-tag>-tagged image. build-lambda-images (above) pushes
-    # the env tag; this job calls aws lambda update-function-code so the
-    # function picks up the new digest behind the same tag.
+    # :<env-key>-tagged image. build-lambda-images (above) pushes the env
+    # tag; this job calls aws lambda update-function-code so the function
+    # picks up the new digest behind the same tag.
     #
     # Static matrix — explicit deploy intent. Future Lambdas (compute-
     # layout at C6, detect-water at C16, compute-energy at C18) get added
@@ -224,18 +231,22 @@ jobs:
     # the failure mode where a new python/lambdas/<dir>/ lands before its
     # AWS function exists.
     #
-    # Gated to the production env only: no staging Lambda function exists
-    # yet. When a staging environment is added with its own Lambda
-    # function shells, this job becomes env-conditional via matrix.
+    # Gated to the Production env only: no Staging Lambda function exists
+    # yet. When a Staging environment is added with its own Lambda
+    # function shells, this job becomes env-conditional via matrix and the
+    # ENV_KEY mapping handles the abbrev normalization.
     name: Deploy Lambdas
     needs: build-lambda-images
-    if: inputs.environment == 'production'
+    if: inputs.environment == 'Production'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: ${{ inputs.environment }}
     permissions:
       id-token: write
       contents: read
+
+    env:
+      ENV_KEY: ${{ inputs.environment == 'Production' && 'prod' || 'staging' }}
 
     strategy:
       fail-fast: false
@@ -255,11 +266,11 @@ jobs:
       - name: Update Lambda function code
         run: |
           aws lambda update-function-code \
-            --function-name solarlayout-${{ matrix.lambda }}-prod \
-            --image-uri 378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/${{ matrix.lambda }}:production \
+            --function-name solarlayout-${{ matrix.lambda }}-${{ env.ENV_KEY }} \
+            --image-uri 378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/${{ matrix.lambda }}:${{ env.ENV_KEY }} \
             --publish
 
       - name: Wait for function update to settle
         run: |
           aws lambda wait function-updated \
-            --function-name solarlayout-${{ matrix.lambda }}-prod
+            --function-name solarlayout-${{ matrix.lambda }}-${{ env.ENV_KEY }}

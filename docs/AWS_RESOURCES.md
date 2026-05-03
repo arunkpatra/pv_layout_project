@@ -293,7 +293,12 @@ Tags:
 - **Image-tag mutability:** MUTABLE (per fix(c3) at commit `645907f`; CI re-pushes `latest` on every merge to main; SHA tags remain per-commit-unique for traceability).
 - **Scan-on-push:** enabled
 - **Architecture:** arm64 (single-arch image manifest)
-- **Tags:** `<git-sha>` per CI run; `latest` re-tagged on every merge to `main`. Both staging and prod Lambda functions consume from this single repo (the function ARN is the cut, not the image).
+- **Tags:**
+  - `<git-sha>` per CI run (audit / `Run.engineVersion` source of truth, per spec D21).
+  - `latest` re-tagged on every merge to `main` (convenience tag).
+  - `prod` (env-state pointer) re-tagged each time `platform-deployment.yml` runs with `environment=Production`. The prod Lambda function is configured with image-uri ending in `:prod`; the deploy job calls `aws lambda update-function-code` so the function picks up the new digest behind the same tag. Future `staging` Lambda will use `:staging` tag the same way.
+  - Env tags are produced ONLY by `platform-deployment.yml` — never by the build's `push:` / `pull_request:` / `workflow_dispatch:` triggers. Semantically: env tags mean "this image is what's running in env X", so they only exist when an operator has actively triggered a deploy.
+  - Both staging and prod Lambda functions consume from this single repo (the function ARN is the cut, not the image).
 - **Placeholder:** Tag `placeholder` was pushed at provisioning time so the Lambda function shells could be created. Replaced by CI on first deploy.
 
 ### Future repositories (created per row by the implementing agent)
