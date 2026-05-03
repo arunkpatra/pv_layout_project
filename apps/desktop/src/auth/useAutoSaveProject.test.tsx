@@ -45,6 +45,7 @@ const STUB_PATCHED: ProjectV2Wire = {
   createdAt: "2026-04-30T10:00:00.000Z",
   updatedAt: "2026-04-30T12:30:00.000Z",
   deletedAt: null,
+  parsedKmz: null,
 }
 
 function makeClient(

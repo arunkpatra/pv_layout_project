@@ -79,6 +79,7 @@ export function useRenameProjectMutation(
           createdAt: cur?.createdAt ?? now,
           updatedAt: now,
           deletedAt: null,
+          parsedKmz: cur?.parsedKmz ?? null,
         }
       }
 
