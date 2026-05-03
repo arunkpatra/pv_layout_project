@@ -278,23 +278,94 @@ Tags:
 - `{git-sha}` — per-commit tag
 - `buildcache` — Docker layer cache (managed by CI)
 
-### Repository: `solarlayout/smoketest` (throwaway)
+### Repository: `solarlayout/parse-kmz` (V2 cloud-offload arc)
 
-- **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/smoketest`
-- **Status:** Throwaway. Created in C3 to verify the build/push pipeline. **Deleted in C4** when parse-kmz lands.
-- **Image-tag mutability:** MUTABLE (switched 2026-05-03 from IMMUTABLE; the CI workflow re-pushes the `latest` convenience tag on every merge to main, which IMMUTABLE rejects on the second push. SHA tags remain per-commit-unique, so traceability is preserved by the SHA itself. All future Lambda repos created per-row also use MUTABLE.)
+- **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/parse-kmz`
+- **Status:** Active. Created 2026-05-03 in C4 Task 1.
+- **Image-tag mutability:** MUTABLE (per fix(c3) at commit `645907f`; CI re-pushes `latest` on every merge to main; SHA tags remain per-commit-unique for traceability).
 - **Scan-on-push:** enabled
-- **Tags:** `<git-sha>` per CI run; `latest` re-tagged on every merge to `main`.
+- **Architecture:** arm64 (single-arch image manifest)
+- **Tags:** `<git-sha>` per CI run; `latest` re-tagged on every merge to `main`. Both staging and prod Lambda functions consume from this single repo (the function ARN is the cut, not the image).
+- **Placeholder:** Tag `placeholder` was pushed at provisioning time so the Lambda function shells could be created. Replaced by CI on first deploy.
 
 ### Future repositories (created per row by the implementing agent)
 
 | Row | Repository | Purpose |
 |---|---|---|
-| C4 | `solarlayout/parse-kmz` | KMZ → parsed boundary geometry (sync invoke) |
 | C6/C8 | `solarlayout/compute-layout` | Heavy compute (SQS-triggered) |
 | C16 | `solarlayout/detect-water` | Water-body satellite detection (SQS) |
 
-All `solarlayout/*` ECR repos use immutable tags + scan-on-push + arm64 image manifests.
+All `solarlayout/*` ECR repos use MUTABLE tags + scan-on-push + arm64 image manifests.
+
+---
+
+## Lambda Functions (V2 cloud-offload arc)
+
+The post-parity V2 desktop relies on a fan-out of small Lambda functions for cloud-offloaded compute. Each function is built as a single arm64 container image, pushed to a per-feature `solarlayout/<feature>` ECR repo (shared across staging and prod — the function ARN is the cut, not the image), and updated by GitHub Actions on merges to `main`.
+
+### parse-kmz
+
+First function in the arc. Validates a KMZ uploaded under `projects/<userId>/kmz/<sha256>.kmz` and returns parsed boundary geometry (sync invoke from `mvp_api`).
+
+| Environment | Function Name                             | Memory | Timeout | Architecture |
+|-------------|-------------------------------------------|--------|---------|--------------|
+| local       | (no AWS Lambda function; runs natively)   | n/a    | n/a     | host machine |
+| staging     | `solarlayout-parse-kmz-staging`           | 512 MB | 30s     | arm64        |
+| prod        | `solarlayout-parse-kmz-prod`              | 512 MB | 30s     | arm64        |
+
+**Local tier (no AWS resources).** Local dev runs `python/lambdas/parse-kmz/parse_kmz_lambda/server.py` natively via `uv run python -m parse_kmz_lambda.server` (port 4101) per the C3.5 D24 pattern. `mvp_api` with `USE_LOCAL_ENVIRONMENT=true` routes to `localhost:4101`. The natively-running `server.py` uses the dev's AWS profile to `s3:GetObject` from `solarlayout-local-projects` (the bucket already exists per the V2 Projects Buckets table above). No new AWS resources for local; no Lambda function; no IAM role.
+
+**Staging + prod tier.** Both functions consume images from the shared `solarlayout/parse-kmz` ECR repository documented under `## ECR` above. The function ARN per environment is the boundary; the image is the same artifact promoted from staging to prod.
+
+#### Execution roles (minimum-privilege per spec C4 sec 4)
+
+Two IAM roles, one per environment, each with the same shape but scoped to the corresponding S3 projects bucket:
+
+- `arn:aws:iam::378240665051:role/solarlayout-parse-kmz-staging-execution`
+- `arn:aws:iam::378240665051:role/solarlayout-parse-kmz-prod-execution`
+
+**Trust policy (both roles, identical):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Service": "lambda.amazonaws.com" },
+    "Action": "sts:AssumeRole"
+  }]
+}
+```
+
+**Inline policy (`parse-kmz-{staging|prod}-permissions`):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::solarlayout-{env}-projects/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:ap-south-1:378240665051:*"
+    }
+  ]
+}
+```
+
+`{env}` is `staging` or `prod` for the corresponding role. **No KMS, no SSM, no SQS, no other S3 buckets, no Lambda invoke chain** — this is the locked minimum-privilege scope per spec C4 sec 4.
+
+#### CI deployment path
+
+GitHub Actions in `SolarLayout/solarlayout` builds the parse-kmz container, pushes to `solarlayout/parse-kmz`, and calls `lambda:UpdateFunctionCode` against both staging and prod function ARNs. The OIDC role (`solarlayout-github-actions`) was extended in C4 Task 1 to grant `lambda:UpdateFunctionCode` + `lambda:GetFunction` on the two function ARNs and `iam:PassRole` on the two execution role ARNs — see the GitHub Actions OIDC section below for the full inline policy.
 
 ---
 
@@ -344,6 +415,8 @@ All `solarlayout/*` ECR repos use immutable tags + scan-on-push + arm64 image ma
 
 **Inline policy (`solarlayout-github-actions-ecr-push`):**
 
+The policy retains its original `solarlayout-github-actions-ecr-push` name for continuity, but its scope grew in C4 Task 1 (2026-05-03) to also cover Lambda code update + iam:PassRole on the parse-kmz execution roles. Future Lambda rows (C6/C8/C16) will append additional statements following the same pattern.
+
 ```json
 {
   "Version": "2012-10-17",
@@ -372,6 +445,27 @@ All `solarlayout/*` ECR repos use immutable tags + scan-on-push + arm64 image ma
       ],
       "Resource": [
         "arn:aws:ecr:ap-south-1:378240665051:repository/solarlayout/*"
+      ]
+    },
+    {
+      "Sid": "LambdaUpdateParseKmz",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:UpdateFunctionCode",
+        "lambda:GetFunction"
+      ],
+      "Resource": [
+        "arn:aws:lambda:ap-south-1:378240665051:function:solarlayout-parse-kmz-staging",
+        "arn:aws:lambda:ap-south-1:378240665051:function:solarlayout-parse-kmz-prod"
+      ]
+    },
+    {
+      "Sid": "PassRoleParseKmzExecution",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::378240665051:role/solarlayout-parse-kmz-staging-execution",
+        "arn:aws:iam::378240665051:role/solarlayout-parse-kmz-prod-execution"
       ]
     }
   ]
