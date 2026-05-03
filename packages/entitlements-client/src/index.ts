@@ -11,7 +11,7 @@ export {
   EntitlementsError,
   type EntitlementsClient,
   type EntitlementsClientOptions,
-} from "./client"
+} from "./client.js"
 
 export {
   LICENSE_KEY_PATTERN,
@@ -29,14 +29,14 @@ export {
   type Plan,
   type UsageReportRequest,
   type UsageReportResult,
-} from "./types"
+} from "./types.js"
 
 export {
   FEATURE_KEYS,
   ALL_FEATURE_KEYS,
   isFeatureKey,
   type FeatureKey,
-} from "./feature-keys"
+} from "./feature-keys.js"
 
 // V2 wire types — mirror of renewable_energy/packages/shared/src/types/*.
 // Keep in lockstep with the backend.
@@ -112,4 +112,4 @@ export {
   type RunSummaryV2Wire,
   type RunWireV2,
   type RunUploadDescriptor,
-} from "./types-v2"
+} from "./types-v2.js"

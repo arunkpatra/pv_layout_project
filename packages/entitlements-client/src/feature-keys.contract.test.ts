@@ -25,7 +25,7 @@
 import { describe, test, expect } from "bun:test"
 import { readFileSync, existsSync } from "node:fs"
 import { resolve } from "node:path"
-import { ALL_FEATURE_KEYS } from "./feature-keys"
+import { ALL_FEATURE_KEYS } from "./feature-keys.js"
 
 // Seed-data file path, relative to this repo's root. Updated if the
 // renewable_energy repo moves or the seed-data file is renamed. As of

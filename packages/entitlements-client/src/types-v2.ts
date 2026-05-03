@@ -22,7 +22,7 @@
  */
 import { z } from "zod"
 
-import { entitlementsDataSchema, type Entitlements } from "./types"
+import { entitlementsDataSchema, type Entitlements } from "./types.js"
 
 // ---------------------------------------------------------------------------
 // Common envelope

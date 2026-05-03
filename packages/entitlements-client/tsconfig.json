@@ -1,7 +1,12 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "@solarlayout/typescript-config/base.json",
   "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "incremental": true,
     "types": ["bun"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules", "src/**/*.test.ts"]
 }

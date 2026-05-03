@@ -38,8 +38,8 @@ import {
   getRunV2ResponseSchema,
   type EntitlementSummaryV2,
   type V2ErrorCode,
-} from "./types-v2"
-import { entitlementsDataSchema } from "./types"
+} from "./types-v2.js"
+import { entitlementsDataSchema } from "./types.js"
 import { z } from "zod"
 
 describe("V2 error codes", () => {

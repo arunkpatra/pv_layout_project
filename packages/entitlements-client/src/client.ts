@@ -27,7 +27,7 @@ import {
   usageReportResponseSchema,
   type Entitlements,
   type UsageReportResult,
-} from "./types"
+} from "./types.js"
 import {
   createProjectV2ResponseSchema,
   createRunV2ResponseSchema,
@@ -56,7 +56,7 @@ import {
   type RunResultType,
   type UsageReportV2Result,
   type V2ErrorCode,
-} from "./types-v2"
+} from "./types-v2.js"
 
 /**
  * Minimal fetch-like signature — narrower than `typeof fetch` so a plain

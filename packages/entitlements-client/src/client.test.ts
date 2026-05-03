@@ -2,8 +2,8 @@ import { describe, test, expect } from "bun:test"
 import {
   createEntitlementsClient,
   EntitlementsError,
-} from "./client"
-import { isPlausibleLicenseKey } from "./types"
+} from "./client.js"
+import { isPlausibleLicenseKey } from "./types.js"
 
 const KEY = "sl_live_abc123"
 

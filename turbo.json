@@ -53,6 +53,14 @@
     "clean": {
       "cache": false
     },
+    "@solarlayout/entitlements-client#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@solarlayout/entitlements-client#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "tsconfig.tsbuildinfo"]
+    },
     "@solarlayout/mvp-db#typecheck": {
       "dependsOn": ["mvp-db:generate"],
       "outputs": []
