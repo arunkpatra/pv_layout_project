@@ -86,3 +86,31 @@ describe("getPresignedUploadUrl", () => {
     expect(opts?.expiresIn).toBe(900)
   })
 })
+
+describe("parseS3Url", () => {
+  let parseS3Url: (url: string) => { bucket: string; key: string }
+
+  beforeAll(async () => {
+    ;({ parseS3Url } = await import("./s3.js"))
+  })
+
+  test("splits a canonical s3:// URL", () => {
+    expect(parseS3Url("s3://my-bucket/path/to/file.kmz")).toEqual({
+      bucket: "my-bucket",
+      key: "path/to/file.kmz",
+    })
+  })
+
+  test("preserves slashes in the key", () => {
+    expect(parseS3Url("s3://b/projects/usr_x/prj_y/kmz/abc.kmz")).toEqual({
+      bucket: "b",
+      key: "projects/usr_x/prj_y/kmz/abc.kmz",
+    })
+  })
+
+  test("throws on malformed url", () => {
+    expect(() => parseS3Url("not-an-s3-url")).toThrow(/malformed/)
+    expect(() => parseS3Url("https://example.com/x")).toThrow(/malformed/)
+    expect(() => parseS3Url("s3://only-bucket")).toThrow(/malformed/)
+  })
+})

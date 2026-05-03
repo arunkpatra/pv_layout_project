@@ -1,20 +1,18 @@
-"""Local HTTP server for smoketest Lambda — sync-mode demonstrator.
+"""Local HTTP server for parse-kmz Lambda — sync-mode (per spec C3.5 + C4).
 
-Runs natively on the host via:
+Runs natively on the host:
 
-    cd python/lambdas/smoketest && uv run python -m smoketest_lambda.server
+    cd python/lambdas/parse-kmz
+    uv run python -m parse_kmz_lambda.server
 
-Pattern source: journium-bip-pipeline/src/server.py (transport)
-                + journium-litellm-proxy/src/server.py (HTTP handler shape).
+Pattern source: journium-bip-pipeline/src/server.py + journium-litellm-proxy/src/server.py
+(transport stays in server.py; handler.handler is unchanged from cloud).
 
-Sync-mode (per spec C3.5): POST /invoke calls handler.handler(body, None)
-inline and returns its dict as JSON; 200 on success, 500 on exception.
-GET /health returns {"ok": true}.
+Sync-mode: POST /invoke calls handler.handler(body, None) inline and returns
+its dict as JSON; 200 on success, 500 on Python exception. GET /health returns
+{"ok": true}.
 
-Throwaway: deleted in C4 alongside the rest of python/lambdas/smoketest/.
-Future Lambdas (parse-kmz at C4 = sync-mode; compute-layout at C6 =
-async-mode 202+daemon-thread) follow this same shape adapted to their
-cloud trigger type. Async pattern reference: journium-bip-pipeline.
+Port 4101 per spec C3.5 + python/lambdas/README.md.
 """
 from __future__ import annotations
 
@@ -25,20 +23,19 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
-from smoketest_lambda.handler import handler as lambda_handler
+from parse_kmz_lambda.handler import handler as lambda_handler
 
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
 )
-
 logger = logging.getLogger(__name__)
 
-PORT = int(os.environ.get("PORT", "4100"))
+PORT = int(os.environ.get("PORT", "4101"))
 
 
-class SmoketestHandler(BaseHTTPRequestHandler):
+class ParseKmzHandler(BaseHTTPRequestHandler):
     """Routes: GET /health, POST /invoke."""
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
@@ -82,8 +79,8 @@ class SmoketestHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    server = HTTPServer(("0.0.0.0", PORT), SmoketestHandler)
-    logger.info("smoketest local server listening on port %d", PORT)
+    server = HTTPServer(("0.0.0.0", PORT), ParseKmzHandler)
+    logger.info("parse-kmz local server listening on port %d", PORT)
     server.serve_forever()
 
 

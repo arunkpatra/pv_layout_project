@@ -109,6 +109,7 @@ const samplePersistedProject: PersistedProject = {
   createdAt: "2026-04-29T10:00:00Z",
   updatedAt: "2026-04-29T10:00:00Z",
   deletedAt: null,
+  parsedKmz: null,
 }
 
 // `projectId` is implicit (= currentProject.id) on the post-parity Run

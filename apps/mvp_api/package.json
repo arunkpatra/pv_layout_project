@@ -17,6 +17,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@clerk/backend": "^1.0.0",
     "@hono/node-server": "^1.19.14",
+    "@solarlayout/entitlements-client": "workspace:*",
     "@solarlayout/mvp-db": "workspace:*",
     "@solarlayout/shared": "workspace:*",
     "hono": "^4.12.0",

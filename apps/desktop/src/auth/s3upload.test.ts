@@ -47,6 +47,7 @@ function makeClient(
     listProjectsV2: vi.fn(),
     getRunV2: vi.fn(),
     deleteRunV2: vi.fn(),
+    parseKmzV2: vi.fn(),
     ...overrides,
   }
 }

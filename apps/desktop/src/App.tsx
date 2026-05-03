@@ -46,7 +46,10 @@ import {
   useEntitlementsQuery,
   useSyncEntitlementsToSidecar,
 } from "./auth/useEntitlements"
-import { useCreateProjectMutation } from "./auth/useCreateProject"
+import {
+  useCreateProjectMutation,
+  type CreateStage,
+} from "./auth/useCreateProject"
 import { useOpenProjectMutation } from "./auth/useOpenProject"
 import {
   useGenerateLayoutMutation,
@@ -72,8 +75,12 @@ import {
 } from "./state/projectEdits"
 import { LicenseKeyDialog } from "./dialogs/LicenseKeyDialog"
 import { LicenseInfoDialog } from "./dialogs/LicenseInfoDialog"
-import { openAndParseKmz } from "./project/kmzLoader"
-import { boundaryGeojsonFromParsed } from "./project/boundaryGeojson"
+import { openKmz } from "./project/kmzLoader"
+import {
+  CreateProjectModal,
+  type CreateProjectStage,
+} from "./project/CreateProjectModal"
+import { parsedKmzFromWire } from "./project/parsedKmzFromWire"
 import { countKmzFeatures, kmzToGeoJson } from "./project/kmzToGeoJson"
 import { layoutToGeoJson } from "./project/layoutToGeoJson"
 import { useProjectStore } from "./state/project"
@@ -171,6 +178,29 @@ export function App(): JSX.Element {
   // Holds the human-readable detail from the backend so the modal can
   // surface "3/3" naturally without re-deriving the numbers locally.
   const [upsellDetail, setUpsellDetail] = useState<string | null>(null)
+  // C4 — three-stage create flow modal. Drives CreateProjectModal's
+  // per-stage progress / error rendering. `createStageRef` is the
+  // ground-truth pointer used inside the catch handler to identify
+  // which stage failed (state updates aren't visible synchronously
+  // inside the same async block).
+  const [createStage, setCreateStage] = useState<CreateProjectStage>({
+    kind: "idle",
+  })
+  const createStageRef = useRef<CreateStage | null>(null)
+  // Cancellation latch for the in-flight create flow. Set to `true` by
+  // the modal's Cancel button; checked at every site that would
+  // otherwise hydrate post-cancel state (stage updates, success
+  // hydration, error UI). Reset on each fresh handleOpenKmz entry.
+  // The mutation itself isn't aborted (no AbortController on the
+  // network paths yet); the guard ensures cancelled flows produce no
+  // user-visible side effects even if the mutation eventually
+  // resolves or rejects.
+  const createCancelledRef = useRef(false)
+  const handleCreateStageChange = useCallback((s: CreateStage) => {
+    if (createCancelledRef.current) return
+    createStageRef.current = s
+    setCreateStage({ kind: s })
+  }, [])
 
   const queryClient = useQueryClient()
 
@@ -571,6 +601,7 @@ export function App(): JSX.Element {
     entitlementsClient,
     {
       fetchImpl: inTauri() ? (tauriFetch as typeof fetch) : undefined,
+      onStageChange: handleCreateStageChange,
     }
   )
 
@@ -694,19 +725,29 @@ export function App(): JSX.Element {
   // tabsReset is declared earlier in the function (above the
   // clearAllPerUserSession helper) so the helper has it in scope.
 
-  // ── KMZ load flow ────────────────────────────────────────────────────────
-  // P1 wiring: parse locally for the canvas (existing behaviour) AND
-  // upload + create the persisted project via B6 → S3 → B11. The two
-  // halves share the same bytes — `openAndParseKmz` returns them so we
-  // don't re-read the file from disk for the upload step.
+  // ── KMZ load flow (C4 cloud-offload) ─────────────────────────────────────
+  // The new-project flow drives the staged CreateProjectModal:
+  //   1. uploading   — uploadKmzToS3 (B6 mint URL → S3 PUT)
+  //   2. creating    — createProjectV2 (B11)
+  //   3. parsing     — parseKmzV2 (POST /v2/projects/:id/parse-kmz; mvp_api
+  //                    invokes the parse-kmz Lambda + persists the result)
+  // Pre-C4 the desktop POSTed the bytes to the local sidecar's
+  // `/parse-kmz`; that call is gone. The sidecar is no longer on the
+  // critical path of the new-project flow.
   const handleOpenKmz = useCallback(async () => {
-    if (!sidecarClient || opening) return
+    if (opening) return
     setOpening(true)
     setOpenError(null)
     setUpsellDetail(null)
+    // Fresh attempt — clear any cancelled latch from a prior run and
+    // reset the stage pointer so the catch handler can identify the
+    // failed stage cleanly.
+    createCancelledRef.current = false
+    createStageRef.current = null
     try {
-      const result = await openAndParseKmz(sidecarClient)
+      const result = await openKmz()
       if (!result) return // user cancelled the native dialog
+
       // New project = fresh start. Drop the previous layout so the canvas
       // doesn't show stale tables/ICRs, reset the input panel's params to
       // defaults, reset visibility toggles to PyQt5 defaults (both off),
@@ -720,64 +761,88 @@ export function App(): JSX.Element {
       resetEditingState()
       setLayoutFormKey((k) => k + 1)
 
-      // Persist via B11 BEFORE touching the parity-era project slice so a
-      // 402 (quota exceeded) leaves the canvas in its prior state — no
-      // half-loaded "ghost project" if the create fails.
+      // Open the staged modal. The hook's onStageChange callback drives
+      // subsequent stage transitions; we set "uploading" upfront so the
+      // modal appears before the first network round-trip.
+      createStageRef.current = "uploading"
+      setCreateStage({ kind: "uploading" })
+
       const projectName = stripKmzExtension(result.fileName)
-      let persistedProjectId: string | null = null
-      let persistedProjectName: string | null = null
+      let returned
       try {
-        const persisted = await createProjectMutation.mutateAsync({
+        returned = await createProjectMutation.mutateAsync({
           bytes: result.bytes,
           name: projectName,
-          // SP6 / B26 — send the parsed boundary so backend can persist
-          // it for the placeholder-fallback render on RecentsView cards.
-          // The desktop already has it in memory from sidecar.parseKmz
-          // a few lines above; no extra round-trip cost.
-          boundaryGeojson: boundaryGeojsonFromParsed(result.parsed),
         })
-        setCurrentProject(persisted)
-        // S1-12 — A freshly-created project has no runs yet. Explicitly
-        // reset the runs slice so a prior project's runs don't leak into
-        // the new project's gallery until the next tab-switch round-trip
-        // overwrites them via P2's B12 fetch. (B11's ProjectV2Wire
-        // intentionally doesn't carry runs[] — only B12 does — so we
-        // must set [] here.) `setRuns([])` also drops a stale
-        // selectedRunId per the slice's setRuns invariant
-        // (state/project.ts:135–138).
-        setRuns([])
-        persistedProjectId = persisted.id
-        persistedProjectName = persisted.name
       } catch (err) {
-        if (err instanceof EntitlementsError && err.code === "PAYMENT_REQUIRED") {
-          // Surface upsell modal; leave project state unchanged.
+        // User clicked Cancel mid-flight — drop the error silently;
+        // the modal is already hidden and the user has moved on.
+        if (createCancelledRef.current) return
+        // 402 PAYMENT_REQUIRED → upsell, leave canvas unchanged + close
+        // the staged modal cleanly (no error overlay).
+        if (
+          err instanceof EntitlementsError &&
+          err.code === "PAYMENT_REQUIRED"
+        ) {
           setUpsellDetail(err.message)
+          setCreateStage({ kind: "idle" })
           return
         }
-        // Non-quota errors (upload failures, 401, 5xx) flow through the
-        // generic open-error overlay below.
-        throw err
+        // Other errors (upload failures, 401, 5xx, parse failures) →
+        // collapse the modal to its error state at the failed stage.
+        // mvp_api auto-cleans the orphan project + refunds quota on
+        // any post-create failure (per spec §Q3 burn-the-boats), so
+        // there's nothing for the desktop to undo.
+        const failedAt: CreateStage = createStageRef.current ?? "uploading"
+        setCreateStage({ kind: "error", failedAt })
+        // Also swallow the error from the outer catch — we've handled
+        // the visual surface here.
+        return
       }
 
-      setProject({ kmz: result.parsed, fileName: result.fileName })
+      // User cancelled while the mutation was in flight but it
+      // completed successfully anyway. Drop the result on the floor —
+      // do NOT hydrate canvas state, do NOT open a tab, do NOT show
+      // the "done" modal. Note: this leaves an orphan project on the
+      // server; mvp_api's auto-cleanup only fires on Lambda FAILURE,
+      // not on user cancel. Pre-launch this is acceptable (Arun
+      // pre-approved DB wipes); a future row could add an explicit
+      // DELETE on cancel-after-success.
+      if (createCancelledRef.current) return
+
+      // Success. Hydrate canvas state from the wire payload, register
+      // the tab, and let the modal auto-dismiss after its 300ms pause.
+      setCurrentProject(returned.project)
+      // S1-12 — fresh project has no runs yet. Reset the runs slice so a
+      // prior project's runs don't leak into the new project's gallery.
+      setRuns([])
+      setProject({
+        kmz: parsedKmzFromWire(returned.parsed),
+        fileName: result.fileName,
+      })
       // S2 — register the just-created project as a tab. openTab dedupes
       // by projectId, so re-opening is a no-op switch.
-      if (persistedProjectId && persistedProjectName) {
-        tabsOpenTab(persistedProjectId, persistedProjectName)
-      }
+      tabsOpenTab(returned.project.id, returned.project.name)
       setPaletteOpen(false)
+      setCreateStage({ kind: "done" })
     } catch (err) {
+      // Outer catch covers file-pick / read-file failures (rare) — the
+      // mutation's own errors are caught above. If the user cancelled
+      // mid-flight, swallow the error: the modal is already hidden and
+      // we don't want to surface a stale failure overlay.
+      if (createCancelledRef.current) return
       const detail = err instanceof Error ? err.message : String(err)
       console.error("KMZ load failed:", err)
       setOpenError(detail)
+      setCreateStage({ kind: "idle" })
     } finally {
       setOpening(false)
     }
   }, [
-    sidecarClient,
     opening,
     setProject,
     setCurrentProject,
+    setRuns,
     clearLayoutResult,
     clearCurrentJobState,
     resetLayoutParams,
@@ -786,6 +851,25 @@ export function App(): JSX.Element {
     createProjectMutation,
     tabsOpenTab,
   ])
+
+  // CreateProjectModal handlers — wrapped in useCallback so their
+  // identities are stable across App re-renders. The modal's
+  // auto-dismiss useEffect has `onAutoDismiss` in its dep array;
+  // unstable identities (inline lambdas) caused the 300ms timer to
+  // be cleared and re-armed on every parent render — combined with
+  // the post-success invalidateQueries refetches, the modal would
+  // hang in the "done" state indefinitely.
+  const handleCreateModalCancel = useCallback(() => {
+    createCancelledRef.current = true
+    setCreateStage({ kind: "idle" })
+  }, [])
+  const handleCreateModalTryAgain = useCallback(() => {
+    setCreateStage({ kind: "idle" })
+    void handleOpenKmz()
+  }, [handleOpenKmz])
+  const handleCreateModalAutoDismiss = useCallback(() => {
+    setCreateStage({ kind: "idle" })
+  }, [])
 
   // ── P2 / S3 — open-existing-project flow ────────────────────────────────
   // The core open-by-ID flow is shared between two entry points:
@@ -813,14 +897,28 @@ export function App(): JSX.Element {
       resetEditingState()
       setLayoutFormKey((k) => k + 1)
 
-      // Parse the downloaded KMZ via the sidecar so the canvas can render.
-      // Mirror the kmzLoader.openAndParseKmz flow — same blob/Content-Type,
-      // filename derived from the project name.
-      const blob = new Blob([opened.bytes as BlobPart], {
-        type: "application/vnd.google-earth.kmz",
-      })
+      // Post-C4: every project has parsedKmz populated server-side at
+      // create time (parse-kmz Lambda persists it to Project.parsedKmz).
+      // Open-flow reads it from B14's response directly — no sidecar
+      // re-parse, no Blob round-trip through the canvas. `opened.bytes`
+      // is still fetched by the mutation today (used as a defensive
+      // hedge if a future flow needs the raw KMZ); cleanup of that
+      // round-trip is deferred to a follow-up.
+      if (!opened.detail.parsedKmz) {
+        // Pre-C4 projects with parsedKmz=null were wiped at cutover;
+        // this path is defensive. Surface a clear error rather than
+        // render an empty canvas or crash.
+        console.error(
+          "openProject: project has no parsedKmz — likely pre-C4 row that was missed by cutover wipe",
+          opened.detail.id
+        )
+        setOpenError(
+          "This project's data is incomplete. Please contact support or re-create the project."
+        )
+        return
+      }
+      const parsed = parsedKmzFromWire(opened.detail.parsedKmz)
       const fileName = `${opened.detail.name}.kmz`
-      const parsed = await sidecarClient.parseKmz(blob, fileName)
 
       setCurrentProject(opened.detail)
       setRuns(opened.detail.runs)
@@ -1424,6 +1522,13 @@ export function App(): JSX.Element {
                 onDismiss={() => setUpsellDetail(null)}
               />
             )}
+            <CreateProjectModal
+              stage={createStage}
+              onCancel={handleCreateModalCancel}
+              onTryAgain={handleCreateModalTryAgain}
+              onAutoDismiss={handleCreateModalAutoDismiss}
+            />
+
             {/* P4 — top-right pill mirrors auto-save status. */}
             <SaveIndicator status={saveStatus} />
 

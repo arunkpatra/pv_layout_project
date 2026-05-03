@@ -195,3 +195,55 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_MVP_ADMIN }}
+
+  deploy-lambdas:
+    # C4 cloud-offload arc: refresh AWS Lambda functions to the latest
+    # :production-tagged image. build-lambdas.yml pushes that tag on every
+    # push to main; this job calls aws lambda update-function-code so the
+    # function picks up the new digest behind the same tag.
+    #
+    # Static matrix — explicit deploy intent. Future Lambdas (compute-
+    # layout at C6, detect-water at C16, compute-energy at C18) get added
+    # here when their AWS function shells are provisioned. Static avoids
+    # the failure mode where a new python/lambdas/<dir>/ lands before its
+    # AWS function exists.
+    #
+    # Gated to the production env only: no staging Lambda function exists
+    # yet. When a staging environment is added with its own Lambda
+    # function shells, this job becomes env-conditional via matrix.
+    name: Deploy Lambdas
+    needs: migrate
+    if: inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        lambda: [parse-kmz]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name solarlayout-${{ matrix.lambda }}-prod \
+            --image-uri 378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/${{ matrix.lambda }}:production \
+            --publish
+
+      - name: Wait for function update to settle
+        run: |
+          aws lambda wait function-updated \
+            --function-name solarlayout-${{ matrix.lambda }}-prod
