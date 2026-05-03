@@ -92,7 +92,7 @@ The `pip install --no-deps` line uses `tomllib` to parse `pyproject.toml` and ex
 1. `mkdir python/lambdas/<purpose>` and create the layout above.
 2. Edit `<purpose>` placeholders in the Dockerfile.
 3. Add the matrix entry in `.github/workflows/build-lambdas.yml` (auto-discovery via `find python/lambdas -mindepth 1 -maxdepth 1 -type d` is also acceptable — see workflow comments).
-4. `aws ecr create-repository --repository-name solarlayout/<purpose> --image-tag-mutability IMMUTABLE --image-scanning-configuration scanOnPush=true --region ap-south-1`.
+4. `aws ecr create-repository --repository-name solarlayout/<purpose> --image-tag-mutability MUTABLE --image-scanning-configuration scanOnPush=true --region ap-south-1`. (MUTABLE because the CI workflow re-pushes the `latest` convenience tag on every merge to main; IMMUTABLE rejects that. The SHA tag is still per-commit-unique, so traceability is preserved by the SHA itself.)
 5. Update `docs/AWS_RESOURCES.md` with the new ECR entry.
 
 ## Build context rule (D5)

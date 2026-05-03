@@ -282,9 +282,9 @@ Tags:
 
 - **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/smoketest`
 - **Status:** Throwaway. Created in C3 to verify the build/push pipeline. **Deleted in C4** when parse-kmz lands.
-- **Image-tag mutability:** IMMUTABLE
+- **Image-tag mutability:** MUTABLE (switched 2026-05-03 from IMMUTABLE; the CI workflow re-pushes the `latest` convenience tag on every merge to main, which IMMUTABLE rejects on the second push. SHA tags remain per-commit-unique, so traceability is preserved by the SHA itself. All future Lambda repos created per-row also use MUTABLE.)
 - **Scan-on-push:** enabled
-- **Tags:** `<git-sha>` per CI run; `latest` only on `main`.
+- **Tags:** `<git-sha>` per CI run; `latest` re-tagged on every merge to `main`.
 
 ### Future repositories (created per row by the implementing agent)
 

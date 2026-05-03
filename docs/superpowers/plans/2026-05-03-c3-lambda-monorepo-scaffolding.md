@@ -255,7 +255,7 @@ The `pip install --no-deps` line uses `tomllib` to parse `pyproject.toml` and ex
 1. `mkdir python/lambdas/<purpose>` and create the layout above.
 2. Edit `<purpose>` placeholders in the Dockerfile.
 3. Add the matrix entry in `.github/workflows/build-lambdas.yml` (auto-discovery via `find python/lambdas -mindepth 1 -maxdepth 1 -type d` is also acceptable — see workflow comments).
-4. `aws ecr create-repository --repository-name solarlayout/<purpose> --image-tag-mutability IMMUTABLE --image-scanning-configuration scanOnPush=true --region ap-south-1`.
+4. `aws ecr create-repository --repository-name solarlayout/<purpose> --image-tag-mutability MUTABLE --image-scanning-configuration scanOnPush=true --region ap-south-1`. (MUTABLE because the CI workflow re-pushes the `latest` convenience tag on every merge to main; IMMUTABLE rejects that on the second push. SHA tags are still per-commit-unique.)
 5. Update `docs/AWS_RESOURCES.md` with the new ECR entry.
 
 ## Build context rule (D5)
@@ -660,9 +660,9 @@ In `docs/AWS_RESOURCES.md`, find the existing `## ECR` section (around line 271-
 
 - **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/smoketest`
 - **Status:** Throwaway. Created in C3 to verify the build/push pipeline. **Deleted in C4** when parse-kmz lands.
-- **Image-tag mutability:** IMMUTABLE
+- **Image-tag mutability:** MUTABLE (originally IMMUTABLE; switched 2026-05-03 because the CI workflow re-pushes `latest` on every merge to main, which IMMUTABLE rejects. SHA tags remain per-commit-unique. All future Lambda repos also use MUTABLE.)
 - **Scan-on-push:** enabled
-- **Tags:** `<git-sha>` per CI run; `latest` only on `main`.
+- **Tags:** `<git-sha>` per CI run; `latest` re-tagged on every merge to `main`.
 
 ### Future repositories (created per row by the implementing agent)
 
@@ -973,12 +973,14 @@ The ECR repo must exist before the workflow attempts a `docker push`. The role's
 > ```bash
 > aws ecr create-repository \
 >   --repository-name solarlayout/smoketest \
->   --image-tag-mutability IMMUTABLE \
+>   --image-tag-mutability MUTABLE \
 >   --image-scanning-configuration scanOnPush=true \
 >   --region ap-south-1
 > ```
 >
 > Expected: JSON response with `repository.repositoryUri = 378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/smoketest`.
+>
+> **Mutability note:** the original C3 plan called for IMMUTABLE. That broke on the first post-C3 merge (C3.5) because the CI workflow re-tags `latest` on every push-to-main, and IMMUTABLE rejects re-pushes of an existing tag. Switched to MUTABLE post-merge. SHA tags are per-commit-unique either way; mutability only affects the convenience `latest` re-tag.
 
 If the command fails with `RepositoryAlreadyExistsException`: the repo already exists from a prior attempt. Verify settings with:
 
@@ -986,7 +988,7 @@ If the command fails with `RepositoryAlreadyExistsException`: the repo already e
 aws ecr describe-repositories --repository-names solarlayout/smoketest --region ap-south-1
 ```
 
-If `imageTagMutability` is `IMMUTABLE` and `imageScanningConfiguration.scanOnPush` is `true`, proceed. Otherwise, agent drafts `aws ecr put-image-tag-mutability` and/or `aws ecr put-image-scanning-configuration` to fix.
+If `imageTagMutability` is `MUTABLE` and `imageScanningConfiguration.scanOnPush` is `true`, proceed. Otherwise, agent drafts `aws ecr put-image-tag-mutability` and/or `aws ecr put-image-scanning-configuration` to fix.
 
 - [ ] **Step 2: NO commit for this task** — AWS state mutation only.
 
@@ -1133,7 +1135,7 @@ jobs:
 
 Notes on tag-list conditional: GitHub Actions doesn't support conditional list entries cleanly; the `format()` ternary returns either the `latest` tag or an empty string. `docker/build-push-action@v5` ignores empty tag entries.
 
-`provenance: false`: SLSA provenance attestations create an OCI manifest list that ECR's `IMMUTABLE` tag policy rejects on second push (each commit creates a new attestation manifest with a different digest but same logical tag, conflicting with immutability). Disabling provenance keeps the image push idempotent.
+`provenance: false`: SLSA provenance attestations create an OCI manifest list that previously fought ECR's `IMMUTABLE` tag policy on the second push (each commit creates a new attestation manifest with a different digest but same logical tag). Now that the repo is MUTABLE this is less load-bearing, but disabling provenance still keeps the image push minimal — no value for a single-image-per-Lambda-repo setup.
 
 - [ ] **Step 2: Verify with `actionlint`**
 
