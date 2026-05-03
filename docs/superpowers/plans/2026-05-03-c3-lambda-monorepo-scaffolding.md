@@ -729,14 +729,16 @@ In `docs/AWS_RESOURCES.md`, find the existing `## GitHub Actions OIDC` section (
       "Effect": "Allow",
       "Action": [
         "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
         "ecr:CompleteLayerUpload",
+        "ecr:CreateRepository",
+        "ecr:DescribeImages",
+        "ecr:DescribeRepositories",
+        "ecr:GetDownloadUrlForLayer",
         "ecr:InitiateLayerUpload",
         "ecr:PutImage",
-        "ecr:UploadLayerPart",
-        "ecr:DescribeRepositories",
-        "ecr:DescribeImages",
-        "ecr:CreateRepository",
-        "ecr:TagResource"
+        "ecr:TagResource",
+        "ecr:UploadLayerPart"
       ],
       "Resource": [
         "arn:aws:ecr:ap-south-1:378240665051:repository/solarlayout/*"
@@ -911,14 +913,16 @@ cat > /tmp/solarlayout-github-actions-ecr-push.json <<'EOF'
       "Effect": "Allow",
       "Action": [
         "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
         "ecr:CompleteLayerUpload",
+        "ecr:CreateRepository",
+        "ecr:DescribeImages",
+        "ecr:DescribeRepositories",
+        "ecr:GetDownloadUrlForLayer",
         "ecr:InitiateLayerUpload",
         "ecr:PutImage",
-        "ecr:UploadLayerPart",
-        "ecr:DescribeRepositories",
-        "ecr:DescribeImages",
-        "ecr:CreateRepository",
-        "ecr:TagResource"
+        "ecr:TagResource",
+        "ecr:UploadLayerPart"
       ],
       "Resource": [
         "arn:aws:ecr:ap-south-1:378240665051:repository/solarlayout/*"
