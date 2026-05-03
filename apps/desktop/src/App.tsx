@@ -897,14 +897,28 @@ export function App(): JSX.Element {
       resetEditingState()
       setLayoutFormKey((k) => k + 1)
 
-      // Parse the downloaded KMZ via the sidecar so the canvas can render.
-      // Mirror the kmzLoader.openAndParseKmz flow — same blob/Content-Type,
-      // filename derived from the project name.
-      const blob = new Blob([opened.bytes as BlobPart], {
-        type: "application/vnd.google-earth.kmz",
-      })
+      // Post-C4: every project has parsedKmz populated server-side at
+      // create time (parse-kmz Lambda persists it to Project.parsedKmz).
+      // Open-flow reads it from B14's response directly — no sidecar
+      // re-parse, no Blob round-trip through the canvas. `opened.bytes`
+      // is still fetched by the mutation today (used as a defensive
+      // hedge if a future flow needs the raw KMZ); cleanup of that
+      // round-trip is deferred to a follow-up.
+      if (!opened.detail.parsedKmz) {
+        // Pre-C4 projects with parsedKmz=null were wiped at cutover;
+        // this path is defensive. Surface a clear error rather than
+        // render an empty canvas or crash.
+        console.error(
+          "openProject: project has no parsedKmz — likely pre-C4 row that was missed by cutover wipe",
+          opened.detail.id
+        )
+        setOpenError(
+          "This project's data is incomplete. Please contact support or re-create the project."
+        )
+        return
+      }
+      const parsed = parsedKmzFromWire(opened.detail.parsedKmz)
       const fileName = `${opened.detail.name}.kmz`
-      const parsed = await sidecarClient.parseKmz(blob, fileName)
 
       setCurrentProject(opened.detail)
       setRuns(opened.detail.runs)

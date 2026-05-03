@@ -385,6 +385,11 @@ export interface RemoveRoadRequest {
 export interface SidecarClient {
   readonly baseUrl: string
   health(): Promise<HealthResponse>
+  /**
+   * @deprecated C4 cloud parse replaces this. No callers in desktop after
+   * C4; sidecar-client's parseKmz is removed entirely at C19 alongside
+   * the sidecar shell.
+   */
   parseKmz(file: Blob | File, filename?: string): Promise<ParsedKMZ>
   /**
    * Run the full layout pipeline (table placement → ICR placement →
