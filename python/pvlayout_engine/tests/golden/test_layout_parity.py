@@ -35,8 +35,13 @@ POSITION_TOL_M = 0.01
 RELATIVE_FLOAT_TOL = 1e-6
 
 GOLDEN_DIR = Path(__file__).resolve().parent
-KMZ_DIR = GOLDEN_DIR / "kmz"
 EXPECTED_DIR = GOLDEN_DIR / "expected"
+# KMZ fixtures moved to pvlayout_core (their natural home) per cloud-offload C2.
+# parents[3] from this file = repo_root/python/.
+KMZ_DIR = (
+    Path(__file__).resolve().parents[3]
+    / "pvlayout_core/tests/golden/kmz"
+)
 
 TEST_TOKEN = "golden-test-token-abcdefghijklmnop"
 
