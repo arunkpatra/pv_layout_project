@@ -70,12 +70,20 @@ projects/<project_id>/versions/<version_id>/layout.dxf     ← written by layout
 ### User: `renewable-energy-app`
 
 - **ARN:** `arn:aws:iam::378240665051:user/renewable-energy-app`
-- **Purpose:** Runtime credentials for the layout engine (and future services that read/write artifacts)
-- **Policy:** `renewable-energy-app-s3` (inline managed policy)
+- **Purpose:** Runtime credentials for mvp_api (and future services that read/write artifacts or invoke Lambdas)
+- **Inline policies:**
+  - `renewable-energy-app-s3` — S3 access (artifact buckets + downloads + V2 projects)
+  - `renewable-energy-app-sqs` — legacy SQS perms from C3-era stack
+  - `renewable-energy-app-lambda-invoke` — Lambda invoke (added 2026-05-03 per C4 Task 9)
 
-**Policy grants:**
-- `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `/*` of all three artifact buckets
-- `s3:ListBucket` on all three artifact buckets
+**`renewable-energy-app-s3` grants:**
+- `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `/*` of artifact + downloads + V2 projects buckets
+- `s3:ListBucket` on those buckets
+
+**`renewable-energy-app-lambda-invoke` grants** (per C4):
+- `lambda:InvokeFunction` on `arn:aws:lambda:ap-south-1:378240665051:function:solarlayout-parse-kmz-prod`
+
+Future Lambdas (compute-layout C6, detect-water C16, compute-energy C18) extend this policy additively when their prod function ARNs land. Staging Lambda invoke ARN added when a staging environment is provisioned.
 
 **Credentials location:** `aws-creds/renewable-energy-app.env` (gitignored — never commit)
 
