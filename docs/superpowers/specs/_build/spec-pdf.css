@@ -1,0 +1,249 @@
+/*
+ * spec-pdf.css — print stylesheet for SolarLayout master specs.
+ *
+ * Targets weasyprint. Used by build-spec-pdf.sh (sibling).
+ *
+ * Sentinel:
+ *   __HEADER_TEXT__   replaced by the script with the running-header
+ *                     string for this PDF (e.g. spec name + version).
+ *                     Appears top-left of every page except page 1.
+ *
+ * Edit this file to change typography / colors / page geometry across
+ * every spec PDF the script produces. Re-run the script after editing.
+ */
+
+/* ---------- Page geometry + running headers ---------- */
+
+@page {
+    size: A4;
+    margin: 22mm 18mm 22mm 18mm;
+
+    @top-right {
+        content: counter(page) " / " counter(pages);
+        font-family: "Inter", "Helvetica Neue", sans-serif;
+        font-size: 8pt;
+        color: #888;
+    }
+
+    @top-left {
+        content: "__HEADER_TEXT__";
+        font-family: "Inter", "Helvetica Neue", sans-serif;
+        font-size: 8pt;
+        color: #888;
+    }
+}
+
+/* Title page: no header, no page number */
+@page :first {
+    @top-left  { content: ""; }
+    @top-right { content: ""; }
+}
+
+/* ---------- Body typography ---------- */
+
+html { font-size: 10.5pt; }
+
+body {
+    font-family: "Inter", "Helvetica Neue", "Segoe UI", -apple-system, sans-serif;
+    line-height: 1.5;
+    color: #1a1a19;
+    margin: 0;
+    padding: 0;
+}
+
+/* ---------- Headings ---------- */
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Inter", "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    color: #0d0d0c;
+    line-height: 1.25;
+    margin-top: 1.4em;
+    margin-bottom: 0.5em;
+    page-break-after: avoid;
+}
+
+h1 {
+    font-size: 22pt;
+    border-bottom: 2px solid #1a1a19;
+    padding-bottom: 0.25em;
+}
+
+h2 {
+    font-size: 16pt;
+    border-bottom: 1px solid #d4d4d2;
+    padding-bottom: 0.2em;
+    page-break-before: always;
+    margin-top: 0;
+}
+
+h2:first-of-type { page-break-before: avoid; }
+
+h3 { font-size: 13pt; margin-top: 1.6em; }
+h4 { font-size: 11pt; margin-top: 1.4em; color: #2a2a28; }
+h5 { font-size: 10pt; margin-top: 1.2em; color: #4a4a47; }
+
+/* ---------- Title (pandoc title block) ---------- */
+
+h1.title {
+    font-size: 24pt;
+    text-align: left;
+    margin-bottom: 0.3em;
+    border-bottom: 2px solid #1a1a19;
+    padding-bottom: 0.4em;
+}
+
+p.subtitle {
+    font-size: 12pt;
+    color: #4a4a47;
+    margin-top: 0;
+    margin-bottom: 1.5em;
+    font-style: italic;
+}
+
+/* ---------- Paragraphs + emphasis ---------- */
+
+p {
+    margin: 0.6em 0;
+    orphans: 3;
+    widows: 3;
+}
+
+strong { font-weight: 600; color: #0d0d0c; }
+em { font-style: italic; }
+
+/* ---------- Inline + block code ---------- */
+
+code {
+    font-family: "JetBrains Mono", "Geist Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: #f5f5f3;
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+    border: 1px solid #e8e8e5;
+    color: #4a4a47;
+    word-wrap: break-word;
+}
+
+pre {
+    font-family: "JetBrains Mono", "Geist Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 8.5pt;
+    line-height: 1.45;
+    background: #f8f8f6;
+    border: 1px solid #e0e0dd;
+    border-left: 3px solid #888;
+    border-radius: 4px;
+    padding: 0.7em 0.9em;
+    margin: 0.8em 0;
+    page-break-inside: avoid;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #2a2a28;
+}
+
+pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    font-size: 1em;
+    color: inherit;
+}
+
+/* ---------- Block quotes (callouts) ---------- */
+
+blockquote {
+    margin: 0.8em 0;
+    padding: 0.4em 1em;
+    border-left: 3px solid #f59e0b;
+    background: #fffbeb;
+    color: #1a1a19;
+}
+
+blockquote p { margin: 0.3em 0; }
+
+/* ---------- Lists ---------- */
+
+ul, ol {
+    margin: 0.5em 0;
+    padding-left: 1.6em;
+}
+
+li {
+    margin: 0.2em 0;
+    line-height: 1.45;
+}
+
+li > ul, li > ol { margin: 0.2em 0; }
+
+/* ---------- Tables ---------- */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.9em 0;
+    font-size: 9.5pt;
+}
+
+thead { display: table-header-group; }
+tr    { page-break-inside: avoid; }
+
+th {
+    background: #1a1a19;
+    color: #fafaf9;
+    text-align: left;
+    padding: 0.45em 0.6em;
+    font-weight: 600;
+    border: 1px solid #1a1a19;
+}
+
+td {
+    padding: 0.4em 0.6em;
+    border: 1px solid #d4d4d2;
+    vertical-align: top;
+    line-height: 1.4;
+}
+
+tbody tr:nth-child(even) td { background: #fafaf9; }
+
+td code {
+    font-size: 0.85em;
+    word-break: break-all;
+}
+
+/* ---------- Links + horizontal rule ---------- */
+
+a {
+    color: #1d4ed8;
+    text-decoration: none;
+    word-wrap: break-word;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #d4d4d2;
+    margin: 1.6em 0;
+}
+
+/* ---------- Table of contents ---------- */
+
+#TOC {
+    page-break-after: always;
+    margin-top: 1em;
+}
+
+#TOC > ul { list-style: none; padding-left: 0; }
+#TOC ul   { list-style: none; }
+#TOC li   { margin: 0.15em 0; line-height: 1.3; }
+#TOC a    { color: #1a1a19; text-decoration: none; }
+
+#TOC > ul > li > a {
+    font-weight: 600;
+    font-size: 10.5pt;
+}
+
+#TOC ul ul a {
+    font-weight: 400;
+    color: #4a4a47;
+    font-size: 9.5pt;
+}
