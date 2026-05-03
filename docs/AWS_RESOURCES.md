@@ -278,6 +278,24 @@ Tags:
 - `{git-sha}` — per-commit tag
 - `buildcache` — Docker layer cache (managed by CI)
 
+### Repository: `solarlayout/_smoketest` (throwaway)
+
+- **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/_smoketest`
+- **Status:** Throwaway. Created in C3 to verify the build/push pipeline. **Deleted in C4** when parse-kmz lands.
+- **Image-tag mutability:** IMMUTABLE
+- **Scan-on-push:** enabled
+- **Tags:** `<git-sha>` per CI run; `latest` only on `main`.
+
+### Future repositories (created per row by the implementing agent)
+
+| Row | Repository | Purpose |
+|---|---|---|
+| C4 | `solarlayout/parse-kmz` | KMZ → parsed boundary geometry (sync invoke) |
+| C6/C8 | `solarlayout/compute-layout` | Heavy compute (SQS-triggered) |
+| C16 | `solarlayout/detect-water` | Water-body satellite detection (SQS) |
+
+All `solarlayout/*` ECR repos use immutable tags + scan-on-push + arm64 image manifests.
+
 ---
 
 ## GitHub Actions OIDC
@@ -292,3 +310,78 @@ Tags:
 - Secret `AWS_ROLE_ARN` = `arn:aws:iam::378240665051:role/renewable-energy-github-actions`
 - Variable `AWS_ACCOUNT_ID` = `378240665051`
 - Variable `AWS_REGION` = `ap-south-1`
+
+### Role: `solarlayout-github-actions` (post-merge, NEW REPO)
+
+- **ARN:** `arn:aws:iam::378240665051:role/solarlayout-github-actions`
+- **Policy:** `solarlayout-github-actions-ecr-push` (inline; ECR push on `solarlayout/*` repos)
+- **Trust:** GitHub OIDC (`token.actions.githubusercontent.com`), scoped to `repo:SolarLayout/solarlayout:*`
+
+**Trust policy (verbatim):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::378240665051:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:SolarLayout/solarlayout:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Inline policy (`solarlayout-github-actions-ecr-push`):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ECRAuthToken",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECRPushOnSolarlayoutRepos",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:CompleteLayerUpload",
+        "ecr:InitiateLayerUpload",
+        "ecr:PutImage",
+        "ecr:UploadLayerPart",
+        "ecr:DescribeRepositories",
+        "ecr:DescribeImages",
+        "ecr:CreateRepository",
+        "ecr:TagResource"
+      ],
+      "Resource": [
+        "arn:aws:ecr:ap-south-1:378240665051:repository/solarlayout/*"
+      ]
+    }
+  ]
+}
+```
+
+**GitHub Actions configuration on `SolarLayout/solarlayout`:**
+
+- Secret `AWS_ROLE_ARN` = `arn:aws:iam::378240665051:role/solarlayout-github-actions`
+- Variable `AWS_ACCOUNT_ID` = `378240665051` (already set; verify)
+- Variable `AWS_REGION` = `ap-south-1` (already set; verify)
+
+### Legacy `renewable-energy-github-actions` role (orphaned, leave alone)
+
+The pre-merge `arn:aws:iam::378240665051:role/renewable-energy-github-actions` role still exists in the account. Its trust policy is scoped to `repo:arunkpatra/renewable_energy:*` (the OLD GitHub repo, archive-pending) so it is not assumable from `SolarLayout/solarlayout`. Per Arun's call (2026-05-03): leave it untouched. It causes no harm; teardown is a separate, post-launch concern.
