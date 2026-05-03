@@ -154,7 +154,7 @@ model UsageRecord {
   /// FK to the original UsageRecord this row refunds. Null for charges.
   /// Self-relation named "Refunds" (Prisma requires named self-relations).
   refundsRecordId String?
-  refundsRecord  UsageRecord?  @relation("Refunds", fields: [refundsRecordId], references: [id])
+  refundsRecord  UsageRecord?  @relation("Refunds", fields: [refundsRecordId], references: [id], onDelete: SetNull)
   refundedBy     UsageRecord[] @relation("Refunds")
   createdAt      DateTime      @default(now())
   run            Run?
@@ -204,6 +204,13 @@ model Project {
   /// SVG outline fallback when no thumbnail exists yet (memo v3 §14).
   /// Nullable for projects predating B26.
   boundaryGeojson  Json?
+  /// C4: full ParsedKmz canvas-render payload (boundaries with name/
+  /// coords/obstacles/water_obstacles/line_obstructions; centroid_lat/
+  /// lon). Populated by the parse-kmz Lambda on project create. Read on
+  /// project open instead of re-parsing client-side. Pre-C4 rows have
+  /// null and are wiped at cutover. Sibling to boundaryGeojson which
+  /// stays as a polygon-only GeoJSON-spec subset (used for thumbnails).
+  parsedKmz        Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
