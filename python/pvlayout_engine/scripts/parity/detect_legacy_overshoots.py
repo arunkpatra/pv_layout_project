@@ -138,7 +138,8 @@ def analyse(plant: str, baseline: str = "baseline-v1-20260429") -> Dict[str, Any
         / plant
     )
     capture_path = baseline_dir / "numeric-baseline.json"
-    kmz_path = PVLE_ROOT / "tests" / "golden" / "kmz" / f"{plant}.kmz"
+    # KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+    kmz_path = PVLE_ROOT.parent / "pvlayout_core" / "tests" / "golden" / "kmz" / f"{plant}.kmz"
 
     if not capture_path.exists():
         raise FileNotFoundError(
@@ -300,7 +301,8 @@ def reconstruct(
     # Build fence using the LEGACY's parse_kmz (paranoia: ensure identical
     # boundary semantics; in practice both parsers agree on the
     # `boundaries[i].coords` shape).
-    kmz_path = PVLE_ROOT / "tests" / "golden" / "kmz" / f"{plant}.kmz"
+    # KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+    kmz_path = PVLE_ROOT.parent / "pvlayout_core" / "tests" / "golden" / "kmz" / f"{plant}.kmz"
     parsed = legacy_parse_kmz(str(kmz_path))
     if not parsed.boundaries:
         raise RuntimeError(f"No boundaries in {kmz_path}")

@@ -32,9 +32,11 @@ from pvlayout_engine.server import build_app
 
 TEST_TOKEN = "row10-export-dxf-test-token-abcdefghij"
 LEGACY_REPO = Path("/Users/arunkpatra/codebase/PVlayout_Advance")
+# KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+# parents[3] from this file = repo_root/python/.
 KMZ_FIXTURE = (
-    Path(__file__).resolve().parents[2]
-    / "tests/golden/kmz/phaseboundary2.kmz"
+    Path(__file__).resolve().parents[3]
+    / "pvlayout_core/tests/golden/kmz/phaseboundary2.kmz"
 )
 POS_TOL = 1e-6
 

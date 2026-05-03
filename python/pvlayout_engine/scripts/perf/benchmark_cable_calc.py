@@ -47,7 +47,11 @@ from pvlayout_core.models.project import LayoutParameters
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-KMZ_DIR = SCRIPT_DIR.parent.parent / "tests" / "golden" / "kmz"
+# KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+# SCRIPT_DIR.parent.parent = python/pvlayout_engine/.
+KMZ_DIR = (
+    SCRIPT_DIR.parent.parent.parent / "pvlayout_core" / "tests" / "golden" / "kmz"
+)
 
 
 @dataclass

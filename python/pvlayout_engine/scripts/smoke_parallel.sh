@@ -31,7 +31,9 @@
 set -euo pipefail
 
 BIN="${1:-dist/pvlayout-engine}"
-KMZ="tests/golden/kmz/complex-plant-layout.kmz"
+# KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+# Script runs from python/pvlayout_engine working-directory in CI.
+KMZ="../pvlayout_core/tests/golden/kmz/complex-plant-layout.kmz"
 
 if [[ ! -x "$BIN" ]]; then
   echo "ERROR: $BIN is not executable" >&2

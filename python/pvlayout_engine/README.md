@@ -4,7 +4,7 @@ The Python sidecar. Bundled as a single-file PyInstaller binary and embedded in 
 
 ## What goes here
 
-- **`pvlayout_core/`** — exact copy of `PVlayout_Advance/{core,models,utils}`. **Never modify.** Landed in **S1**.
+- **`pvlayout_core/`** — extracted to its own package at `../pvlayout_core/` per cloud-offload C2 (spec D6). Engine consumes via editable path-dep declared in `[tool.uv.sources]`.
 - **`pvlayout_engine/`** — FastAPI wrapper (server, routes, pydantic schemas). Landed in **S2 / S3**.
 - **`pvlayout-engine.spec`** — single PyInstaller spec. Landed in **S4**.
 - **`tests/`** — smoke tests (S1), golden-file tests (S3).

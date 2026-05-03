@@ -3,9 +3,10 @@ name: ci
 # Frontend + sidecar tests on every push (any branch, including main)
 # and every PR targeting main.
 #
-# Two jobs run in parallel:
+# Three jobs run in parallel:
 #   - frontend: bun install, lint, typecheck, test, build (turbo-orchestrated).
 #   - sidecar:  uv sync, pytest (lint/typecheck wired in a future spike).
+#   - core:     uv sync, pytest for the standalone pvlayout_core package.
 #
 # The sidecar PyInstaller bundle build lives in sidecar-build.yml, scoped
 # to changes under python/pvlayout_engine/** — that's a separate concern
@@ -71,6 +72,28 @@ jobs:
       run:
         shell: bash
         working-directory: python/pvlayout_engine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install Python deps
+        run: uv sync --extra dev
+
+      - name: pytest
+        run: uv run pytest tests/ -q
+
+  core:
+    name: pvlayout_core (pytest)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: python/pvlayout_core
     steps:
       - name: Checkout
         uses: actions/checkout@v4
