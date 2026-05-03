@@ -9,7 +9,7 @@ COPY python/pvlayout_core /opt/pvlayout_core
 RUN pip install --no-cache-dir /opt/pvlayout_core
 
 # Lambda-specific code into LAMBDA_TASK_ROOT.
-COPY python/lambdas/_smoketest/smoketest_lambda ${LAMBDA_TASK_ROOT}/smoketest_lambda
+COPY python/lambdas/smoketest/smoketest_lambda ${LAMBDA_TASK_ROOT}/smoketest_lambda
 
 # Bake git SHA at build time. The CI workflow passes
 # --build-arg GIT_SHA=${{ github.sha }}; locally use $(git rev-parse HEAD).

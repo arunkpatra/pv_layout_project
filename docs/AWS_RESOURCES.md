@@ -278,9 +278,9 @@ Tags:
 - `{git-sha}` — per-commit tag
 - `buildcache` — Docker layer cache (managed by CI)
 
-### Repository: `solarlayout/_smoketest` (throwaway)
+### Repository: `solarlayout/smoketest` (throwaway)
 
-- **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/_smoketest`
+- **URI:** `378240665051.dkr.ecr.ap-south-1.amazonaws.com/solarlayout/smoketest`
 - **Status:** Throwaway. Created in C3 to verify the build/push pipeline. **Deleted in C4** when parse-kmz lands.
 - **Image-tag mutability:** IMMUTABLE
 - **Scan-on-push:** enabled

@@ -432,14 +432,14 @@ Acceptance
     (stdlib http.server example, no Flask); port allocation table
     (smoketest=4100, parse-kmz=4101, compute-layout=4102, detect-
     water=4103, compute-energy=4104).
-  - python/lambdas/_smoketest/server.py implemented (stdlib
+  - python/lambdas/smoketest/server.py implemented (stdlib
     BaseHTTPRequestHandler) on port 4100; routes:
       GET /health  → {"ok": true}
       POST /invoke → calls handler.handler(body, None) and returns
                      its dict as JSON; 200 on success, 500 on
                      handler exception (response body carries
                      {"error": "<msg>"}).
-  - python/lambdas/_smoketest/Dockerfile.local builds + runs
+  - python/lambdas/smoketest/Dockerfile.local builds + runs
     server.py on port 4100; image distinct from production
     Dockerfile.
   - apps/mvp_api/src/lib/lambda-invoker.ts shared util with two
