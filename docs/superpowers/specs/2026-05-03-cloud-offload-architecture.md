@@ -1,7 +1,7 @@
 # Cloud-Offload Compute Architecture — Master Spec
 
 **Status:** Locked (2026-05-03). Living document — updated per row close. See §15 changelog for amendments.
-**Version:** v1.1 (2026-05-03 — deployment topology amendment; smoke protocol reality-aligned)
+**Version:** v1.2 (2026-05-03 — C3 naming-convention prefix flip to `solarlayout-*`)
 **Owner:** Arun (engineering authority) + Prasanta (solar-domain authority).
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
@@ -130,7 +130,7 @@ mvp_web's dashboard and mvp_admin do NOT initiate compute; they read from the sa
 **Generate-Layout flow (canonical):**
 
 1. Desktop POST `/v2/projects/:id/runs` (B16) with `{params, edits, idempotencyKey}`.
-2. mvp_api opens tx → debit entitlement + UsageRecord(charge) + Run.create(status=QUEUED) → SQS SendMessage to `pvlayout-compute-layout-jobs` → COMMIT (D19).
+2. mvp_api opens tx → debit entitlement + UsageRecord(charge) + Run.create(status=QUEUED) → SQS SendMessage to `solarlayout-compute-layout-jobs` → COMMIT (D19).
 3. mvp_api returns `{run, ...}` immediately. Desktop starts polling `GET /v2/projects/:id/runs/:runId` (B17) every ~2s.
 4. SQS triggers `compute-layout` Lambda. Lambda's first action: `UPDATE Run SET status='RUNNING' WHERE id=$1 AND status='QUEUED'` (idempotent against redelivery, D14).
 5. Lambda fetches KMZ from S3 (already there from B6 at project create), runs `pvlayout_core.run_layout(...)`, then renders DXF + PDF + KMZ + thumbnail inline (D12). All artifacts PUT to S3 at deterministic keys.
@@ -365,9 +365,9 @@ Acceptance
   - `.github/workflows/build-lambdas.yml` matrix workflow scaffolded;
     initially empty matrix or with parse-kmz only.
   - Naming convention recorded:
-      Lambda fn:  pvlayout-<purpose>-<env>
-      ECR repo:   pvlayout/<purpose>
-      SQS queue:  pvlayout-<purpose>-jobs + -dlq
+      Lambda fn:  solarlayout-<purpose>-<env>
+      ECR repo:   solarlayout/<purpose>
+      SQS queue:  solarlayout-<purpose>-jobs + -dlq
 
 Out of scope
   - Any Lambda code (that's C4).
@@ -402,7 +402,7 @@ Open verifications
 
 Acceptance
   - python/lambdas/parse-kmz/ exists with full structure.
-  - Lambda pvlayout-parse-kmz-staging deployed and invokeable.
+  - Lambda solarlayout-parse-kmz-staging deployed and invokeable.
   - New mvp_api route POST /v2/projects/:id/parse-kmz invokes Lambda
     sync, returns parsed boundaries in V2 envelope.
   - Desktop's useCreateProject flow swaps from sidecar.parseKmz to
@@ -417,9 +417,9 @@ Smoke trigger (Arun, per sec 11.2)
             "Reading boundaries..." spinner; verify parsed boundaries
             render on canvas matching legacy sidecar parse.
   Staging:  AWS-only smoke against staging Lambda. Invoke
-            pvlayout-parse-kmz-staging directly with a real KMZ
+            solarlayout-parse-kmz-staging directly with a real KMZ
             payload via `aws lambda invoke --function-name
-            pvlayout-parse-kmz-staging --payload <b64-kmz> ...`;
+            solarlayout-parse-kmz-staging --payload <b64-kmz> ...`;
             verify CloudWatch shows the invocation; verify response
             shape matches the V2 envelope and the parsed boundaries
             count matches the legacy sidecar output. (No staging
@@ -458,8 +458,8 @@ Open verifications
     (probably needs VPC config to reach RDS; check existing infra).
 
 Acceptance
-  - SQS queues: pvlayout-compute-layout-jobs-{staging,prod} +
-    pvlayout-compute-layout-jobs-dlq-{staging,prod}.
+  - SQS queues: solarlayout-compute-layout-jobs-{staging,prod} +
+    solarlayout-compute-layout-jobs-dlq-{staging,prod}.
   - RedrivePolicy: maxReceiveCount = 3; visibility timeout = 1020s
     (Lambda 14min × 1.2 + buffer).
   - CloudWatch alarm on DLQ ApproximateNumberOfMessages > 0 for >5min.
@@ -643,7 +643,7 @@ Open verifications
     Lambda batching multiple Runs into one invocation).
 
 Acceptance
-  - Lambda function pvlayout-compute-layout-staging deployed with SQS
+  - Lambda function solarlayout-compute-layout-staging deployed with SQS
     event source mapping.
   - End-to-end staging test: trigger via Tauri (or curl), observe
     Run.status transitions QUEUED → RUNNING → DONE, observe S3
@@ -655,7 +655,7 @@ Smoke trigger (Arun, per sec 11.2) — first full async cloud smoke
   Staging:  AWS-resource end-to-end against staging infra. Hand-
             craft an SQS message body (run id + project id + params)
             and `aws sqs send-message --queue-url <staging-compute-
-            layout-jobs> --message-body ...`; observe pvlayout-
+            layout-jobs> --message-body ...`; observe solarlayout-
             compute-layout-staging Lambda fire (CloudWatch); verify
             staging RDS Run row transitions QUEUED → RUNNING → DONE;
             verify all 5 S3 artifacts (layout.json + 3 exports +
@@ -1368,7 +1368,7 @@ Out of scope
 
 These are documented to keep current decisions honest about future-proofing, NOT as backlog. Add only when telemetry proves the constraint.
 
-**v2 — functional split.** Energy yield separates from compute-layout into its own Lambda + SQS queue. Triggered when a Run has `billedFeatureKey ∈ {energy_yield, generation_estimates}`. Layout completes first; energy publishes a follow-on message; rollup waits for both before flipping DONE. Adds: `compute-energy/` Lambda dir; `pvlayout-compute-energy-jobs` queue; rollup logic. Justification trigger: Lambda cost tells us energy network-wait is wasting CPU minutes, OR energy-only re-runs become a feature.
+**v2 — functional split.** Energy yield separates from compute-layout into its own Lambda + SQS queue. Triggered when a Run has `billedFeatureKey ∈ {energy_yield, generation_estimates}`. Layout completes first; energy publishes a follow-on message; rollup waits for both before flipping DONE. Adds: `compute-energy/` Lambda dir; `solarlayout-compute-energy-jobs` queue; rollup logic. Justification trigger: Lambda cost tells us energy network-wait is wasting CPU minutes, OR energy-only re-runs become a feature.
 
 **v3 — per-plot fan-out.** Add `Slice` table (one row per boundary in a multi-plot Run). mvp_api publishes N SQS messages. Each Lambda handles one Slice. Rollup: when all Slices terminal, flip Run.status. Adds: `Slice` table + semantic-ID prefix; idempotent slice-update SQL becomes per-slice; result aggregation across N S3 blobs into one combined response; per-slice progress UI option re-enabled. Justification trigger: a real customer hits Lambda 15-min timeout, or worst-plot wall-clock > acceptable user-wait.
 
@@ -1518,7 +1518,7 @@ Sub-steps within a session are referenced as `ST-C9-S.1`, `ST-C9-S.2`, etc. when
 
 2. **Bite-sized step execution.** Claude breaks the row's `Smoke trigger` `<level>` entry into atomic executable steps. **One step per prompt.** Each step is concrete and runnable:
    - ✅ "In another terminal at repo root, run `bun run dev` and report back when you see `mvp_api ready on :3003`."
-   - ✅ "Open AWS console → Lambda → `pvlayout-compute-layout-staging` → Monitor tab. Paste the most recent invocation timestamp + duration."
+   - ✅ "Open AWS console → Lambda → `solarlayout-compute-layout-staging` → Monitor tab. Paste the most recent invocation timestamp + duration."
    - ✅ "In Tauri, click the Generate button. Paste any console errors that appear in the next 10s."
    - ❌ "Verify mvp_api works." (abstract; no atomic action)
    - ❌ "Test all four status transitions." (multiple actions bundled)
@@ -1833,7 +1833,7 @@ Operating rules — DO NOT EXERCISE JUDGMENT, the spec decided:
    Each step must be concrete and runnable:
      ✅ "In another terminal at repo root, run `bun run dev` and
          report when you see `mvp_api ready on :3003`."
-     ✅ "Open AWS console → Lambda → pvlayout-compute-layout-staging
+     ✅ "Open AWS console → Lambda → solarlayout-compute-layout-staging
          → Monitor tab. Paste the most recent invocation timestamp
          + duration."
      ❌ "Verify mvp_api works." (abstract)
@@ -1917,6 +1917,7 @@ This section tracks amendments to the spec after the initial 2026-05-03 lockin. 
 |---|---|---|---|
 | **v1** | 2026-05-03 | Entire spec | Initial lockin. D1–D23 locked; C1–C21 row table established; smoke-testing protocol (§11.2 + §11.4) and brainstorm-first policy (§11.3) defined; cold-session prompts (§13) drafted; doc kill list (§14) executed. |
 | **v1.1** | 2026-05-03 | Header status / version line, §11.2 (smoke-testing protocol — levels table + cadence + anti-patterns + evidence template + cleanup paragraph), §11.4 (pre-req validation step), §11.5 (NEW — post-row completion protocol), §11.6 (NEW — pre-row-start protocol), §12 (update cadence back-reference to §11.5), §13.1 (cold-session prompt — new rule #0 invokes §11.6 pre-flight; rule #5 amended to invoke §11.5; new "Prior row's PR" slot for Arun to fill; "Begin by" steps reordered to put pre-flight before deep reading), §9 row Smoke trigger fields (15 in-place rewrites), this changelog (NEW §15). | Reality amendment: deployment topology + session-boundary protocols. The original spec assumed a full Vercel + AWS staging deploy paralleling production. As of v1.1, no Vercel staging exists — production is the de-facto staging environment for app-layer smoke (co-founder-only, Stripe live, no external customers yet). Staging is partial: RDS staging DB for migrations + staging AWS resources for provisioning / IAM verification. **All 15 (smoke)-marked rows in §9 had their `Smoke trigger` fields rewritten in-place to be reality-aware:** 9 app-code rows dropped Staging entirely (Local + Prod only — C9, C10, C11, C12, C14, C15, C17, C19, C21); 2 DB-migration rows kept Staging as RDS-only (C7, C13); 4 AWS-resource rows kept Staging as AWS-only (C4, C8, C16, C18). Cleanup paragraphs in §11.2 / §11.4 simplified accordingly. **Two new session-boundary protocols added:** §11.5 post-row completion protocol — a four-category drift check (stale row text / new rows / adjacent scope gaps / D-id implications) that fires before every row's status flip and surfaces candidate spec amendments for Arun's concurrence. §11.6 pre-row-start protocol — a 7-precondition pre-flight gate (prior-PR-merged confirmation, `git fetch origin`, local `main` matches `origin/main`, clean tree, on `main`, row Status `todo`, Depends all `done`) that fires at the start of every cold-session implementation run; halts on ANY discrepancy rather than auto-recovering (risk of destroying real work). Both protocols wired into the §13.1 cold-session prompt — rule #0 (§11.6 pre-flight) and rule #5 (§11.5 post-row close) bracket the row's lifecycle. **No locked decision (D-id) was changed**; this is a smoke-protocol + tracking-protocol reality amendment, not an architectural one. |
+| **v1.2** | 2026-05-03 | Header version line; §9 row C3 Acceptance naming-convention block; §4 architecture overview generate-layout step; §9 rows C4 / C5 / C8 (Acceptance + Smoke trigger forward-looking resource names); §10 Future Ladder v2 example; §11.4 example step; §13.1 cold-session prompt template example; this changelog. | C3 implementation discovered material spec-vs-reality drift via the `Open verifications` pass: the legacy `renewable-energy-github-actions` OIDC role + supporting AWS resources (`renewable-energy/layout-engine` ECR repo, `layout_engine_lambda_prod` Lambda, `re_layout_queue_prod` SQS) are already present in the account from the pre-merge stack — orphaned but not removed. Arun's call: leave the legacy stack alone, create a fresh `solarlayout-github-actions` OIDC role for the new repo, and unify the new-resource prefix on `solarlayout-*` for brand consistency with the existing S3 buckets. C3 row text is amended to record the new prefix on all three lines (Lambda fn, ECR, SQS); downstream rows (C4/C5/C8/§10 future-ladder/§11.4 + §13.1 examples) that reference forward-looking resource names by example are updated in lockstep for spec internal consistency; legacy resource ARNs (renewable-energy-*) are explicitly left alone. **No locked decision (D-id) was changed.** |
 
 **Format for future amendments:** append a row above. Bump the patch version (v1.2, v1.3, …) for protocol / structural changes that don't touch a D-id; bump the minor version (v2.0) for any amendment that changes a locked decision. Mention every section touched. Keep the `Change` cell to one paragraph; link to a longer memo at `docs/initiatives/findings/` if more detail is needed.
 
