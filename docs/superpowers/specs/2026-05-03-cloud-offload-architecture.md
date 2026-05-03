@@ -1,6 +1,7 @@
 # Cloud-Offload Compute Architecture — Master Spec
 
-**Status:** Locked (2026-05-03). Living document — updated per row close.
+**Status:** Locked (2026-05-03). Living document — updated per row close. See §15 changelog for amendments.
+**Version:** v1.1 (2026-05-03 — deployment topology amendment; smoke protocol reality-aligned)
 **Owner:** Arun (engineering authority) + Prasanta (solar-domain authority).
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
@@ -413,9 +414,15 @@ Smoke trigger (Arun, per sec 11.2)
             USE_CLOUD_PARSE=true; pick a real customer KMZ; observe
             "Reading boundaries..." spinner; verify parsed boundaries
             render on canvas matching legacy sidecar parse.
-  Staging:  Tauri (or curl) against api-staging mvp_api with the
-            same KMZ; verify response shape matches local + Lambda
-            CloudWatch log shows the invoke.
+  Staging:  AWS-only smoke against staging Lambda. Invoke
+            pvlayout-parse-kmz-staging directly with a real KMZ
+            payload via `aws lambda invoke --function-name
+            pvlayout-parse-kmz-staging --payload <b64-kmz> ...`;
+            verify CloudWatch shows the invocation; verify response
+            shape matches the V2 envelope and the parsed boundaries
+            count matches the legacy sidecar output. (No staging
+            mvp_api exists; the mvp_api ↔ Lambda wire is verified
+            at Prod.)
   Prod:     deferred to phase-end (C21).
 
 Out of scope
@@ -587,10 +594,21 @@ Smoke trigger (Arun, per sec 11.2)
             a Free-tier license key → expect 402 with feature_key
             citing cable_routing. Then same on Pro key → expect 201
             + Run.status=QUEUED. Verify SQS message in dev queue.
-  Staging:  Same two cases against staging mvp_api. Verify staging
-            SQS queue has the message; confirm no message published
-            on the 402 path (rollback worked).
-  Prod:     deferred to phase-end (C9 cutover smoke covers this).
+  Staging:  DB migration smoke — apply the engineVersion migration
+            against staging RDS first to verify it lands cleanly:
+            `set -a; . ./.env.staging; set +a; bunx prisma migrate
+            deploy --schema=packages/mvp_db/prisma/schema.prisma`.
+            Verify with `bunx prisma migrate status ...`. (CD
+            applies the same migration against prod RDS on PR
+            merge.) No app-code smoke at this level — staging
+            mvp_api does not exist.
+  Prod:     repeat the two 402 / 201 cases against
+            api.solarlayout.in with Arun's Free-tier and Pro-tier
+            prod license keys. Verify the prod compute-layout SQS
+            queue receives the message on the 201 path; confirm no
+            message published on the 402 path (rollback worked).
+            Verify a fresh Run row carries the new engineVersion
+            column (NULL until C8 lands; non-NULL afterward).
 
 Out of scope
   - Lambda actually consuming the message (C8).
@@ -631,14 +649,18 @@ Acceptance
   - DLQ stays empty under normal traffic.
 
 Smoke trigger (Arun, per sec 11.2) — first full async cloud smoke
-  Local:    LocalStack (or skip; staging is the real test).
-  Staging:  Tauri pointed at api-staging; create project, click
-            Generate on phaseboundary2.kmz fixture; observe
-            Run.status QUEUED → RUNNING → DONE in DB; verify all
-            5 S3 artifacts (layout.json + 3 exports + thumbnail);
-            CloudWatch shows Lambda invocation; DLQ empty.
-            Then complex-plant-layout.kmz (multi-plot, ~4min):
-            confirm Lambda doesn't time out; final status DONE.
+  Local:    LocalStack (or skip; staging AWS is the real test).
+  Staging:  AWS-resource end-to-end against staging infra. Hand-
+            craft an SQS message body (run id + project id + params)
+            and `aws sqs send-message --queue-url <staging-compute-
+            layout-jobs> --message-body ...`; observe pvlayout-
+            compute-layout-staging Lambda fire (CloudWatch); verify
+            staging RDS Run row transitions QUEUED → RUNNING → DONE;
+            verify all 5 S3 artifacts (layout.json + 3 exports +
+            thumbnail) land in solarlayout-staging-projects bucket;
+            DLQ empty. Then a complex-plant payload (~4min): confirm
+            Lambda doesn't time out; final status DONE. (No staging
+            mvp_api exists — Tauri-triggered end-to-end at Prod.)
   Prod:     deferred to phase-end (C9 cutover smoke).
 
 Out of scope
@@ -687,13 +709,13 @@ Smoke trigger (Arun, per sec 11.2) — first user-facing cutover smoke
             but unused for layout; click Generate; verify spinner +
             polling against mvp_api dev server; canvas renders
             cloud-produced layout JSON; per-plot UI absent.
-  Staging:  Same Tauri build pointed at api-staging; full Generate
-            flow on phaseboundary2 + complex-plant fixtures; verify
-            polling cadence and canvas hydration match parity with
-            sidecar-rendered output (modulo engineVersion).
   Prod:     PRODUCTION CUTOVER for layout — flip USE_CLOUD_LAYOUT in
-            a release build; verify on Arun's prod license that
-            Generate works; capture wall-clock vs sidecar baseline.
+            a release build. Run the full Generate flow on
+            phaseboundary2 + complex-plant fixtures via Arun's prod
+            license against api.solarlayout.in; verify polling
+            cadence and canvas hydration match parity with sidecar-
+            rendered output (modulo engineVersion); capture wall-
+            clock vs sidecar baseline.
 ```
 
 ### Phase D — Cancel + Fail semantics
@@ -737,10 +759,11 @@ Smoke trigger (Arun, per sec 11.2) — money flow
             modal copy; confirm cancel; verify entitlement
             remainingCalculations restored (refund); verify Run
             row shows status=CANCELLED with deletedAt=null.
-  Staging:  Same against api-staging. Verify the
-            UsageRecord(kind='refund') row exists in staging RDS
-            with correct refundsRecordId.
-  Prod:     deferred to phase-end (C21).
+  Prod:     same flow on Arun's prod license against
+            api.solarlayout.in. Verify the UsageRecord(kind='refund')
+            row exists in prod RDS with correct refundsRecordId.
+            Don't trigger more cancels than needed — each consumes
+            a real entitlement cycle on the live Subscription chain.
 
 Out of scope
   - Lambda-side cancel-marker check (C11).
@@ -779,14 +802,16 @@ Acceptance
     (B30's, not duplicated by Lambda).
 
 Smoke trigger (Arun, per sec 11.2) — race-condition smoke
-  Local:    skip — race needs real timing; covered in staging.
-  Staging:  Tauri click Generate on a small fixture (phaseboundary2,
-            ~4s); race the Cancel click to land DURING the Lambda's
-            compute window. Verify (a) Run ends CANCELLED; (b)
-            exactly ONE refund row; (c) S3 layout/exports either
-            absent OR explicitly cleaned up by Lambda; (d) no
-            "DONE → CANCELLED → DONE" status flap.
-  Prod:     deferred to phase-end (C21).
+  Local:    skip — race needs real timing; covered at Prod.
+  Prod:     Tauri click Generate on a small fixture (phaseboundary2,
+            ~4s) against api.solarlayout.in; race the Cancel click
+            to land DURING the Lambda's compute window. Verify
+            (a) Run ends CANCELLED; (b) exactly ONE refund row in
+            prod RDS; (c) S3 layout/exports either absent OR
+            explicitly cleaned up by Lambda; (d) no "DONE →
+            CANCELLED → DONE" status flap. Run minimum number of
+            attempts to land the race window — each costs a real
+            calc on the live Subscription chain.
 
 Out of scope
   - Mid-run cancel polling (Lambda checks ONLY at completion, per
@@ -834,11 +859,11 @@ Smoke trigger (Arun, per sec 11.2) — money flow on system error
             explicit raise mid-handler in dev); trigger Generate;
             verify Run.status=FAILED + refund row + entitlement
             decremented + failureReason populated.
-  Staging:  Use a deliberately-broken KMZ that triggers a known
-            engine error (Prasanta or test-fixture sourced);
-            same observations. DLQ should NOT receive (Lambda
-            caught + handled the failure cleanly).
-  Prod:     deferred to phase-end (C21).
+  Prod:     use a deliberately-broken KMZ that triggers a known
+            engine error (Prasanta or test-fixture sourced) against
+            api.solarlayout.in on Arun's prod license; same
+            observations against prod RDS. DLQ should NOT receive
+            (Lambda caught + handled the failure cleanly).
 
 Out of scope
   - Failure-type taxonomy (one badge per B27 §A.1).
@@ -881,10 +906,20 @@ Smoke trigger (Arun, per sec 11.2) — backstop for crashed Lambdas
   Local:    insert a Run row directly in dev RDS with status=RUNNING
             + createdAt = NOW()-1h; trigger reconciler manually;
             verify FAILED + refund.
-  Staging:  same in staging RDS via psql; trigger via Vercel Cron
-            invocation (or manual admin endpoint); verify the cron
-            log shows the swept count + observability metric.
-  Prod:     deferred to phase-end (C21).
+  Staging:  same Run-row insertion against staging RDS via psql to
+            confirm the SQL behaves correctly against a real RDS
+            instance + indexes. (No Vercel staging app exists, so
+            the cron-trigger half cannot run here — that runs at
+            Prod.)
+  Prod:     verify the Vercel Cron is wired in prod (Vercel
+            dashboard → mvp_api → Cron); insert one stuck Run row
+            in prod RDS via psql with createdAt 60+min in the past;
+            wait for the next cron tick (or trigger via the
+            admin-endpoint fallback if implemented); verify
+            Run.status flips to FAILED, a refund UsageRecord row
+            lands, and the cron log records the swept count. Clean
+            up the test row afterward (or leave it — the FAILED
+            status + refund pair is harmless).
 
 Out of scope
   - Configurable per-tier timeout (one global value v1).
@@ -927,10 +962,14 @@ Smoke trigger (Arun, per sec 11.2) — visibility regression detection
   Local:    seed dev RDS with one Run per status (DONE / CANCELLED
             / FAILED / RUNNING); open Tauri RunsList + RecentsView;
             visually confirm 4 distinct variants render correctly.
-  Staging:  same against staging fixtures. Cancelled/failed cards
+  Prod:     verify against prod RDS state — Arun's prod account
+            should already have at least one each of DONE /
+            CANCELLED / FAILED Runs from prior C10 / C11 / C12
+            smokes; if not, exercise once each. Open Tauri pointed
+            at api.solarlayout.in; visually confirm 4 distinct
+            variants render correctly; cancelled / failed cards
             are visually distinguishable from DONE; click does NOT
             hydrate canvas; thumbnail fallback respects status.
-  Prod:     deferred to phase-end (C21).
 
 Out of scope
   - Re-running a failed run (deferred).
@@ -969,9 +1008,10 @@ Smoke trigger (Arun, per sec 11.2) — customer-visible smoke
             DONE/CANCELLED/FAILED Run); load mvp_web /dashboard/
             usage in browser; verify 3 badges + correct quota
             remaining.
-  Staging:  same against staging mvp_web at the staging URL.
-            Verify refund rows are NOT visible in the table.
-  Prod:     deferred to phase-end (C21).
+  Prod:     load solarlayout.in/dashboard/usage in browser as
+            Arun's prod Clerk session. Verify 3 badges render for
+            the existing prod UsageRecord rows; correct quota
+            remaining; refund rows are NOT visible in the table.
 
 Out of scope
   - Customer-visible refund history.
@@ -1015,11 +1055,19 @@ Acceptance
 
 Smoke trigger (Arun, per sec 11.2) — second SQS pattern, lighter
   Local:    skip — needs real satellite tile fetch.
-  Staging:  Tauri click "Detect water" on a known fixture with
-            water bodies; observe Project.edits.water_obstructions
-            populated within ~60s; canvas overlays water polygons
-            matching legacy sidecar output.
-  Prod:     deferred to phase-end (C21).
+  Staging:  AWS-only smoke against staging detect-water Lambda.
+            Hand-craft an SQS message (project id + KMZ S3 key) and
+            `aws sqs send-message` to the staging detect-water
+            queue; observe Lambda fire (CloudWatch); verify
+            Project.edits.water_obstructions populates in staging
+            RDS within ~60s; verify polygons match legacy sidecar
+            output for a known fixture. (Tauri-triggered end-to-end
+            at Prod.)
+  Prod:     Tauri click "Detect water" against api.solarlayout.in
+            on a known fixture with water bodies; observe
+            Project.edits.water_obstructions populated in prod RDS
+            within ~60s; canvas overlays water polygons matching
+            legacy sidecar output.
 
 Out of scope
   - Lifecycle table for detection jobs (write-through is sufficient).
@@ -1059,16 +1107,17 @@ Acceptance
 
 Smoke trigger (Arun, per sec 11.2) — exports cutover smoke
   Local:    Tauri with USE_CLOUD_EXPORTS=true; pick a DONE Run from
-            staging RDS; click each of DXF/PDF/KMZ download; verify
-            file lands on disk; open each (AutoCAD/Acrobat/Earth)
-            and confirm contents match legacy sidecar export.
-  Staging:  same against staging deployment; pick a Run on a
-            customer-realistic plant; download all three; spot-check
-            each. Especially: PDF includes correct project metadata,
-            DXF layers correct, KMZ opens in Google Earth.
+            prod RDS (or seed dev RDS with a synthesized DONE Run
+            pointing at known prod S3 keys); click each of
+            DXF/PDF/KMZ download; verify file lands on disk; open
+            each (AutoCAD/Acrobat/Earth) and confirm contents match
+            legacy sidecar export.
   Prod:     PRODUCTION CUTOVER for exports — flip USE_CLOUD_EXPORTS
-            in a release build; verify downloads work for an
-            actual customer-style Run.
+            in a release build. Pick a Run on a customer-realistic
+            plant from prod RDS via Arun's prod license; download
+            all three formats; spot-check each. Especially: PDF
+            includes correct project metadata, DXF layers correct,
+            KMZ opens in Google Earth.
 ```
 
 #### C18 — Energy-yield wiring (cloud Lambda branch + Inspector tab)
@@ -1148,12 +1197,17 @@ Smoke trigger (Arun + Prasanta, per sec 11.2) — new gated feature
             (Prasanta validates solar-domain correctness on at
             least one fixture). Then on Pro license: verify upsell
             state in Energy tab; no console errors.
-  Staging:  same flow against staging; verify PVGIS/NASA POWER
-            calls succeed from Lambda; energy result blob present
-            in S3; wall-clock acceptable (<2min total).
+  Staging:  AWS-only smoke against staging compute-layout Lambda
+            with energy flag in the SQS payload. Verify external
+            calls (PVGIS / NASA POWER) succeed from the staging
+            Lambda VPC; verify energy result blob lands in staging
+            S3 (solarlayout-staging-projects); wall-clock acceptable
+            (<2min total). (Tauri-triggered Pro-Plus end-to-end at
+            Prod.)
   Prod:     PRODUCTION CUTOVER for energy — flip the energy
             feature flag in a release build; Arun runs Generate-
-            with-energy on a real Pro Plus license; numbers verified.
+            with-energy on a real Pro Plus license against
+            api.solarlayout.in; numbers verified.
 
 Out of scope
   - Functional split (separate compute-energy Lambda) — v2 future.
@@ -1213,10 +1267,10 @@ Smoke trigger (Arun, per sec 11.2) — irreversibility smoke; FULL
             (refund verified) → Failed run path (refund verified)
             → all 3 exports download → Recents view + RunsList
             render correctly → multi-tab → license-key swap.
-  Staging:  same full regression against staging.
-  Prod:     PRODUCTION SIDECAR DELETION — release-build; Arun
-            verifies the same customer flow on prod with a real
-            Pro Plus license. NO ROLLBACK PATH after this row;
+  Prod:     PRODUCTION SIDECAR DELETION — release-build off the
+            deletion branch; Arun verifies the same full customer
+            flow on prod with a real Pro Plus license against
+            api.solarlayout.in. NO ROLLBACK PATH after this row;
             captured in the decision memo with the verification
             evidence.
 
@@ -1290,15 +1344,16 @@ Acceptance
 
 Smoke trigger (Arun, per sec 11.2) — final cutover smoke
   Local:    skip — this is a prod-state row.
-  Staging:  spot-check the legacy V1 endpoints respond as expected
-            (or 410 Gone where deletion-marked), confirm staging
-            mvp_web download CTA copy.
   Prod:     PRODUCTION FINAL SIGN-OFF — verify on prod that:
             (a) any remaining V1 endpoint usage from legacy installs
-            still works OR has been migrated cleanly;
-            (b) marketing site CTA reflects new state;
-            (c) DLQ has been empty for the prior 2 weeks;
-            (d) reconciler logs show no pathological patterns;
+            still works OR has been migrated cleanly (curl the V1
+            endpoints; confirm 410 Gone on deletion-marked routes);
+            (b) marketing site CTA on solarlayout.in reflects the
+            new state;
+            (c) DLQ has been empty for the prior 2 weeks
+            (CloudWatch metric);
+            (d) reconciler logs show no pathological patterns
+            (mvp_api / Vercel Cron logs);
             (e) Prasanta's legacy install path either migrated or
             documented as support-only.
             Sign-off captured in retirement memo.
@@ -1340,13 +1395,24 @@ These need a green checkmark before the rows that depend on them start. Recommen
 
 > **Operating principle:** unit tests test small pieces of code; smoke tests test what the user experiences. **No "works on my laptop" claim is acceptable as evidence the row is done.** CI/CD is a first-class citizen and ships alongside code, not as an afterthought. *But* smoke testing has real human cost — Arun's time is the bottleneck — so the cadence is **strategic, not exhaustive**.
 
-**Levels (ordered by cost):**
+**Today's deployment topology (as of v1.1 — 2026-05-03):**
+
+The original spec assumed a full Vercel + AWS staging deploy paralleling production. That topology does not exist today. Reality:
+
+- **Production is the de-facto staging environment for app-layer changes** until external launch. The public release has not happened; only Arun and Prasanta exercise prod. CI/CD (GitHub Actions) deploys `mvp_api`, `mvp_web`, `mvp_admin` only to production — there are no Vercel staging projects. Smoke for app-code rows therefore happens on prod by definition.
+- **Production stability bar is high regardless** — Stripe is live and wired to `api.solarlayout.in/webhooks/stripe`; RDS holds real entitlement state; S3 buckets accumulate real artifacts. Treat as production: don't break it; don't trigger live-Stripe charges that aren't intended; don't pollute shared state. Prod is **co-founder dogfood**, not a developer scratch space — when external customers land, the same prod environment serves them.
+- **Staging is partial** — it covers the surfaces where mistakes are non-trivial to undo:
+  - **Staging RDS** (`MVP_DATABASE_URL` in `.env.staging`) — every Prisma migration runs there first via the `set -a; . ./.env.staging; set +a; bunx prisma migrate ...` pattern. Production RDS rollback is non-trivial and disruptive; this gate is non-negotiable for any row that touches `schema.prisma`.
+  - **Staging AWS resources** — `solarlayout-staging-{downloads,projects}` S3 buckets, IAM policies, eventually the SQS queues from C5 and Lambda functions from C4 / C6 / C8 / C16. Provisioning, permissions, and policy changes get exercised in staging AWS first to gain confidence before the prod analogue is created or modified.
+  - **Staging Vercel apps DO NOT exist.** No staging deploy of `mvp_api`, `mvp_web`, or `mvp_admin`. App-code smoke happens at Local then directly at Prod.
+
+**Levels (reality-aware, ordered by cost):**
 
 | Level | Environment | When | Who |
 |---|---|---|---|
-| **Local** | Laptop: sidecar (until C19) + mvp_api dev server + dev/local S3 + local Postgres or staging RDS read-replica + LocalStack/real Lambda invoke | Every (smoke)-marked row, first | Arun |
-| **Staging** | Full Vercel + AWS staging deploy, real Lambda + SQS + RDS + S3 staging buckets | Every (smoke)-marked row, after Local + CI green | Arun |
-| **Production** | Live prod deploy, minimal targeted exercise post-cutover | Phase-end cutover rows only (C9, C19, C21) | Arun |
+| **Local** | Laptop: sidecar (until C19) + mvp_api dev server + dev/local S3 (or LocalStack) + local Postgres or staging-RDS connection + LocalStack/real Lambda invoke | Every (smoke)-marked row, first | Arun |
+| **Staging** | **Partial.** RDS staging DB for migrations; staging AWS resources (S3 / IAM / SQS / Lambda) for provisioning + permission verification. **No Vercel apps in staging.** | Rows that touch DB migrations (C7, C13) or AWS Lambda / SQS / IAM provisioning (C4, C8, C16, C18) — apply this level. App-code-only rows skip directly from Local to Prod. | Arun |
+| **Production** | Live prod deploy (CI/CD wired here). Stripe live. Co-founders only until external launch. **De-facto staging for app code** in the meantime. | Every (smoke)-marked row, after Local + CI green. Replaces what the original spec called "Staging" for app-layer smoke. | Arun |
 
 **Operator default:** Arun for desktop UX + most rows. Prasanta when solar-domain correctness is the validation question (e.g., golden-test divergence on a real customer KMZ).
 
@@ -1354,18 +1420,20 @@ These need a green checkmark before the rows that depend on them start. Recommen
 
 1. **Automated gates pass** — pre-commit gate from CLAUDE.md §8 (`bun run lint && bun run typecheck && bun run test && bun run build`) plus any row-specific test gates.
 2. **Local smoke (Arun)** — execute the row's `Smoke trigger` *Local* steps. **Bite-sized chunks** per memory's feedback rule: one observation per prompt, never bundle a numbered checklist. Capture output evidence in the row's PR description (paste of relevant tool output, DB query result, S3 ListObjects, mvp_api response).
-3. **CI/CD green** — staging deploy succeeds; staging integration tests pass; the row's PR is green on `main`.
-4. **Staging smoke (Arun)** — execute the row's `Smoke trigger` *Staging* steps. Same bite-sized cadence. **This is the bulk of the "real environment" verification** — same wire as prod, no customer impact.
-5. **Production sign-off** — only at the phase-end cutover rows (C9, C19, C21). Targeted production smoke; captured in the cutover row's decision memo.
+3. **CI/CD green** — the row's PR is green on `main`. CD deploys to **production** automatically (no staging deploy step exists for Vercel apps). For DB-migration rows, CD also runs the migration against the configured DB target — verify migration status before merging.
+4. **Staging smoke (Arun) — only if applicable.** Execute the row's `Smoke trigger` *Staging* steps **only** if the row declares one — that's DB-migration rows (C7, C13) and AWS-resource rows (C4, C8, C16, C18) per the levels table above. Otherwise skip — proceed to step 5.
+5. **Production smoke (Arun) — the actual smoke gate today.** Execute the row's `Smoke trigger` *Prod* steps (or its *Staging* steps re-targeted at prod for app-code rows). Same bite-sized cadence. **Don't break Prod.** Don't trigger live-Stripe charges that weren't intended (the entitlement system reads the live-billed Subscription chain). For phase-end "PRODUCTION CUTOVER" rows (C9, C19, C21), this step also doubles as the cutover sign-off captured in the row's decision memo — those rows still represent first-use-on-prod milestones for new compute paths and warrant the heavier ceremony.
 
-**Rows that are NOT (smoke)-marked:** automated gates + code review is enough. CI/CD still runs against staging on every merge, but no manual sign-off is needed. Examples: doc cleanup, refactor-only, scaffold-only, documentation-only rows.
+**Rows that are NOT (smoke)-marked:** automated gates + code review is enough. CI/CD still runs against production on every merge, but no manual sign-off is needed. Examples: doc cleanup, refactor-only, scaffold-only, documentation-only rows.
 
 **Anti-patterns to avoid:**
 
 - ❌ Bundling smoke checks into a numbered list ("steps 1-7"). One question per prompt; wait for human response. Memory feedback rule.
-- ❌ Claiming a row done before staging smoke passes. "Works on my laptop" is not done.
+- ❌ Claiming a row done before its applicable-level smokes pass. "Works on my laptop" is not done.
 - ❌ Smoking every row "to be safe." Smokes for pure refactors waste Arun's time and dilute the signal of the genuinely high-risk smokes.
-- ❌ Skipping local smoke and going straight to staging. Local catches 80% of issues at 1× the cost; staging issues are more expensive to debug.
+- ❌ Skipping local smoke and going straight to prod. Local catches 80% of issues at 1× the cost; prod issues are more expensive to debug AND visible to shared state (Stripe, RDS, S3).
+- ❌ Treating Prod as a developer testbed. Co-founder dogfood ≠ developer scratch — Stripe charges are real, S3 objects accumulate cost, data integrity for the first paying customers depends on what lands here.
+- ❌ Skipping staging-RDS migration smoke for migration rows. Production RDS rollback is non-trivial; this gate exists to prevent that.
 
 **Smoke evidence captured in the PR:**
 
@@ -1377,15 +1445,15 @@ These need a green checkmark before the rows that depend on them start. Recommen
 - <observation 2>: <evidence>
 ...
 
-### Staging
+### Staging  (only for DB migration / AWS provisioning / IAM rows)
 - <observation 1>: <evidence>
 ...
 
-### Prod  (only for phase-end cutover rows)
+### Prod
 - <observation>: <evidence>
 ```
 
-Each `Smoke trigger` field in row §9 names the specific exercises for that row. The protocol above governs **what / when / who**; **§11.4 governs HOW to run a smoke session** (ST-ID nomenclature, pre-req validation, bite-sized step execution, P0–P3 finding classification, outcome protocol, dual evidence capture). Smoke sessions are launched via the **§13.2 cold-session prompt** — a fresh Claude Code session dedicated to driving one ST-ID end-to-end.
+Each `Smoke trigger` field in row §9 names the specific exercises for that row, written reality-aware (v1.1) — Staging entries appear only on rows that touch DB migrations (C7, C13) or AWS-resource provisioning (C4, C8, C16, C18) and target staging RDS / staging AWS specifically; app-code rows have Local + Prod entries only. The protocol above governs **what / when / who**; **§11.4 governs HOW to run a smoke session** (ST-ID nomenclature, pre-req validation, bite-sized step execution, P0–P3 finding classification, outcome protocol, dual evidence capture). Smoke sessions are launched via the **§13.2 cold-session prompt** — a fresh Claude Code session dedicated to driving one ST-ID end-to-end.
 
 ### 11.3 Brainstorm-first vs writing-plans-direct
 
@@ -1438,8 +1506,11 @@ Sub-steps within a session are referenced as `ST-C9-S.1`, `ST-C9-S.2`, etc. when
 1. **Pre-requisite validation FIRST.** The session verifies, before any smoke step:
    - The target row in §9 has `Status: in-progress` (not `done` — smoke is the gate that flips done; not `todo` — implementation must be in flight).
    - All of the row's `Depends` rows have `Status: done` in §9.
-   - The target environment is live and reachable: dev server up (Local), staging deploy green (Staging), prod accessible (Prod).
-   - No stale state from a prior smoke (no orphan Run rows in dev RDS, etc.).
+   - The target environment is live and reachable for the chosen level (per §11.2 reality):
+     - **Local (L)**: dev server up (`bun run dev` showing `mvp_api ready`); local DB connectable; sidecar (until C19) responding to `/health`.
+     - **Staging (S) — partial-only**: applicable only when the row's `Smoke trigger` field declares a Staging entry — that's DB-migration rows (C7, C13) and AWS-resource rows (C4, C8, C16, C18) per §11.2. For DB rows: staging RDS reachable via `set -a; . ./.env.staging; set +a; bunx prisma migrate status --schema=packages/mvp_db/prisma/schema.prisma`. For AWS rows: the specific staging AWS resource the row exercises is provisioned and reachable (queue exists, IAM policy attached, bucket reachable, Lambda function deployed, etc.). If a row has no Staging entry, skip directly to Prod.
+     - **Prod (P) — the de-facto smoke gate today**: prod deploy green on the latest commit (`gh pr checks` or recent CD run); `api.solarlayout.in/health` returns 200; co-founder license key authenticates; the specific prod AWS resource the row exercises is provisioned.
+   - No stale state from a prior smoke (no orphan Run rows in dev / staging / prod RDS, no leftover S3 objects under known fixture key prefixes, no stuck SQS messages).
    
    If any pre-req fails: **HALT.** Report what failed; smoke is rescheduled. Do NOT improvise a workaround.
 
@@ -1484,6 +1555,113 @@ Sub-steps within a session are referenced as `ST-C9-S.1`, `ST-C9-S.2`, etc. when
 - ❌ Capture evidence only in the PR description without updating `SMOKE-LOG.md`. The cross-cutting archive is what protects future cold sessions from re-discovering the same bug.
 - ❌ Improvise around an environment problem mid-smoke. If staging is half-broken, halt and surface; don't smoke through it and call results valid.
 
+### 11.5 Post-row completion protocol
+
+> **Operating principle:** the row's spec text, plan, and live execution can drift apart. Drift caught BEFORE the row closes is cheap to fix; drift left in the spec rots into surprises for the next cold session. Every row close runs this protocol — a brief structured retrospective that surfaces drift candidates and asks for concurrence before any spec amendment lands. It is NOT a full design re-think; it is an "anything I learned that the next cold-session reader needs?" pass.
+
+**When this protocol fires:** AFTER the row's Acceptance criteria are met + all applicable smoke gates passed (per §11.2's 5-step DoD), BEFORE flipping `Status: in-progress → done`. Cold-session implementation runs (per §13.1) end with this step — it's wired into the §13.1 prompt's operating rule #5.
+
+**What this protocol does NOT cover** (these are mechanical per §12 and don't need discussion):
+
+- Status flip `in-progress → done` itself.
+- `Plan:` and `Shipped:` cross-reference lines.
+- The atomic row-close commit message.
+
+**Four-category drift check** — run silently first; surface only what's material:
+
+1. **Stale assumptions in row text.** A fact stated in the row body (Goal / Open verifications / Acceptance / Out of scope / Smoke trigger) that turned out wrong during execution. Example: a recon list of N affected files where execution found 2N. Recommend: amend row text to reflect reality, OR amend the convention if the gap recurs across rows.
+2. **New rows surfaced by execution.** Discoveries that cleanly belong in their own future row (not inline-fixable per the §11.4 P0/P1 outcome protocol). Example: a smoke finding that a downstream row's preconditions need a precursor cleanup row. Recommend: the new row's position in §9 (which phase, which Depends).
+3. **Adjacent-row scope gaps.** A discovery that a not-yet-started downstream row's text is incomplete or now wrong given what landed. Example: a fixture relocation in this row implies a future row's inventory step needs a corresponding update. Recommend: specific edit + which row(s) it touches.
+4. **Locked-decision (D-id) implications.** Rare. A row's execution surfaces evidence that a locked decision is wrong / unworkable / needs nuance. Per §12 this requires a dedicated spec amendment commit BEFORE the row's implementation lands; if discovered at row close (rather than mid-execution), it BLOCKS the close — escalate to Arun, do not flip the status until the D-id amendment is decided.
+
+**Trigger condition (when to actually start the discussion vs skip):**
+
+Run the four-category check silently. If all four yield "nothing to surface" — proceed with the mechanical close per §12. Common case for pure-refactor or scaffold rows where the plan + execution matched the spec exactly. The protocol's pass-through behavior is the default; only surface when something material was found.
+
+**If anything surfaces — discussion shape (one item at a time):**
+
+Apply the memory-feedback "one question at a time during design / brainstorming" rule. Per surfaced item:
+
+1. Agent presents the finding in plain prose: what category, what was observed during execution, what the candidate spec amendment would look like.
+2. Agent recommends an action with reason: amend row text / add new row / leave as tradecraft (not spec content) / escalate D-id.
+3. Arun responds: concur / amend recommendation / reject.
+4. If concurred: the amendment commit lands per §12 (dedicated commit, version bump in §15 changelog) BEFORE the row-close commit.
+5. Move to the next surfaced item.
+
+**Negative outcomes are common and correct.** "I noticed X but it's tradecraft, not spec content — leave it" is a valid conclusion. "I noticed X but the spec's existing language already covers this in spirit" is a valid conclusion. Don't manufacture amendments to look productive.
+
+**Outputs:**
+
+- Per surfaced item: zero-or-more spec-amendment commits (per §12), each appending a row to the §15 changelog.
+- A brief mention in the row's PR description under a `## Post-row completion protocol` section, listing the four categories + their dispositions. Even "nothing material surfaced" gets recorded so future readers know the protocol ran.
+
+### 11.6 Pre-row-start protocol
+
+> **Operating principle:** every row begins on a clean slate. A fresh cold session starting work without verifying its starting state risks landing the row's first WIP commit on top of stale code, a wrong branch, or unmerged work — mistakes that are expensive to unwind. The pre-row-start protocol is the bookend to §11.5: §11.5 closes one row cleanly; §11.6 opens the next one cleanly.
+
+**When this protocol fires:** at the start of a cold-session implementation run (per §13.1), BEFORE any code action, BEFORE invoking `superpowers:brainstorming` or `superpowers:writing-plans`, BEFORE the first WIP commit. It is the FIRST mutating-action gate of every row.
+
+**Pre-conditions to verify (in order):**
+
+1. **Prior row's PR merged** — Arun confirms in the §13.1 cold-session prompt by filling the "Prior row's PR" slot with a URL or "merged at <SHA>". If empty or "no" — HALT and ask. (For the very first row in the arc: "N/A — first row".)
+2. **`git fetch origin`** succeeds (network + auth + remote reachable).
+3. **Local `main` matches `origin/main`** — no divergence:
+   ```bash
+   [ "$(git rev-parse main)" = "$(git rev-parse origin/main)" ]
+   ```
+4. **Working tree clean** — `git status --porcelain` is empty.
+5. **Current branch is `main`** — `git branch --show-current` returns `main`.
+6. **Target row's `Status` is `todo`** in §9 — not `in-progress` (another session may be running it; or the prior session didn't close cleanly), not `done` (already shipped), not `blocked` (resume conditions need addressing first).
+7. **Target row's `Depends` rows all have Status `done`** in §9 — dependency chain is satisfied.
+
+**Required steps once all 7 pre-conditions pass:**
+
+```bash
+# 1. Ensure on main + clean
+git checkout main
+git status --porcelain   # must be empty
+
+# 2. Pull latest from origin (fast-forward only — refuses divergence)
+git fetch origin
+git pull --ff-only origin main
+
+# 3. Branch off the freshly-pulled main
+git checkout -b <branch-name>
+```
+
+**Branch naming convention:**
+
+Use conventional-commit type as the prefix:
+
+- `chore/c<NN>-<short-slug>` — refactor, structural, dep update (e.g., `chore/c2-extract-pvlayout-core`, `chore/c19-delete-sidecar`).
+- `feat/c<NN>-<short-slug>` — new functionality (e.g., `feat/c4-parse-kmz-lambda`, `feat/c8-compute-layout-end-to-end`).
+- `fix/c<NN>-<short-slug>` — fix-shaped row (rare; rows usually create not fix).
+- `docs/spec-v<X.Y>-<short-slug>` — spec amendment commits per §12 (e.g., `docs/spec-v1.1-protocol-amendments`). Spec amendments may also commit direct-to-main when Arun explicitly authorizes a low-risk docs-only change.
+
+**On ANY pre-condition failure: HALT.**
+
+| Failure | Surface to Arun |
+|---|---|
+| Prior PR not confirmed merged | Ask explicitly. Do not proceed on assumption. |
+| `git fetch origin` failed | Network / auth / remote-reachability error. Paste the error. Wait. |
+| `git pull --ff-only` rejected (divergent local main) | Local main has unexpected commits not on origin. Paste `git log origin/main..main`. Ask: stash, discard, force-push origin, or investigate. |
+| Working tree not clean | Paste `git status` output. Ask: commit, stash, discard, or investigate. |
+| Current branch not `main` | Paste current branch + `git status`. Ask: commit, stash, switch, or investigate. |
+| Target row Status not `todo` | Paste the row's current Status line. If `in-progress`: another session may be active or prior session left it open. If `done`: row already shipped. If `blocked`: surface the blocker note. |
+| Target row's `Depends` not all `done` | List the missing dependencies. Wait — those rows must close first. |
+
+**Why HALT instead of auto-recover:**
+
+Local-state discrepancies usually mean either (a) the previous session didn't close cleanly, or (b) Arun made a manual change the agent shouldn't silently overwrite. Auto-recovery (`git stash`, `git reset --hard`, `git checkout -- .`) risks destroying real work. **Always surface; never silently mutate state.**
+
+**What happens AFTER pre-flight passes:**
+
+The new branch is created. Then the row's normal §13.1 operating rules take over: brainstorming-first if marked, writing-plans, executing-plans, smoke gates, post-row completion protocol (§11.5), commit, PR.
+
+**Cold-session integration:**
+
+Wired into §13.1 as operating rule #0 — runs BEFORE rules 1–5. The cold-session prompt template makes this explicit so a fresh session can't accidentally start work on a dirty or stale state.
+
 ## 12. Tracking Protocol
 
 This spec is a living document. The Implementation Rows section (§9) is the source of truth for what's done, in-progress, todo, blocked across the entire cloud-offload arc.
@@ -1496,7 +1674,7 @@ This spec is a living document. The Implementation Rows section (§9) is the sou
 
 **Update cadence:**
 - Row claimed: `todo → in-progress` in same commit as first WIP.
-- Row completed: `in-progress → done` in same commit as merge (or final row commit).
+- Row completed: run the §11.5 post-row completion protocol; if it surfaces material drift, the corresponding spec amendment commits land first; THEN `in-progress → done` in same commit as merge (or final row commit).
 - Row blocked: `in-progress → blocked` immediately on discovery; notes name blocker + resume conditions.
 
 **Cross-references appended to a row on close:**
@@ -1533,8 +1711,20 @@ implementation rows (C1–C21). I will reference IDs throughout our
 session.
 
 I want to execute row: <ROW-ID>: <ROW-NAME>
+Prior row's PR (or N/A if first row): <PR URL, "merged at <SHA>", or "N/A — first row" — Arun fills>
 
 Operating rules:
+
+0. PRE-ROW-START PROTOCOL (§11.6). Before any code action, before
+   invoking brainstorming or writing-plans, run the §11.6 pre-flight
+   gate: verify the prior PR confirmation above, `git fetch origin`,
+   local `main` matches `origin/main`, working tree clean, current
+   branch is `main`, target row's Status is `todo`, all of the
+   row's `Depends` rows have Status `done`. If all 7 pass: create
+   the row's feature branch off the freshly-pulled `main` per
+   §11.6's branch naming convention; that's where this row's work
+   lands. On ANY discrepancy: HALT and surface to me — auto-recovery
+   is not allowed (risk of destroying real work).
 
 1. Locked decisions are non-negotiable. If you think one is wrong,
    STOP and surface to me explicitly — do not work around silently.
@@ -1574,15 +1764,24 @@ Operating rules:
    was a writing-plans output against a row whose architecture
    hadn't been brainstormed. Don't repeat that.
 
-5. On completion: flip the row's Status from todo/in-progress → done
-   in the spec, append a one-line PR/commit reference, commit as
-   part of the row's atomic commit.
+5. On completion: BEFORE flipping the row's Status from
+   todo/in-progress → done, run the §11.5 post-row completion
+   protocol — a brief four-category retrospective for spec drift
+   (stale assumptions / new rows / adjacent scope gaps / D-id
+   implications). If anything material surfaces, discuss with me
+   one item at a time and land any concurred spec amendments per
+   §12 (dedicated commit + §15 changelog bump) BEFORE the row
+   close. Then flip Status to done, append `Plan:` and `Shipped:`
+   lines, commit as part of the row's atomic commit.
 
-Begin by reading:
-  - The full spec
-  - The row's own entry (§9)
-  - All "Open verifications" surfaces in current code
-  - All "Depends" rows already marked done in §9
+Begin by:
+  (a) Reading the full spec.
+  (b) Running the §11.6 pre-row-start protocol — return either a
+      HALT report (with what failed) or a "pre-flight OK; created
+      branch <name>" confirmation before going further.
+  (c) Reading the row's own entry (§9), the "Open verifications"
+      surfaces in current code, and confirming all "Depends" rows
+      are marked done in §9.
 
 Then propose your plan to me before writing any code.
 ```
@@ -1708,4 +1907,17 @@ Disposition table for every existing doc that touches cloud offload, Spike 1/2, 
 
 ---
 
-*End of spec. This is the source of truth for cloud-offload compute architecture work. Implementation cold sessions: §13.1. Smoke-test cold sessions: §13.2. Live status of rows: §9. Decision IDs cited by rows: §3. Smoke-test protocol: §11.2 + §11.4.*
+## 15. Changelog
+
+This section tracks amendments to the spec after the initial 2026-05-03 lockin. Each amendment is committed in a dedicated commit per §12 ("Spec amendments") and appends a row here. Per-row Status / `Shipped:` updates from §9 row closes are NOT changelog entries — they're tracked in the rows themselves; this changelog is for spec-level structural / decision / protocol amendments.
+
+| Version | Date | Sections touched | Change |
+|---|---|---|---|
+| **v1** | 2026-05-03 | Entire spec | Initial lockin. D1–D23 locked; C1–C21 row table established; smoke-testing protocol (§11.2 + §11.4) and brainstorm-first policy (§11.3) defined; cold-session prompts (§13) drafted; doc kill list (§14) executed. |
+| **v1.1** | 2026-05-03 | Header status / version line, §11.2 (smoke-testing protocol — levels table + cadence + anti-patterns + evidence template + cleanup paragraph), §11.4 (pre-req validation step), §11.5 (NEW — post-row completion protocol), §11.6 (NEW — pre-row-start protocol), §12 (update cadence back-reference to §11.5), §13.1 (cold-session prompt — new rule #0 invokes §11.6 pre-flight; rule #5 amended to invoke §11.5; new "Prior row's PR" slot for Arun to fill; "Begin by" steps reordered to put pre-flight before deep reading), §9 row Smoke trigger fields (15 in-place rewrites), this changelog (NEW §15). | Reality amendment: deployment topology + session-boundary protocols. The original spec assumed a full Vercel + AWS staging deploy paralleling production. As of v1.1, no Vercel staging exists — production is the de-facto staging environment for app-layer smoke (co-founder-only, Stripe live, no external customers yet). Staging is partial: RDS staging DB for migrations + staging AWS resources for provisioning / IAM verification. **All 15 (smoke)-marked rows in §9 had their `Smoke trigger` fields rewritten in-place to be reality-aware:** 9 app-code rows dropped Staging entirely (Local + Prod only — C9, C10, C11, C12, C14, C15, C17, C19, C21); 2 DB-migration rows kept Staging as RDS-only (C7, C13); 4 AWS-resource rows kept Staging as AWS-only (C4, C8, C16, C18). Cleanup paragraphs in §11.2 / §11.4 simplified accordingly. **Two new session-boundary protocols added:** §11.5 post-row completion protocol — a four-category drift check (stale row text / new rows / adjacent scope gaps / D-id implications) that fires before every row's status flip and surfaces candidate spec amendments for Arun's concurrence. §11.6 pre-row-start protocol — a 7-precondition pre-flight gate (prior-PR-merged confirmation, `git fetch origin`, local `main` matches `origin/main`, clean tree, on `main`, row Status `todo`, Depends all `done`) that fires at the start of every cold-session implementation run; halts on ANY discrepancy rather than auto-recovering (risk of destroying real work). Both protocols wired into the §13.1 cold-session prompt — rule #0 (§11.6 pre-flight) and rule #5 (§11.5 post-row close) bracket the row's lifecycle. **No locked decision (D-id) was changed**; this is a smoke-protocol + tracking-protocol reality amendment, not an architectural one. |
+
+**Format for future amendments:** append a row above. Bump the patch version (v1.2, v1.3, …) for protocol / structural changes that don't touch a D-id; bump the minor version (v2.0) for any amendment that changes a locked decision. Mention every section touched. Keep the `Change` cell to one paragraph; link to a longer memo at `docs/initiatives/findings/` if more detail is needed.
+
+---
+
+*End of spec. This is the source of truth for cloud-offload compute architecture work. Implementation cold sessions: §13.1. Smoke-test cold sessions: §13.2. Live status of rows: §9. Decision IDs cited by rows: §3. Smoke-test protocol: §11.2 + §11.4. Amendment history: §15.*
