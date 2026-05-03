@@ -348,6 +348,40 @@ describe("POST /v2/projects/:id/parse-kmz", () => {
     expect(updateArgs.data.deletedAt).toBeInstanceOf(Date)
   })
 
+  it("Lambda returns ok=true with malformed parsed payload → 500 INTERNAL_SERVER_ERROR + generic message + soft-delete + no leak of Zod internals", async () => {
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      kmzBlobUrl: VALID_S3_URL,
+    }))
+    // ok=true but `parsed` doesn't conform to parsedKmzSchema (missing
+    // boundaries / centroid_lat / centroid_lon — entirely wrong shape).
+    mockInvoke.mockImplementation(async () => ({
+      ok: true,
+      parsed: { malformed: "shape" },
+    }))
+
+    const res = await post("prj_x")
+    expect(res.status).toBe(500)
+    const body = (await res.json()) as ErrorBody
+    expect(body.success).toBe(false)
+    expect(body.error.code).toBe("INTERNAL_SERVER_ERROR")
+    // Generic, customer-safe message — never Zod's internal error surface.
+    expect(body.error.message).toContain("Something went wrong")
+    expect(body.error.message).not.toContain("ZodError")
+    expect(body.error.message).not.toContain("invalid_type")
+    expect(body.error.message).not.toContain("malformed")
+    expect(body.error.message).not.toContain("boundaries")
+
+    // Cleanup ran exactly like the other failure paths — soft-delete only,
+    // no parsedKmz / boundaryGeojson written.
+    expect(mockProjectUpdate).toHaveBeenCalledTimes(1)
+    const updateArgs = mockProjectUpdate.mock.calls[0]![0] as UpdateArgs
+    expect(updateArgs.where.id).toBe("prj_x")
+    expect(updateArgs.data.deletedAt).toBeInstanceOf(Date)
+    expect(updateArgs.data.parsedKmz).toBeUndefined()
+    expect(updateArgs.data.boundaryGeojson).toBeUndefined()
+  })
+
   it("scopes findFirst to caller (userId, deletedAt: null)", async () => {
     mockProjectFindFirst.mockImplementation(async () => null)
     await post("prj_x")

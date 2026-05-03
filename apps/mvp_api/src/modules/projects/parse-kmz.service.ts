@@ -1,4 +1,7 @@
 import type { Context } from "hono"
+import { parsedKmzSchema } from "@solarlayout/entitlements-client"
+import type { ParsedKmz } from "@solarlayout/entitlements-client"
+import type { BoundaryGeojson } from "@solarlayout/shared"
 import { db } from "../../lib/db.js"
 import { AppError, NotFoundError } from "../../lib/errors.js"
 import { parseS3Url } from "../../lib/s3.js"
@@ -17,28 +20,19 @@ const GENERIC_FAILURE_MESSAGE =
   "Please try again, or contact support if it keeps happening."
 
 // ─────────────────────────────────────────────────────────────────────────
-// ParsedKmz wire shape (mirror of entitlements-client/src/types-v2.ts and
-// the Lambda's `_parsed_to_wire`). Kept narrow + structural — the Lambda
-// is the source of truth, mvp_api just persists + relays.
+// Lambda envelope. `ParsedKmz` (success-shape) and `BoundaryGeojson`
+// (derived storage shape) are the authoritative cross-runtime contracts
+// imported from `@solarlayout/entitlements-client` and `@solarlayout/shared`
+// respectively — see `docs/principles/external-contracts.md`. Lambda's
+// `_parsed_to_wire` is the source of truth for ParsedKmz; mvp_api validates
+// and persists.
 // ─────────────────────────────────────────────────────────────────────────
-
-interface ParsedKmzBoundary {
-  name: string
-  coords: Array<[number, number]>
-  obstacles: Array<Array<[number, number]>>
-  water_obstacles: Array<Array<[number, number]>>
-  line_obstructions: Array<Array<[number, number]>>
-}
-
-interface ParsedKmz {
-  boundaries: ParsedKmzBoundary[]
-  centroid_lat: number
-  centroid_lon: number
-}
 
 interface LambdaSuccess {
   ok: true
-  parsed: ParsedKmz
+  // `parsed` is structurally validated via `parsedKmzSchema.safeParse` in
+  // the success branch before any DB write — never trusted as-is.
+  parsed: unknown
 }
 
 interface LambdaFailure {
@@ -50,16 +44,6 @@ interface LambdaFailure {
 }
 
 type LambdaResult = LambdaSuccess | LambdaFailure
-
-type BoundaryGeojson =
-  | {
-      type: "Polygon"
-      coordinates: Array<Array<[number, number]>>
-    }
-  | {
-      type: "MultiPolygon"
-      coordinates: Array<Array<Array<[number, number]>>>
-    }
 
 /**
  * Derive a polygon-only `BoundaryGeojson` (B26 contract) from the
@@ -224,13 +208,45 @@ export async function parseKmzHandler(c: Context<MvpHonoEnv>): Promise<Response>
     )
   }
 
-  // 5. Success path — persist parsedKmz (snake_case verbatim — DO NOT
-  //    camelCase-normalize) AND derive boundaryGeojson for B26.
-  const boundaryGeojson = parsedKmzToBoundaryGeojson(result.parsed)
+  // 5. Validate the Lambda's `parsed` payload against the canonical
+  //    Zod schema BEFORE any persistence. The Lambda is the source of
+  //    truth, but a buggy / drifted Lambda must not be allowed to write
+  //    malformed JSON into Postgres (which subsequent reads would echo
+  //    back to the desktop). Validation failure collapses into the same
+  //    uniform path as `result.ok === false` — log, cleanup, 500.
+  //
+  //    The malformed payload itself is NOT logged — it could be huge
+  //    and we have the Zod issue list which is sufficient triage data.
+  const validated = parsedKmzSchema.safeParse(result.parsed)
+  if (!validated.success) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        message: "parse-kmz Lambda response failed schema validation",
+        projectId,
+        bucket,
+        key,
+        issues: validated.error.issues,
+      }),
+    )
+    await cleanupOnFailure(projectId)
+    throw new AppError(
+      "INTERNAL_SERVER_ERROR",
+      GENERIC_FAILURE_MESSAGE,
+      500,
+    )
+  }
+  const parsed = validated.data
+
+  // 6. Success path — persist the schema-validated parsedKmz (snake_case
+  //    verbatim — DO NOT camelCase-normalize) AND derive boundaryGeojson
+  //    for B26. We use `validated.data` everywhere downstream so what
+  //    persists exactly matches what we return to the caller.
+  const boundaryGeojson = parsedKmzToBoundaryGeojson(parsed)
   await db.project.update({
     where: { id: projectId },
     data: {
-      parsedKmz: result.parsed as unknown as object,
+      parsedKmz: parsed as unknown as object,
       ...(boundaryGeojson !== null
         ? { boundaryGeojson: boundaryGeojson as unknown as object }
         : {}),
@@ -238,5 +254,5 @@ export async function parseKmzHandler(c: Context<MvpHonoEnv>): Promise<Response>
   })
 
   // V2 envelope wrapping the snake_case ParsedKmz payload (verbatim).
-  return c.json(ok(result.parsed))
+  return c.json(ok(parsed))
 }
