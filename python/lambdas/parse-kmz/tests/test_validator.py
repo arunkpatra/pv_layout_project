@@ -1,4 +1,4 @@
-"""Tests for domain validation (levels 1-4)."""
+"""Tests for domain validation (levels 1-3; L4 dropped post-prod-smoke)."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -54,10 +54,14 @@ def test_level3_out_of_range_lat_fails():
         validate_parsed_kmz(_parsed([_boundary("a", [(78.0, 95.0), (78.1, 95.0), (78.0, 95.1), (78.0, 95.0)])]))
 
 
-def test_level4_self_intersecting_fails():
+def test_self_intersecting_polygon_passes():
+    """L4 (Shapely is_valid) was dropped post-prod-smoke — real customer
+    KMZs from CAD/KML editors / surveyed boundaries routinely have
+    minor topological imperfections (one-vertex kinks) that Shapely
+    flags but downstream rendering + compute-layout handle fine. The
+    legacy sidecar didn't do this check; we matched legacy behavior."""
     bow_tie = _boundary("a", [(78.0, 12.0), (78.1, 12.1), (78.1, 12.0), (78.0, 12.1), (78.0, 12.0)])
-    with pytest.raises(ValidationError, match="not a valid polygon"):
-        validate_parsed_kmz(_parsed([bow_tie]))
+    validate_parsed_kmz(_parsed([bow_tie]))  # no exception
 
 
 def test_multi_boundary_first_failure_wins():

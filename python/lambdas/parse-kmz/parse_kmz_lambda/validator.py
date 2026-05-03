@@ -1,10 +1,18 @@
 """Domain validation for parsed KMZ output.
 
-Per spec C4 brainstorm Q-validation: levels 1-4 in scope.
+Per spec C4 brainstorm Q-validation; revised post-prod-smoke (2026-05-03)
+to drop L4 — Shapely `is_valid` over-rejected real customer KMZs that the
+legacy sidecar (no Shapely check) had accepted for years. Multi-plot
+KMZs from CAD/KML editors / surveyed boundaries routinely have minor
+topological imperfections (one-vertex kinks, near-duplicate points) that
+Shapely's strict OGC `is_valid` flags but downstream rendering +
+compute-layout handle without issue.
+
+In-scope levels:
   1. boundaries[] non-empty
   2. each boundary has >= 3 coords
   3. each coord within WGS84 range (-90/90 lat, -180/180 lon)
-  4. each polygon is_valid (Shapely; no self-intersection)
+  4. (DROPPED — see header) each polygon Shapely.is_valid
 
 All validation failures raise ValidationError with a specific message
 naming the failed check. Lambda handler catches and returns
@@ -13,9 +21,6 @@ naming the failed check. Lambda handler catches and returns
 from __future__ import annotations
 
 from typing import Any
-
-from shapely.geometry import Polygon
-from shapely.validation import explain_validity
 
 
 class ValidationError(ValueError):
@@ -48,17 +53,3 @@ def validate_parsed_kmz(parsed: Any) -> None:
                 raise ValidationError(
                     f"boundary '{name}' has out-of-range coord: ({lon}, {lat})"
                 )
-
-        # Level 4: Shapely is_valid.
-        try:
-            poly = Polygon(coords)
-        except Exception as exc:
-            raise ValidationError(
-                f"boundary '{name}' could not form a polygon: {exc}"
-            ) from exc
-
-        if not poly.is_valid:
-            reason = explain_validity(poly)
-            raise ValidationError(
-                f"boundary '{name}' is not a valid polygon: {reason}"
-            )

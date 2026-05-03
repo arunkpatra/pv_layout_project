@@ -111,12 +111,16 @@ def test_kmz_with_out_of_range_returns_invalid(s3_client):
     assert result["code"] == "INVALID_KMZ"
 
 
-def test_kmz_with_self_intersecting_returns_invalid(s3_client):
-    """Level-4 validation."""
+def test_kmz_with_self_intersecting_polygon_succeeds(s3_client):
+    """Self-intersecting polygons used to fail at L4; that check was
+    dropped post-prod-smoke (real customer KMZs from CAD/KML editors
+    routinely have minor topological imperfections that Shapely flags
+    but downstream rendering + compute-layout handle fine). Match
+    legacy sidecar behavior."""
     _put(s3_client, kmz_with_self_intersecting_polygon())
     result = handler_module.handler({"bucket": BUCKET, "key": KEY}, None)
-    assert result["ok"] is False
-    assert result["code"] == "INVALID_KMZ"
+    assert result["ok"] is True
+    assert "parsed" in result
 
 
 def test_missing_bucket_or_key_returns_internal_error(s3_client):
