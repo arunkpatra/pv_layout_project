@@ -53,7 +53,8 @@ from pvlayout_core.core.string_inverter_manager import (  # noqa: E402
 )
 from pvlayout_core.models.project import LayoutParameters  # noqa: E402
 
-KMZ_DIR = PVLE_ROOT / "tests" / "golden" / "kmz"
+# KMZ fixtures moved to pvlayout_core per cloud-offload C2.
+KMZ_DIR = PVLE_ROOT.parent / "pvlayout_core" / "tests" / "golden" / "kmz"
 
 PLANTS = [
     ("phaseboundary2", KMZ_DIR / "phaseboundary2.kmz"),

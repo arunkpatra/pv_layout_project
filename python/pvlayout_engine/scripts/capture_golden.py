@@ -38,8 +38,12 @@ from pvlayout_engine.adapters import result_from_core
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 GOLDEN_DIR = SCRIPT_DIR.parent / "tests" / "golden"
-KMZ_DIR = GOLDEN_DIR / "kmz"
 EXPECTED_DIR = GOLDEN_DIR / "expected"
+# KMZ fixtures moved to pvlayout_core per cloud-offload C2; expected
+# JSONs stay engine-local because they verify the engine's response shape.
+KMZ_DIR = (
+    SCRIPT_DIR.parent.parent / "pvlayout_core" / "tests" / "golden" / "kmz"
+)
 
 
 def capture_for_kmz(kmz_path: Path) -> dict:
