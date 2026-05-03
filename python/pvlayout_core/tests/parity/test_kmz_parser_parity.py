@@ -23,7 +23,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-KMZ_DIR = REPO_ROOT / "python/pvlayout_engine/tests/golden/kmz"
+KMZ_DIR = REPO_ROOT / "python/pvlayout_core/tests/golden/kmz"
 LEGACY_REPO = Path("/Users/arunkpatra/codebase/PVlayout_Advance")
 
 

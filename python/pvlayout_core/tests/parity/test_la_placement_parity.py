@@ -30,7 +30,7 @@ from pvlayout_core.models.project import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-KMZ_DIR = REPO_ROOT / "python/pvlayout_engine/tests/golden/kmz"
+KMZ_DIR = REPO_ROOT / "python/pvlayout_core/tests/golden/kmz"
 BASELINE_DIR = (
     REPO_ROOT / "docs/parity/baselines/baseline-v1-20260429/ground-truth"
 )
