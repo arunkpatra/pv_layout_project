@@ -13,6 +13,7 @@
  * `docs/superpowers/specs/2026-05-03-c4-parse-kmz-lambda.md` §Q3 + Q6.
  */
 import { useEffect, useRef, useState } from "react"
+import { AlertTriangle, Check, Circle, Loader2 } from "lucide-react"
 import {
   Button,
   Dialog,
@@ -86,11 +87,20 @@ function statusFor(stage: CreateProjectStage, name: StageName): RowStatus {
   return "pending"
 }
 
-function statusIcon(status: RowStatus): string {
-  if (status === "done") return "✓"
-  if (status === "active") return "⟳"
-  if (status === "error") return "⚠"
-  return "○"
+function StatusIcon({ status }: { status: RowStatus }) {
+  // 16px icons match the row's 13px text baseline reasonably; the stroke
+  // weight (1.75) is the project's design-foundations default for inline
+  // glyphs at this size. aria-hidden because the row label conveys
+  // semantics; data-status on the <li> is the test/programmatic hook.
+  const props = {
+    size: 16,
+    strokeWidth: 1.75,
+    "aria-hidden": true as const,
+  }
+  if (status === "done") return <Check {...props} />
+  if (status === "active") return <Loader2 {...props} className="animate-spin" />
+  if (status === "error") return <AlertTriangle {...props} />
+  return <Circle {...props} />
 }
 
 export function CreateProjectModal({
@@ -200,9 +210,7 @@ export function CreateProjectModal({
                 ].join(" ")}
               >
                 <span className="inline-flex items-center gap-[8px]">
-                  <span aria-hidden className="font-mono">
-                    {statusIcon(status)}
-                  </span>
+                  <StatusIcon status={status} />
                   <span>{label}</span>
                 </span>
                 {elapsed !== null && (
