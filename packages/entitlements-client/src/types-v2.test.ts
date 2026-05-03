@@ -53,6 +53,7 @@ describe("V2 error codes", () => {
     const expected: string[] = [
       "CONFLICT",
       "INTERNAL_SERVER_ERROR",
+      "INVALID_KMZ",
       "NOT_FOUND",
       "PAYMENT_REQUIRED",
       "S3_NOT_CONFIGURED",
