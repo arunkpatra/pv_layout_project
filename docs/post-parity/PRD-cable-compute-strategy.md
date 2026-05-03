@@ -1,6 +1,25 @@
 # PRD — Cable-Compute Strategy: Local Wins + Cloud Offload
 
-**Status:** Draft, ready for spike creation
+> # ⚠️ SUPERSEDED — 2026-05-03
+>
+> **The architectural framing in this PRD is no longer current.** Spike 1 (local perf wins + UX hygiene + relabel) has shipped to `main`. **Spike 2 (cloud offload) has been completely re-architected** and is replaced by:
+>
+>   **[`docs/superpowers/specs/2026-05-03-cloud-offload-architecture.md`](../superpowers/specs/2026-05-03-cloud-offload-architecture.md)** — the master spec for cloud-offload compute work.
+>
+> What changed in the re-architecture (briefly):
+> - The **Python sidecar dies entirely** (D2 in the new spec); not "shrunk to parser-only" or "kept as a heavy-only escape valve."
+> - **Per-Run unit of compute, not per-plot fan-out** (D11). The `Slice` table designed in §4.3 of this PRD is **NOT BUILT v1** — it is a v3 future-ladder item only.
+> - **Pre-render all artifacts in one Lambda invocation** (layout JSON + DXF + PDF + KMZ + thumbnail), eliminating the separate export-Lambda design entirely (D12).
+> - **Lambda writes RDS direct via psycopg2** (D9). No HTTP callbacks, no internal-secret middleware.
+> - **mvp_api orchestrator publishes to SQS** at Run create (D19); polling on `Run.status` replaces the local-job-table polling pattern.
+>
+> This PRD is preserved as **historical context** — the empirical performance numbers in §1.4, the local-perf wins documented in §3 (which actually shipped), and the industry-correctness baseline in §2 are still factually correct and informed the new spec. The "Spike 2" architecture below — the cross-repo wheel pipeline, the Slice table, the per-plot fan-out, the separate export Lambdas, the cancel/fail callback semantics — is **superseded in its entirety**. Do not implement from this document.
+>
+> *Disposition recorded by row C1 of the cloud-offload spec.*
+
+---
+
+**Status:** ~~Draft, ready for spike creation~~ **SUPERSEDED 2026-05-03 (Spike 1 shipped; Spike 2 re-architected)**
 **Date:** 2026-05-01
 **Author:** Claude (under Arun's direction)
 **Scope:** Two-phase strategy to eliminate the multi-plot cable-calc UX failure mode and to put compute on a sustainable architectural footing for low-end clients + future mobile.

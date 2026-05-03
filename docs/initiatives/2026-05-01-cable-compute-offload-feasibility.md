@@ -1,7 +1,27 @@
 # Cable Compute Cloud Offload — Feasibility Audit
 
+> # ⚠️ SUPERSEDED — 2026-05-03
+>
+> **Architecture replaced.** This memo's design (Job + Slice tables, per-plot SQS fan-out, cross-repo wheel publishing, separate export Lambdas, internal-callback failure path) is **NOT what we are building.** See:
+>
+>   **[`docs/superpowers/specs/2026-05-03-cloud-offload-architecture.md`](../superpowers/specs/2026-05-03-cloud-offload-architecture.md)** — the master spec for cloud-offload compute work.
+>
+> Major divergences from this memo:
+> - **No `Slice` table v1** (D11). Per-Run unit of compute. Slice/fan-out is v3 future-ladder only.
+> - **No separate export Lambdas** (D12). All artifacts (layout JSON + DXF + PDF + KMZ + thumbnail) pre-rendered inside one `compute-layout` Lambda invocation.
+> - **No cross-repo wheel publishing.** The post-merge banner in §1.5 footnoted this; the new spec (D5) finalizes it as `Dockerfile COPY` from intra-repo `python/pvlayout_core/`.
+> - **No internal callback endpoint or `MVP_INTERNAL_SHARED_SECRET`** for fail/cancel reporting (D9 + D17). Lambdas write RDS direct via psycopg2; cancel + fail mechanics are detailed in C10-C13 of the new spec.
+> - **The dormant `apps/layout-engine` POC** referenced in the TL;DR was never merged into this repo post-merge. The new spec's `python/lambdas/<purpose>/` structure (§7) replaces the `apps/cable-engine/` framing this memo proposed.
+>
+> What's still useful here as historical context: the inventory of existing AWS infra surfaces (account, IAM, S3, Lambda packaging conventions), the cost reasoning, the ECS/Fargate decision rationale (which the new spec preserves as D22 escape hatch). The specific *architecture* this memo recommended is not what we are building.
+>
+> *Disposition recorded by row C1 of the cloud-offload spec.*
+
+---
+
 **Date:** 2026-05-01
-**Audience:** sister desktop session at `pv_layout_project` (cable-compute spike)
+**Status:** **SUPERSEDED 2026-05-03** — see banner above; architecture replaced.
+**Audience:** ~~sister desktop session at `pv_layout_project` (cable-compute spike)~~ historical reference only
 **Repo at audit time:** `renewable_energy` @ `59c4e30` on `post-parity-v2-backend`
 **Scope:** Inventory existing experimental Lambda/SQS/compute infra; assess `mvp_api`/`mvp_db` readiness for a Job + Slice job system; recommend SQS / Lambda / Fargate patterns; sketch end-to-end flow; raise unknowns.
 

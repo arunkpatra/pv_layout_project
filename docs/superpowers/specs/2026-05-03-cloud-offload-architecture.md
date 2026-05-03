@@ -242,7 +242,7 @@ Each row is one cold-session unit. Status is one of `todo | in-progress | done |
 #### C1 — Doc cleanup
 
 ```
-Status:   todo
+Status:   done (2026-05-03)
 Depends:  none
 Tier:     T1
 
@@ -260,18 +260,28 @@ Open verifications
     rows B27-B34) are updated to point at this spec.
 
 Acceptance
-  - Halted plan file deleted (`docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`).
+  - Halted plan file deleted (`docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`). ✅
   - Cable PRD + offload-feasibility memo annotated SUPERSEDED with link
-    to this spec in their headers.
+    to this spec in their headers. ✅
   - B27 memo §B.6 amended (the "internal endpoint sidecar callback"
-    paragraph rewritten to point at D9 + D17).
+    paragraph rewritten to point at D9 + D17). ✅
   - post-parity-v2-backend-plan.md B28-B34 row group amended to
-    redirect at this spec's C-rows.
-  - Atomic commit: `docs: cloud-offload spec lockin + kill stale docs`.
+    redirect at this spec's C-rows (B28 → C14; B29/B30 done historical;
+    B31 → C11; B32 → C12; B33 → C10; B34 → C15). ✅
+  - docs/PLAN.md "renewable_energy session" + Spike 2 references
+    amended to reflect post-merge reality + cloud-offload spec. ✅
+  - Spec §14 path typo fixed (was `docs/post-parity/PLAN.md`, now
+    `docs/PLAN.md`). ✅
+  - Atomic commit: `docs(c1): cloud-offload spec lockin + kill stale docs`.
 
 Out of scope
   - Code changes.
   - Deleting historical findings (`docs/post-parity/findings/*` stays).
+
+Shipped: 2026-05-03 — executed inline in the brainstorming session
+that produced the master spec (§9 row table); commit ref appended at
+PR/push time. No separate writing-plans output (row was small and
+mechanical; §14 kill list was the plan).
 ```
 
 #### C2 — Extract `pvlayout_core` to standalone
@@ -1679,7 +1689,7 @@ Disposition table for every existing doc that touches cloud offload, Spike 1/2, 
 | `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md` | **ANNOTATE SUPERSEDED** + link | Backend-side feasibility assessment; useful history; architecture replaced. |
 | `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` | **AMEND §B.6** | Decisions A through B.5 stand. §B.6's "internal endpoint sidecar callback" framing is wrong — replace with reference to D9 + D17. |
 | `docs/initiatives/post-parity-v2-backend-plan.md` rows B27-B34 | **AMEND** | B27 stays as decision row. B28-B34 redirect to this spec's C-rows (B28 → C14; B29 done; B30 done; B31 → C11; B32 → C12; B33 → C10; B34 → C15). |
-| `docs/post-parity/PLAN.md` references to "renewable_energy session" / Spike 2 | **AMEND** | Post-merge; redirect at this spec for cloud-offload work. |
+| `docs/PLAN.md` references to "renewable_energy session" / Spike 2 | **AMEND** | Post-merge; redirect at this spec for cloud-offload work. |
 | `docs/post-parity/RESUME-*.md` | **KEEP** | Historical session logs. Not load-bearing. |
 | `docs/post-parity/SMOKE-LOG.md` | **KEEP** | Active session log. |
 | `docs/post-parity/findings/2026-04-30-002-cable-perf-poc.md` | **KEEP** | Real perf data; informs §1 motivation. |

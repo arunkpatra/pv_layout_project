@@ -113,13 +113,19 @@ If forensic detail is ever needed (e.g., a support inquiry "I see N charges but 
 
 ### B.6 Failed-runs path uses the same B.1–B.5 mechanism
 
-Failed runs are not user-cancellable (no user click). The orchestrator/sidecar emits the failure transition internally:
+Failed runs are not user-cancellable (no user click). The orchestrator emits the failure transition internally:
 - `BEGIN`.
 - `SELECT Run … FOR UPDATE`.
 - `UPDATE Run SET status='FAILED', failedAt=NOW(), failureReason=<text>` + `INSERT UsageRecord (count=-1, kind='refund', refundsRecordId=<original>)`.
 - `COMMIT`.
 
-This is internal — no public endpoint. Sidecar callback or orchestrator-detected timeout triggers it.
+> **⚠ AMENDED 2026-05-03 (by C1 of the cloud-offload spec):** the original wording said *"internal — no public endpoint. Sidecar callback or orchestrator-detected timeout triggers it."* That framing was wrong on two axes — wrong for v1 (the desktop is the orchestrator; sidecar has no DB access), wrong for the cloud-offload future (Lambdas write RDS direct via psycopg2 per **D9**; no HTTP callbacks at any layer). The transactional pattern above is correct and stands; the **trigger mechanism** is replaced as follows:
+>
+> - **In the cloud-offload architecture** (master spec [`2026-05-03-cloud-offload-architecture.md`](../../superpowers/specs/2026-05-03-cloud-offload-architecture.md)): the `compute-layout` Lambda's top-level try/except runs the transactional FAILED-write directly via psycopg2 (per **D17**). No callback, no internal endpoint, no shared secret. Implemented in row **C12 — Lambda fail path**.
+> - **As a backstop for crashed Lambdas** that don't reach their try/except: a stuck-RUNNING reconciler (per **D18**) sweeps `Run.status='RUNNING'` rows older than N minutes and flips them to FAILED + refund. Implemented in row **C13 — Stuck-RUNNING reconciler**.
+> - **There is no "sidecar callback."** The sidecar dies entirely (per **D2**); cloud paths are canonical for fail reporting end-to-end.
+>
+> The halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md` (deleted by C1) was a writing-plans output against this paragraph's incorrect framing. That plan was the trigger for the architectural reset captured in the master spec.
 
 ### B.7 Cancel UI presents a confirmation modal
 
