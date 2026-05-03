@@ -106,3 +106,89 @@ The Dockerfile's build context is **always the repo root**. Always run `docker b
 - **arm64 Graviton everywhere**: cost; consistency.
 - **`<git-sha>` as the canonical image tag** (D21): every Run records its `Run.engineVersion` from the SHA the Lambda was built from. `latest` is a convenience; SHA is the truth.
 - **Build context = repo root**: required for `COPY python/pvlayout_core`. Documented here so it isn't re-debated in every Lambda's Dockerfile review.
+
+## Local-dev: parallel HTTP entry (per D24 + C3.5)
+
+Each Lambda ships TWO entry points sharing one business-logic module:
+
+1. `<purpose>_lambda/handler.py` — AWS Lambda entry. Cloud invokes this. SQS-triggered Lambdas unwrap `event["Records"]` here.
+2. `<purpose>_lambda/server.py` — local-dev HTTP entry (stdlib `http.server`, no Flask). Devs run this natively on the host:
+
+   ```bash
+   cd python/lambdas/<purpose>
+   uv run python -m <purpose>_lambda.server
+   ```
+
+   Matches the journium-bip-pipeline `serve` target convention. **No Dockerfile.local**; **no docker-compose service for the Lambda**. Only the local Postgres lives in `docker-compose.yml`.
+
+mvp_api's `apps/mvp_api/src/lib/lambda-invoker.ts` routes calls based on `USE_LOCAL_ENVIRONMENT`:
+- `true`  → `fetch http://localhost:<port>/invoke`
+- unset/false → AWS SDK Lambda invoke (sync) or SQS publish (async). Cloud paths stubbed as `NotImplementedError` at C3.5; filled at C4 (`invoke`) and C7 (`enqueue`).
+
+### Port allocation
+
+| Purpose         | Port | Status                                |
+|-----------------|------|---------------------------------------|
+| smoketest       | 4100 | live (C3.5; deleted at C4)            |
+| parse-kmz       | 4101 | added at C4                           |
+| compute-layout  | 4102 | added at C6                           |
+| detect-water    | 4103 | added at C16                          |
+| compute-energy  | 4104 | added at C18 (if functional split)    |
+
+Override per-Lambda via env: `LOCAL_<PURPOSE>_LAMBDA_URL=http://localhost:<other-port>` (e.g., `LOCAL_PARSE_KMZ_LAMBDA_URL`).
+
+### server.py shape mirrors cloud trigger type
+
+| Cloud trigger                              | Local server.py response                                                              |
+|--------------------------------------------|---------------------------------------------------------------------------------------|
+| Sync invoke (parse-kmz, smoketest)         | `POST /invoke` returns 200 + handler result (200 success / 500 on exception)          |
+| SQS-triggered (compute-layout, detect-water, future compute-energy) | `POST /invoke` returns 202 + spawns `Thread(daemon=True).start(target=process_message)` |
+
+Plus uniform `GET /health` returning `{"ok": true}` on every Lambda (used by devs for liveness curl).
+
+The mode is intrinsic to the Lambda — locked at deploy time, not at call time. mvp_api picks the verb (`invoke` vs `enqueue`); the Lambda's server.py is hand-coded to behave accordingly.
+
+### Business-logic factoring (first exercised at C6)
+
+For async-mode Lambdas, factor the work into a transport-agnostic function:
+
+```python
+# <purpose>_lambda/<purpose>.py (or similar)
+def process_message(payload: dict) -> dict | None:
+    """Pure work — no HTTP, no SQS-event envelope."""
+    ...
+```
+
+Both entry points become thin transport unwrappers:
+
+```python
+# handler.py — SQS-triggered Lambda
+def handler(event, context):
+    for record in event["Records"]:
+        body = json.loads(record["body"])
+        process_message(body)
+    return {"batchItemFailures": []}
+
+# server.py — sibling local entry
+def do_POST(self):
+    body = json.loads(self.rfile.read(...))
+    Thread(target=process_message, args=(body,), daemon=True).start()
+    self._send_json(202, {"accepted": True})
+```
+
+Pattern source: `journium-bip-pipeline/src/server.py` + `journium-bip-pipeline/src/orchestrator.py`. Sync-mode Lambdas (smoketest, parse-kmz) don't need this factor — the handler IS the business logic, called inline.
+
+### DB connection lifecycle (first exercised at C6)
+
+DB-using Lambdas (compute-layout at C6+) connect natively from `server.py`'s handler thread to the compose-Postgres via the host-mapped port:
+
+```bash
+# Dev's shell env
+export MVP_DATABASE_URL='postgres://mvp:mvp@localhost:5433/mvp_db'
+```
+
+Per-invocation psycopg2 connection (no pool); mirrors the per-invocation Lambda model in cloud. Add `psycopg2-binary` (or `psycopg[binary]`) to the Lambda's `pyproject.toml` when introducing DB use.
+
+### Throwaway demonstrator: smoketest
+
+`python/lambdas/smoketest/` is the C3-shipped demonstrator. Its `server.py` (added in C3.5) is sync-mode and trivially small — proves the lambda-invoker plumbing once, then C4 deletes the entire smoketest directory + drops the ECR repo `solarlayout/smoketest`. Future Lambdas (parse-kmz, etc.) replace it; the build-lambdas matrix workflow auto-discovers them.
