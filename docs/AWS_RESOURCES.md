@@ -359,14 +359,16 @@ All `solarlayout/*` ECR repos use immutable tags + scan-on-push + arm64 image ma
       "Effect": "Allow",
       "Action": [
         "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
         "ecr:CompleteLayerUpload",
+        "ecr:CreateRepository",
+        "ecr:DescribeImages",
+        "ecr:DescribeRepositories",
+        "ecr:GetDownloadUrlForLayer",
         "ecr:InitiateLayerUpload",
         "ecr:PutImage",
-        "ecr:UploadLayerPart",
-        "ecr:DescribeRepositories",
-        "ecr:DescribeImages",
-        "ecr:CreateRepository",
-        "ecr:TagResource"
+        "ecr:TagResource",
+        "ecr:UploadLayerPart"
       ],
       "Resource": [
         "arn:aws:ecr:ap-south-1:378240665051:repository/solarlayout/*"
