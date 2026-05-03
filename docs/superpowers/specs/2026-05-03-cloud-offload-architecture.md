@@ -1,7 +1,7 @@
 # Cloud-Offload Compute Architecture — Master Spec
 
 **Status:** Locked (2026-05-03). Living document — updated per row close. See §15 changelog for amendments.
-**Version:** v1.2 (2026-05-03 — C3 naming-convention prefix flip to `solarlayout-*`)
+**Version:** v1.3 (2026-05-03 — D24 + C3.5: local-dev parallel HTTP transport pattern)
 **Owner:** Arun (engineering authority) + Prasanta (solar-domain authority).
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
@@ -63,6 +63,7 @@ These came out of the brainstorm captured in this session (transcript-level note
 - **D21 — Engine version recorded per Run.** `compute-layout` writes the git SHA of its image to a new column `Run.engineVersion: String?` (added in C7's mvp_api migration row). Mid-deploy drift is observable by post-hoc query.
 - **D22 — Lambda → ECS portability.** Same Docker image works for ECS via `CMD` change. Documented escape hatch; not built v1.
 - **D23 — Compound feature gating for compute Runs.** A single Run may invoke multiple gated compute features: layout (always), cable routing (conditionally, per `params.enable_cable_calc` + `cable_routing` entitlement; works today in Tauri via the LayoutPanel toggle), energy yield (conditionally, per `energy_yield`/`generation_estimates` entitlement; not yet wired — see D13 + C18). Gating enforces at three layers: **(1)** client UI gates per-feature affordances (toggles, tabs, upsell chips) per the user's `availableFeatures` union — same as today on Tauri; **(2)** mvp_api B16 enforces at Run-create time — for each gated feature implied by `params`, verify the corresponding feature key is in `availableFeatures`; reject 402 if missing; **(3)** the Lambda trusts what's in params — no entitlement re-validation, no DB entitlement query (keeps Lambda simple per D9). **Migration note:** today, layer-2 cable enforcement lives in the sidecar's `require_feature("cable_routing")` dependency on the `/layout` route. When the sidecar dies (C19), that enforcement must already be live in B16. C7 picks this up explicitly. Energy gating follows the same pattern when C18 lands.
+- **D24 — Parallel HTTP entry per Lambda; mvp_api routes via `USE_LOCAL_ENVIRONMENT`.** Every Lambda in `python/lambdas/` ships TWO entry points sharing one business-logic module: the AWS Lambda handler (sync-invoked for parse-kmz; SQS-event-shaped for compute-layout / detect-water / future compute-energy) and a parallel stdlib `http.server`-based HTTP server (`server.py` sibling to `handler.py`, port `4100 + <lambda-offset>`). mvp_api gets a `lambda-invoker` shared util reading `USE_LOCAL_ENVIRONMENT`: if `true`, routes to `http://localhost:<port>` via fetch; if unset / false, real AWS SDK invoke (parse-kmz) or SQS publish (compute-layout, detect-water, future compute-energy). Lambda DB writes use `MVP_DATABASE_URL` — locally points at the docker-compose Postgres; in cloud, points at staging / prod RDS. **Justification:** AWS-hosted Lambdas cannot reach a developer's local Postgres for the per-Run RDS writes mandated by D9; without local HTTP transport, every Lambda code change would require a cloud-deploy round-trip just to be exercised, which is unworkable for iteration. **Stdlib `http.server` chosen over Flask** because the transport is a pure shim around the same handler module — no routing, middleware, or auth concerns merit a framework dependency (verified: `journium-litellm-proxy` uses stdlib successfully for one POST + one GET; `journium-bip-pipeline` uses Flask but Flask earns no specific value there per code review). **For SQS-triggered Lambdas in local mode**, the HTTP server returns `202 Accepted` and spawns a background thread to run the handler — mirroring the cloud's async semantics so mvp_api's `Run.status` polling sees the same `QUEUED → RUNNING → DONE` transitions without code paths diverging. Pattern reference: `journium-litellm-proxy/src/server.py` (transport) + `journium-bip-pipeline/src/server.py` (202 + thread async pattern) + `journium-backend/src/config/app.ts` (env-switch read).
 
 ## 4. Architecture Overview
 
@@ -136,6 +137,8 @@ mvp_web's dashboard and mvp_admin do NOT initiate compute; they read from the sa
 5. Lambda fetches KMZ from S3 (already there from B6 at project create), runs `pvlayout_core.run_layout(...)`, then renders DXF + PDF + KMZ + thumbnail inline (D12). All artifacts PUT to S3 at deterministic keys.
 6. Before flipping DONE, Lambda re-reads `Run.status` `FOR UPDATE` (D16). If CANCELLED, abort upload + S3 cleanup. Else `UPDATE Run SET status='DONE', engineVersion=<git_sha>, exports_blob_urls=[...]`. COMMIT.
 7. Desktop's poll sees `status='DONE'`, fetches presigned-GET URLs for layout + thumbnail, renders. Download buttons each fetch their own presigned URL on click.
+
+**Local-dev architecture (per D24, C3.5):** the same flow runs unchanged on a developer's laptop with one substitution — mvp_api's `lambda-invoker` util reads `USE_LOCAL_ENVIRONMENT`, and when set, routes Lambda calls to `http://localhost:<port>` (each Lambda runs its `server.py` stdlib HTTP server in a docker-compose service alongside mvp_api + local Postgres). The Lambda's HTTP entry calls the same `handler.py` business logic and writes to the same `MVP_DATABASE_URL` (pointed at the local Postgres in the compose network). For SQS-triggered Lambdas, the local HTTP server returns 202 + spawns a background thread, so polling semantics match prod. Production path is unchanged: `USE_LOCAL_ENVIRONMENT` is unset/false in deployed mvp_api, real AWS SDK invoke + SQS publish are used.
 
 **Cancel flow:** Desktop POST B30 (`cancelRunV2`, already shipped). mvp_api flips status + inserts refund + decrements entitlement in one tx (D16). In-flight Lambda's `FOR UPDATE` check sees CANCELLED at completion and aborts (D16).
 
@@ -374,11 +377,126 @@ Out of scope
   - IaC.
 ```
 
-#### C4 — `parse-kmz` Lambda end-to-end
+#### C3.5 — Local-dev parallel HTTP transport + `USE_LOCAL_ENVIRONMENT` switch
 
 ```
 Status:           todo
 Depends:          C3
+Tier:             T2 (build + integration test against local docker-compose)
+Brainstorm-first: yes — first cross-cutting cross-runtime pattern; choices
+                  made here (server.py shape, port allocation, mvp_api
+                  invoker util shape, SQS-vs-sync local emulation strategy,
+                  DB connection lifecycle inside the local HTTP server)
+                  cascade to every downstream Lambda row C4/C6/C16/C18.
+
+Goal
+  Establish the dual-transport pattern. Each Lambda ships server.py
+  (stdlib http.server) alongside handler.py, both calling shared
+  business logic. mvp_api flips between AWS SDK invoke / SQS publish
+  and local-HTTP fetch via USE_LOCAL_ENVIRONMENT env switch.
+
+  Pattern adapted from journium-litellm-proxy (transport) +
+  journium-bip-pipeline (DB + 202+thread async); rough edges fixed
+  (naming consistency, complete dispatcher impl).
+
+  Pattern reference (read in C3.5's brainstorm):
+    - /Users/arunkpatra/codebase/journium/journium/apps/journium-litellm-proxy
+    - /Users/arunkpatra/codebase/journium/journium/apps/journium-bip-pipeline
+    - /Users/arunkpatra/codebase/journium/journium/apps/journium-backend
+
+Locked
+  D24
+
+Open verifications
+  - Read journium-litellm-proxy/src/server.py for the stdlib
+    BaseHTTPRequestHandler pattern.
+  - Read journium-bip-pipeline/src/server.py for the 202+thread async
+    pattern (matters for compute-layout / detect-water in C6+).
+  - Read journium-backend/src/config/app.ts for the env-switch read
+    convention; note the rough edges (USE_LOCAL_ENV vs per-service
+    USE_LOCAL_BILLING_SERVICE) and pick ONE consistent name for our
+    arc — USE_LOCAL_ENVIRONMENT.
+  - Confirm the local docker-compose at repo root accommodates new
+    services per Lambda (smoketest-lambda first; pattern extends to
+    C4 onward).
+  - Confirm @aws-sdk/client-lambda is NOT yet a mvp_api dep (will be
+    added in C4 alongside parse-kmz; C3.5 ships the lambda-invoker
+    interface + local-HTTP path; the AWS SDK paths are stubbed-but-
+    typed (throw NotImplementedError) and filled in at C4 / C7).
+  - Verify MVP_DATABASE_URL reaches a docker-compose-launched Lambda
+    HTTP server (psycopg2-binary against the local Postgres
+    container).
+
+Acceptance
+  - python/lambdas/README.md updated: server.py template documented
+    (stdlib http.server example, no Flask); port allocation table
+    (smoketest=4100, parse-kmz=4101, compute-layout=4102, detect-
+    water=4103, compute-energy=4104).
+  - python/lambdas/_smoketest/server.py implemented (stdlib
+    BaseHTTPRequestHandler) on port 4100; routes:
+      GET /health  → {"ok": true}
+      POST /invoke → calls handler.handler(body, None) and returns
+                     its dict as JSON; 200 on success, 500 on
+                     handler exception (response body carries
+                     {"error": "<msg>"}).
+  - python/lambdas/_smoketest/Dockerfile.local builds + runs
+    server.py on port 4100; image distinct from production
+    Dockerfile.
+  - apps/mvp_api/src/lib/lambda-invoker.ts shared util with two
+    methods:
+      invokeSync(purpose, payload)   → Promise<dict>
+      publishAsync(purpose, payload) → Promise<void>
+    Both branch on USE_LOCAL_ENVIRONMENT; local=fetch
+    http://localhost:<port>; cloud paths throw NotImplementedError
+    (filled at C4 / C7).
+  - docker-compose.yml at repo root extended with smoketest-lambda
+    service (Dockerfile.local, port 4100, depends_on: postgres,
+    env: MVP_DATABASE_URL pointed at the compose-network Postgres).
+  - apps/mvp_api/.env.example documents USE_LOCAL_ENVIRONMENT and
+    LOCAL_<PURPOSE>_LAMBDA_URL pattern (default
+    http://localhost:<port>).
+  - Integration test: with USE_LOCAL_ENVIRONMENT=true in mvp_api,
+    a fake caller invokes lambda-invoker pointed at smoketest;
+    receives smoketest handler's response dict; cloud-path branch
+    throws NotImplementedError as expected.
+  - Brainstorm output committed at docs/superpowers/specs/<date>-
+    c3.5-local-dev-transport.md per the §13.1 protocol.
+
+Smoke trigger (Arun, per §11.2) — local-dev pattern verification
+  Local:    docker-compose up; verify smoketest-lambda service comes
+            up listening on 4100; curl POST localhost:4100/invoke
+            with a trivial JSON body; verify response shape matches
+            Lambda handler's output. Then via mvp_api dev server
+            with USE_LOCAL_ENVIRONMENT=true: trigger lambda-invoker
+            via the integration test or a temp test endpoint;
+            verify the response shape arrives identical to the curl
+            path.
+  Prod:     SKIPPED — this row is local-dev-only by definition.
+            USE_LOCAL_ENVIRONMENT is unset / false in prod, which
+            is unchanged-from-today behavior; no prod risk surface.
+
+Out of scope
+  - Real Lambda business logic (C4 ships parse-kmz; C6 ships
+    compute-layout; etc.).
+  - SQS local-emulation server (LocalStack, ElasticMQ) — not
+    needed; SQS-triggered Lambdas use sync HTTP locally with the
+    202+thread async pattern from bip-pipeline.
+  - RDS Proxy / connection pooling — deferred to C6 if Lambda
+    cold starts under heavy load show pgbouncer is needed; v1
+    uses per-invocation psycopg2 connection.
+  - Lambda-invoker as a shared package (packages/lambda-invoker/)
+    — stays in apps/mvp_api/src/lib/ for v1; promote when a
+    second consumer (mobile, future web layout app) materializes.
+  - Cloud-side AWS SDK invoke + SQS publish implementation — those
+    paths in lambda-invoker throw NotImplementedError in C3.5;
+    C4 fills the SDK invoke path; C7 fills the SQS publish path.
+```
+
+#### C4 — `parse-kmz` Lambda end-to-end
+
+```
+Status:           todo
+Depends:          C3.5
 Tier:             T2 (build + integration test against real Lambda + mvp_api)
 Brainstorm-first: yes — first Lambda; pattern decisions (IAM, invoke timeout config, error response shape, exact wire contract vs sidecar) cascade to the 4 downstream Lambdas. Get them right once.
 
@@ -1918,6 +2036,7 @@ This section tracks amendments to the spec after the initial 2026-05-03 lockin. 
 | **v1** | 2026-05-03 | Entire spec | Initial lockin. D1–D23 locked; C1–C21 row table established; smoke-testing protocol (§11.2 + §11.4) and brainstorm-first policy (§11.3) defined; cold-session prompts (§13) drafted; doc kill list (§14) executed. |
 | **v1.1** | 2026-05-03 | Header status / version line, §11.2 (smoke-testing protocol — levels table + cadence + anti-patterns + evidence template + cleanup paragraph), §11.4 (pre-req validation step), §11.5 (NEW — post-row completion protocol), §11.6 (NEW — pre-row-start protocol), §12 (update cadence back-reference to §11.5), §13.1 (cold-session prompt — new rule #0 invokes §11.6 pre-flight; rule #5 amended to invoke §11.5; new "Prior row's PR" slot for Arun to fill; "Begin by" steps reordered to put pre-flight before deep reading), §9 row Smoke trigger fields (15 in-place rewrites), this changelog (NEW §15). | Reality amendment: deployment topology + session-boundary protocols. The original spec assumed a full Vercel + AWS staging deploy paralleling production. As of v1.1, no Vercel staging exists — production is the de-facto staging environment for app-layer smoke (co-founder-only, Stripe live, no external customers yet). Staging is partial: RDS staging DB for migrations + staging AWS resources for provisioning / IAM verification. **All 15 (smoke)-marked rows in §9 had their `Smoke trigger` fields rewritten in-place to be reality-aware:** 9 app-code rows dropped Staging entirely (Local + Prod only — C9, C10, C11, C12, C14, C15, C17, C19, C21); 2 DB-migration rows kept Staging as RDS-only (C7, C13); 4 AWS-resource rows kept Staging as AWS-only (C4, C8, C16, C18). Cleanup paragraphs in §11.2 / §11.4 simplified accordingly. **Two new session-boundary protocols added:** §11.5 post-row completion protocol — a four-category drift check (stale row text / new rows / adjacent scope gaps / D-id implications) that fires before every row's status flip and surfaces candidate spec amendments for Arun's concurrence. §11.6 pre-row-start protocol — a 7-precondition pre-flight gate (prior-PR-merged confirmation, `git fetch origin`, local `main` matches `origin/main`, clean tree, on `main`, row Status `todo`, Depends all `done`) that fires at the start of every cold-session implementation run; halts on ANY discrepancy rather than auto-recovering (risk of destroying real work). Both protocols wired into the §13.1 cold-session prompt — rule #0 (§11.6 pre-flight) and rule #5 (§11.5 post-row close) bracket the row's lifecycle. **No locked decision (D-id) was changed**; this is a smoke-protocol + tracking-protocol reality amendment, not an architectural one. |
 | **v1.2** | 2026-05-03 | Header version line; §9 row C3 Acceptance naming-convention block; §4 architecture overview generate-layout step; §9 rows C4 / C5 / C8 (Acceptance + Smoke trigger forward-looking resource names); §10 Future Ladder v2 example; §11.4 example step; §13.1 cold-session prompt template example; this changelog. | C3 implementation discovered material spec-vs-reality drift via the `Open verifications` pass: the legacy `renewable-energy-github-actions` OIDC role + supporting AWS resources (`renewable-energy/layout-engine` ECR repo, `layout_engine_lambda_prod` Lambda, `re_layout_queue_prod` SQS) are already present in the account from the pre-merge stack — orphaned but not removed. Arun's call: leave the legacy stack alone, create a fresh `solarlayout-github-actions` OIDC role for the new repo, and unify the new-resource prefix on `solarlayout-*` for brand consistency with the existing S3 buckets. C3 row text is amended to record the new prefix on all three lines (Lambda fn, ECR, SQS); downstream rows (C4/C5/C8/§10 future-ladder/§11.4 + §13.1 examples) that reference forward-looking resource names by example are updated in lockstep for spec internal consistency; legacy resource ARNs (renewable-energy-*) are explicitly left alone. **No locked decision (D-id) was changed.** |
+| **v1.3** | 2026-05-03 | Header version line; §3 (new D24); §4 architecture overview (new local-dev paragraph after generate-layout flow); §9 (new row C3.5 inserted between C3 and C4; C4 `Depends:` repointed C3 → C3.5); this changelog. | C3 implementation, mid-execution after Phase 1 (Tasks 1–7 of plan) and before Phase 2 (AWS provisioning), surfaced a structural local-dev concern that blocks downstream Lambda rows: the cloud Lambdas write directly to RDS via psycopg2 (per D9), and AWS-hosted Lambdas cannot reach a developer's local Postgres. Without a parallel local-HTTP transport, every Lambda iteration requires a cloud-deploy round-trip — unworkable for development. **D24 added** locking the dual-entry pattern (Lambda handler + stdlib `http.server`-based `server.py` sibling sharing one business-logic module; mvp_api routes via `USE_LOCAL_ENVIRONMENT` env switch). **New row C3.5 inserted** between C3 and C4 to ship the pattern (smoketest server.py + Dockerfile.local; mvp_api lambda-invoker util; docker-compose extension; integration test). Pattern adapted from journium-litellm-proxy (transport) + journium-bip-pipeline (DB + 202+thread async) — sibling-project working code; rough edges fixed (naming consistency: USE_LOCAL_ENVIRONMENT chosen as the single global switch, no per-service overrides v1; complete mvp_api dispatcher implementation including the cloud-side `NotImplementedError` stubs for forward extension at C4/C7). C4's Depends repointed C3 → C3.5. **D-id added (D24); no existing D-id changed.** Patch version per §15 footer convention (additive, not modifying). |
 
 **Format for future amendments:** append a row above. Bump the patch version (v1.2, v1.3, …) for protocol / structural changes that don't touch a D-id; bump the minor version (v2.0) for any amendment that changes a locked decision. Mention every section touched. Keep the `Change` cell to one paragraph; link to a longer memo at `docs/initiatives/findings/` if more detail is needed.
 
