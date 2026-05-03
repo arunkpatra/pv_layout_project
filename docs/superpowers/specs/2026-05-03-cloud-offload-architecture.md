@@ -322,14 +322,16 @@ Out of scope
   - Lambda use of pvlayout_core (that's C3+).
 
 Plan:     docs/superpowers/plans/2026-05-03-c2-extract-pvlayout-core.md
-Shipped:  2026-05-03 — pvlayout_core extracted to standalone uv
-          package (own pyproject + tests + CI gate). Engine consumes
-          via editable path-dep in [tool.uv.sources]. 39 pvlayout_core
-          tests pass standalone; 89 engine tests still pass (post-move
-          baseline 128 = 39 + 89). Plan-text gap caught at smoke:
-          5 additional engine integration tests used a different KMZ
-          path pattern not enumerated in §Task 7; fixed inline at the
-          Task 9 verification gate (commit 502b6c3).
+Shipped:  PR #5 (https://github.com/SolarLayout/solarlayout/pull/5),
+          merged at 6c42eb6 on 2026-05-03 — pvlayout_core extracted
+          to standalone uv package (own pyproject + tests + CI gate).
+          Engine consumes via editable path-dep in [tool.uv.sources].
+          39 pvlayout_core tests pass standalone; 89 engine tests
+          still pass (post-move baseline 128 = 39 + 89). Plan-text
+          gap caught at smoke: 5 additional engine integration tests
+          used a different KMZ path pattern not enumerated in §Task 7;
+          fixed inline at the Task 9 verification gate (commit
+          502b6c3).
 ```
 
 ### Phase B — First Lambda end-to-end (proves the pattern)
