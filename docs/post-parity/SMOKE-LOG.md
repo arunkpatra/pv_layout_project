@@ -2448,4 +2448,60 @@ Plus: the Run gallery card shows the same thumbnail / metadata for both. A futur
 | FE | Implementation follows the product call. None of the four options are heavy lifts. |
 | Backend | None — not a wire-shape concern. |
 
+---
+
+### ST-C3.5-L — Local-dev parallel HTTP transport (cloud-offload arc, first ST-ID-formatted entry)
+
+**Date:** 2026-05-03
+**Operator:** Arun (steps run); Claude (drove bite-sized prompts).
+**Mode:** Inline (same Claude session as implementation, by Arun's choice — spec §13.2 default is a separate cold session, but for this small mechanical row inline was efficient).
+**Branch HEAD at smoke time:** `e8e3734` (TS side commit) on `chore/c3.5-local-dev-transport`.
+**Spec row:** C3.5 in `docs/superpowers/specs/2026-05-03-cloud-offload-architecture.md` §9.
+**Brainstorm doc:** `docs/superpowers/specs/2026-05-03-c3.5-local-dev-transport.md`.
+**Plan doc:** `docs/superpowers/plans/2026-05-03-c3.5-local-dev-transport.md`.
+**Session duration:** ~10 minutes.
+
+#### Pre-requisite validation (per §11.4)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Target row Status | `todo` — minor protocol drift (should be `in-progress` per §12 cadence; matches C2/C3 precedent skipping the intermediate flip). Logged for §11.5. |
+| 2 | Depends C3 Status | ✅ `done (2026-05-03)` |
+| 3 | Working tree clean | ✅ |
+| 4 | On row branch | ✅ `chore/c3.5-local-dev-transport` |
+| 5 | Local env reachable | ✅ (no AWS / Postgres / Vercel deps for this row) |
+| 6 | No stale state | ✅ port 4100 free, smoketest `.venv` rebuilt |
+
+Pre-flight: PASS.
+
+#### Atomic-step execution
+
+| Step | Action | Result |
+|---|---|---|
+| ST-C3.5-L.1 | `cd python/lambdas/smoketest && uv run python -m smoketest_lambda.server` | ✅ logs `smoketest local server listening on port 4100` |
+| ST-C3.5-L.2 | `curl -X POST localhost:4100/invoke -d '{}'` | ✅ `{"ok": true, "engine_version": "unknown", "pvlayout_core_importable": true}` |
+| ST-C3.5-L.3 | `USE_LOCAL_ENVIRONMENT=true bun -e '... invoke("smoketest", {})'` | ✅ same dict as Step 2 — TS shim → fetch → server.py → handler wire end-to-end ok |
+| ST-C3.5-L.4 | `USE_LOCAL_ENVIRONMENT=true bun -e '... enqueue("smoketest", {})'` | ✅ resolves void after server returns 200 (smoketest is sync-mode; enqueue accepts 200 OR 202) |
+| ST-C3.5-L.5 | `unset USE_LOCAL_ENVIRONMENT && bun -e '... invoke("smoketest", {}).catch(...)'` | ✅ throws `lambda-invoker.invoke(smoketest): AWS SDK Lambda invoke wired in C4` |
+| ST-C3.5-L.6 | `unset USE_LOCAL_ENVIRONMENT && bun -e '... enqueue("smoketest", {}).catch(...)'` | ✅ throws `lambda-invoker.enqueue(smoketest): AWS SDK SQS publish wired in C7` |
+| ST-C3.5-L.7 | Ctrl-C the server | ⚠ exits with KeyboardInterrupt traceback (process stops cleanly; cosmetic noise — see P3 below) |
+
+#### Findings
+
+**P3 — Ctrl-C emits a Python KeyboardInterrupt traceback** in `python/lambdas/smoketest/smoketest_lambda/server.py`. `HTTPServer.serve_forever()` doesn't catch the signal; bubbles up. Process exits cleanly (exit code 130 = SIGINT), no port leak, no data loss. Matches the journium-litellm-proxy/src/server.py precedent (same shape, no `KeyboardInterrupt` handler). Per `feedback_proven_over_novel.md`: don't add ceremony journium doesn't. **No code change.** Recorded for posterity.
+
+**Status flip protocol drift** (from pre-req #1 above): plan didn't include a Status `todo → in-progress` flip at first WIP commit per spec §12 cadence. C2 and C3 both skipped this intermediate flip too (the convention-by-precedent is direct `todo → done` at row close). Worth either codifying the precedent in §12 or adopting the literal cadence. Surfaced for §11.5 retrospective discussion with Arun.
+
+#### Outcome
+
+**ST-C3.5-L: PASS** (one P3 observation, no inline fixes required, no new rows surfaced).
+
+All four `lambda-invoker.ts` code paths verified end-to-end:
+- `invoke()` local — POST → 200 + handler dict (Step 3)
+- `enqueue()` local — POST → 200 (smoketest sync) → resolves void (Step 4)
+- `invoke()` cloud — `NotImplementedError("…wired in C4")` (Step 5)
+- `enqueue()` cloud — `NotImplementedError("…wired in C7")` (Step 6)
+
+Ready for §11.5 post-row completion protocol → status flip → PR.
+
 
