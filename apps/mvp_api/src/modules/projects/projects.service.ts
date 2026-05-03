@@ -5,6 +5,7 @@ import { getPresignedDownloadUrl } from "../../lib/s3.js"
 import { getProjectQuotaState } from "../entitlements/entitlements.service.js"
 import type {
   BoundaryGeojson,
+  ParsedKmz,
   ProjectDetail,
   ProjectWire,
   RunSummary,
@@ -156,6 +157,7 @@ export async function createProject(
     edits: project.edits,
     boundaryGeojson:
       (project.boundaryGeojson as BoundaryGeojson | null) ?? null,
+    parsedKmz: (project.parsedKmz as ParsedKmz | null) ?? null,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
@@ -238,6 +240,7 @@ export async function getProject(
     edits: project.edits,
     boundaryGeojson:
       (project.boundaryGeojson as BoundaryGeojson | null) ?? null,
+    parsedKmz: (project.parsedKmz as ParsedKmz | null) ?? null,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
     deletedAt: project.deletedAt?.toISOString() ?? null,
@@ -294,6 +297,7 @@ export async function patchProject(
     edits: updated.edits,
     boundaryGeojson:
       (updated.boundaryGeojson as BoundaryGeojson | null) ?? null,
+    parsedKmz: (updated.parsedKmz as ParsedKmz | null) ?? null,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
     deletedAt: updated.deletedAt?.toISOString() ?? null,

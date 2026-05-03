@@ -186,7 +186,7 @@ export async function parseKmzHandler(c: Context<MvpHonoEnv>): Promise<Response>
 
   if (!result.ok) {
     // Log Lambda's full structured envelope server-side (CloudWatch +
-    // future Sentry). NEVER forward code/message/trace to the caller.
+    // future Sentry). Lambda trace is NEVER forwarded.
     console.error(
       JSON.stringify({
         level: "error",
@@ -201,6 +201,18 @@ export async function parseKmzHandler(c: Context<MvpHonoEnv>): Promise<Response>
       }),
     )
     await cleanupOnFailure(projectId)
+    // INVALID_KMZ is a user-actionable failure (bad input) — surface it
+    // with an HTTP 422 + a curated user-friendly message so the desktop
+    // can render specific UX copy instead of the generic fallback. Other
+    // codes (KMZ_NOT_FOUND, INTERNAL_ERROR) indicate a server bug or
+    // race and stay collapsed.
+    if (result.code === "INVALID_KMZ") {
+      throw new AppError(
+        "INVALID_KMZ",
+        "The uploaded file isn't a valid KMZ.",
+        422,
+      )
+    }
     throw new AppError(
       "INTERNAL_SERVER_ERROR",
       GENERIC_FAILURE_MESSAGE,

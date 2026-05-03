@@ -36,7 +36,17 @@ export type CreateProjectStage =
   | { kind: "creating" }
   | { kind: "parsing" }
   | { kind: "done" }
-  | { kind: "error"; failedAt: "uploading" | "creating" | "parsing" }
+  | {
+      kind: "error"
+      failedAt: "uploading" | "creating" | "parsing"
+      /**
+       * V2 server-error code (e.g. `"INVALID_KMZ"`, `"INTERNAL_SERVER_ERROR"`)
+       * when the failure originated from a typed server response. Drives the
+       * `ERROR_COPY` lookup so the modal can render an actionable message;
+       * unknown / undefined falls back to the generic copy.
+       */
+      code?: string
+    }
 
 export interface CreateProjectModalProps {
   stage: CreateProjectStage
@@ -59,8 +69,36 @@ const ROW_LABELS: Record<
 }
 
 const HEADER = "Setting up your project"
-const ERROR_MESSAGE =
+const GENERIC_ERROR_MESSAGE =
   "Something went wrong setting up your project. Please try again, or contact support if it keeps happening."
+
+/**
+ * Code → user-facing copy table for known V2 server error codes. Mirrors
+ * the backend's `V2ErrorCode` union (`packages/shared/src/types/api-v2.ts`)
+ * — when a new code is added on the backend that should surface a
+ * specific message here, add it to this table. Codes not in this table
+ * fall back to `GENERIC_ERROR_MESSAGE`. PAYMENT_REQUIRED is handled
+ * upstream (App.tsx swaps to the upsell overlay before the error stage
+ * fires), so it deliberately isn't in this table.
+ */
+const ERROR_COPY: Record<string, string> = {
+  INVALID_KMZ:
+    "This file isn't a valid KMZ. Make sure you're uploading a .kmz exported from your design tool.",
+  UNAUTHORIZED:
+    "Your session expired. Sign in again to continue.",
+  S3_NOT_CONFIGURED:
+    "Project storage isn't configured. Contact support.",
+  VALIDATION_ERROR:
+    "We couldn't process this project's details. Please try again or contact support.",
+  NOT_FOUND:
+    "The project couldn't be found. It may have been deleted from another window.",
+}
+
+function errorMessageFor(stage: CreateProjectStage): string {
+  if (stage.kind !== "error") return GENERIC_ERROR_MESSAGE
+  if (stage.code && ERROR_COPY[stage.code]) return ERROR_COPY[stage.code]!
+  return GENERIC_ERROR_MESSAGE
+}
 
 const AUTO_DISMISS_DELAY_MS = 300
 const TICK_INTERVAL_MS = 100
@@ -225,7 +263,7 @@ export function CreateProjectModal({
 
         {isError && (
           <p className="mt-[12px] text-[12px] text-(--error-default)">
-            {ERROR_MESSAGE}
+            {errorMessageFor(stage)}
           </p>
         )}
 

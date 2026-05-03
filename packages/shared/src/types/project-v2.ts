@@ -41,6 +41,27 @@ export type BoundaryGeojson =
   | BoundaryGeojsonPolygon
   | BoundaryGeojsonMultiPolygon
 
+/** parse-kmz Lambda output, persisted on `Project.parsedKmz` (Json column).
+ *  Defined inline here (not imported from `@solarlayout/entitlements-client`)
+ *  so `packages/shared` stays zero-dep. Schema mirrors
+ *  `parsedKmzSchema` in `packages/entitlements-client/src/types-v2.ts`;
+ *  changes must be made in both places (contract crosses the desktop ↔
+ *  cloud boundary). Snake_case fields preserved from the Python
+ *  `pvlayout_core` payload — no camelCase renaming on the wire. */
+export interface ParsedKmzBoundary {
+  name: string
+  /** [longitude, latitude] pairs in WGS84 — closed ring. */
+  coords: [number, number][]
+  obstacles: { name: string; coords: [number, number][] }[]
+  water_obstacles: { name: string; coords: [number, number][] }[]
+  line_obstructions: { name: string; coords: [number, number][] }[]
+}
+export interface ParsedKmz {
+  boundaries: ParsedKmzBoundary[]
+  centroid_lat: number
+  centroid_lon: number
+}
+
 export interface ProjectWire {
   id: string
   userId: string
@@ -57,6 +78,11 @@ export interface ProjectWire {
    *  (the desktop's SVG fallback degrades to the existing muted
    *  placeholder when null). */
   boundaryGeojson: BoundaryGeojson | null
+  /** parse-kmz Lambda output (C4) — populated by `POST /v2/projects/:id/
+   *  parse-kmz`. Null on freshly-created projects (before parse-kmz runs)
+   *  and on legacy rows from before C4. Desktop reads this on project-
+   *  open in lieu of round-tripping the KMZ through the local sidecar. */
+  parsedKmz: ParsedKmz | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null

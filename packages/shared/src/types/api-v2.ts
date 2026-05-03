@@ -13,6 +13,7 @@ export type V2ErrorCode =
   | "CONFLICT"
   | "NOT_FOUND"
   | "S3_NOT_CONFIGURED"
+  | "INVALID_KMZ"
   | "INTERNAL_SERVER_ERROR"
 
 export interface V2ErrorBody {

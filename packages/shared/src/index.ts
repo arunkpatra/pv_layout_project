@@ -30,4 +30,6 @@ export type {
   BoundaryGeojson,
   BoundaryGeojsonPolygon,
   BoundaryGeojsonMultiPolygon,
+  ParsedKmz,
+  ParsedKmzBoundary,
 } from "./types/project-v2.js"

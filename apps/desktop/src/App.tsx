@@ -792,9 +792,17 @@ export function App(): JSX.Element {
         // collapse the modal to its error state at the failed stage.
         // mvp_api auto-cleans the orphan project + refunds quota on
         // any post-create failure (per spec §Q3 burn-the-boats), so
-        // there's nothing for the desktop to undo.
+        // there's nothing for the desktop to undo. The server's V2
+        // error code (when present) drives the modal's per-code
+        // user-facing copy table — see CreateProjectModal.ERROR_COPY.
         const failedAt: CreateStage = createStageRef.current ?? "uploading"
-        setCreateStage({ kind: "error", failedAt })
+        const errorCode =
+          err instanceof EntitlementsError ? err.code : undefined
+        setCreateStage({
+          kind: "error",
+          failedAt,
+          ...(errorCode ? { code: errorCode } : {}),
+        })
         // Also swallow the error from the outer catch — we've handled
         // the visual surface here.
         return

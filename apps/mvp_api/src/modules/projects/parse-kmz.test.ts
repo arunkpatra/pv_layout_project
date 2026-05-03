@@ -247,7 +247,7 @@ describe("POST /v2/projects/:id/parse-kmz", () => {
     })
   })
 
-  it("Lambda returns ok=false → 500 INTERNAL_SERVER_ERROR + generic message + soft-delete", async () => {
+  it("Lambda returns ok=false code=INVALID_KMZ → 422 INVALID_KMZ + curated message + soft-delete (no leak)", async () => {
     mockProjectFindFirst.mockImplementation(async () => ({
       id: "prj_x",
       kmzBlobUrl: VALID_S3_URL,
@@ -261,15 +261,15 @@ describe("POST /v2/projects/:id/parse-kmz", () => {
     }))
 
     const res = await post("prj_x")
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(422)
     const body = (await res.json()) as ErrorBody
     expect(body.success).toBe(false)
-    expect(body.error.code).toBe("INTERNAL_SERVER_ERROR")
-    // Generic, customer-safe message — never the Lambda's structured
-    // code/message/trace.
-    expect(body.error.message).toContain("Something went wrong")
-    expect(body.error.message).not.toContain("INVALID_KMZ")
+    expect(body.error.code).toBe("INVALID_KMZ")
+    // Curated, customer-safe message — never the Lambda's raw message
+    // or trace (those go to CloudWatch only).
+    expect(body.error.message).toContain("isn't a valid KMZ")
     expect(body.error.message).not.toContain("Traceback")
+    expect(body.error.message).not.toContain("internal lambda detail")
     // Cleanup: project soft-deleted.
     expect(mockProjectUpdate).toHaveBeenCalledTimes(1)
     const updateArgs = mockProjectUpdate.mock.calls[0]![0] as UpdateArgs
@@ -278,6 +278,29 @@ describe("POST /v2/projects/:id/parse-kmz", () => {
     // Cleanup update doesn't write parsedKmz / boundaryGeojson.
     expect(updateArgs.data.parsedKmz).toBeUndefined()
     expect(updateArgs.data.boundaryGeojson).toBeUndefined()
+  })
+
+  it("Lambda returns ok=false code=INTERNAL_ERROR → 500 INTERNAL_SERVER_ERROR + generic message + soft-delete", async () => {
+    mockProjectFindFirst.mockImplementation(async () => ({
+      id: "prj_x",
+      kmzBlobUrl: VALID_S3_URL,
+    }))
+    mockInvoke.mockImplementation(async () => ({
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: "boto3 blew up",
+      trace: "Traceback (most recent call last)…",
+    }))
+
+    const res = await post("prj_x")
+    expect(res.status).toBe(500)
+    const body = (await res.json()) as ErrorBody
+    expect(body.success).toBe(false)
+    expect(body.error.code).toBe("INTERNAL_SERVER_ERROR")
+    expect(body.error.message).toContain("Something went wrong")
+    expect(body.error.message).not.toContain("INTERNAL_ERROR")
+    expect(body.error.message).not.toContain("Traceback")
+    expect(mockProjectUpdate).toHaveBeenCalledTimes(1)
   })
 
   it("Lambda invocation throws → 500 INTERNAL_SERVER_ERROR + generic message + soft-delete", async () => {

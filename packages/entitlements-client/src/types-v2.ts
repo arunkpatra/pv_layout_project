@@ -41,6 +41,7 @@ export const v2ErrorCodes = [
   "CONFLICT",
   "NOT_FOUND",
   "S3_NOT_CONFIGURED",
+  "INVALID_KMZ",
   "INTERNAL_SERVER_ERROR",
 ] as const
 
