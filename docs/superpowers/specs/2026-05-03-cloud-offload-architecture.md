@@ -529,8 +529,9 @@ Out of scope
 
 Plan:     docs/superpowers/plans/2026-05-03-c3.5-local-dev-transport.md
 Brainstorm: docs/superpowers/specs/2026-05-03-c3.5-local-dev-transport.md
-Shipped:  PR #<filled-at-merge>, merged at <SHA-filled-at-merge> on
-          2026-05-03 — local-dev parallel HTTP transport pattern
+Shipped:  PR #7 (https://github.com/SolarLayout/solarlayout/pull/7),
+          merged at 22b9bf2 on 2026-05-03 — local-dev parallel HTTP
+          transport pattern
           landed (smoketest server.py stdlib http.server on 4100;
           mvp_api lambda-invoker.ts with invoke()/enqueue() +
           USE_LOCAL_ENVIRONMENT branching + NotImplementedError stubs
