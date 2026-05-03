@@ -166,7 +166,7 @@ export function CreateProjectModal({
       }}
     >
       <DialogContent className="max-w-[460px]">
-        <DialogTitle className="text-[16px] font-semibold text-[var(--text-primary)]">
+        <DialogTitle className="text-[16px] font-semibold text-(--text-primary)">
           {HEADER}
         </DialogTitle>
 
@@ -192,11 +192,11 @@ export function CreateProjectModal({
                 className={[
                   "flex items-center justify-between py-[8px] text-[13px]",
                   status === "pending"
-                    ? "text-[var(--text-secondary)] opacity-50"
+                    ? "text-(--text-secondary) opacity-50"
                     : "",
-                  status === "active" ? "text-[var(--text-primary)]" : "",
-                  status === "done" ? "text-[var(--text-primary)]" : "",
-                  status === "error" ? "text-[var(--error-default)]" : "",
+                  status === "active" ? "text-(--text-primary)" : "",
+                  status === "done" ? "text-(--text-primary)" : "",
+                  status === "error" ? "text-(--error-default)" : "",
                 ].join(" ")}
               >
                 <span className="inline-flex items-center gap-[8px]">
@@ -206,7 +206,7 @@ export function CreateProjectModal({
                   <span>{label}</span>
                 </span>
                 {elapsed !== null && (
-                  <span className="text-[12px] text-[var(--text-tertiary)] tabular-nums">
+                  <span className="text-[12px] text-(--text-tertiary) tabular-nums">
                     {elapsed}
                   </span>
                 )}
@@ -216,7 +216,7 @@ export function CreateProjectModal({
         </ul>
 
         {isError && (
-          <p className="mt-[12px] text-[12px] text-[var(--error-default)]">
+          <p className="mt-[12px] text-[12px] text-(--error-default)">
             {ERROR_MESSAGE}
           </p>
         )}
