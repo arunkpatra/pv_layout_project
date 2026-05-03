@@ -1,7 +1,7 @@
 # Cloud-Offload Compute Architecture — Master Spec
 
 **Status:** Locked (2026-05-03). Living document — updated per row close. See §15 changelog for amendments.
-**Version:** v1.4 (2026-05-03 — C4 smoketest-cleanup explicit; C3 plan IAM action list backfill)
+**Version:** v1.5 (2026-05-03 — C3.5 Acceptance simplified; manual smoke replaces integration test)
 **Owner:** Arun (engineering authority) + Prasanta (solar-domain authority).
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
@@ -472,10 +472,14 @@ Acceptance
   - apps/mvp_api/.env.example documents USE_LOCAL_ENVIRONMENT and
     LOCAL_<PURPOSE>_LAMBDA_URL pattern (default
     http://localhost:<port>).
-  - Integration test: with USE_LOCAL_ENVIRONMENT=true in mvp_api,
-    a fake caller invokes lambda-invoker pointed at smoketest;
-    receives smoketest handler's response dict; cloud-path branch
-    throws NotImplementedError as expected.
+  - End-to-end exercise validated via row's manual Smoke trigger
+    (curl + mvp_api dev server) — see Smoke trigger field below.
+    No automated bun test required at C3.5: the lambda-invoker.ts
+    contract is a thin transport shim whose cloud branches are
+    NotImplementedError stubs that get replaced (and tested) at
+    C4 (invoke ← AWS SDK Lambda invoke) and C7 (enqueue ← SQS
+    publish). Smoke catches the URL/env-switch wiring bugs more
+    directly at 1/10 the maintenance cost.
   - Brainstorm output committed at docs/superpowers/specs/<date>-
     c3.5-local-dev-transport.md per the §13.1 protocol.
 
@@ -485,9 +489,11 @@ Smoke trigger (Arun, per §11.2) — local-dev pattern verification
             with a trivial JSON body; verify response shape matches
             Lambda handler's output. Then via mvp_api dev server
             with USE_LOCAL_ENVIRONMENT=true: trigger lambda-invoker
-            via the integration test or a temp test endpoint;
-            verify the response shape arrives identical to the curl
-            path.
+            via a temp test endpoint or REPL; verify the response
+            shape arrives identical to the curl path. Then with
+            USE_LOCAL_ENVIRONMENT unset, hit the same temp endpoint
+            and confirm both invoke() and enqueue() throw
+            NotImplementedError.
   Prod:     SKIPPED — this row is local-dev-only by definition.
             USE_LOCAL_ENVIRONMENT is unset / false in prod, which
             is unchanged-from-today behavior; no prod risk surface.
@@ -2061,6 +2067,8 @@ This section tracks amendments to the spec after the initial 2026-05-03 lockin. 
 | **v1.2** | 2026-05-03 | Header version line; §9 row C3 Acceptance naming-convention block; §4 architecture overview generate-layout step; §9 rows C4 / C5 / C8 (Acceptance + Smoke trigger forward-looking resource names); §10 Future Ladder v2 example; §11.4 example step; §13.1 cold-session prompt template example; this changelog. | C3 implementation discovered material spec-vs-reality drift via the `Open verifications` pass: the legacy `renewable-energy-github-actions` OIDC role + supporting AWS resources (`renewable-energy/layout-engine` ECR repo, `layout_engine_lambda_prod` Lambda, `re_layout_queue_prod` SQS) are already present in the account from the pre-merge stack — orphaned but not removed. Arun's call: leave the legacy stack alone, create a fresh `solarlayout-github-actions` OIDC role for the new repo, and unify the new-resource prefix on `solarlayout-*` for brand consistency with the existing S3 buckets. C3 row text is amended to record the new prefix on all three lines (Lambda fn, ECR, SQS); downstream rows (C4/C5/C8/§10 future-ladder/§11.4 + §13.1 examples) that reference forward-looking resource names by example are updated in lockstep for spec internal consistency; legacy resource ARNs (renewable-energy-*) are explicitly left alone. **No locked decision (D-id) was changed.** |
 | **v1.3** | 2026-05-03 | Header version line; §3 (new D24); §4 architecture overview (new local-dev paragraph after generate-layout flow); §9 (new row C3.5 inserted between C3 and C4; C4 `Depends:` repointed C3 → C3.5); this changelog. | C3 implementation, mid-execution after Phase 1 (Tasks 1–7 of plan) and before Phase 2 (AWS provisioning), surfaced a structural local-dev concern that blocks downstream Lambda rows: the cloud Lambdas write directly to RDS via psycopg2 (per D9), and AWS-hosted Lambdas cannot reach a developer's local Postgres. Without a parallel local-HTTP transport, every Lambda iteration requires a cloud-deploy round-trip — unworkable for development. **D24 added** locking the dual-entry pattern (Lambda handler + stdlib `http.server`-based `server.py` sibling sharing one business-logic module; mvp_api routes via `USE_LOCAL_ENVIRONMENT` env switch). **New row C3.5 inserted** between C3 and C4 to ship the pattern (smoketest server.py + Dockerfile.local; mvp_api lambda-invoker util; docker-compose extension; integration test). Pattern adapted from journium-litellm-proxy (transport) + journium-bip-pipeline (DB + 202+thread async) — sibling-project working code; rough edges fixed (naming consistency: USE_LOCAL_ENVIRONMENT chosen as the single global switch, no per-service overrides v1; complete mvp_api dispatcher implementation including the cloud-side `NotImplementedError` stubs for forward extension at C4/C7). C4's Depends repointed C3 → C3.5. **D-id added (D24); no existing D-id changed.** Patch version per §15 footer convention (additive, not modifying). |
 | **v1.4** | 2026-05-03 | Header version line; §9 row C4 Acceptance (new bullet for smoketest cleanup made explicit); docs/superpowers/plans/2026-05-03-c3-lambda-monorepo-scaffolding.md (Task 7 + Task 10 IAM action lists corrected to 11 actions including `ecr:BatchGetImage` + `ecr:GetDownloadUrlForLayer`); this changelog. | C3 §11.5 post-row completion protocol surfaced two material drift items at row close: **(1) Plan-file IAM action list incomplete** — Task 10's policy doc listed 9 ECR actions but missed `ecr:BatchGetImage` (required for docker-push HEAD-manifest dedup check) + `ecr:GetDownloadUrlForLayer` (required for layer-availability checks during multi-step push). The first CI run on this branch failed with 403 Forbidden at the push step until the policy was extended. AWS-side state was corrected inline; AWS_RESOURCES.md was corrected via `fix(c3): add ecr:BatchGetImage…` commit. The plan file (a teaching reference future C-row sessions consult for similar IAM extension work in C5/C7/C16) is now updated in both occurrences (Task 7's AWS_RESOURCES.md template + Task 10's policy attach) so future readers see the corrected action set. **(2) C4 row text didn't explicitly name smoketest cleanup** — C3 ships `python/lambdas/smoketest/` + ECR repo `solarlayout/smoketest` as a throwaway demonstrator that C4 deletes. The cleanup contract was implicit in `python/lambdas/smoketest/README.md`'s deletion-pointer note + spec context, but C4's row text (which a brainstorm-first cold session reads first) didn't name the `aws ecr delete-repository` invocation or the directory `rm`. C4's Acceptance now carries an explicit bullet so the cleanup is in scope of C4's first commit and the build-lambdas matrix workflow naturally transitions to discovering parse-kmz instead. **No D-id changed.** |
+
+| **v1.5** | 2026-05-03 | Header version line; §9 row C3.5 Acceptance + Smoke trigger Local; this changelog. | C3.5 brainstorming session surfaced over-engineering in C3.5's Acceptance: the "Integration test" bullet mandated a `bun test` of the lambda-invoker.ts TS contract (mock-fetch verifying URL construction + env-switch read + NotImplementedError throw). For a 30-line transport shim whose cloud branches are stubs replaced wholesale at C4 (invoke ← AWS SDK) and C7 (enqueue ← SQS publish), an automated test buys little signal beyond what the row's manual Smoke trigger already validates end-to-end (curl + temp REPL/endpoint), AND the test would churn twice within weeks. Acceptance bullet replaced with a pointer to the Smoke trigger; Smoke trigger Local extended to explicitly cover the NotImplementedError-on-cloud-path exercise. **No D-id changed.** |
 
 **Format for future amendments:** append a row above. Bump the patch version (v1.2, v1.3, …) for protocol / structural changes that don't touch a D-id; bump the minor version (v2.0) for any amendment that changes a locked decision. Mention every section touched. Keep the `Change` cell to one paragraph; link to a longer memo at `docs/initiatives/findings/` if more detail is needed.
 
