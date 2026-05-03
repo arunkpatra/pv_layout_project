@@ -187,7 +187,17 @@ export function App(): JSX.Element {
     kind: "idle",
   })
   const createStageRef = useRef<CreateStage | null>(null)
+  // Cancellation latch for the in-flight create flow. Set to `true` by
+  // the modal's Cancel button; checked at every site that would
+  // otherwise hydrate post-cancel state (stage updates, success
+  // hydration, error UI). Reset on each fresh handleOpenKmz entry.
+  // The mutation itself isn't aborted (no AbortController on the
+  // network paths yet); the guard ensures cancelled flows produce no
+  // user-visible side effects even if the mutation eventually
+  // resolves or rejects.
+  const createCancelledRef = useRef(false)
   const handleCreateStageChange = useCallback((s: CreateStage) => {
+    if (createCancelledRef.current) return
     createStageRef.current = s
     setCreateStage({ kind: s })
   }, [])
@@ -729,6 +739,11 @@ export function App(): JSX.Element {
     setOpening(true)
     setOpenError(null)
     setUpsellDetail(null)
+    // Fresh attempt — clear any cancelled latch from a prior run and
+    // reset the stage pointer so the catch handler can identify the
+    // failed stage cleanly.
+    createCancelledRef.current = false
+    createStageRef.current = null
     try {
       const result = await openKmz()
       if (!result) return // user cancelled the native dialog
@@ -760,6 +775,9 @@ export function App(): JSX.Element {
           name: projectName,
         })
       } catch (err) {
+        // User clicked Cancel mid-flight — drop the error silently;
+        // the modal is already hidden and the user has moved on.
+        if (createCancelledRef.current) return
         // 402 PAYMENT_REQUIRED → upsell, leave canvas unchanged + close
         // the staged modal cleanly (no error overlay).
         if (
@@ -782,6 +800,16 @@ export function App(): JSX.Element {
         return
       }
 
+      // User cancelled while the mutation was in flight but it
+      // completed successfully anyway. Drop the result on the floor —
+      // do NOT hydrate canvas state, do NOT open a tab, do NOT show
+      // the "done" modal. Note: this leaves an orphan project on the
+      // server; mvp_api's auto-cleanup only fires on Lambda FAILURE,
+      // not on user cancel. Pre-launch this is acceptable (Arun
+      // pre-approved DB wipes); a future row could add an explicit
+      // DELETE on cancel-after-success.
+      if (createCancelledRef.current) return
+
       // Success. Hydrate canvas state from the wire payload, register
       // the tab, and let the modal auto-dismiss after its 300ms pause.
       setCurrentProject(returned.project)
@@ -799,7 +827,10 @@ export function App(): JSX.Element {
       setCreateStage({ kind: "done" })
     } catch (err) {
       // Outer catch covers file-pick / read-file failures (rare) — the
-      // mutation's own errors are caught above.
+      // mutation's own errors are caught above. If the user cancelled
+      // mid-flight, swallow the error: the modal is already hidden and
+      // we don't want to surface a stale failure overlay.
+      if (createCancelledRef.current) return
       const detail = err instanceof Error ? err.message : String(err)
       console.error("KMZ load failed:", err)
       setOpenError(detail)
@@ -820,6 +851,25 @@ export function App(): JSX.Element {
     createProjectMutation,
     tabsOpenTab,
   ])
+
+  // CreateProjectModal handlers — wrapped in useCallback so their
+  // identities are stable across App re-renders. The modal's
+  // auto-dismiss useEffect has `onAutoDismiss` in its dep array;
+  // unstable identities (inline lambdas) caused the 300ms timer to
+  // be cleared and re-armed on every parent render — combined with
+  // the post-success invalidateQueries refetches, the modal would
+  // hang in the "done" state indefinitely.
+  const handleCreateModalCancel = useCallback(() => {
+    createCancelledRef.current = true
+    setCreateStage({ kind: "idle" })
+  }, [])
+  const handleCreateModalTryAgain = useCallback(() => {
+    setCreateStage({ kind: "idle" })
+    void handleOpenKmz()
+  }, [handleOpenKmz])
+  const handleCreateModalAutoDismiss = useCallback(() => {
+    setCreateStage({ kind: "idle" })
+  }, [])
 
   // ── P2 / S3 — open-existing-project flow ────────────────────────────────
   // The core open-by-ID flow is shared between two entry points:
@@ -1460,12 +1510,9 @@ export function App(): JSX.Element {
             )}
             <CreateProjectModal
               stage={createStage}
-              onCancel={() => setCreateStage({ kind: "idle" })}
-              onTryAgain={() => {
-                setCreateStage({ kind: "idle" })
-                void handleOpenKmz()
-              }}
-              onAutoDismiss={() => setCreateStage({ kind: "idle" })}
+              onCancel={handleCreateModalCancel}
+              onTryAgain={handleCreateModalTryAgain}
+              onAutoDismiss={handleCreateModalAutoDismiss}
             />
 
             {/* P4 — top-right pill mirrors auto-save status. */}

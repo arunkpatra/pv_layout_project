@@ -96,6 +96,50 @@ describe("<CreateProjectModal>", () => {
     expect(onAutoDismiss).toHaveBeenCalledOnce()
   })
 
+  // Regression for C4 critical bug: parent re-renders during the 300ms
+  // window must NOT reset the auto-dismiss timer. The auto-dismiss
+  // useEffect lists `onAutoDismiss` in its deps; if the parent passes a
+  // fresh function identity per render (inline lambda), the timer is
+  // cleared and re-armed every render — combined with post-success
+  // invalidateQueries refetches, the modal hangs in "done" state.
+  // Stable identity (useCallback) is the fix; this test asserts the
+  // contract from the modal side.
+  test("auto-dismiss timer survives parent re-renders with stable handler", () => {
+    const onAutoDismiss = vi.fn()
+    const { rerender } = render(
+      <CreateProjectModal
+        stage={{ kind: "done" }}
+        onCancel={noop}
+        onTryAgain={noop}
+        onAutoDismiss={onAutoDismiss}
+      />
+    )
+    // Three re-renders inside the 300ms window — same stable handler
+    // identity, so the effect's dep array is unchanged and the timer
+    // is NOT cleared.
+    vi.advanceTimersByTime(100)
+    rerender(
+      <CreateProjectModal
+        stage={{ kind: "done" }}
+        onCancel={noop}
+        onTryAgain={noop}
+        onAutoDismiss={onAutoDismiss}
+      />
+    )
+    vi.advanceTimersByTime(100)
+    rerender(
+      <CreateProjectModal
+        stage={{ kind: "done" }}
+        onCancel={noop}
+        onTryAgain={noop}
+        onAutoDismiss={onAutoDismiss}
+      />
+    )
+    expect(onAutoDismiss).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(100)
+    expect(onAutoDismiss).toHaveBeenCalledOnce()
+  })
+
   test("Cancel button calls onCancel", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onCancel = vi.fn()
