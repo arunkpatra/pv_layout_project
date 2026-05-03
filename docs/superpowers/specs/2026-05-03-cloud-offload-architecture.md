@@ -1,7 +1,7 @@
 # Cloud-Offload Compute Architecture — Master Spec
 
 **Status:** Locked (2026-05-03). Living document — updated per row close. See §15 changelog for amendments.
-**Version:** v1.6 (2026-05-03 — C3.5 adopts journium-bip-pipeline pattern; drop Dockerfile.local + docker-compose service)
+**Version:** v1.7 (2026-05-03 — burn-the-boats per row; drop USE_CLOUD_* dual-path scaffolding)
 **Owner:** Arun (engineering authority) + Prasanta (solar-domain authority).
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
@@ -219,19 +219,19 @@ pv_layout_project/
 
 ## 8. Migration Sequencing
 
-**Sidecar coexists with Lambdas during the cutover** so we never have both desktops broken at once. Per route, the desktop has a feature flag (`USE_CLOUD_PARSE`, `USE_CLOUD_LAYOUT`, etc.) that toggles between sidecar and cloud paths. We flip flags one at a time after each Lambda lands and is verified.
+**Burn-the-boats per row.** Each cloud path replaces its sidecar predecessor at row merge — no dual-path code, no rollback flag. Each row's PR is the cutover for that surface. Pre-launch reality (co-founder dogfood only; no external customers) makes this acceptable: the brief windows when Tauri is partially functional (e.g., new-project on cloud but Generate Layout still on sidecar between C4 and C9) are tolerable for the small user base. Sidecar routes become orphan code from each row's merge but are not deleted incrementally; **sidecar deletion stays atomic at C19** to keep per-row scopes clean.
 
 Order:
 1. Doc cleanup (C1) — clear contradictions before writing new code.
 2. `pvlayout_core` extracted (C2) — domain code is now independently versionable.
-3. Lambda monorepo scaffolding + first Lambda (C3, C4) — `parse-kmz` cuts over via flag.
+3. Lambda monorepo scaffolding + first Lambda (C3, C4) — `parse-kmz` is the only path post-C4 merge.
 4. SQS + heavy Lambda (C5, C6, C7, C8) — `compute-layout` builds and tests in isolation, then wires.
-5. Desktop migration off sidecar (C9) — flag flip; sidecar still runs but is unused for layout.
+5. Desktop migration off sidecar (C9) — `mvp_api` Run.status polling becomes the only path; sidecar `/layout/jobs` orphans.
 6. Cancel + fail wiring (C10, C11, C12, C13).
 7. Visibility (C14, C15).
-8. Remaining workloads (C16, C17).
+8. Remaining workloads (C16, C17) — exports cut over to mvp_api download endpoints; sidecar `/export-*` orphans.
 9. Energy-yield wiring (C18) — brainstorm-first per row spec; cloud Lambda branch + Inspector tab.
-10. Sidecar deletion (C19) — when every flag is permanently flipped.
+10. Sidecar deletion (C19) — `python/pvlayout_engine/`, `packages/sidecar-client/`, Tauri sidecar shell removed atomically; the orphan routes that have accumulated since C4/C9/C17 disappear in one row.
 11. Mobile parity verification (C20) — no new code; confirm forms.
 12. Production cutover signoff (C21).
 
@@ -567,8 +567,9 @@ Tier:             T2 (build + integration test against real Lambda + mvp_api)
 Brainstorm-first: yes — first Lambda; pattern decisions (IAM, invoke timeout config, error response shape, exact wire contract vs sidecar) cascade to the 4 downstream Lambdas. Get them right once.
 
 Goal
-  Ship the first cloud Lambda. Replaces sidecar /parse-kmz behind a
-  feature flag. Sync HTTP-invoked from mvp_api. Validates the entire
+  Ship the first cloud Lambda. Replaces sidecar /parse-kmz as the
+  only desktop call site (burn-the-boats — no feature flag, no dual
+  path). Sync HTTP-invoked from mvp_api. Validates the entire
   monorepo Lambda mechanism on the simplest workload before scaling
   to compute-layout.
 
@@ -596,16 +597,20 @@ Acceptance
   - New mvp_api route POST /v2/projects/:id/parse-kmz invokes Lambda
     sync, returns parsed boundaries in V2 envelope.
   - Desktop's useCreateProject flow swaps from sidecar.parseKmz to
-    mvp_api parseKmzV2 behind feature flag USE_CLOUD_PARSE (default
-    off).
+    mvp_api parseKmzV2 — single path, no feature flag. The
+    open-project flow's redundant sidecar.parseKmz call (App.tsx
+    handleOpenProjectById) is also deleted; post-C4, every project
+    open reads boundaryGeojson from B12's response directly.
   - Integration test: real KMZ → mvp_api → Lambda → parsed JSON.
-  - Sidecar's /parse-kmz STAYS alive (deletion is C19).
+  - Sidecar's /parse-kmz route stays alive but orphan (no callers);
+    deletion is C19 along with the rest of the sidecar.
 
 Smoke trigger (Arun, per sec 11.2)
-  Local:    Tauri pointed at localhost:3003 mvp_api with
-            USE_CLOUD_PARSE=true; pick a real customer KMZ; observe
-            "Reading boundaries..." spinner; verify parsed boundaries
-            render on canvas matching legacy sidecar parse.
+  Local:    Tauri pointed at localhost:3003 mvp_api; pick a real
+            customer KMZ; observe staged-modal progression
+            (uploading → creating → reading boundaries); verify
+            parsed boundaries render on canvas matching legacy
+            sidecar parse.
   Staging:  AWS-only smoke against staging Lambda. Invoke
             solarlayout-parse-kmz-staging directly with a real KMZ
             payload via `aws lambda invoke --function-name
@@ -868,12 +873,13 @@ Out of scope
 Status:           todo
 Depends:          C8
 Tier:             T2 (live verification on staging fixtures)
-Brainstorm-first: yes — first user-facing cutover. Multiple state-shape decisions (LayoutJobState reduction, RunningPin redesign), polling cadence, feature-flag granularity, what to do on cloud-flag-off fallback. Read current useGenerateLayout end-to-end before deciding.
+Brainstorm-first: yes — first user-facing cutover. Multiple state-shape decisions (LayoutJobState reduction, RunningPin redesign), polling cadence, partial-progress display during long compute. Read current useGenerateLayout end-to-end before deciding.
 
 Goal
   Switch useGenerateLayout from sidecar /layout/jobs polling to
-  mvp_api Run.status polling. Behind feature flag USE_CLOUD_LAYOUT.
-  Remove per-plot progress UI from RunningPin (D11 implication).
+  mvp_api Run.status polling — single path, no feature flag (burn-
+  the-boats per spec §8). Remove per-plot progress UI from
+  RunningPin (D11 implication).
 
 Locked
   D1, D11
@@ -889,25 +895,30 @@ Open verifications
     concern at single-user volume).
 
 Acceptance
-  - useGenerateLayout: when USE_CLOUD_LAYOUT, skips sidecar entirely;
-    polls mvp_api getRunV2 every 2s until DONE/FAILED/CANCELLED.
+  - useGenerateLayout: skips sidecar entirely (no
+    sidecarClient.startLayoutJob/getLayoutJob/cancelLayoutJob calls
+    remain); polls mvp_api getRunV2 every 2s until
+    DONE/FAILED/CANCELLED.
   - LayoutJobState reduced to {status, elapsed_estimated_pct?}.
   - RunningPin renders simplified progress (single bar or spinner).
-  - All existing tests pass; new tests cover the cloud-flag branch.
+  - Existing sidecar-layout tests REPLACED with cloud Run.status
+    polling tests (no parallel test suites — single path).
   - Live: staging end-to-end verified.
 
 Smoke trigger (Arun, per sec 11.2) — first user-facing cutover smoke
-  Local:    Tauri with USE_CLOUD_LAYOUT=true, sidecar still running
-            but unused for layout; click Generate; verify spinner +
-            polling against mvp_api dev server; canvas renders
-            cloud-produced layout JSON; per-plot UI absent.
-  Prod:     PRODUCTION CUTOVER for layout — flip USE_CLOUD_LAYOUT in
-            a release build. Run the full Generate flow on
-            phaseboundary2 + complex-plant fixtures via Arun's prod
-            license against api.solarlayout.in; verify polling
-            cadence and canvas hydration match parity with sidecar-
-            rendered output (modulo engineVersion); capture wall-
-            clock vs sidecar baseline.
+  Local:    Tauri pointed at localhost:3003 mvp_api; click Generate;
+            verify spinner + polling against mvp_api dev server;
+            canvas renders cloud-produced layout JSON; per-plot UI
+            absent. Sidecar /layout/jobs route still exists but is
+            orphan (no caller).
+  Prod:     PRODUCTION CUTOVER for layout — release build merged
+            from this row makes the cloud path the only path.
+            Run the full Generate flow on phaseboundary2 +
+            complex-plant fixtures via Arun's prod license against
+            api.solarlayout.in; verify polling cadence and canvas
+            hydration match parity with sidecar-rendered output
+            (modulo engineVersion); capture wall-clock vs sidecar
+            baseline.
 ```
 
 ### Phase D — Cancel + Fail semantics
@@ -1277,7 +1288,8 @@ Brainstorm-first: yes — endpoint shape (presigned URL minted on each request v
 Goal
   mvp_api routes that mint presigned-GET URLs for the pre-rendered
   artifacts (D12). Desktop export buttons swap from sidecar
-  /export-* to mvp_api download endpoints behind feature flag.
+  /export-* to mvp_api download endpoints — single path, no
+  feature flag (burn-the-boats per spec §8).
 
 Locked
   D12
@@ -1293,23 +1305,26 @@ Acceptance
   - GET /v2/projects/:id/runs/:runId/exports/:type returns
     {downloadUrl, expiresAt, sha256?, size?} or 404.
   - Desktop export buttons (DXF/PDF/KMZ) call mvp_api endpoint
-    behind USE_CLOUD_EXPORTS flag.
+    directly (sidecar /export-* call sites deleted from desktop).
   - Browser/Tauri shell handles the actual download via the URL.
   - Tests cover happy path + missing artifact (404) + expired URL.
+  - Sidecar /export-* routes stay alive but orphan (no callers);
+    deletion is C19 along with the rest of the sidecar.
 
 Smoke trigger (Arun, per sec 11.2) — exports cutover smoke
-  Local:    Tauri with USE_CLOUD_EXPORTS=true; pick a DONE Run from
-            prod RDS (or seed dev RDS with a synthesized DONE Run
-            pointing at known prod S3 keys); click each of
+  Local:    Tauri pointed at localhost:3003 mvp_api; pick a DONE
+            Run from prod RDS (or seed dev RDS with a synthesized
+            DONE Run pointing at known prod S3 keys); click each of
             DXF/PDF/KMZ download; verify file lands on disk; open
             each (AutoCAD/Acrobat/Earth) and confirm contents match
             legacy sidecar export.
-  Prod:     PRODUCTION CUTOVER for exports — flip USE_CLOUD_EXPORTS
-            in a release build. Pick a Run on a customer-realistic
-            plant from prod RDS via Arun's prod license; download
-            all three formats; spot-check each. Especially: PDF
-            includes correct project metadata, DXF layers correct,
-            KMZ opens in Google Earth.
+  Prod:     PRODUCTION CUTOVER for exports — release build merged
+            from this row makes the cloud path the only path.
+            Pick a Run on a customer-realistic plant from prod RDS
+            via Arun's prod license; download all three formats;
+            spot-check each. Especially: PDF includes correct
+            project metadata, DXF layers correct, KMZ opens in
+            Google Earth.
 ```
 
 #### C18 — Energy-yield wiring (cloud Lambda branch + Inspector tab)
@@ -1396,9 +1411,10 @@ Smoke trigger (Arun + Prasanta, per sec 11.2) — new gated feature
             S3 (solarlayout-staging-projects); wall-clock acceptable
             (<2min total). (Tauri-triggered Pro-Plus end-to-end at
             Prod.)
-  Prod:     PRODUCTION CUTOVER for energy — flip the energy
-            feature flag in a release build; Arun runs Generate-
-            with-energy on a real Pro Plus license against
+  Prod:     PRODUCTION CUTOVER for energy — release build merged
+            from this row makes the energy path live (no feature
+            flag per §8 burn-the-boats); Arun runs Generate-with-
+            energy on a real Pro Plus license against
             api.solarlayout.in; numbers verified.
 
 Out of scope
@@ -1414,22 +1430,25 @@ Out of scope
 
 ```
 Status:           todo
-Depends:          C4, C9, C16, C17, C18 (every flag must be permanently flipped)
+Depends:          C4, C9, C16, C17, C18 (every cloud path replaces its sidecar predecessor; orphan sidecar routes accumulate from each row's merge)
 Tier:             T3 (decision memo + multi-file deletion)
-Brainstorm-first: yes — irreversibility risk management. Brainstorm forces inventory of stragglers (any USE_CLOUD_* flag still off? any sidecar import in test fixtures? any CI gate still pointing at pvlayout_engine/?) before deletion is committed. The brainstorm output IS most of the decision memo.
+Brainstorm-first: yes — irreversibility risk management. Brainstorm forces inventory of stragglers (any sidecar import in test fixtures? any CI gate still pointing at pvlayout_engine/? any orphan route still being called accidentally?) before deletion is committed. The brainstorm output IS most of the decision memo.
 
 Goal
   Delete python/pvlayout_engine/, packages/sidecar-client/,
   apps/desktop/src-tauri/src/sidecar.rs (the process management),
-  Tauri sidecar config, the USE_CLOUD_* feature flags, and every
-  remaining sidecar reference. The end-state code reflects D2.
+  Tauri sidecar config, and every remaining sidecar reference. The
+  end-state code reflects D2. By this row, all desktop call sites
+  already route exclusively to cloud paths (per §8 burn-the-boats);
+  this row deletes the orphan sidecar surface.
 
 Locked
   D2
 
 Open verifications
-  - Verify every USE_CLOUD_* feature flag has been on (true) in
-    production for at least 1 release cycle without rollback.
+  - Verify every cloud path (parse-kmz, compute-layout, exports,
+    detect-water, energy) has been live in production for at least
+    1 release cycle without rollback.
   - Inventory every remaining import of @solarlayout/sidecar-client
     or sidecar functions; expect zero in production code paths.
   - Confirm Tauri build still works without the sidecar bundling.
@@ -1442,7 +1461,8 @@ Acceptance
   - packages/sidecar-client/ deleted.
   - Tauri Rust sidecar process management removed.
   - tauri.conf.json sidecar entries removed.
-  - All feature flags removed; cloud paths are the only paths.
+  - Cloud paths remain the only paths (already true since C4/C9/C17;
+    this row just removes the dormant sidecar surface).
   - CI gates updated; pre-commit gate from CLAUDE.md §8 still green.
   - Decision memo at docs/initiatives/findings/YYYY-MM-DD-NNN-
     sidecar-deletion.md documenting the switchover dates and
@@ -2114,6 +2134,8 @@ This section tracks amendments to the spec after the initial 2026-05-03 lockin. 
 | **v1.5** | 2026-05-03 | Header version line; §9 row C3.5 Acceptance + Smoke trigger Local; this changelog. | C3.5 brainstorming session surfaced over-engineering in C3.5's Acceptance: the "Integration test" bullet mandated a `bun test` of the lambda-invoker.ts TS contract (mock-fetch verifying URL construction + env-switch read + NotImplementedError throw). For a 30-line transport shim whose cloud branches are stubs replaced wholesale at C4 (invoke ← AWS SDK) and C7 (enqueue ← SQS publish), an automated test buys little signal beyond what the row's manual Smoke trigger already validates end-to-end (curl + temp REPL/endpoint), AND the test would churn twice within weeks. Acceptance bullet replaced with a pointer to the Smoke trigger; Smoke trigger Local extended to explicitly cover the NotImplementedError-on-cloud-path exercise. **No D-id changed.** |
 
 | **v1.6** | 2026-05-03 | Header version line; §9 row C3.5 Open verifications + Acceptance + Smoke trigger Local; this changelog. | C3.5 brainstorming surfaced that C3.5's Acceptance had drifted from the proven journium pattern: requiring `Dockerfile.local` + a docker-compose service for the Lambda when journium-bip-pipeline (the production-tested SQS-shaped Python Lambda in journium) ships a single production-only Dockerfile and runs `server.py` natively on the host via `uv run python` for local dev. The litellm-proxy `Dockerfile.local` precedent that v1.3 cited is the bad example (per Arun); bip-pipeline's pattern is the validated one. AWS Lambda RIE was explored as a cleaner "single Dockerfile, no server.py" alternative but rejected: prefer proven-in-prod patterns over technically-nicer-but-untested alternatives. Acceptance updated to reflect: single Dockerfile (existing one); `server.py` runs natively via `uv run python -m <pkg>.server`; no Dockerfile.local; no docker-compose service for any Lambda; only Postgres stays in docker-compose. Future DB-using Lambdas (C6+) connect from natively-launched `server.py` to compose-Postgres via host-mapped port 5433. Open verifications updated accordingly (drop the docker-compose-Lambda-services bullet; replace MVP_DATABASE_URL bullet with native-process-to-compose-Postgres reachability). Smoke trigger Local replaces docker-compose-up with `uv run python -m smoketest_lambda.server`. Path nit fixed in the same edit: server.py lives at `python/lambdas/smoketest/smoketest_lambda/server.py` (sibling to handler.py, inside the package) so `uv run python -m smoketest_lambda.server` works. **D24 preserved** (it mandates server.py exists; it does NOT mandate Dockerfile.local or docker-compose); **no D-id changed.** |
+
+| **v1.7** | 2026-05-03 | Header version line; §8 Migration Sequencing (paragraph + order list rewrite); §9 row C4 Goal + Acceptance + Smoke trigger; §9 row C9 Brainstorm-first Reason + Goal + Acceptance + Smoke trigger; §9 row C17 Goal + Acceptance + Smoke trigger; §9 row C18 Smoke trigger Prod; §9 row C19 Depends + Brainstorm-first Reason + Goal + Open verifications + Acceptance; this changelog. | C4 brainstorming surfaced that the spec's `USE_CLOUD_PARSE` / `USE_CLOUD_LAYOUT` / `USE_CLOUD_EXPORTS` feature-flag scaffolding (which would let sidecar + cloud paths coexist during cutover) is over-engineered for our pre-launch reality (co-founder dogfood; no external customers). Arun's call: burn the boats — each cloud path replaces its sidecar predecessor at row merge; no dual-path code; no rollback flag; sidecar routes become orphan from each row's merge but are deleted atomically at C19 to keep per-row scopes clean. The brief windows of partial Tauri functionality between rows (e.g., new-project on cloud but Generate Layout still on sidecar between C4 and C9) are tolerable for the small co-founder user base. §8 paragraph + order list rewritten to reflect this. C4/C9/C17/C18 row text strips USE_CLOUD_* references from Goal/Acceptance/Smoke trigger; tests become single-path (REPLACED, not augmented with flag branches). C19 Depends/Goal/verifications/Acceptance rewrites to match (no flags to flip; cloud paths already the only paths since their respective rows). **No D-id changed**; this is a row-scaffolding posture change, not an architecture change. Patch version per §15 footer convention. |
 
 **Format for future amendments:** append a row above. Bump the patch version (v1.2, v1.3, …) for protocol / structural changes that don't touch a D-id; bump the minor version (v2.0) for any amendment that changes a locked decision. Mention every section touched. Keep the `Change` cell to one paragraph; link to a longer memo at `docs/initiatives/findings/` if more detail is needed.
 
