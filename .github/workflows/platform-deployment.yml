@@ -214,6 +214,9 @@ jobs:
     name: Build Lambda images
     needs: migrate
     if: inputs.environment == 'Production'
+    permissions:
+      id-token: write    # for OIDC (assumes solarlayout-github-actions role in build-lambdas.yml)
+      contents: read     # for actions/checkout@v4 in the called workflow
     uses: ./.github/workflows/build-lambdas.yml
     with:
       environment-tag: ${{ inputs.environment == 'Production' && 'prod' || 'staging' }}
