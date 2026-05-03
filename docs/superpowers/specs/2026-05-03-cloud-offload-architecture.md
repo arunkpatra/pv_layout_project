@@ -1,7 +1,7 @@
 # Cloud-Offload Compute Architecture — Master Spec
 
 **Status:** Locked (2026-05-03). Living document — updated per row close. See §15 changelog for amendments.
-**Version:** v1.5 (2026-05-03 — C3.5 Acceptance simplified; manual smoke replaces integration test)
+**Version:** v1.6 (2026-05-03 — C3.5 adopts journium-bip-pipeline pattern; drop Dockerfile.local + docker-compose service)
 **Owner:** Arun (engineering authority) + Prasanta (solar-domain authority).
 **Supersedes:** `docs/post-parity/PRD-cable-compute-strategy.md`, `docs/initiatives/2026-05-01-cable-compute-offload-feasibility.md`, the architectural framing of `docs/initiatives/findings/2026-05-02-002-refund-on-cancel-policy.md` §B.6, and the halted plan at `docs/superpowers/plans/2026-05-02-b32-failed-runs-path.md`. See §14 for the full disposition.
 **Cross-references:** `docs/initiatives/post-parity-v2-backend-plan.md`, `docs/PLAN.md`, `CLAUDE.md`.
@@ -433,32 +433,41 @@ Open verifications
     convention; note the rough edges (USE_LOCAL_ENV vs per-service
     USE_LOCAL_BILLING_SERVICE) and pick ONE consistent name for our
     arc — USE_LOCAL_ENVIRONMENT.
-  - Confirm the local docker-compose at repo root accommodates new
-    services per Lambda (smoketest-lambda first; pattern extends to
-    C4 onward).
   - Confirm @aws-sdk/client-lambda is NOT yet a mvp_api dep (will be
     added in C4 alongside parse-kmz; C3.5 ships the lambda-invoker
     interface + local-HTTP path; the AWS SDK paths are stubbed-but-
     typed (throw NotImplementedError) and filled in at C4 / C7).
-  - Verify MVP_DATABASE_URL reaches a docker-compose-launched Lambda
-    HTTP server (psycopg2-binary against the local Postgres
-    container).
+  - Confirm the local Postgres in docker-compose (host-mapped port
+    5433) is reachable from a natively-launched (non-containerized)
+    Python process. Pattern reference for C6+: compute-layout's
+    server.py will run natively via `uv run` and connect to the
+    compose-Postgres via the host-mapped port — no docker network
+    needed.
 
 Acceptance
-  - python/lambdas/README.md updated: server.py template documented
-    (stdlib http.server example, no Flask); port allocation table
-    (smoketest=4100, parse-kmz=4101, compute-layout=4102, detect-
-    water=4103, compute-energy=4104).
-  - python/lambdas/smoketest/server.py implemented (stdlib
-    BaseHTTPRequestHandler) on port 4100; routes:
+  - python/lambdas/README.md updated: server.py convention documented
+    (stdlib http.server, no Flask; sync-mode template inline; async-
+    mode 202+daemon-thread pattern referenced as "implemented at C6,
+    pattern source: journium-bip-pipeline/src/server.py +
+    orchestrator.py"); port allocation table (smoketest=4100, parse-
+    kmz=4101, compute-layout=4102, detect-water=4103, compute-
+    energy=4104); local-dev invocation documented as
+    `cd python/lambdas/<purpose> && uv run python -m <purpose>_lambda.server`
+    (matches journium-bip-pipeline `serve` target convention).
+  - python/lambdas/smoketest/smoketest_lambda/server.py implemented
+    (stdlib BaseHTTPRequestHandler) on port 4100; routes:
       GET /health  → {"ok": true}
       POST /invoke → calls handler.handler(body, None) and returns
                      its dict as JSON; 200 on success, 500 on
                      handler exception (response body carries
                      {"error": "<msg>"}).
-  - python/lambdas/smoketest/Dockerfile.local builds + runs
-    server.py on port 4100; image distinct from production
-    Dockerfile.
+    Sync-mode (smoketest is the simplest demonstrator; parse-kmz at
+    C4 reuses this exact shape since it's also sync per D7).
+  - smoketest's existing production Dockerfile is unchanged. NO
+    Dockerfile.local; NO docker-compose service for the Lambda.
+    Local dev runs server.py natively via `cd python/lambdas/smoketest
+    && uv run python -m smoketest_lambda.server` (journium-bip-
+    pipeline pattern).
   - apps/mvp_api/src/lib/lambda-invoker.ts shared util with two
     methods:
       invokeSync(purpose, payload)   → Promise<dict>
@@ -466,9 +475,10 @@ Acceptance
     Both branch on USE_LOCAL_ENVIRONMENT; local=fetch
     http://localhost:<port>; cloud paths throw NotImplementedError
     (filled at C4 / C7).
-  - docker-compose.yml at repo root extended with smoketest-lambda
-    service (Dockerfile.local, port 4100, depends_on: postgres,
-    env: MVP_DATABASE_URL pointed at the compose-network Postgres).
+  - docker-compose.yml at repo root UNCHANGED at C3.5. Only Postgres
+    lives there. Future DB-using Lambdas (compute-layout at C6+)
+    connect from natively-running server.py to compose-Postgres via
+    host-mapped port 5433.
   - apps/mvp_api/.env.example documents USE_LOCAL_ENVIRONMENT and
     LOCAL_<PURPOSE>_LAMBDA_URL pattern (default
     http://localhost:<port>).
@@ -484,13 +494,16 @@ Acceptance
     c3.5-local-dev-transport.md per the §13.1 protocol.
 
 Smoke trigger (Arun, per §11.2) — local-dev pattern verification
-  Local:    docker-compose up; verify smoketest-lambda service comes
-            up listening on 4100; curl POST localhost:4100/invoke
-            with a trivial JSON body; verify response shape matches
-            Lambda handler's output. Then via mvp_api dev server
-            with USE_LOCAL_ENVIRONMENT=true: trigger lambda-invoker
-            via a temp test endpoint or REPL; verify the response
-            shape arrives identical to the curl path. Then with
+  Local:    cd python/lambdas/smoketest && uv run python -m
+            smoketest_lambda.server (matches journium-bip-pipeline
+            pattern: server.py runs natively, no docker for the
+            Lambda; only Postgres in docker-compose); verify it
+            listens on 4100; curl POST localhost:4100/invoke with a
+            trivial JSON body; verify response shape matches Lambda
+            handler's output. Then via mvp_api dev server with
+            USE_LOCAL_ENVIRONMENT=true: trigger lambda-invoker via
+            a temp test endpoint or REPL; verify the response shape
+            arrives identical to the curl path. Then with
             USE_LOCAL_ENVIRONMENT unset, hit the same temp endpoint
             and confirm both invoke() and enqueue() throw
             NotImplementedError.
@@ -2069,6 +2082,8 @@ This section tracks amendments to the spec after the initial 2026-05-03 lockin. 
 | **v1.4** | 2026-05-03 | Header version line; §9 row C4 Acceptance (new bullet for smoketest cleanup made explicit); docs/superpowers/plans/2026-05-03-c3-lambda-monorepo-scaffolding.md (Task 7 + Task 10 IAM action lists corrected to 11 actions including `ecr:BatchGetImage` + `ecr:GetDownloadUrlForLayer`); this changelog. | C3 §11.5 post-row completion protocol surfaced two material drift items at row close: **(1) Plan-file IAM action list incomplete** — Task 10's policy doc listed 9 ECR actions but missed `ecr:BatchGetImage` (required for docker-push HEAD-manifest dedup check) + `ecr:GetDownloadUrlForLayer` (required for layer-availability checks during multi-step push). The first CI run on this branch failed with 403 Forbidden at the push step until the policy was extended. AWS-side state was corrected inline; AWS_RESOURCES.md was corrected via `fix(c3): add ecr:BatchGetImage…` commit. The plan file (a teaching reference future C-row sessions consult for similar IAM extension work in C5/C7/C16) is now updated in both occurrences (Task 7's AWS_RESOURCES.md template + Task 10's policy attach) so future readers see the corrected action set. **(2) C4 row text didn't explicitly name smoketest cleanup** — C3 ships `python/lambdas/smoketest/` + ECR repo `solarlayout/smoketest` as a throwaway demonstrator that C4 deletes. The cleanup contract was implicit in `python/lambdas/smoketest/README.md`'s deletion-pointer note + spec context, but C4's row text (which a brainstorm-first cold session reads first) didn't name the `aws ecr delete-repository` invocation or the directory `rm`. C4's Acceptance now carries an explicit bullet so the cleanup is in scope of C4's first commit and the build-lambdas matrix workflow naturally transitions to discovering parse-kmz instead. **No D-id changed.** |
 
 | **v1.5** | 2026-05-03 | Header version line; §9 row C3.5 Acceptance + Smoke trigger Local; this changelog. | C3.5 brainstorming session surfaced over-engineering in C3.5's Acceptance: the "Integration test" bullet mandated a `bun test` of the lambda-invoker.ts TS contract (mock-fetch verifying URL construction + env-switch read + NotImplementedError throw). For a 30-line transport shim whose cloud branches are stubs replaced wholesale at C4 (invoke ← AWS SDK) and C7 (enqueue ← SQS publish), an automated test buys little signal beyond what the row's manual Smoke trigger already validates end-to-end (curl + temp REPL/endpoint), AND the test would churn twice within weeks. Acceptance bullet replaced with a pointer to the Smoke trigger; Smoke trigger Local extended to explicitly cover the NotImplementedError-on-cloud-path exercise. **No D-id changed.** |
+
+| **v1.6** | 2026-05-03 | Header version line; §9 row C3.5 Open verifications + Acceptance + Smoke trigger Local; this changelog. | C3.5 brainstorming surfaced that C3.5's Acceptance had drifted from the proven journium pattern: requiring `Dockerfile.local` + a docker-compose service for the Lambda when journium-bip-pipeline (the production-tested SQS-shaped Python Lambda in journium) ships a single production-only Dockerfile and runs `server.py` natively on the host via `uv run python` for local dev. The litellm-proxy `Dockerfile.local` precedent that v1.3 cited is the bad example (per Arun); bip-pipeline's pattern is the validated one. AWS Lambda RIE was explored as a cleaner "single Dockerfile, no server.py" alternative but rejected: prefer proven-in-prod patterns over technically-nicer-but-untested alternatives. Acceptance updated to reflect: single Dockerfile (existing one); `server.py` runs natively via `uv run python -m <pkg>.server`; no Dockerfile.local; no docker-compose service for any Lambda; only Postgres stays in docker-compose. Future DB-using Lambdas (C6+) connect from natively-launched `server.py` to compose-Postgres via host-mapped port 5433. Open verifications updated accordingly (drop the docker-compose-Lambda-services bullet; replace MVP_DATABASE_URL bullet with native-process-to-compose-Postgres reachability). Smoke trigger Local replaces docker-compose-up with `uv run python -m smoketest_lambda.server`. Path nit fixed in the same edit: server.py lives at `python/lambdas/smoketest/smoketest_lambda/server.py` (sibling to handler.py, inside the package) so `uv run python -m smoketest_lambda.server` works. **D24 preserved** (it mandates server.py exists; it does NOT mandate Dockerfile.local or docker-compose); **no D-id changed.** |
 
 **Format for future amendments:** append a row above. Bump the patch version (v1.2, v1.3, …) for protocol / structural changes that don't touch a D-id; bump the minor version (v2.0) for any amendment that changes a locked decision. Mention every section touched. Keep the `Change` cell to one paragraph; link to a longer memo at `docs/initiatives/findings/` if more detail is needed.
 
